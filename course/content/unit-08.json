@@ -1,0 +1,1203 @@
+{
+  "unit": {
+    "id": "platform-systems",
+    "title": "Platform systems",
+    "summary": "Background execution, routing, Foundation correctness, persistence, web trust, device services, and extension boundaries grounded in the active client.",
+    "order": 8
+  },
+  "lessons": [
+    {
+      "id": "050",
+      "title": "Background execution, notifications, and APNs ownership",
+      "summary": "Choose a supported execution mechanism, complete bounded work once, and verify notification identity and delivery without scheduling promises.",
+      "duration": 150,
+      "level": "Deep dive",
+      "prerequisites": [
+        "008",
+        "015",
+        "018",
+        "020",
+        "025",
+        "026"
+      ],
+      "objectives": [
+        "Separate background execution opportunities from notification presentation and server delivery.",
+        "Design expiration, cancellation, completion, and account-generation policies.",
+        "Trace APNs registration, entitlements, payload types, and notification responses in the active checkout.",
+        "Specify device evidence without promising an exact wake-up or delivery time."
+      ],
+      "sections": [
+        {
+          "id": "execution-model",
+          "title": "Start with WorkManager, then remove the timing assumption",
+          "html": "<p>Imagine an Android feature that uploads a draft when its screen disappears and periodically refreshes a list with WorkManager. On iOS, leaving the foreground is a change in execution permission, not simply another coroutine scope. A normal Swift Task can remain allocated while the process is suspended; that does not mean it continues executing. The system can terminate a suspended process. Store enough durable state to resume a logical operation and make repeated processing safe. Do not keep its only identifier inside an escaping closure.</p><p>Foreground, inactive, background, suspended, and terminated describe different circumstances. Inactive can mean a temporary interruption while the app remains visible. Scene activation is separate from application execution: one window becoming inactive does not necessarily mean every window is inactive. Session 034 develops scene ownership; here, ask which application service owns work after its presenting scene disappears. A UI task should usually stop when its owner stops. An account upload may have a longer owner, but needs an approved background mechanism.</p><p>Android foreground services and WorkManager provide useful questions about user visibility, constraints, retries, and durable identifiers. They do not map directly to one iOS API. A background mode is not a general exemption from suspension. Apple defines specific allowed use cases, and scheduling is discretionary. Even a correctly submitted request may not run when your product would prefer. Design the UI to show last-known freshness and offer foreground recovery rather than declaring that content will refresh every fifteen minutes.</p>"
+        },
+        {
+          "id": "mechanisms",
+          "title": "Choose a mechanism by the operation's contract",
+          "html": "<p><code>UIApplication.beginBackgroundTask</code> asks for finite extra execution time to finish work already underway. Its returned identifier is a lease you must end, not an operating-system job ID that persists through relaunch. A failed request can return <code>.invalid</code>. Install an expiration handler, stop promptly when it runs, and end the lease when the operation finishes; do not wait for expiration to clean up successful work. No particular number of seconds is promised by this lesson.</p><p><code>BGAppRefreshTask</code> and <code>BGProcessingTask</code>, available from iOS 13, are different scheduled opportunities. Register supported identifiers early in application launch, declare permitted identifiers and relevant capabilities, then submit a matching request. <code>earliestBeginDate</code> is a lower-bound preference, not an appointment with the scheduler. Processing constraints such as network or external power influence eligibility, not a completion guarantee. Catch submission errors and maintain foreground fallback.</p><p>A background-configured <code>URLSession</code> is appropriate for supported upload and download transfers whose ownership moves beyond an ordinary in-process data request. Use stable session identifiers, file-backed uploads where required, delegate reconnection, and the system's completion handoff. A successful async <code>data(for:)</code> example from session 018 does not establish background-transfer support. File staging, retries, authentication, and server idempotency remain your responsibility.</p><p>Apple documents <code>BGContinuedProcessingTask</code> and its request from iOS/iPadOS 26 for work that starts in the foreground and continues with visible progress and user cancellation. The system can still terminate it under resource pressure. Compile against a supporting SDK and use <code>if #available(iOS 26.0, *)</code> with an honest older-OS path. Treat this as an adjacent option, not a replacement already used here. Searches of active Projects Swift sources found finite UIKit leases, but no direct BGTaskScheduler registration. The checked app manifest has an iOS 17 minimum; SDK documentation availability does not raise that deployment minimum or prove a newer path is enabled.</p>"
+        },
+        {
+          "id": "completion",
+          "title": "Make terminal transitions explicit",
+          "html": "<p>Expiration, success, ordinary failure, cancellation, logout, and process death are distinct outcomes. Expiration must cancel the underlying work, prevent future commits, and satisfy the framework's completion contract. Task cancellation is cooperative: a task that ignores it can still return a result. Check both cancellation and an ownership generation immediately before committing. For a background upload, a canceled local waiter cannot undo a server-side write; reconcile using the logical operation's idempotency contract.</p><p>This standalone Swift state machine models one terminal decision. It does not itself register a background task or stop networking:</p><pre><code class=\"language-swift\">enum WorkTerminal: Equatable, Sendable {\n    case success, failure, expired, canceled\n}\n@MainActor\nfinal class WorkFinishGate {\n    private var terminal: WorkTerminal?\n    private let report: (WorkTerminal) -&gt; Void\n\n    init(report: @escaping (WorkTerminal) -&gt; Void) {\n        self.report = report\n    }\n\n    func finish(_ outcome: WorkTerminal) {\n        guard terminal == nil else { return }\n        terminal = outcome\n        report(outcome)\n    }\n}</code></pre><p>The enum restricts the vocabulary. <code>@MainActor</code> serializes access to the optional state. <code>@escaping</code> means the supplied callback can survive initialization. <code>guard</code> returns on a second terminal attempt; assigning before calling <code>report</code> also prevents reentrant reporting. This protects completion count only if every caller enters that isolation domain. A Boolean shared across arbitrary delegate queues is not equivalent.</p><p>Adapt the winning outcome to the API in use: end a UIKit lease, or call a BGTask's <code>setTaskCompleted(success:)</code>, or supply the fetch result. These callbacks have different types and meanings. Ending a lease does not automatically cancel a Task. A production adapter retains its task handle, invalidates commit ownership, and invokes the appropriate terminal callback once.</p>"
+        },
+        {
+          "id": "apns-identity",
+          "title": "Trace APNs identity through signing and registration",
+          "html": "<p>APNs transports remote notifications. The app registers with UIApplication and receives a device token through a delegate callback. Notification presentation authorization is a separate request to <code>UNUserNotificationCenter</code>. A person can deny alerts while other registration or application state still exists; a server record containing a token does not prove permission to show a banner. Re-read settings when the app becomes active, because preferences can change outside your process.</p><p>A token is opaque binary data tied to an app/device/environment relationship, not a permanent user identifier. Register the current token with the appropriate server account, handle registration failure, and update bindings after account transitions. Do not assume token byte length or print the full token for diagnostics. The checkout forwards Data from AppDelegate and constructs a hexadecimal representation in Application. Inspect that actual path rather than copying an older description-based conversion as a general encoding recipe.</p><p>The APNs environment entitlement is signed into the application. Provider requests must use the matching APNs environment and topic, normally the app's bundle identifier. Source files named Prod or QA do not prove the final value: the inspected <code>ZocdocProd.entitlements</code> contains <code>aps-environment = development</code>. This is a source fact, not a diagnosis that production delivery is broken. Inspect the signed archive, provisioning/export path, server topic, and endpoint before making an operational claim.</p><p>Keep provider credentials on the service, never in the mobile bundle. APNs acceptance establishes that a request was accepted for processing; it is not proof that a person saw it. Invalid or obsolete tokens, wrong topic, mismatched environment, and transient provider failures need separate handling and synthetic diagnostics that exclude sensitive payloads.</p>"
+        },
+        {
+          "id": "notification-lifecycle",
+          "title": "Separate alert delivery, background updates, and user actions",
+          "html": "<p>An alert payload, a background update, and a local notification have different lifecycles. A background-only APNs payload uses <code>aps.content-available</code> and corresponding background push headers; Apple documents low-priority, discretionary delivery that may be delayed, throttled, or discarded. Do not use it as a precise alarm or a transaction acknowledgment. Reconcile authoritative state when the app next runs, including when the user force-quits and expected background work does not occur.</p><p><code>UNUserNotificationCenterDelegate.willPresent</code> decides presentation while the app is foregrounded. The notification-response callback handles a person's tap or category action. It is not called simply because a remote notification reached the device. Distinguish default open, dismiss, and custom action identifiers. Register categories before scheduling notifications that reference them, and keep payload parsing bounded. Unknown identifiers should produce a safe outcome, not an unconditional mutation.</p><p>The active Application sets foreground presentation to list and banner and routes medication reminder responses before its marketing path. That teaches a concrete privacy and ownership seam. Completion follows the local response handling; a route requiring authentication is handled separately. An action can be delivered after its original data has changed, so pass an occurrence identifier and validate current state rather than recomputing the target from the wall clock.</p><p>The Notifications extension subclasses Braze's service extension. A notification service extension can modify eligible remote alert content within a bounded lifetime; it is not a general application background worker. Its fallback and time-expiration behavior matter. A source subclass establishes integration, not proof that all provider payloads invoke it or that attachments always arrive.</p>"
+        },
+        {
+          "id": "policy",
+          "title": "Cancellation, protected data, and retries form one policy",
+          "html": "<p>Start with a written policy for each operation: durable input, owner, eligibility, bounded effort, success definition, retry classification, and recovery trigger. An offline read can wait for a later opportunity. A decoded but unauthorized response requires another decision. An expired execution opportunity should not become “empty successful data.” Capture enough non-sensitive metadata to distinguish these outcomes without logging reminder names, raw URLs, tokens, or account records.</p><p>Account invalidation must reach the final store owner. Capture an account epoch before suspension and compare it at commit, including an A-to-B-to-A transition. Session 020's request generation prevents stale memory-cache commits; a disk write on another queue needs an equivalent serialized validation. Canceling the foreground caller alone does not ensure that an SDK callback or background transfer cannot refill an old account's files.</p><p>Locked-device behavior also affects execution. A permitted background wake does not guarantee readable Keychain items or files. An unavailable protected item is not necessarily deleted or corrupt. Preserve its error, avoid replacing it with an empty store, and retry through a defined recovery path. Select protection classes from actual access requirements; do not weaken them merely because a callback sometimes arrives while locked.</p><p>Keep retries bounded and idempotent. The background scheduler is not your exact retry clock. A local notification's requested date is also not a medical or delivery guarantee. The learning exercises use synthetic refreshes and reminder-like identifiers only; specialist notification, clinical, security, and release review remains necessary for a real high-stakes feature.</p>"
+        },
+        {
+          "id": "evidence",
+          "title": "Read the checkout as evidence, then design the missing verification",
+          "html": "<p>Read AppDelegate's finite protected-data lease, Application's remote-notification handler, the dedicated medication response branch, and the source entitlements together. Record where each receives work, owns completion, and changes account state. A comment describing an exactly-once wrapper is useful intent; inspect its isolation and all fallback paths before asserting race freedom. Likewise, source-level capability declarations do not verify the installed archive.</p><p>Build a device matrix that separates foreground delivery, background delivery, cold launch from a tap, Settings changes, network failure, locked protected data, and a duplicate or late action. Observe terminal callback counts and durable state, rather than accepting a banner screenshot as evidence of correct processing. Verify scheduled notification contents with synthetic fixtures; never copy a real payload into course notes.</p><p>For a scheduler experiment, record OS, device, build, request submission, eventual invocation if observed, expiration, and resulting freshness. “Not invoked during this observation window” is valid evidence and must not be converted into a scheduling defect without more information. For APNs, add environment/topic evidence and provider outcome. Simulator tests of parsing and completion cannot validate signed-device delivery or actual energy budgets.</p><p>Your handoff should say which invariants were practiced and which operating-system paths remain unverified. This lesson provides execution and ownership reasoning; it does not claim a full BGTask migration, background URLSession implementation, or successful production push test.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "earliestBeginDate is tomorrow at 09:00. What can the product promise?",
+          "options": [
+            "The task runs exactly at 09:00.",
+            "It is a scheduling preference; refresh may occur later or not in the observed window.",
+            "It runs at 09:00 if a Swift actor owns it."
+          ],
+          "answer": 1,
+          "explanation": "Eligibility is discretionary. An actor controls local state access, not the operating system's scheduling policy. Show freshness and retain foreground recovery."
+        },
+        {
+          "question": "A source file named ZocdocProd.entitlements contains development. Which conclusion is supported?",
+          "options": [
+            "All installed production pushes are broken.",
+            "The server should send to both environments blindly.",
+            "The source requests development; verify the signed/exported artifact and provider configuration."
+          ],
+          "answer": 2,
+          "explanation": "File names are not signed evidence. Source, provisioning, export, installed identity, topic, and provider endpoint must be traced before diagnosing delivery."
+        },
+        {
+          "question": "The expiration handler cancels a task that later returns success. What still protects account data?",
+          "options": [
+            "A commit guard for cancellation and current ownership plus one terminal transition.",
+            "Returning an empty collection.",
+            "Increasing the scheduler priority."
+          ],
+          "answer": 0,
+          "explanation": "Cancellation is cooperative. The final serialized store commit must reject expired or superseded work, and framework completion must not run twice."
+        }
+      ],
+      "exercise": {
+        "brief": "Create a synthetic refresh lease adapter and a verification ledger. Simulate success, expiration, late success, and logout; do not register real pushes or mutate client configuration.",
+        "steps": [
+          "Use WorkFinishGate with a fake completion recorder and a retained Task handle.",
+          "Give the store an account epoch and an allowed-to-commit flag; serialize both validation and replacement.",
+          "Drive expiration before releasing a gated fake response, then release it anyway.",
+          "Repeat with normal success, ordinary failure, duplicate finish calls, and A-to-B-to-A account changes.",
+          "Write an APNs artifact checklist and mark physical-device delivery as pending."
+        ],
+        "acceptance": [
+          "Exactly one terminal completion is recorded per fake lease.",
+          "Expiration cancels work and prevents a later response from replacing the snapshot.",
+          "Changing account ownership blocks old writes even if the account text becomes A again.",
+          "The ledger distinguishes source entitlements from signed archive evidence.",
+          "No timing, APNs delivery, or background-transfer verification is claimed from the fake."
+        ],
+        "solution": "<p>A worked adapter has one owner for terminal state and one owner for durable commit. For the scratch experiment keep both on MainActor so no await separates the ownership check from the replacement. Use session 020's gated-fake pattern to control ordering. The following value is only a synthetic commit boundary, not a production database:</p><pre><code class=\"language-swift\">@MainActor\nfinal class RefreshCommit {\n    private var epoch = 0\n    private var accepting = true\n    private(set) var snapshot: [String] = []\n\n    func ticket() -&gt; Int { epoch }\n\n    func close() {\n        accepting = false\n        epoch += 1\n    }\n\n    func startNewOwner() {\n        epoch += 1\n        accepting = true\n        snapshot = []\n    }\n\n    func commit(_ values: [String], ticket: Int) -&gt; Bool {\n        guard accepting, ticket == epoch else { return false }\n        snapshot = values\n        return true\n    }\n}</code></pre><p>Capture <code>ticket()</code> before awaiting the fake remote. On expiration call <code>close()</code>, cancel the retained task, and finish the gate as expired. When the fake is released, check Task cancellation, then call commit with the original ticket; it must fail even if the fake ignored cancellation. Normal success commits first and reports success only after that succeeds. Ordinary failure preserves the previous snapshot and reports failure. A second terminal call has no effect.</p><p><code>private(set)</code> lets the harness inspect the snapshot but keeps mutation inside the owner. Incrementing epoch invalidates all prior tickets. Starting another owner increments it again, so textual account equality cannot restore validity. The methods are synchronous; a disk adapter would need to perform the same validation in its actual transaction owner, not validate here and later await an unguarded file write.</p><p>The worked ledger records the fake's completion sequence, snapshot before and after each case, and pending device rows. The APNs row requests the installed bundle ID, signed aps environment, compatible profile/export path, provider endpoint and topic, current token binding, payload push type, and observed response. A foreground banner screenshot answers only presentation. No exact scheduler cadence or clinical reminder reliability follows from this exercise.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Extending your app's background execution time",
+          "url": "https://developer.apple.com/documentation/uikit/extending-your-app-s-background-execution-time"
+        },
+        {
+          "label": "Apple: Background Tasks",
+          "url": "https://developer.apple.com/documentation/backgroundtasks"
+        },
+        {
+          "label": "Apple: Pushing background updates to your app",
+          "url": "https://developer.apple.com/documentation/usernotifications/pushing-background-updates-to-your-app"
+        },
+        {
+          "label": "Apple: Sending notification requests to APNs",
+          "url": "https://developer.apple.com/documentation/usernotifications/sending-notification-requests-to-apns"
+        },
+        {
+          "label": "Apple: Downloading files in the background",
+          "url": "https://developer.apple.com/documentation/foundation/downloading-files-in-the-background"
+        },
+        {
+          "label": "Apple: BGContinuedProcessingTask (iOS/iPadOS 26+)",
+          "url": "https://developer.apple.com/documentation/backgroundtasks/bgcontinuedprocessingtask"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Finite protected-data background lease",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/AppDelegate/AppDelegate.swift",
+          "line": 511,
+          "why": "The active app requests and ends a UIKit lease; inspect expiration and Task ownership rather than inferring scheduler registration."
+        },
+        {
+          "label": "APNs registration and fetch callbacks",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Application/Application+States.swift",
+          "line": 415,
+          "why": "The app handles background remote notifications and a completion wrapper; lifecycle support is directly visible."
+        },
+        {
+          "label": "Source APNs environment",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Resources/Entitlements/ZocdocProd.entitlements",
+          "line": 9,
+          "why": "The Prod-named source requests development. Signed/exported environment and service configuration require separate verification."
+        },
+        {
+          "label": "Dedicated local response ownership",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Application/Application+PushNotifications.swift",
+          "line": 26,
+          "why": "Medication responses short-circuit marketing handling and complete after dedicated local processing."
+        },
+        {
+          "label": "Notification service extension integration",
+          "path": "ios-client/Projects/Apps/Zocdoc/Extensions/Notifications/NotificationService.swift",
+          "line": 11,
+          "why": "The extension subclasses BrazeNotificationService; it is not a general background worker."
+        }
+      ],
+      "checklist": [
+        "I can choose execution mechanisms without promising wake-up times.",
+        "I can trace APNs identity to a signed artifact.",
+        "I can keep completion count, cancellation, and stale-commit protection distinct.",
+        "I can distinguish notification delivery, presentation, and response.",
+        "I can list the device evidence still required."
+      ]
+    },
+    {
+      "id": "051",
+      "title": "Universal links, routes, authentication gates, and App Clips",
+      "summary": "Treat external URLs as bounded input, verify domain association separately from routing, and preserve ownership through launch and login.",
+      "duration": 150,
+      "level": "Deep dive",
+      "prerequisites": [
+        "010",
+        "018",
+        "020",
+        "025",
+        "026",
+        "050"
+      ],
+      "objectives": [
+        "Distinguish custom schemes, universal-link association, routing, and authorization.",
+        "Parse URLs into bounded route values with explicit encoding and duplicate-query policy.",
+        "Retain pending route ownership through cold launch, login cancellation, and account changes.",
+        "Trace the checkout's App Clip invocation and separate local support from service and distribution verification."
+      ],
+      "sections": [
+        {
+          "id": "intent-analogy",
+          "title": "An incoming URL is a request to navigate",
+          "html": "<p>On Android, an Intent filter determines which activities can receive a link, while the activity still parses input and checks login. Keep that separation on iOS. A custom URL scheme such as <code>examplecourse://cards/alpha</code> advertises an application entry point but does not prove website ownership. Universal links use HTTPS and an association between a domain and an application. Neither mechanism authorizes access to the requested card. Server-side resource authorization remains mandatory.</p><p>Draw four boundaries: operating-system delivery, syntactic parsing, account/feature gating, and destination execution. A parser should produce a small route value or an explicit rejection. It should not present controllers, access Keychain, request permissions, or issue a booking. This lets parser fixtures stay deterministic and avoids side effects while inspecting a malformed link. A coordinator resolves the route only when its scene and account dependencies are ready.</p><p>The Android analogy breaks at callback and lifecycle details. Intent extras, Android verified App Links, iOS browsing activities, and custom scheme callbacks have different delivery and verification rules. Do not expect a single equivalent of <code>onNewIntent</code> to cover every cold and warm launch. A routing framework is useful only after you know which inputs it receives and when. Test the entry adapters and the pure parser separately.</p><p>Use synthetic identifiers in exercises. A route category can be diagnostic metadata; the raw URL may include credentials or private information. A familiar host is not permission to export its complete query string.</p>"
+        },
+        {
+          "id": "association",
+          "title": "Verify both sides of a universal link",
+          "html": "<p>The app requests the Associated Domains entitlement with a service entry such as <code>applinks:learn.example.com</code>. The website serves an <code>apple-app-site-association</code> JSON file without a filename extension, normally under <code>/.well-known/</code>, over HTTPS with a valid certificate and no redirect. The file declares application identifiers and matching rules. The identifier includes the application identifier prefix and bundle identifier; do not blindly substitute a team identifier without checking the actual prefix.</p><p>Path and query matching in the association file decide which web links are eligible for app handling. Ordered exclusions and specific rules matter. The app's parser must still reject unsupported or malformed input. Association is not a substitute for validation, and <code>webcredentials:</code> is a different associated-domain service from <code>applinks:</code>. Declaring one does not grant the other. App Clip association uses its own service entry and identifiers.</p><p>Apple uses an associated-domain CDN on supported OS versions. Source changes on your server need not immediately change the device's association state. Do not promise exact cache-refresh timing. Test with the intended build and installation state, inspect server responses, and record the actual device behavior. Typing a URL into a browser address bar or following a same-site link can behave differently from tapping a link in another app; user choice and browsing context also influence opening.</p><p>The checkout declares several concrete domains in Prod and QA source entitlements. That establishes requested support, not the currently deployed AASA contents, CDN response, signed entitlements, or every possible launch context. This lesson does not fetch company association files or validate their production ownership.</p>"
+        },
+        {
+          "id": "parser",
+          "title": "A small parser makes the input contract visible",
+          "html": "<p>This Foundation-only example accepts exactly one synthetic HTTPS path shape. It intentionally rejects every query and fragment so no duplicate or unknown field can acquire accidental meaning. A real route can add a query schema, but should define allowed keys, multiplicity, length, encoding, and missing-versus-empty semantics first.</p><pre><code class=\"language-swift\">import Foundation\n\nenum LessonRoute: Equatable, Sendable {\n    case card(String)\n}\nenum RouteError: Error { case unsupported }\n\nfunc parseLessonRoute(_ url: URL) throws -&gt; LessonRoute {\n    guard let parts = URLComponents(\n        url: url, resolvingAgainstBaseURL: false\n    ), parts.scheme?.lowercased() == \"https\",\n       parts.host?.lowercased() == \"learn.example.com\",\n       parts.user == nil, parts.password == nil,\n       parts.port == nil,\n       parts.query == nil, parts.fragment == nil else {\n        throw RouteError.unsupported\n    }\n    let segments = parts.percentEncodedPath.split(\n        separator: \"/\", omittingEmptySubsequences: false\n    )\n    guard segments.count == 3,\n          segments[0].isEmpty, segments[1] == \"cards\",\n          !segments[2].isEmpty else {\n        throw RouteError.unsupported\n    }\n    let id = String(segments[2])\n    let allowed = CharacterSet(\n        charactersIn: \"abcdefghijklmnopqrstuvwxyz0123456789-\"\n    )\n    guard id.utf8.count &lt;= 40,\n          id.unicodeScalars.allSatisfy({ allowed.contains($0) }) else {\n        throw RouteError.unsupported\n    }\n    return .card(id)\n}</code></pre><p><code>guard let</code> unwraps components and combines rejection conditions. Optional chaining accesses scheme or host only if present. The parser compares an exact normalized host, so <code>learn.example.com.evil.invalid</code> fails. Reading <code>percentEncodedPath</code> and allowing only literal ASCII avoids accepting encoded slashes or double-decoded identifiers. Empty subsequences remain visible, making double slashes and trailing slashes reject rather than silently normalize.</p><p><code>utf8.count</code> is a byte bound; <code>unicodeScalars</code> checks the allowlist. Here the accepted alphabet is ASCII, so that bound also has an uncomplicated character interpretation. The enum stores a validated ID. This parser is stricter than the real product parser and is not a proposed replacement for all existing links.</p>"
+        },
+        {
+          "id": "launch",
+          "title": "Cold launch and scene readiness need a pending route owner",
+          "html": "<p>A universal link arrives through an <code>NSUserActivity</code> representing browsing, with a possible <code>webpageURL</code>. Custom schemes arrive through URL-opening callbacks. With scenes, cold launch inputs can be in connection options, and warm inputs can arrive in scene callbacks. With an app delegate lifecycle, other callbacks apply. Check the target's actual lifecycle declarations instead of implementing every path and risking duplicate routing.</p><p>The active <code>AppLaunchRouter</code> forwards already-unwrapped delegate-shaped inputs to existing Application behavior. Its comments explicitly describe a seam for a future scene cutover. That is a verified adapter, not evidence that the main app has already completed the cutover. The App Clip, separately, has a SceneDelegate that handles both connection-option activities and later continuations. Keep these target facts distinct.</p><p>A coordinator may receive a route before the root UI exists. Retain a bounded pending destination, with an explicit policy for later arrivals: latest wins, queue with a cap, or reject while handling. Do not accumulate an unbounded list of external URLs. Clear a pending destination when consumed, canceled, expired by product policy, or invalidated by account ownership. Assigning a view controller after awaiting startup is a commit that still needs a scene identity check.</p><p>Choose which scene should receive the route on a multiple-window device. Reusing a global presenter without checking its scene can put login in the wrong window. Persist restoration state only when it is suitable for later replay; do not persist a one-time authorization code as ordinary navigation state.</p>"
+        },
+        {
+          "id": "authentication",
+          "title": "Login grants a session, not every resource",
+          "html": "<p>Suppose a synthetic card requires an account. Parse its route, check feature availability, and retain the validated value while presenting login. After login succeeds, resolve the current account and request the resource through the established service. Login cancellation is an expected outcome. It should clear or explicitly retain the pending route according to the product contract, without reporting a successful navigation or repeatedly prompting the person.</p><p>Account and route generations protect different ownership. If A begins login or data loading, then a later route arrives or the account changes, the old completion must not overwrite the new destination. An A-to-B-to-A transition needs an epoch rather than string equality alone. Validate that epoch after every relevant suspension. Service authorization can still reject the requested resource, even when local account identity matches expectations.</p><p>Links that embed an authentication callback require protocol-specific validation: exact redirect shape, state bound to the request, and PKCE where required. A normal route parser should not accept arbitrary “redirect” parameters and forward credentials to their targets. Keep callback handling inside the authentication owner. Do not equate Universal Link association with OAuth state validation or service authorization.</p><p>For destructive actions, navigation can show a review screen, but an incoming link must not silently perform the action under the current session. Replayed links, notification taps after logout, and stale widget URLs all reach the same trust boundary. Session 054 adds the browser and system authentication lifetime details.</p>"
+        },
+        {
+          "id": "app-clip",
+          "title": "App Clips are a separate invocation and product boundary",
+          "html": "<p>An App Clip is a separately built lightweight experience associated with a full app. Its invocation includes a URL that should identify a useful small task. Associated domains and configured App Clip experiences participate in discovery and invocation; merely declaring <code>appclips:</code> does not create a working distributed experience. Apple account configuration, signed artifacts, and supported invocation contexts require their own verification.</p><p>The inspected app manifest declares a ZocdocAppClip target with iOS 17 deployment, sources, resources, and its own entitlements. Its SceneDelegate extracts a webpage URL, parses an AppClipLink, chooses intake, practice, professional, or default UI, and retains navigation coordinators. This is concrete checkout support. It does not mean the full application's route parser, session, containers, or features are automatically available in the clip process.</p><p>For cold invocation, the clip drains connection-option user activities into the same continuation method. The retained coordinator is essential because otherwise a temporary coordinator can disappear before navigation completes. Inspect references and errors just as you would an Android dynamic experience. Swift's ARC terminology differs from tracing garbage collection: keeping a reference establishes ownership, not just a vague “prevent garbage collection” convention.</p><p>Limit dependencies to the clip's task and design a useful web or full-app fallback. App Clip size limits and eligible APIs vary with OS and distribution rules; check current official guidance for the exact release instead of embedding a universal numerical limit in this course. Installation, credential handoff, invocation validation, and special capabilities deserve a dedicated specialist lab.</p>"
+        },
+        {
+          "id": "route-evidence",
+          "title": "Use fixtures to separate parser correctness from association",
+          "html": "<p>A parser test can prove that a trusted synthetic host and valid ID produce a route. It cannot prove that iOS delivers the link. A simulator-opening command may inject a URL directly; that is useful adapter evidence but bypasses some association and installation behavior. A browser fallback test and a signed-device tap test answer different questions. Write which layer each observation covers.</p><p>Include fixtures for a deceptive suffix host, HTTP instead of HTTPS, embedded user/password, unexpected port, unknown query, duplicate query, encoded slash, empty ID, excessive length, trailing path, and mixed case where allowed. Add cold start, warm start, UI-not-ready, logged-out login, canceled login, foreign-resource rejection, second route during login, and account switch during loading. Assert destination count as well as destination content.</p><p>The checkout parser explicitly rejects unknown trailing medication-reminder segments. Application also validates accepted HTTP domains before parsing and carries separate external-fallback behavior. Trace both decisions; a parser accepting a URL does not mean Application will open it internally. Conversely, an external fallback may be intentional rather than a parse failure hidden from the person.</p><p>Your evidence ledger should name source anchors, fixture results, and pending AASA/device/distribution checks. No part of this synthetic exercise verifies live company links or claims that an App Clip invocation has been distributed successfully.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "AASA associates a trusted domain with the app. Does that authorize the card ID in a link?",
+          "options": [
+            "Yes, the OS has authenticated the card owner.",
+            "No; parsing, account gates, and service authorization remain necessary.",
+            "Only if the URL has no query."
+          ],
+          "answer": 1,
+          "explanation": "Association establishes a domain/app relationship and eligible link handling. It does not authorize user-supplied resource identifiers."
+        },
+        {
+          "question": "Why does the synthetic parser keep empty path components?",
+          "options": [
+            "To silently normalize double slashes.",
+            "To make malformed path shapes reject explicitly.",
+            "To support any number of trailing segments."
+          ],
+          "answer": 1,
+          "explanation": "Keeping empty subsequences makes a double slash or trailing slash visible. The route contract accepts exactly the intended path shape."
+        },
+        {
+          "question": "What does the AppLaunchRouter source prove?",
+          "options": [
+            "The main app's UIScene migration is complete.",
+            "All Branch and App Clip links use one parser.",
+            "An active delegate adapter forwards existing logic and provides a seam for future lifecycle work."
+          ],
+          "answer": 2,
+          "explanation": "Read its actual forwarding methods and comments. A planned scene seam is not a completed migration; the App Clip has its own scene implementation."
+        }
+      ],
+      "exercise": {
+        "brief": "Implement the synthetic parser and a pending-route gate in a scratch target. Produce separate fixture and association verification ledgers.",
+        "steps": [
+          "Run accepted and malformed URL fixtures without opening a network connection.",
+          "Represent pending routes as LessonRoute values rather than raw strings.",
+          "Give each accepted route and account ownership period a generation.",
+          "Pause fake login, deliver a second route, then complete the first login.",
+          "List the signed-domain, AASA, CDN, device-tap, and App Clip distribution checks still pending."
+        ],
+        "acceptance": [
+          "Only exact allowed hosts and bounded ASCII IDs parse.",
+          "Unknown or duplicate queries, encoded slashes, and trailing paths reject.",
+          "Only the current route/account generation may navigate after login.",
+          "Login cancellation does not navigate or restart a prompt loop.",
+          "Parser success is never reported as verified universal-link delivery."
+        ],
+        "solution": "<p>The worked approach keeps a small MainActor gate separate from the pure parser. A latest-wins route policy is deliberate. Every new route and account reset invalidates the old token, including when the new route value happens to equal the old one:</p><pre><code class=\"language-swift\">@MainActor\nfinal class PendingLessonRoute {\n    private var generation = 0\n    private var pending: LessonRoute?\n\n    func accept(_ route: LessonRoute) -&gt; Int {\n        generation += 1\n        pending = route\n        return generation\n    }\n\n    func invalidate() {\n        generation += 1\n        pending = nil\n    }\n\n    func consume(ticket: Int) -&gt; LessonRoute? {\n        guard ticket == generation, let route = pending else {\n            return nil\n        }\n        pending = nil\n        return route\n    }\n}</code></pre><p><code>accept</code> returns the ticket captured before login. <code>consume</code> both validates and clears synchronously; repeating it returns nil. Invalidate on account changes and cancellation, then check the scene still owns presentation before navigation. A production implementation also resolves current service authorization, handles feature flags, and defines user feedback when a route cannot be completed.</p><p>For a worked ordering, accept card alpha, pause login, accept card beta, then complete alpha's login. Consuming alpha's ticket returns nil. Complete the current login and consume beta's ticket once. Repeat with account invalidation and A-to-B-to-A; neither should recover alpha's original ticket. Avoid sleeps: explicitly gate fake completion and assert both the count and selected destination.</p><p>The parser ledger marks local fixtures as run only after the learner executes them. The association ledger requests the signed app identifier and associated-domains entries, website JSON and HTTPS response without redirects, eligible path rules, current installed build, actual cross-app tap behavior, browser fallback, and App Clip experience configuration. These are planned checks here, not evidence of live company infrastructure.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Supporting associated domains",
+          "url": "https://developer.apple.com/documentation/xcode/supporting-associated-domains"
+        },
+        {
+          "label": "Apple: Allowing apps and websites to link to your content",
+          "url": "https://developer.apple.com/documentation/xcode/allowing-apps-and-websites-to-link-to-your-content"
+        },
+        {
+          "label": "Apple: Responding to App Clip invocations",
+          "url": "https://developer.apple.com/documentation/appclip/responding-to-invocations"
+        },
+        {
+          "label": "Apple: Configuring the launch experience of your App Clip",
+          "url": "https://developer.apple.com/documentation/appclip/configuring-the-launch-experience-of-your-app-clip"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Delegate routing adapter and future scene seam",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/AppDelegate/AppLaunchRouter.swift",
+          "line": 13,
+          "why": "The active adapter forwards inputs; its comments explicitly distinguish existing routing from future scene integration."
+        },
+        {
+          "label": "Bounded medication route shape",
+          "path": "ios-client/Projects/Infra/ZDComponent/Sources/ZDDeepLinkParser/DeepLinkParser.swift",
+          "line": 95,
+          "why": "The parser consumes one known subpath and rejects remaining segments instead of routing all unknown paths to a list."
+        },
+        {
+          "label": "Application domain gate and fallback policy",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Application/Application+DeepLinks.swift",
+          "line": 75,
+          "why": "HTTP domain validation precedes parsing; later handling owns internal versus external navigation."
+        },
+        {
+          "label": "App Clip cold and warm invocation",
+          "path": "ios-client/Projects/Apps/ZocdocAppClip/SceneDelegate.swift",
+          "line": 27,
+          "why": "The clip parses browsing activity and retains coordinators; connection options feed this method at line 132."
+        },
+        {
+          "label": "Declared App Clip build target",
+          "path": "ios-client/Projects/Apps/Zocdoc/Project.swift",
+          "line": 16,
+          "why": "The manifest declares the clip's target, deployment, resources, dependencies, and separate entitlements."
+        }
+      ],
+      "checklist": [
+        "I can separate association, parsing, login, and authorization.",
+        "I can explain why encoded and duplicate parameters need explicit policy.",
+        "I can own a pending destination through cold launch and cancellation.",
+        "I can identify actual App Clip support and remaining distribution checks.",
+        "I can report fixture evidence without claiming verified OS delivery."
+      ]
+    },
+    {
+      "id": "052",
+      "title": "Foundation correctness: civil time, Unicode, locale, and files",
+      "summary": "Choose the right representation for instants, human text, numbers, and protected storage; test edge cases that ordinary English and UTC fixtures hide.",
+      "duration": 160,
+      "level": "Deep dive",
+      "prerequisites": [
+        "001",
+        "002",
+        "018",
+        "019",
+        "022",
+        "025",
+        "050"
+      ],
+      "objectives": [
+        "Separate Date instants, civil dates, floating times, calendars, zones, and monotonic durations.",
+        "Specify daylight-saving and locale policies with deterministic fixtures.",
+        "Handle Swift String and UTF-16 ranges without assuming byte or character equivalence.",
+        "Choose sandbox directories, error taxonomy, atomic replacement, backup, and file protection deliberately."
+      ],
+      "sections": [
+        {
+          "id": "representations",
+          "title": "Date is an instant, not an appointment label",
+          "html": "<p>Your Android experience with Instant, LocalDate, LocalTime, ZonedDateTime, and Duration is a strong starting point. Foundation's <code>Date</code> represents an instant on a timeline. It does not store a timezone, locale, or calendar. Two displays of the same Date can show different local days. A date of birth, such as a year-month-day chosen by a person, usually represents a civil date, not midnight in whichever timezone happens to format it.</p><p><code>DateComponents</code> stores selected calendar fields. <code>Calendar</code> interprets those fields and performs calendar arithmetic. <code>TimeZone</code> supplies civil-time offset rules, and <code>Locale</code> supplies conventions for presentation. These are separate inputs. A numeric offset such as minus five hours describes one offset; a region identifier such as America/New_York describes rules that can change with daylight saving and historical transitions. Storing only an offset loses those rules.</p><p>Ask what the product means before choosing fields. An appointment with a service-defined instant and venue zone is different from “daily at 09:00 wherever the person is.” A floating reminder may store hour and minute plus a travel policy. An annual civil birthday stores civil components. A stopwatch needs elapsed duration. Converting all four to Date simplifies a database column while moving ambiguity into every caller.</p><p>The checkout has a concrete example: MedicationRemindersCalendar explicitly uses the device system zone because Application's default zone override differs from the widget process and SwiftUI date picker. Do not assume Calendar.current has the same meaning across processes. Use an injected calendar and named policy.</p>"
+        },
+        {
+          "id": "dst",
+          "title": "Civil arithmetic needs a policy for gaps and repeated times",
+          "html": "<p>Adding 86,400 seconds advances an instant by a fixed duration. Advancing one civil day with Calendar preserves calendar meaning; the elapsed seconds can differ around daylight-saving transitions. A civil day can be shorter or longer than twenty-four hours. Midnight is not universally guaranteed to be the start of every day in every historical timezone. Use <code>startOfDay(for:)</code> when you need the calendar's day boundary.</p><p>Some local times do not occur during a spring-forward gap. Other local times occur twice during a fall-back transition. <code>Calendar.nextDate</code> offers matching and repeated-time policies; choose them from the business requirement. Strict matching can skip a non-existent candidate, while other policies adjust it. The word “daily” does not settle whether to skip, advance, or preserve smaller components. A medication workflow needs specialist policy; use ordinary synthetic reminders for this lab.</p><pre><code class=\"language-swift\">import Foundation\n\nfunc nextSyntheticNine(after instant: Date, zone: TimeZone) -&gt; Date? {\n    var calendar = Calendar(identifier: .gregorian)\n    calendar.timeZone = zone\n    return calendar.nextDate(\n        after: instant,\n        matching: DateComponents(hour: 9, minute: 0, second: 0),\n        matchingPolicy: .nextTime,\n        repeatedTimePolicy: .first,\n        direction: .forward\n    )\n}</code></pre><p><code>var</code> permits changing the calendar value; <code>let</code> would prevent assigning its timezone. Argument labels make the policy visible. The optional return requires handling a failure to find a result. This example chooses the first repeated match and next-time adjustment; it does not assert that those policies fit every reminder. Test a missing 02:30 and a repeated 01:30 separately, not only the uncomplicated 09:00 example.</p><p>Timezone databases and political rules can change. Persist the semantic inputs, and record the timezone/OS context of fixtures. A future scheduled civil time is not necessarily a permanently settled UTC instant.</p>"
+        },
+        {
+          "id": "clocks-format",
+          "title": "Parsing wire data and formatting people-facing text differ",
+          "html": "<p>Use wall-clock Date for persisted timestamps and service-defined instants. Use a monotonic clock such as ContinuousClock, introduced with modern Swift concurrency, for elapsed durations inside the process. Wall time can jump when system time changes; subtracting two Date values is therefore not a reliable timeout policy. Do not persist a process clock instant as if it were a portable service timestamp.</p><p>For a wire timestamp, define an exact format contract: offset or UTC marker, fractional seconds, allowed precision, and failure behavior. ISO8601DateFormatter or Date's ISO8601 format style can express supported representations, but one configuration does not accept every string that resembles ISO 8601. Test fractional and non-fractional fixtures and reject malformed values. A timestamp without an offset needs an explicitly named interpretation rather than a guess based on the device zone.</p><p>For localized display, prefer semantic format styles or localized templates. Literal <code>yyyy</code> is calendar year; <code>YYYY</code> is week-based year and can differ near a year boundary. Quoting a literal Z in a format does not convert an instant to UTC. The formatter's timezone must also be set. Locale, calendar, and zone belong in fixture setup, not in a presumed ambient global.</p><p>The active DateFormatter helper caches by format, zone, and locale and also contains a thread-dictionary legacy path. Read how callers configure these shared reference objects. Do not mutate a cached formatter's settings casually, and do not treat thread-local storage as task-local isolation: a Swift task can resume on a different thread.</p>"
+        },
+        {
+          "id": "numbers",
+          "title": "Locale changes conventions, not domain meaning",
+          "html": "<p>A decimal separator, grouping mark, currency symbol, and date order are locale-dependent. The string <code>1,234</code> can mean different values under different conventions. Choose whether user input follows the visible locale or an invariant machine grammar. A locale-aware NumberFormatter or parse strategy can help, but its leniency and full-input acceptance still require fixtures. Do not silently delete punctuation and guess the result.</p><p>Represent exact money according to the service contract, often integer minor units with a currency code or Decimal with a specified scale and rounding rule. Double is a binary floating-point value; many decimal fractions cannot be represented exactly. Decimal is not a substitute for deciding rounding, currency scale, overflow, and business rules. A formatter presents a value; it does not authorize a charge or establish the arithmetic contract.</p><p>Localized number styles can produce non-Latin digits and non-breaking separators. A user's locale can change while a feature remains active. Tests fixed to en_US make string equality deterministic, but they must be paired with product-policy tests for other locales. Keep transport encoding independent of display output: a localized formatted amount should not become the JSON number or query representation.</p><p>The same distinction appears in language. Translating a month label is not choosing the appointment zone. Choosing a timezone is not choosing a calendar. Session 022 covers translation resources and reading direction; this section adds correctness at the data boundary. A review should name all three inputs, including when they deliberately differ.</p>"
+        },
+        {
+          "id": "unicode",
+          "title": "String indices are positions in a collection, not integer offsets",
+          "html": "<p>Kotlin and Java commonly expose UTF-16 code units through String indexing. Swift String is a collection of Characters, where a Character is an extended grapheme cluster. An emoji with modifiers or a family sequence can contain several Unicode scalars and many UTF-8 bytes while appearing as one Character. A visually identical accented letter can have composed or decomposed scalar representation. Character count, scalar count, UTF-16 length, and byte size answer different questions.</p><pre><code class=\"language-swift\">let composed = \"é\"\nlet decomposed = \"e\\u{301}\"\nlet sameText = composed == decomposed\nlet characterCount = decomposed.count\nlet wireBytes = decomposed.utf8.count\n\nlet text = \"A👩🏽‍💻B\"\nlet range = text.range(of: \"B\")!\nlet foundationRange = NSRange(range, in: text)\nlet recovered = Range(foundationRange, in: text)</code></pre><p>The fixtures are known literals, which is why the found range is force-unwrapped here. Production lookup should handle nil. Swift string equality respects canonical equivalence; it does not promise identical wire bytes. <code>NSRange</code> at a Foundation text boundary generally measures UTF-16 offsets. Convert with the initializer that takes the actual String, and convert back with <code>Range(_:in:)</code>, whose optional result can reject an out-of-bounds range. Conversion alone does not ensure Character-aligned endpoints: an offset inside a grapheme cluster can still convert. A character-based editing policy must validate that separately.</p><p>For character-based selection, this Foundation helper checks both endpoints against the String's actual Character boundaries:</p><pre><code class=\"language-swift\">func isCharacterAligned(_ nsRange: NSRange, in text: String) -&gt; Bool {\n    guard let range = Range(nsRange, in: text) else { return false }\n    let boundaries = Set(text.indices).union([text.endIndex])\n    return boundaries.contains(range.lowerBound)\n        &amp;&amp; boundaries.contains(range.upperBound)\n}</code></pre><p>Including endIndex permits a selection ending at the end of the text. Building this Set scans the string; reuse a suitable boundary policy for repeated editing checks rather than assuming constant cost.</p><p>Do not manufacture a Swift String.Index from an integer byte offset or reuse indices after mutating the string. Repeatedly walking from startIndex can also create quadratic work; scan once or use an appropriate view. Bound both user-visible length and wire-byte size when the endpoint imposes both. Unicode normalization, case folding, confusable identifiers, and collation need a service-aligned security policy; lowercasing display names is not such a policy.</p>"
+        },
+        {
+          "id": "sandbox-files",
+          "title": "Directories express durability and user visibility",
+          "html": "<p>The iOS sandbox gives each application a container; it does not make every path appropriate for every file. Documents is for user-facing durable material according to the product's document behavior. Application Support is for app-managed durable support data. Caches is for recreatable content the system may remove. The temporary directory is for short-lived material. A caches write cannot be the only copy of an irreplaceable draft.</p><p>Obtain directories from FileManager and build paths with URL file APIs. <code>URL(fileURLWithPath:)</code> interprets a filesystem path; <code>URL(string:)</code> parses a URL string and is not a general substitute. Create required parent directories and handle errors. Treat a user-supplied filename as untrusted: reject path traversal and inappropriate separators or generate an internal opaque name. Sandboxing does not excuse overwriting another file inside your own container.</p><p>Atomic replacement helps avoid exposing a partially written file. It does not serialize a read-modify-write sequence across tasks or processes. Two writers can both load the same snapshot and atomically replace it, losing one update. Backups and protected-data availability are separate policies. Set them deliberately and verify the resulting resource attributes on supported devices.</p><p>For document-provider URLs outside your normal container, security-scoped access and coordinated file access may be necessary. Balance start/stop access and copy or bookmark only under a defined lifetime. This is an adjacent document-integration topic; a synthetic sandbox exercise does not establish provider interoperability.</p>"
+        },
+        {
+          "id": "protection-errors",
+          "title": "Preserve storage failures instead of guessing empty state",
+          "html": "<p>Distinguish absent file, unreadable protected file, malformed schema, insufficient storage, and failed replacement. The active generic File helper returns Bool or nil, collapsing several causes. That may fit a particular optional cache but is not a universal durable-store contract. The newer medication store separately throws corruptData and injects its clock. Read its behavior rather than assuming every file helper shares the same taxonomy.</p><p>Apple's <code>completeUnlessOpen</code> policy allows continued access through a file opened while unlocked; an existing closed protected file cannot simply be reopened after lock. It is not equivalent to after-first-unlock availability. A background callback waking while locked must still handle failed access. The medication source comments describe background intentions, but only actual handle ownership and device observation establish whether that path can read.</p><p>The store writes atomically and then applies protection and backup exclusion. A review should examine creation/replacement attributes and failure between these steps, rather than declare all writes transactionally protected because each API appears in the file. No vulnerability or runtime result is asserted here. Select a storage adapter whose failure semantics fit the data's sensitivity and durability.</p><p>Keychain remains the appropriate separate facility for small credentials under a chosen access policy. File protection is not application-level authorization, and an App Group expands the set of entitled processes that can access a shared container. Account epochs and scoped cleanup remain necessary even when every byte is encrypted at rest.</p>"
+        },
+        {
+          "id": "fixtures",
+          "title": "Build a correctness matrix with named policies",
+          "html": "<p>Use fixtures that isolate meaning: an appointment instant shown in two zones, a civil birthday unaffected by travel, a DST-short day, a repeated local hour, a device-zone reminder, composed/decomposed text, an emoji selection range, and decimal input under two locales. Assert components or values first, then localized presentation separately. Exact English output can change with OS locale data even when the underlying instant remains correct.</p><p>The checkout's reminder calendar addresses a real cross-process zone discrepancy, so compare app and widget policy explicitly. The date formatter's template cache listens for locale changes; that is useful source evidence, not proof that every cached formatter or visible label updates correctly. Include a runtime locale or zone change in an eventual device test.</p><p>For files, use a unique synthetic temporary directory and test missing versus corrupt content, failed save, and atomic visibility. Locked protection and backup behavior require an iOS device and actual container attributes. Avoid deleting production stores as a troubleshooting exercise. Record which cases you executed and which remain planned.</p><p>These exercises cover everyday Foundation correctness. Full internationalization, calendar-domain policy, Unicode security, coordinated document editing, and unsafe byte manipulation remain specialist work; they are not completed by recognizing the relevant API names.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A product means the next civil day in New York. Is adding 86,400 seconds always equivalent?",
+          "options": [
+            "Yes, all civil days have equal duration.",
+            "No; calendar arithmetic and elapsed duration differ around offset transitions.",
+            "Only if the display language is English."
+          ],
+          "answer": 1,
+          "explanation": "A timezone transition can change the elapsed duration between the same civil time on adjacent days. Locale does not determine timezone arithmetic."
+        },
+        {
+          "question": "A UIKit text API supplies an NSRange. How should it become a Swift range?",
+          "options": [
+            "Treat location as a Character index.",
+            "Convert using Range(nsRange, in: theActualString) and handle nil.",
+            "Use the same range after arbitrary mutations."
+          ],
+          "answer": 1,
+          "explanation": "Foundation text ranges use UTF-16 conventions. Swift Characters can contain multiple code units, and conversion depends on the exact string."
+        },
+        {
+          "question": "Does an atomic JSON replacement protect against two independent read-modify-write writers?",
+          "options": [
+            "Yes, both updates are merged automatically.",
+            "Only if the file is in Application Support.",
+            "No; complete-file visibility and serialized logical mutation are different guarantees."
+          ],
+          "answer": 2,
+          "explanation": "Atomic replacement prevents a partial-file observation but can still let the last writer overwrite an intervening update. A serialized transaction or coordination protocol is needed."
+        }
+      ],
+      "exercise": {
+        "brief": "Build a Foundation fixture notebook for time, text, numbers, and files using synthetic data. Separate host-runnable assertions from pending iOS device checks.",
+        "steps": [
+          "Construct Gregorian New York noon on 9 March 2024 and advance one civil day; compare elapsed seconds.",
+          "Write policies for a missing 02:30 and repeated 01:30, then inspect nextDate results.",
+          "Compare composed/decomposed accent values and byte counts; round-trip an emoji-adjacent NSRange.",
+          "Parse a decimal under explicitly selected locales and keep transport encoding invariant.",
+          "Plan missing/corrupt/unavailable/write-failed file cases without touching client data."
+        ],
+        "acceptance": [
+          "The civil-day fixture reports 23 elapsed hours across the selected spring transition.",
+          "Civil dates and floating reminder times are not silently represented as device-midnight instants.",
+          "UTF-16 ranges convert through the exact string; out-of-bounds ranges reject, and character-based editing separately checks grapheme boundaries.",
+          "Locale formatting never defines currency arithmetic or wire encoding.",
+          "Protected-data, backup, and cross-process coordination remain explicitly unverified on a host."
+        ],
+        "solution": "<p>A worked time fixture chooses all interpretation inputs instead of using ambient defaults. This Foundation code throws when constructing a supposedly valid fixture fails, rather than quietly substituting the current Date:</p><pre><code class=\"language-swift\">enum FoundationFixtureError: Error { case invalidDate }\n\nfunc springDayFixture() throws -&gt; TimeInterval {\n    guard let zone = TimeZone(identifier: \"America/New_York\") else {\n        throw FoundationFixtureError.invalidDate\n    }\n    var calendar = Calendar(identifier: .gregorian)\n    calendar.timeZone = zone\n    guard let start = calendar.date(from: DateComponents(\n        year: 2024, month: 3, day: 9, hour: 12\n    )), let tomorrow = calendar.date(\n        byAdding: .day, value: 1, to: start\n    ) else {\n        throw FoundationFixtureError.invalidDate\n    }\n    let fields = calendar.dateComponents(\n        [.year, .month, .day, .hour], from: tomorrow\n    )\n    precondition(fields.day == 10 &amp;&amp; fields.hour == 12)\n    return tomorrow.timeIntervalSince(start)\n}</code></pre><p>The expected interval for this named transition is 82,800 seconds. The code first verifies civil meaning, then measures elapsed time. A fixed 86,400-second addition would answer a different question. For the gap/repeat fixtures, write the expected adjustment or skip policy before running Calendar; do not choose policy by accepting whichever result arrives.</p><p>The worked text row observes one Character for the decomposed accent and more UTF-8 bytes than its composed counterpart, while equality is true. The emoji-adjacent selection round-trips through NSRange because the conversion uses the exact text. An out-of-bounds range must reject. A partial grapheme range may convert, so use isCharacterAligned to reject it for character-based editing instead of assuming the conversion performs that validation. Do not log real user text to diagnose it.</p><p>The number row declares a visible locale and exact decimal or minor-unit contract. The file row treats missing content as empty only if that is the stated store contract, preserves corruption, and reports write failure without replacing it with success. Device rows request protection attributes, locked-open versus locked-reopen observations, and backup policy evidence. No file is created or learner exercise marked complete by this worked answer.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Calendar and matching policies",
+          "url": "https://developer.apple.com/documentation/foundation/calendar"
+        },
+        {
+          "label": "Apple: DateFormatter",
+          "url": "https://developer.apple.com/documentation/foundation/dateformatter"
+        },
+        {
+          "label": "Swift: Strings and characters",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/stringsandcharacters/"
+        },
+        {
+          "label": "Apple: FileManager",
+          "url": "https://developer.apple.com/documentation/foundation/filemanager"
+        },
+        {
+          "label": "Apple: completeUnlessOpen file protection",
+          "url": "https://developer.apple.com/documentation/foundation/fileprotectiontype/completeunlessopen"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Explicit device wall-clock calendar",
+          "path": "ios-client/Projects/Features/ZDMedicationReminders/Sources/ZDMedicationRemindersCore/MedicationRemindersCalendar.swift",
+          "line": 7,
+          "why": "Documents the app default-zone override versus widget/device-zone discrepancy and names the feature policy."
+        },
+        {
+          "label": "Date formatter configuration cache",
+          "path": "ios-client/Projects/Infra/ZDCalendar/Sources/ZDCalendar/Extensions/DateFormatter+Extensions.swift",
+          "line": 63,
+          "why": "The active helper keys formatters by format, zone, and locale; later code distinguishes templates and literal patterns."
+        },
+        {
+          "label": "Generic file write and error collapse",
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDCoreBase/Medical Bag (Utilities)/File.swift",
+          "line": 62,
+          "why": "Shows file URL construction, atomic/protection options, and Bool/nil error semantics that must match the storage contract."
+        },
+        {
+          "label": "Protected reminder-store write ordering",
+          "path": "ios-client/Projects/Features/ZDMedicationReminders/Sources/ZDMedicationRemindersCore/MedicationReminderStore.swift",
+          "line": 122,
+          "why": "Atomic write, protection attributes, and backup exclusion are separate steps; runtime locked access and writer coordination require further evidence."
+        }
+      ],
+      "checklist": [
+        "I can name the meaning of an instant, civil date, and floating time.",
+        "I can choose gap/repeat policies and test named DST fixtures.",
+        "I can separate locale display from exact number and wire contracts.",
+        "I can convert text ranges without assuming one byte or code unit per Character.",
+        "I can explain the limits of atomic writes and protected files."
+      ]
+    },
+    {
+      "id": "053",
+      "title": "Core Data, SwiftData, contexts, and migration boundaries",
+      "summary": "Keep live models within their owners, design durable account-scoped transactions, and verify schema upgrades without confusing cache recovery with data preservation.",
+      "duration": 160,
+      "level": "Deep dive",
+      "prerequisites": [
+        "016",
+        "019",
+        "020",
+        "025",
+        "052"
+      ],
+      "objectives": [
+        "Explain model, context, coordinator/container, store, object ID, and fault responsibilities.",
+        "Use context perform operations and return immutable snapshots across concurrency boundaries.",
+        "Distinguish save, merge, conflict, account invalidation, and migration policy.",
+        "Compare actual Core Data support with availability-qualified SwiftData alternatives and pending specialist sync work."
+      ],
+      "sections": [
+        {
+          "id": "object-graph",
+          "title": "Room is an analogy for persistence, not the whole model",
+          "html": "<p>On Android, a Room entity often becomes an ordinary data value after a DAO query. A Core Data managed object is different: it remains associated with a managed object context that owns change tracking, identity, relationships, and faulting. A property access can materialize persisted state. Passing that object to another task as if it were a Kotlin data class hides both ownership and possible I/O.</p><p>The managed object model describes entities, attributes, and relationships. A context is a working set and unit of change. A persistent store coordinator connects contexts to stores in a traditional stack. NSPersistentContainer packages common stack setup without changing those rules. A SQLite store is one backend; Core Data is an object-graph management framework, not just a lightweight SQL wrapper. Raw SQL against its private schema is not a supported general mutation strategy.</p><p>The active checkout uses a custom CoreDataStore with NSManagedObjectModel, NSPersistentStoreCoordinator, and a main-queue context. It does not construct NSPersistentContainer in that implementation. Teach the modern convenience container as an alternative, while tracing this stack as it exists. The bundle lookup for the compiled model also matters: a source model present in the repository is not sufficient if the owning target omits the compiled resource.</p><p>Choose the store by ownership and durability before comparing frameworks. A server cache that can be reconstructed, an unsent draft, a locally authored history, and a credential need different recovery promises. Sessions 019–020 introduced those distinctions; here they constrain transactions, schema upgrades, and account cleanup.</p>"
+        },
+        {
+          "id": "confinement",
+          "title": "A context owns its queue even inside an actor",
+          "html": "<p>Main-queue contexts are for main-queue use. Private-queue contexts own an internal queue accessed through <code>perform</code> or <code>performAndWait</code>. An unrelated Swift actor serializes its own state but does not transfer a private context to that actor's executor. A detached task is not a shortcut to “background Core Data.” Keep framework confinement and language isolation visible as two contracts.</p><p>Async context perform APIs are available on appropriately recent platforms, including iOS 15+. This example requires Core Data plus a scratch model with SyntheticCard, String id/title/accountID fields. It is not a standalone database just because the declarations compile:</p><pre><code class=\"language-swift\">import CoreData\nimport Foundation\n\nstruct PersistentCardSnapshot: Sendable, Equatable {\n    let id: String\n    let title: String\n}\nenum CardStoreReadError: Error { case malformed }\n\nfunc readSyntheticCards(\n    in context: NSManagedObjectContext,\n    accountID: String\n) async throws -&gt; [PersistentCardSnapshot] {\n    try await context.perform {\n        let request = NSFetchRequest&lt;NSManagedObject&gt;(\n            entityName: \"SyntheticCard\"\n        )\n        request.predicate = NSPredicate(\n            format: \"accountID == %@\", accountID\n        )\n        request.sortDescriptors = [\n            NSSortDescriptor(key: \"id\", ascending: true)\n        ]\n        request.fetchLimit = 100\n        return try context.fetch(request).map { object in\n            guard let id = object.value(forKey: \"id\") as? String,\n                  let title = object.value(forKey: \"title\") as? String else {\n                throw CardStoreReadError.malformed\n            }\n            return PersistentCardSnapshot(id: id, title: title)\n        }\n    }\n}</code></pre><p>The generic fetch request names the result type. The predicate substitutes a value instead of interpolating untrusted text into predicate syntax. Every fetch and managed-property read occurs in perform. Only Sendable snapshots leave the closure. KVC keys are dynamic model names, so misspellings can be runtime failures; a generated subclass can improve typing. The limit is a safety bound, not a complete pagination design.</p>"
+        },
+        {
+          "id": "identity-save",
+          "title": "Saving and merging do not happen by magic",
+          "html": "<p>Inserting or changing a managed object modifies its context first. A save validates and pushes changes toward its parent or persistent store. A child context save can update its parent without immediately making bytes durable; the parent may also need saving. Keep your success definition clear. Do not tell the UI that a draft is durable merely because its in-memory managed object has the new title.</p><p>Two contexts can have separate views of the same store state. A background save does not imply every already-loaded UI object instantly reflects it. Configure an appropriate merge path, such as container view-context merging where applicable, or handle save notifications and refresh policy deliberately. Choose a merge policy from the conflict semantics. Store-trump and object-trump strategies can discard different updates; neither is universally safe for user-authored fields.</p><p>Pass NSManagedObjectID when a destination context should refetch a reference to the same persisted object. An inserted object may initially have a temporary ID; obtain a permanent identity and ensure required saves are visible before another context resolves it. Even a permanent ID is not authorization or proof the object still exists. Use <code>existingObject(with:)</code> and handle deletion or unavailable-store failure.</p><p>Do not keep a live object after resetting its context or unloading its store and assume later access remains valid. For module contracts, snapshots and domain IDs usually make lifetime clearer than leaking object IDs or context instances into presentation. A URI representation of an object ID also remains store-specific, not a universal service identifier.</p>"
+        },
+        {
+          "id": "queries",
+          "title": "Faults, batches, and main-thread work have observable costs",
+          "html": "<p>A fault is an object representation whose persistent values can be materialized later. It can reduce initial loading, but accidental relationship traversal can create repeated fetches and visible latency. A loop rendering a hundred cards that each resolves a relationship may become a database version of N-plus-one requests. Read fault and prefetch behavior before “optimizing” with a blanket instruction to fetch every property.</p><p>Use bounded fetches, stable sorting, appropriate predicates and indexes, and relationship prefetching when measurements show the access pattern benefits. <code>fetchBatchSize</code> affects materialization behavior; it is not a user-visible page token. Offset pagination can drift under concurrent inserts. Choose stable cursor or snapshot semantics when product continuity requires them, and verify the supported store behavior.</p><p>Batch updates and deletes can bypass normal managed-object change tracking. Their results may need explicit reconciliation into contexts. A UI holding deleted objects can otherwise show stale state or fail on later access. Store-level efficiency is not permission to skip account predicates, validation, or merge handling. Model callbacks and ordinary object lifecycle work can differ from a batch operation.</p><p>The checkout's context is on the main queue. That proves its confinement choice, not that every workload is small enough for smooth rendering. A proposal to move imports should identify the existing call sites, prepare immutable DTOs outside the UI, perform context work on an appropriate queue, and measure on a representative device. This course performs no database benchmark or Instruments capture.</p>"
+        },
+        {
+          "id": "migration",
+          "title": "A schema version is a data compatibility promise",
+          "html": "<p>Core Data stores model metadata and checks compatibility when opening a store. Version the model and retain the source versions needed to read installed stores. Lightweight migration infers supported mappings, such as compatible additions or changes with appropriate defaults and renaming identifiers. It is not a promise that every attribute type, relationship, or semantic transformation can be inferred.</p><p>For changes needing explicit transformation, investigate mapping models, custom migration, or staged migration on supported OS versions. A field rename without its migration identity can become a delete-and-add from the framework's perspective. A non-optional field added to old records needs valid historical values. Even when migration opens successfully, assert record counts, relationships, uniqueness, and actual domain meaning; “no error” is weaker evidence than preservation.</p><p>The active CoreDataStore enables automatic migration and inferred mapping options. On one failure path, a caller-controlled serious-business flag permits removing the SQLite file and retrying. This is a directly observed recovery policy, not proof that the store contains only disposable data or that deletion is appropriate for a new feature. Inspect callers and classify data before adopting that pattern. Never exercise it against the user's real store.</p><p>A migration failure must not silently become a fresh empty collection when local data is irreplaceable. Keep repair, recoverable cache rebuild, user-visible error, and backup/restore separate. Release rollback must also consider whether an older binary can read the upgraded store; reinstalling older source code is not necessarily a data-compatible recovery.</p>"
+        },
+        {
+          "id": "swiftdata",
+          "title": "SwiftData simplifies declaration while retaining ownership",
+          "html": "<p>SwiftData is available from iOS 17 and uses declarations such as <code>@Model</code>, ModelContainer, and ModelContext. Model declarations are macros that generate persistence behavior; they are not Codable value structs. A container owns schema and storage configuration. A context tracks changes. SwiftUI's model-context environment provides a convenient UI owner, not a license to carry a model instance across unrelated tasks.</p><p><code>@ModelActor</code> can supply a model executor and context for serialized model access. Return immutable Sendable values across actor boundaries and resolve identifiers inside the destination owner. A model actor does not make every model magically Sendable. Creating a plain actor around a context without understanding its executor and initialization is not an equivalent isolation strategy.</p><p>Use explicit save and failure handling when the workflow needs a durable acknowledgment. Autosave behavior should not define the product's only durability promise. VersionedSchema and SchemaMigrationPlan make schema evolution explicit; lightweight and custom stages still need upgrade fixtures. Recent SDK examples can contain APIs unavailable at the repository's deployment floor, so verify each symbol rather than assuming all SwiftData features started in iOS 17.</p><p>No direct SwiftData import or ModelActor declaration was found in the inspected active Projects sources. The existing persistence path is Core Data, alongside other file-backed stores. SwiftData here is a taught alternative, not a completed repository migration. CloudKit-backed synchronization, multi-device conflicts, and framework coexistence deserve separate specialist exercises with real schema and device evidence.</p>"
+        },
+        {
+          "id": "accounts",
+          "title": "Account boundaries belong at transaction ownership",
+          "html": "<p>An account predicate protects queries only if every query and mutation applies it. Per-account stores can make cleanup more explicit, but introduce store-open, migration, and shared-public-cache decisions. A shared store needs scoped records and clear uniqueness keys. Choose one contract and test it. A globally cached managed object can still leak account A into B even if disk records are properly scoped.</p><p>Capture ownership before asynchronous remote work, then validate it where the transaction commits. If an actor checks an epoch and awaits context.perform, another account transition can occur before the queued closure writes. Put epoch validation in the same serialized command owner as the mutation, or define a transaction queue whose account-reset command orders before later commits. Do not claim an actor's earlier guard alone protects a different persistence queue.</p><p>On logout, stop or invalidate old work, clear presentation snapshots, clean the correct account's durable state, and invalidate shared widget/cache representations when required. A file purge, Core Data reset, and Keychain delete are separate operations with different failures. An unavailable store while locked is not the same as a missing account. Preserve enough state to recover without restoring old data under a new session.</p><p>Use distinct synthetic accounts and deliberately late operations in the lab. Include failed cleanup and A-to-B-to-A, not only the happy path. Account-scoped persistence is a correctness and privacy boundary, so acceptance must inspect data after ordering changes rather than merely checking that logout returned.</p>"
+        },
+        {
+          "id": "verification",
+          "title": "Test upgrades with real old stores and honest scope",
+          "html": "<p>An in-memory store can verify predicates, relationships, and many domain transformations quickly. It cannot establish SQLite migration compatibility, protected-file availability, or archive resource packaging. Create synthetic old-version SQLite fixtures in an isolated test location, upgrade through each supported source version, and check preservation. Retain the fixture's model version, schema assumptions, OS, and expected records.</p><p>For concurrency, assert that no managed object crosses a boundary, changes merge as intended, and stale account commands fail before mutation. Use controlled gates to queue logout before a pending commit. Concurrency debugging diagnostics can expose misuse, but a clean run does not mathematically prove every interleaving safe. A bounded ownership design plus adversarial ordering tests provides stronger evidence.</p><p>The existing Core Data stack and file stores make this a mixed persistence checkout. Do not migrate a file store into Core Data just to standardize API names. Write a decision note about query needs, durability, migration cost, data sensitivity, and extension consumers. The smallest reliable store can be appropriate when its writer and schema policies are explicit.</p><p>This lesson teaches context and migration fundamentals with a concrete review. Production store repair, CloudKit sync, advanced conflict resolution, and performance tuning of large histories remain specialist practice. No client schema, labels, database, or account data is changed.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "An actor holds a private-queue NSManagedObjectContext. Where must managed-object reads occur?",
+          "options": [
+            "Anywhere inside the actor because actors replace Core Data rules.",
+            "Inside the context's perform/performAndWait owner, even when called by an actor.",
+            "Only after marking the object unchecked Sendable."
+          ],
+          "answer": 1,
+          "explanation": "The context's queue and the Swift actor's executor are distinct contracts. Return snapshots or refetch IDs instead of moving live managed objects."
+        },
+        {
+          "question": "A child context save succeeds. What can still be necessary for durability?",
+          "options": [
+            "Saving its parent context through the intended store path.",
+            "Converting objects to String.",
+            "Nothing; all saves always flush every ancestor."
+          ],
+          "answer": 0,
+          "explanation": "A child save can push changes into its parent rather than directly to disk. The stack and success contract determine which saves are required."
+        },
+        {
+          "question": "Automatic migration is enabled. Does it prove a newly renamed field preserves meaning?",
+          "options": [
+            "Yes, any name change is inferred perfectly.",
+            "No; verify migration identity and old-store fixtures with data assertions.",
+            "Only if the database is in Documents."
+          ],
+          "answer": 1,
+          "explanation": "Inference supports particular transformations. A rename needs appropriate identity, and opening successfully is not proof that records and domain values survived."
+        }
+      ],
+      "exercise": {
+        "brief": "Design a synthetic account-scoped Core Data card cache with a UI snapshot boundary and an old-version upgrade fixture. Keep the real checkout read-only.",
+        "steps": [
+          "Describe the SyntheticCard model and mark which fields are cache versus irreplaceable data.",
+          "Use readSyntheticCards and return only immutable snapshots.",
+          "Specify background write, UI merge, permanent-ID, and deletion behavior.",
+          "Queue account invalidation before a delayed commit and demonstrate rejection.",
+          "Plan a rename/add-field migration fixture and inspect the active recovery branch."
+        ],
+        "acceptance": [
+          "All live managed-object access stays within the context owner.",
+          "Query and mutation account scope are explicit.",
+          "The final mutation validates ownership in its transaction domain.",
+          "Upgrade checks assert field values, relationships, and counts, not just successful open.",
+          "The submission labels SQLite/device upgrade checks pending until actually executed."
+        ],
+        "solution": "<p>The worked model has id, accountID, and title, with an account-plus-id identity contract. A worker prepares immutable response DTOs before entering a private context. Its transaction command carries the account epoch. The command owner serializes epoch reset and writes; it validates the epoch before fetching or replacing account records and before its final save without a suspension that admits an account reset. The UI reads snapshots on its own context and applies a defined merge policy.</p><p>The example query in the section demonstrates a typed snapshot boundary. For a generated subclass, replace KVC with typed properties while retaining the same perform ownership. A write failure must throw and leave the old snapshot visible as stale if that is the cache contract. Do not use a catch-all empty array to represent missing, corrupt, unauthorized, and unavailable data.</p><table><thead><tr><th>Fixture</th><th>Expected result</th></tr></thead><tbody><tr><td>A and B contain the same card ID</td><td>Each query and mutation remains account-scoped</td></tr><tr><td>Logout orders before delayed A write</td><td>A command rejects before any replacement</td></tr><tr><td>V1 title renamed to V2 displayTitle</td><td>Migration identity preserves the synthetic title</td></tr><tr><td>V2 adds required source field</td><td>Old rows receive a documented valid default or transformation</td></tr><tr><td>Migration fails for non-disposable data</td><td>Failure preserves repair evidence; no automatic deletion</td></tr></tbody></table><p>Build a real old-model SQLite fixture for the upgrade rows in a scratch test target. In-memory model tests alone do not cover metadata compatibility. For the checkout review, point to the automatic-mapping options and the conditional remove-and-retry branch, then ask which data and callers permit rebuilding. This answer is a design and worked fixture plan; it does not claim a migration was run or the repository's store contents were classified.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Using Core Data in the background",
+          "url": "https://developer.apple.com/documentation/coredata/using-core-data-in-the-background"
+        },
+        {
+          "label": "Apple: Migrating your data model automatically",
+          "url": "https://developer.apple.com/documentation/coredata/migrating-your-data-model-automatically"
+        },
+        {
+          "label": "Apple: NSManagedObjectContext",
+          "url": "https://developer.apple.com/documentation/coredata/nsmanagedobjectcontext"
+        },
+        {
+          "label": "Apple: ModelActor (iOS 17+)",
+          "url": "https://developer.apple.com/documentation/swiftdata/modelactor"
+        },
+        {
+          "label": "Apple: SchemaMigrationPlan",
+          "url": "https://developer.apple.com/documentation/swiftdata/schemamigrationplan"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Actual context and coordinator ownership",
+          "path": "ios-client/Projects/Infra/ZDData/Sources/ZDDataPersistentModels/DataStore/CoreDataStore.swift",
+          "line": 25,
+          "why": "The checked stack owns a main-queue context and coordinator rather than adopting NSPersistentContainer."
+        },
+        {
+          "label": "Conditional remove-and-retry recovery",
+          "path": "ios-client/Projects/Infra/ZDData/Sources/ZDDataPersistentModels/DataStore/CoreDataStore.swift",
+          "line": 60,
+          "why": "Opening failure can lead to SQLite removal under a caller-controlled flag; data classification is required before copying this recovery policy."
+        },
+        {
+          "label": "Migration and file protection options",
+          "path": "ios-client/Projects/Infra/ZDData/Sources/ZDDataPersistentModels/DataStore/CoreDataStore.swift",
+          "line": 105,
+          "why": "Automatic migration/inference and completeUnlessOpen are explicit checkout settings, not proof every upgrade or locked access succeeds."
+        },
+        {
+          "label": "Separate file-store error contract",
+          "path": "ios-client/Projects/Features/ZDMedicationReminders/Sources/ZDMedicationRemindersCore/MedicationReminderStore.swift",
+          "line": 80,
+          "why": "Missing file and corrupt data differ, illustrating that the checkout contains multiple persistence mechanisms with separate contracts."
+        }
+      ],
+      "checklist": [
+        "I can explain a managed object's context lifetime.",
+        "I can return snapshots and refetch stable references safely.",
+        "I can distinguish saving, merging, and durable acknowledgment.",
+        "I can design a migration fixture that proves data meaning survives.",
+        "I can reject old account commands at the actual transaction owner."
+      ]
+    },
+    {
+      "id": "054",
+      "title": "WebKit, system authentication, cookies, and bridge lifetimes",
+      "summary": "Define trust and ownership when native code loads web content, shares session state, receives JavaScript, or starts system web authentication.",
+      "duration": 160,
+      "level": "Deep dive",
+      "prerequisites": [
+        "005",
+        "010",
+        "015",
+        "018",
+        "025",
+        "051"
+      ],
+      "objectives": [
+        "Separate embedded web content, system browser/authentication, native networking, and cookie ownership.",
+        "Apply navigation and bridge allowlists at precise trust boundaries.",
+        "Retain authentication and bridge owners without cycles or stale callback commits.",
+        "Audit current WebKit integration and label modern authentication alternatives honestly."
+      ],
+      "sections": [
+        {
+          "id": "web-choices",
+          "title": "Start with Android WebView and Custom Tabs",
+          "html": "<p>An Android engineer knows that an embedded WebView, a Custom Tab, and an OkHttp client can have different cookie and lifecycle behavior. On iOS, WKWebView embeds web content under your application UI; SFSafariViewController offers a system-managed browsing presentation; ASWebAuthenticationSession is designed for web authentication. A URLSession is a native transport. These choices are related but not interchangeable. Choose the API from the user's task and the identity boundary.</p><p>WKWebView coordinates a content process with a native view. A page can navigate, submit forms, open new windows, execute scripts, and crash independently of your controller. A title or trusted starting URL does not make every later navigation trusted. Define whether the feature is displaying first-party content, browsing arbitrary content, or performing authentication before deciding which native privileges it can reach.</p><p>The checkout uses WKWebView in its web controller, configures cookies, and applies navigation policies. Searches of active Projects Swift sources did not find a direct ASWebAuthenticationSession call. That is not proof that a dependency never uses it internally. This lesson teaches the system authentication API as an alternative, not a completed replacement for existing login or web flows.</p><p>Keep analogies conceptual: iOS cookie stores, presentation anchors, callback delivery, and WebKit process lifetimes are their own APIs. A Compose wrapper around Android WebView does not tell you where a SwiftUI representable should retain a delegate or when an authentication owner should cancel.</p>"
+        },
+        {
+          "id": "navigation",
+          "title": "A URL policy is a boundary, not a substring search",
+          "html": "<p>A WKNavigationDelegate decides whether a navigation action or response should continue. Invoke a supplied decision handler exactly once on every path. An early return that omits it can leave navigation unresolved; calling it twice violates the callback contract. Decide how target frames, redirects, unsupported schemes, downloads, and external browsing fit the feature. A nil target frame can mean a new-window request and needs an explicit policy.</p><p>Use URLComponents and exact scheme/host/port checks when matching an origin. A hostname ending in a deceptive suffix is not your domain. A path containing “signin” does not necessarily identify the intended endpoint, and percent encoding can affect the interpretation. Navigation permission and credential permission should be separate functions: a page may be viewable while never being eligible for credentials or a JavaScript bridge.</p><pre><code class=\"language-swift\">import Foundation\n\nfunc isSyntheticTrustedOrigin(_ url: URL) -&gt; Bool {\n    guard let parts = URLComponents(\n        url: url, resolvingAgainstBaseURL: false\n    ) else { return false }\n    return parts.scheme?.lowercased() == \"https\"\n        &amp;&amp; parts.host?.lowercased() == \"learn.example.com\"\n        &amp;&amp; parts.user == nil\n        &amp;&amp; parts.password == nil\n        &amp;&amp; (parts.port == nil || parts.port == 443)\n}</code></pre><p>The Boolean expression joins independently named URL properties, not substrings of the complete URL. This Foundation helper only tests origin; it does not prove certificate trust, authorize a resource, or validate a route. TLS uses the system's normal trust evaluation. Never return an unconditional “accept” for an authentication challenge to get around a certificate failure.</p><p>The active controller has first-party/external flags and specific legacy path/scheme actions. Read them as observed product policy. They are not a reusable complete trust policy for arbitrary web browsing or every authentication flow.</p>"
+        },
+        {
+          "id": "cookies",
+          "title": "Cookie readiness and account ownership are asynchronous",
+          "html": "<p>WKWebsiteDataStore owns the WebKit data store, and its WKHTTPCookieStore provides cookie operations. URLSession cookie handling and HTTPCookieStorage are separate boundaries; do not assume writing one store instantly updates every other session. A persistent WebKit data store and a non-persistent store have different retention choices. Non-persistence limits the selected store's persistence; it does not authorize copying credentials into JavaScript.</p><p>Cookies have domain, path, secure, expiry, and other attributes that constrain use. Native header authentication is different from page cookie authentication. A header added to an initial URLRequest is not a guarantee that every later web navigation, subresource, or redirect carries it correctly. Conversely, a broadly scoped cookie can reach requests beyond the single initial page. Follow the service's intended session contract.</p><p>The active WebViewController sets cookies through completion callbacks and resolves them before loading its request. It also adds a bearer header only under current login, trusted-domain, and HTTPS checks. That is a concrete readiness and credential boundary. It does not prove arbitrary redirects preserve the same checks or that cookie teardown reaches every WebKit store.</p><p>Logout is a sequence across native session state, Keychain, HTTP cookies, WebKit website data, visible content, and pending work. The inspected account path deletes selected HTTPCookieStorage cookies; trace the selected WebKit store separately before promising full logout isolation. If cookie setup for A finishes after logout or after B logs in, an account epoch must prevent it from starting an A-authenticated page.</p>"
+        },
+        {
+          "id": "bridge",
+          "title": "JavaScript messages grant a narrow native capability",
+          "html": "<p>A script bridge turns web-controlled input into a native request. Expose a small named command set with bounded payloads, versioning when needed, main-frame/origin policy, and explicit success/failure behavior. Never provide generic native method names, arbitrary file access, or arbitrary authenticated URL loading. Even trusted-origin content can be compromised; minimize the available capability and keep service authorization independent.</p><p>This WebKit example requires a platform target. The user-content controller can retain the receiver, while the receiver weakly references the UI owner. It accepts one harmless synthetic command and no extra fields:</p><pre><code class=\"language-swift\">import WebKit\n\n@MainActor\nprotocol CourseWebOwner: AnyObject {\n    func closeRequested()\n}\n\n@MainActor\nfinal class CourseBridge: NSObject, WKScriptMessageHandler {\n    weak var owner: (any CourseWebOwner)?\n\n    func userContentController(\n        _ userContentController: WKUserContentController,\n        didReceive message: WKScriptMessage\n    ) {\n        let origin = message.frameInfo.securityOrigin\n        guard message.name == \"courseBridge\",\n              message.frameInfo.isMainFrame,\n              origin.protocol == \"https\",\n              origin.host.lowercased() == \"learn.example.com\",\n              origin.port == 0 || origin.port == 443,\n              let body = message.body as? [String: String],\n              body.count == 1,\n              body[\"command\"] == \"close\" else { return }\n        owner?.closeRequested()\n    }\n}</code></pre><p><code>AnyObject</code> restricts the owner protocol to reference types, enabling weak storage. <code>any</code> expresses a protocol existential. Optional chaining safely handles a disappeared owner. MainActor matches current WebKit's handler isolation. Install with the agreed name, and remove the handler at the feature's stopping event. A weak owner avoids one cycle but does not automatically unregister a stale bridge.</p><p>Content worlds can help separate script namespaces on supported APIs, but are not a service-authorization boundary. Handle page replacement and disabled features so an old document cannot continue issuing valid-looking commands.</p>"
+        },
+        {
+          "id": "js-lifetime",
+          "title": "Asynchronous script and navigation work needs document identity",
+          "html": "<p>Calling evaluateJavaScript interpolates code, not a typed Swift method invocation. Concatenating a user string into script source risks syntax errors and injection. Prefer APIs that pass arguments separately, such as callAsyncJavaScript on supported versions, and validate returned types. Strings, null-like values, arrays, and thrown script failures do not map automatically into your domain model. Keep size and shape limits at the conversion boundary.</p><p>Capture a document generation before asynchronous script evaluation. After it finishes, confirm the same document, scene, account, and feature still own the result. Navigating to a new page can leave an old completion pending. A controller remaining alive does not prove that completion belongs to the current document. Cancellation helps reduce work but may not retract a previously submitted JavaScript operation.</p><p>Retain required delegate/coordinator owners when bridging UIKit into SwiftUI, and explicitly stop loading and unregister messages during teardown. Be careful with closure captures: owner to web view to user-content controller to handler to owner can form a cycle. A weak forwarding owner plus removal breaks the obvious retention path; inspect other stored callbacks too. Weak capture solves retention, not authorization or stale commits.</p><p>Implement content-process termination and navigation failures with a bounded recovery policy. A page reload may be safe for a read-only page and unsafe for a submitted form whose server effect is uncertain. Do not treat every web error as permission to replay a side effect. Session 018's idempotency reasoning also applies here.</p>"
+        },
+        {
+          "id": "system-auth",
+          "title": "System authentication still needs a protocol owner",
+          "html": "<p>ASWebAuthenticationSession is available from iOS 12, while particular callback and presentation APIs have later availability. It presents a system-managed web authentication session and returns a callback URL or error. Current documentation includes newer callback matching APIs and marks an older scheme initializer deprecated. Choose an initializer supported by your deployment range and SDK rather than copying a current snippet into an iOS 17 target without checking symbols.</p><p>A coordinator retains the session and presentation-context provider, uses an anchor from the correct active scene, and handles the Boolean result of start. Failing to start is different from the person canceling. Provide a meaningful recovery state without a prompt loop. Cancel when the owning attempt ends, clear retained state on terminal completion, and reject callbacks from superseded attempts.</p><p>Validate OAuth or OpenID Connect protocol fields according to the actual flow: exact callback destination, state tied to the attempt, PKCE verifier/challenge where required, and nonce for the appropriate identity-token flow. Do not log callback URLs, authorization codes, tokens, or full identity claims. Browser isolation does not replace protocol validation or server authorization.</p><p>An ephemeral preference requests an appropriate private authentication session; it is not a guarantee that every identity provider forgets server-side login or that your existing WKWebView shares the same cookies. Credentials stay with the established networking/account owner after exchange. A successful browser callback alone should not install account data until that owner validates the current attempt.</p>"
+        },
+        {
+          "id": "audit-evidence",
+          "title": "Observe each trust and lifetime boundary separately",
+          "html": "<p>Inspect WebViewController's cookie completion chain, its trusted HTTPS header predicate, the navigation delegate's exactly-once decisions, and Application's native cookie cleanup together. Write what each establishes and what it leaves unanswered. Existing source path checks describe current flows; they do not prove a generic JavaScript-message bridge is implemented. The new bridge example is a teaching design, not an installed checkout feature.</p><p>Use synthetic fixtures for deceptive hosts, unknown schemes, malformed messages, wrong frame origins, additional fields, new-window actions, redirected navigation, and a document change before script completion. For identity, pause cookie setup, log out, then release it; no old page should load. Pause authentication, start another attempt, then return the first callback; it must not replace the new attempt's state.</p><p>A fake completion chain can verify ordering but cannot prove actual cookie propagation, browser sharing, identity-provider compatibility, TLS challenges, or content-process failure recovery. Those need platform targets and, where applicable, signed devices and a controlled test service. UI screenshots show visible states, not absence of stale credentials.</p><p>Keep residual specialist work explicit: enterprise SSO, passkeys, advanced browser policies, certificate operations, complex document downloads, and third-party authentication SDK internals need deeper review. No production credentials, login sessions, cookies, or website data are read or modified by this lesson.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Cookies were written to HTTPCookieStorage.shared. What does that prove about WKWebView?",
+          "options": [
+            "Every WebKit data store is already updated.",
+            "Nothing about a selected WKHTTPCookieStore without tracing its synchronization path.",
+            "All future redirects are authenticated."
+          ],
+          "answer": 1,
+          "explanation": "Native networking and WebKit have distinct stores and asynchronous operations. Verify the selected store and await readiness before loading."
+        },
+        {
+          "question": "A bridge uses a weak owner. Is the trust boundary complete?",
+          "options": [
+            "Yes, weak references validate website identity.",
+            "No; still validate origin/frame/message and unregister stale handlers.",
+            "Only if the handler name is secret."
+          ],
+          "answer": 1,
+          "explanation": "Weak ownership prevents a retention path. It does not authorize a message, constrain payloads, or stop an old document using an installed bridge."
+        },
+        {
+          "question": "A system authentication callback arrives after a second login attempt started. What should happen?",
+          "options": [
+            "Always install its token because the system returned it.",
+            "Validate attempt ownership and protocol fields before any credential commit.",
+            "Reload the current WKWebView to fix state."
+          ],
+          "answer": 1,
+          "explanation": "The callback can be valid for an obsolete attempt. Current generation, exact redirect, state, and the flow's protections must be checked before installing credentials."
+        }
+      ],
+      "exercise": {
+        "brief": "Build a synthetic web-boundary design with an origin predicate, narrow bridge contract, cookie-readiness gate, and authentication-attempt ledger. Do not open a real identity provider.",
+        "steps": [
+          "Run URL predicate fixtures for trusted HTTPS, deceptive host, HTTP, credentials, and unexpected port.",
+          "Specify which messages and frames CourseBridge accepts; test its validation through an extracted pure decision seam.",
+          "Gate fake cookie setup, invalidate account ownership, then release setup.",
+          "Define document and authentication generations and reject late callbacks.",
+          "Write pending WebKit/device/controlled-provider checks separately from fake results."
+        ],
+        "acceptance": [
+          "Origin matching uses parsed properties rather than URL substrings.",
+          "Unknown bridge fields, commands, or origins cannot invoke native actions.",
+          "Account invalidation blocks a late cookie setup from starting an old page.",
+          "Navigation decisions and authentication terminal reporting occur once.",
+          "No fake test is presented as live cookie sharing or production authentication verification."
+        ],
+        "solution": "<p>The worked policy allows only the synthetic HTTPS origin for credential eligibility and a single main-frame close command for the bridge. It distinguishes origin eligibility from route parsing and actual TLS trust. Give each document an incrementing generation, and remove the named handler when that document's native capability ends.</p><p>Use this MainActor value to model the readiness decision without a web view or real cookies:</p><pre><code class=\"language-swift\">@MainActor\nfinal class WebAttemptGate {\n    private var generation = 0\n\n    func begin() -&gt; Int {\n        generation += 1\n        return generation\n    }\n\n    func invalidate() { generation += 1 }\n\n    func isCurrent(_ ticket: Int) -&gt; Bool {\n        ticket == generation\n    }\n}</code></pre><p>Capture begin's ticket before cookie work. After awaiting the fake, check cancellation, account/document ownership, and isCurrent before starting a load. No await should separate the final decision from the load call on MainActor. Authentication has a separate attempt owner with terminal state; a valid redirect for attempt one must still fail ownership after attempt two begins.</p><p>The fixture matrix accepts a trusted origin and one close body, rejects deceptive host and extra fields, rejects a subframe, and ignores callbacks after invalidation. For retention review, draw owner to web view to configuration/content controller to handler, then identify the weak edge and explicit removal. Add page termination and teardown to the pending platform matrix.</p><p>The checkout review states that cookies are awaited before load and initial bearer attachment has login/domain/HTTPS predicates, while native logout deletes selected HTTP cookies. It asks for evidence covering the selected WebKit data store and redirects rather than claiming a leak. No SDK internals or identity-provider runtime flow were verified by this worked answer.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: WKNavigationDelegate",
+          "url": "https://developer.apple.com/documentation/webkit/wknavigationdelegate"
+        },
+        {
+          "label": "Apple: WKHTTPCookieStore",
+          "url": "https://developer.apple.com/documentation/webkit/wkhttpcookiestore"
+        },
+        {
+          "label": "Apple: WKScriptMessageHandler",
+          "url": "https://developer.apple.com/documentation/webkit/wkscriptmessagehandler"
+        },
+        {
+          "label": "Apple: ASWebAuthenticationSession",
+          "url": "https://developer.apple.com/documentation/authenticationservices/aswebauthenticationsession"
+        },
+        {
+          "label": "Apple: Authenticating a user through a web service",
+          "url": "https://developer.apple.com/documentation/authenticationservices/authenticating-a-user-through-a-web-service"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Cookie readiness and credential predicate",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Controllers/Web View/WebViewController.swift",
+          "line": 195,
+          "why": "Initial credential attachment is conditional; the subsequent cookie completion chain runs before the page loads."
+        },
+        {
+          "label": "Current navigation decisions",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Controllers/Web View/WebViewController+WebView.swift",
+          "line": 35,
+          "why": "The active delegate routes external links and legacy scheme/path actions before resolving the decision handler."
+        },
+        {
+          "label": "Native cookie cleanup at logout",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Application/Application+Account.swift",
+          "line": 73,
+          "why": "Selected HTTPCookieStorage cookies are deleted; full WebKit cleanup requires tracing the actual data store separately."
+        }
+      ],
+      "checklist": [
+        "I can choose browsing versus authentication APIs from the task.",
+        "I can specify cookie readiness and account invalidation.",
+        "I can explain message authorization separately from weak retention.",
+        "I can reject stale document and authentication callbacks.",
+        "I can identify platform and provider verification still pending."
+      ]
+    },
+    {
+      "id": "055",
+      "title": "Device capability, permission states, location, maps, photos, and camera",
+      "summary": "Model authorization, hardware, accuracy, and feature lifetime separately so device services degrade safely and late callbacks cannot revive stopped work.",
+      "duration": 160,
+      "level": "Deep dive",
+      "prerequisites": [
+        "008",
+        "011",
+        "015",
+        "022",
+        "025",
+        "050",
+        "052"
+      ],
+      "objectives": [
+        "Separate API availability, hardware capability, authorization, service state, and product eligibility.",
+        "Design explicit denied, restricted, limited, reduced-accuracy, unavailable, and canceled behavior.",
+        "Trace current location, MapKit, PhotosPicker, and camera implementations.",
+        "Own capture sessions and callback/continuation lifetimes with observable stop behavior."
+      ],
+      "sections": [
+        {
+          "id": "capability-model",
+          "title": "A permission Boolean cannot describe a device service",
+          "html": "<p>Android runtime permissions provide a useful analogy, but even there “granted” does not prove GPS has a fix or a camera exists. On iOS, separate at least five questions: is this API available on the current OS, does the hardware support the operation, is the app authorized, is the service currently usable, and is the feature enabled for this account? These questions can change independently. A compiled import and an Info.plist string answer only parts of them.</p><p>Frameworks use different authorization states. Camera has not-determined, authorized, denied, and restricted. Photos can grant limited library access. Location adds when-in-use versus always and an accuracy authorization dimension. Notifications have still other statuses and presentation settings. Do not build one global “PermissionStatus” enum that erases distinctions consumers need. Normalize only at a well-defined feature boundary.</p><p>Denied generally means the person declined access; repeated requests usually do not show the original prompt again. Restricted can represent parental or managed-device policy that the person cannot simply change in app Settings. Not-determined means a contextual request may be possible, not that it must occur during startup. Authorized means permitted scope, not successful operation. Unknown future states need a conservative, useful fallback.</p><p>Usage descriptions explain why the app requests access and are required for relevant protected APIs. A capability entitlement can grant a different kind of system access. Neither is the runtime decision. Session 026 covers signed artifacts; verify the descriptions and capabilities in the actual target, including extensions, rather than assuming the main app's plist covers every process.</p>"
+        },
+        {
+          "id": "location",
+          "title": "Location authorization, accuracy, and a fix are separate",
+          "html": "<p>CLLocationManager owns a delegate-driven service. Create and retain it under a clear owner with the required run-loop and isolation behavior. Request when-in-use authorization only when the person's task needs their location, and inspect current status first. Always authorization and background location are separate product and capability decisions, not upgrades you request merely to keep a search page alive.</p><p>On supported OS versions, full versus reduced accuracy is a separate authorization value. Accept an approximate location when it meets the search contract; temporary precision requests require a specific user benefit and appropriate purpose configuration. Do not interpret reduced accuracy as denial. A CLLocation also includes timestamp and accuracy metadata. A stale fix or invalid horizontal accuracy should not become “current precise location” just because a callback returned a coordinate.</p><p>Use one-shot requests when the task only needs one fix, and stop ongoing updates at the owner's stopping event. Handle service-disabled, denied, restricted, temporarily unavailable, and timeout/cancellation outcomes independently. A permitted request can still fail indoors or on a simulator with no location set. Offer manual location selection rather than routing every failure to Settings.</p><p>The active LocationPermissionService separates authorization prompting from GPS fetch, checks global services, and offers manual/Settings recovery. Its code notes that a fetch can fail despite permission. Read the continuations and foreground observer lifetime as well: a screen disappearing while waiting must have a defined stop outcome, and a checked continuation alone does not implement cancellation.</p>"
+        },
+        {
+          "id": "maps",
+          "title": "Displaying a map does not require the person's position",
+          "html": "<p>MapKit can display a known region and provider coordinates without asking for the person's location. Showing a current-location indicator or starting a location-dependent action needs the relevant authorization and service behavior. Keep those tasks separate so denying GPS does not disable browsing a map of a manually selected city. This parallels Android Maps SDK use, but MapKit annotation, region, and delegate APIs are different.</p><p>The checkout uses an MKMapView inside a MapViewController, maintains provider locations and search identities, and has dedicated map delegate code. A source map view proves an implemented rendering path, not successful geocoding, routing, or position tracking on every device. Region changes can trigger search; avoid feedback loops where applying results changes region and launches another identical request.</p><p>Coordinate order matters: latitude and longitude are distinct fields, measured in degrees. Validate finite values and allowed ranges before creating domain input. Zero-zero can be a legitimate coordinate, so it should not automatically mean “missing.” A map projection's screen distance is not simply degree subtraction. Use appropriate geospatial APIs and service contracts for distance, route duration, and region bounds.</p><p>Geocoding and directions are asynchronous services that can fail or be constrained. Cancel obsolete requests, guard their generation after waiting, and keep manual addresses usable. Opening Maps through a map item transfers a task to another app; it does not give your process indefinite navigation background execution. Full navigation, offline maps, advanced geospatial search, and location privacy need separate specialist practice.</p>"
+        },
+        {
+          "id": "photos",
+          "title": "Choose a picker before asking for broad library access",
+          "html": "<p>If the person selects a photo for a card upload, the system Photos picker often meets the task without broad PhotoKit library authorization. PHPickerViewController is available from iOS 14; SwiftUI PhotosPicker from iOS 16. The selected item represents access to a chosen asset through an asynchronous loading mechanism, not an immediate UIImage or an unrestricted filesystem path.</p><p>PhotoKit's read/write and add-only access scopes have different purposes. Limited access allows only selected assets and is useful authorization, not an error to “fix” by forcing full access. Asset visibility can change after the person edits their limited selection. A cached asset identifier may no longer resolve. Check status for the intended access level and provide a scoped recovery path instead of assuming one Boolean grants every operation.</p><p>A selected item may need an iCloud download, conversion, or decoding before usable data arrives. The person can cancel or choose a second item during that work. Retain the task handle, cancel obsolete work, and guard selection generation before replacing the preview. Keep large decode/downsampling work within a measured memory budget. Session 039 studies that performance work; merely requesting a JPEG does not guarantee bounded memory use.</p><p>The active card-capture view model stores a PhotosPickerItem. That establishes current picker integration, while broader library editing and asset management remain separate. Review export orientation, metadata retention, temporary-file deletion, upload authorization, and account ownership. A selected image can contain sensitive identity or location metadata; use synthetic images for this course.</p>"
+        },
+        {
+          "id": "camera",
+          "title": "Authorization is the beginning of capture ownership",
+          "html": "<p>AVCaptureSession connects inputs and outputs. A device input represents an available capture device; AVCapturePhotoOutput receives still-photo requests through delegate callbacks. Preview display and captured data are different consumers. Hardware can be absent, unavailable, interrupted by another activity, or unsuitable for the requested format even when permission is authorized.</p><p>Configure a session consistently with beginConfiguration and commitConfiguration, test whether each input/output can be added, and handle configuration failure. Starting and stopping can block, so do not put expensive session startup on the UI thread. Use a serialized session owner for configuration, start, stop, and interruption recovery; firing unrelated operations onto a global concurrent queue is not itself a serialization guarantee.</p><p>The checked CameraSessionManager is MainActor-facing, uses background global queues for start/stop, retains its photo delegate, and has a simulator placeholder path. Those are actual source choices. They do not prove every start/stop race is resolved or that simulator permission success validates hardware capture. A review should test serialized lifecycle ownership and interruption cases before endorsing a reusable camera architecture.</p><p>Rotation and mirroring affect both preview and output. Current AVFoundation offers availability-qualified rotation APIs such as videoRotationAngle; the source still uses an older videoOrientation path. Inspect supported OS and connection capabilities before updating it. Still capture fundamentals are covered here; real-time video, audio routing, synchronization, DSP, codecs, and telehealth performance remain specialist branches.</p>"
+        },
+        {
+          "id": "state-machine",
+          "title": "Write decisions as values before invoking system prompts",
+          "html": "<p>A small pure policy function lets tests distinguish “request authorization,” “offer manual input,” and “start capture.” It is not a universal permission service. This standalone Swift example intentionally models only a synthetic camera feature:</p><pre><code class=\"language-swift\">enum CameraGrant: Sendable {\n    case neverAsked, authorized, denied, restricted\n}\nenum CameraPlan: Equatable, Sendable {\n    case request\n    case capture\n    case manualNoDevice\n    case manualDenied\n    case manualRestricted\n}\n\nfunc cameraPlan(\n    grant: CameraGrant,\n    hasDevice: Bool\n) -&gt; CameraPlan {\n    guard hasDevice else { return .manualNoDevice }\n    switch grant {\n    case .neverAsked: return .request\n    case .authorized: return .capture\n    case .denied: return .manualDenied\n    case .restricted: return .manualRestricted\n    }\n}</code></pre><p>The enums make outcomes explicit. The first guard avoids prompting for unavailable hardware. The exhaustive switch ensures known states have defined behavior. An adapter maps AVAuthorizationStatus, including unknown future values conservatively, then a UI owner interprets the plan. Requesting access is an effect executed after the decision, not inside this pure function.</p><p>After the request returns, re-read current status and feature ownership. The user may have dismissed the screen or the account may have changed. A positive Boolean from the authorization callback must not automatically start a stopped flow. Keep an owner generation around that await. A one-shot capture callback also needs exactly-once delivery and a policy for late data.</p><p>For callbacks wrapped in continuations, serialize completion versus cancellation, resume once, and stop the underlying operation where supported. A checked continuation detects certain misuse; it does not invent cancellation or prevent an indefinitely retained observer. Do not use an unsynchronized Boolean as the entire race solution.</p>"
+        },
+        {
+          "id": "capability-evidence",
+          "title": "Define fallback behavior for every visible state",
+          "html": "<p>Translate framework outcomes into user tasks. Denied camera can offer Photos picker or manual entry; restricted camera should explain the available fallback without promising Settings can remove policy. Approximate location can show nearby results with a suitable radius. Unavailable GPS can preserve manually selected city. Limited photos should retain the selected assets that remain accessible. Each fallback must remain keyboard, Dynamic Type, and VoiceOver usable.</p><p>Re-query relevant state on returning from Settings, but do not assume a change occurred. Retain and remove foreground observers according to the flow's lifetime. The checkout's location service awaits foreground then fetches; a canceled owner, failed Settings opening, or another scene transition deserves an explicit verification case. Global application notifications can be insufficient to identify which scene owns the result.</p><p>A physical-device matrix includes first request, denial, restriction where available, Settings change, approximate location, disabled services, missing or interrupted hardware, picker cancellation, iCloud-loading failure, and rapid start-stop. Simulator fixtures are valuable for deterministic policy and UI checks. The source's placeholder image deliberately bypasses hardware, so record it as simulation rather than actual capture evidence.</p><p>Bluetooth, motion/sensors, HealthKit and regulatory policy, ML-based recognition, and other specialized device services are further study. This lesson provides transferable ownership questions but does not implement those services or certify clinical camera/location workflows. Use current official docs and target-specific evidence before expanding scope.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Location permission is granted, but a one-shot fix fails. What should the feature infer?",
+          "options": [
+            "Permission was definitely revoked.",
+            "Authorization and operation success differ; inspect service/fix failure and offer a useful fallback.",
+            "Open Settings indefinitely until a coordinate appears."
+          ],
+          "answer": 1,
+          "explanation": "A granted scope does not guarantee a usable fix. Disabled services, environment, stale data, and transient failures need their own handling."
+        },
+        {
+          "question": "A person selects a photo through PhotosPicker. Must the app request full PhotoKit access first?",
+          "options": [
+            "Yes, all pickers require unrestricted library access.",
+            "No; the system picker can supply selected content without broad library authorization.",
+            "Only if the image is in iCloud."
+          ],
+          "answer": 1,
+          "explanation": "Selection through the system picker is a scoped workflow. Loading can still fail or suspend, and its result needs selection/lifetime guards."
+        },
+        {
+          "question": "The simulator returns a placeholder and reports camera authorization success. What is verified?",
+          "options": [
+            "Physical camera rotation and interruption recovery.",
+            "The simulation path, not real-device permission or capture behavior.",
+            "All AVFoundation performance budgets."
+          ],
+          "answer": 1,
+          "explanation": "The checkout explicitly bypasses actual setup in the simulator. Hardware, prompts, session lifetimes, and output orientation require device evidence."
+        }
+      ],
+      "exercise": {
+        "brief": "Implement the camera decision function and a synthetic service-flow gate. Build a capability/fallback matrix for location, picker, and still capture without requesting real permissions.",
+        "steps": [
+          "Test every CameraGrant with present and absent hardware.",
+          "Gate fake authorization, stop the flow, then return granted.",
+          "Gate two fake photo selections and return the older item last.",
+          "Specify location denied/restricted/approximate/unavailable/manual states separately.",
+          "Inspect camera/session and location observer sources and list physical-device checks."
+        ],
+        "acceptance": [
+          "Missing hardware never triggers a permission request.",
+          "Denied and restricted states have distinct explanations and workable fallbacks.",
+          "Late authorization never starts a stopped camera flow.",
+          "Only the current photo selection replaces the preview.",
+          "Simulator placeholder behavior is reported separately from device capture and permission verification."
+        ],
+        "solution": "<p>The worked policy tests an eight-case matrix: four grant states multiplied by hardware present/absent. All absent-hardware cases return manualNoDevice. Present hardware chooses request, capture, manualDenied, or manualRestricted according to grant. An adapter maps system status into this camera-specific model without pretending it describes Photos or Location.</p><pre><code class=\"language-swift\">@MainActor\nfinal class DeviceFlowGate {\n    private var generation = 0\n    private var active = false\n\n    func start() -&gt; Int {\n        generation += 1\n        active = true\n        return generation\n    }\n\n    func stop() {\n        active = false\n        generation += 1\n    }\n\n    func accepts(_ ticket: Int) -&gt; Bool {\n        active &amp;&amp; ticket == generation\n    }\n}</code></pre><p>Capture start's ticket before a fake authorization await. Stop the flow before releasing the fake; accepts must be false even if access is granted. For photo selection, start a new generation for each chosen item and release the older transfer last. Only the current ticket can replace the preview. In a real feature, combine this guard with retained task cancellation and a serialized capture-session owner.</p><p>The location matrix has independent columns for authorization, accuracy, global services, fix freshness, and owner lifetime. A manual city keeps map browsing available. The device ledger requests prompt outcomes, Settings-return behavior, restricted-state messaging, session interruption/start-stop ordering, preview/output rotation, and a large or remotely stored selected image. It marks those observations pending until executed.</p><p>The source review notes that global background dispatch avoids UI blocking but does not by itself serialize session operations. It also notes retained photo delegates and simulator bypass. This is a bounded design and synthetic test plan, not a camera migration or a proof that every existing callback race is safe.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Requesting authorization to use location services",
+          "url": "https://developer.apple.com/documentation/corelocation/requesting-authorization-to-use-location-services"
+        },
+        {
+          "label": "Apple: CLLocationManager",
+          "url": "https://developer.apple.com/documentation/corelocation/cllocationmanager"
+        },
+        {
+          "label": "Apple: Delivering an enhanced privacy experience in your Photos app",
+          "url": "https://developer.apple.com/documentation/photokit/delivering-an-enhanced-privacy-experience-in-your-photos-app"
+        },
+        {
+          "label": "Apple: PhotosPicker",
+          "url": "https://developer.apple.com/documentation/photosui/photospicker"
+        },
+        {
+          "label": "Apple: Requesting authorization to capture and save media",
+          "url": "https://developer.apple.com/documentation/avfoundation/requesting-authorization-to-capture-and-save-media"
+        },
+        {
+          "label": "Apple: AVCaptureSession",
+          "url": "https://developer.apple.com/documentation/avfoundation/avcapturesession"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Location authorization and manual recovery",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Interactions/LocationPermissionService.swift",
+          "line": 24,
+          "why": "Authorization is separated from obtaining a fix; later methods handle Settings, foreground return, and manual selection."
+        },
+        {
+          "label": "Camera capability and simulator behavior",
+          "path": "ios-client/Projects/Features/ZDCardCapture/Sources/ZDCardCapture/Internal/Camera/CameraSessionManager.swift",
+          "line": 52,
+          "why": "The manager explicitly bypasses hardware authorization/setup in the simulator and retains a capture delegate."
+        },
+        {
+          "label": "Session start and stop execution",
+          "path": "ios-client/Projects/Features/ZDCardCapture/Sources/ZDCardCapture/Internal/Camera/CameraSessionManager.swift",
+          "line": 118,
+          "why": "Background global dispatch prevents blocking the UI but is not itself proof of serialized lifecycle operations."
+        },
+        {
+          "label": "Current Photos picker item",
+          "path": "ios-client/Projects/Features/ZDCardCapture/Sources/ZDCardCapture/Internal/ViewModel/CardCaptureFlowViewModel.swift",
+          "line": 41,
+          "why": "The active feature owns a PhotosPickerItem and its surrounding flow state; broad library management is a separate capability."
+        },
+        {
+          "label": "Actual MapKit view",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Map/MapViewController.swift",
+          "line": 28,
+          "why": "The app contains an MKMapView path and separate search identities; map browsing and current location should remain distinct."
+        },
+        {
+          "label": "App usage descriptions",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Resources/Zocdoc-Info.plist",
+          "line": 83,
+          "why": "Camera, location, microphone, and photos purpose strings are declared; actual runtime grants remain separate."
+        }
+      ],
+      "checklist": [
+        "I can distinguish permission, accuracy, hardware, and service failure.",
+        "I can design denied/restricted/limited fallbacks without prompt loops.",
+        "I can reject late authorization and selected-image results.",
+        "I can explain camera session and delegate ownership.",
+        "I can state exactly what simulator checks do and do not prove."
+      ]
+    },
+    {
+      "id": "056",
+      "title": "Extensions, widgets, App Intents, and platform integration review",
+      "summary": "Keep extension processes and system surfaces within explicit capability, storage, and identity boundaries, then review one synthetic workflow across the unit.",
+      "duration": 180,
+      "level": "Deep dive",
+      "prerequisites": [
+        "026",
+        "050",
+        "051",
+        "052",
+        "053",
+        "054",
+        "055"
+      ],
+      "objectives": [
+        "Explain containing app, extension, shared module, App Group, and system-rendered surface boundaries.",
+        "Design widget timelines and intent actions without exact refresh promises.",
+        "Guard shared mutations with current ownership and stable operation identity.",
+        "Produce an integration evidence ledger that distinguishes explained, practiced, and specialist branches."
+      ],
+      "sections": [
+        {
+          "id": "processes",
+          "title": "An extension is not a background view controller",
+          "html": "<p>Android services, providers, and widgets offer familiar questions about process identity, storage, and lifetime. An iOS app extension is a separately built executable with its own bundle identity, entry-point configuration, and constrained lifecycle. A containing app can embed it, but the extension does not share the app's heap, global DI container, current window, or retained session singleton. Importing a shared Swift module shares code, not live instances.</p><p>The system or a host invokes the extension under an extension-specific contract. A notification service extension modifies eligible remote notifications; a WidgetKit extension supplies timeline content. A share extension handles a host request with its own completion and cancellation semantics. These are different mechanisms, not interchangeable places to run arbitrary background work. Some application APIs are unavailable to extensions, so compile shared code with the appropriate extension-safe settings and check imports.</p><p>App Groups grant entitled targets access to a named shared container. They do not provide a shared actor, transaction queue, automatic account synchronization, or unrestricted access to another app. Keychain sharing uses separate access-group controls. Inspect signed entitlements and actual container resolution in each target. A matching literal in source is necessary evidence but does not prove provisioning or runtime container access.</p><p>The active app manifest embeds App Clip, Notifications, and MedicationWidget targets. The notification extension subclasses Braze's service, and the medication core module is reused from the widget. This is implemented source support. Specialized share, keyboard, file-provider, network, and credential-provider extensions remain further study rather than implied support.</p>"
+        },
+        {
+          "id": "packaging",
+          "title": "Target boundaries also constrain dependencies and resources",
+          "html": "<p>Each extension needs its own Info.plist extension point, supported OS, resources, entitlements, and dependency graph. A shared package with UIKit navigation or UIApplication calls may be unsuitable even if one helper inside it is useful. Read public APIs and target dependencies together. Keep a small extension-safe core when it separates actual domain decisions from app presentation and analytics.</p><p>The checkout's medication package has a core target with no package dependencies, while its app-facing target depends on UI and module infrastructure. The core still imports Apple frameworks in particular files; zero package dependencies is not a claim of universal platform independence. Its host-tooling guards and iOS availability need inspection per file. The app manifest declares MedicationWidget as an app extension with an iOS 17 floor.</p><p>Resource ownership matters here just as in session 022: an extension's bundle and a package's resource bundle are distinct. A localization key in the containing app is not automatically visible to its extension. A widget preview must use suitable synthetic placeholders, not load a person's current data merely to show a gallery example.</p><p>Validate embedding and extension-safe linking in the final archive, not only in package unit tests. Keep artifact identities for the app and embedded products. Source manifests establish packaging intent; a signed install and actual extension invocation establish runtime integration. No archive or device build was performed for this course-content edit.</p>"
+        },
+        {
+          "id": "timelines",
+          "title": "Widgets render snapshots on a system-managed schedule",
+          "html": "<p>A TimelineEntry describes content at a Date. A TimelineProvider supplies a placeholder, snapshot, and timeline. Placeholder and gallery-preview paths should be cheap, useful, and synthetic. The timeline contains predicted content changes, so the extension need not remain running to update every visible state. This is closer to handing the system a content plan than mounting a permanently active SwiftUI screen.</p><p>Reload policies such as atEnd or after request a later opportunity for a new timeline. WidgetCenter reload requests tell the system that existing content is obsolete. Neither is an exact scheduling contract. Dynamic resource budgets and visibility affect updates. A counter or deadline must use appropriate system-supported time rendering or a stale-state design; do not create a per-second timer and assume the extension remains alive.</p><p>The active MedicationWidgetTimelineProvider returns empty placeholder/gallery content, reads the shared store for actual snapshots, builds entries, and uses atEnd. Its pure WidgetTimelineBuilder is a useful test seam. The source's predicted entries and refresh request do not establish that every device renders each transition at an exact instant or that an unavailable protected file becomes readable.</p><p>Privacy includes cached snapshots and system surfaces. Sensitive details can remain in a rendered timeline after the source changes until the system processes a reload. Request reload after logout and minimize what the widget displays by design. Treat actual stale-snapshot visibility and locked-screen behavior as device verification, not something proved by deleting the backing file.</p>"
+        },
+        {
+          "id": "intents",
+          "title": "App Intents describe capabilities, not implicit authorization",
+          "html": "<p>An AppIntent declares metadata, parameters, and an async perform operation. <code>@Parameter</code> is a property wrapper used by the system's intent representation; the parameter title is user-facing metadata, not the storage key of an ordinary Codable property. <code>some IntentResult</code> is an opaque conforming result, not an arbitrary object returned to every caller. Availability applies to the framework and to newer capabilities within it.</p><p>Some intents open the app and route into UI; others support interactions within a widget or another system surface. Execution location depends on the intent configuration and system behavior. MainActor means the selected process's main actor, not the containing app's main actor. Shared intent code must therefore not assume app-only singletons exist merely because perform is MainActor-isolated.</p><p>The checkout's BookAgainIntent sets openAppWhenRun and routes through an injected IntentRouter. The router buffers one destination until UI wiring exists. Its isDiscoverable setting is false, so do not describe the type as automatically publishing every action to broad shortcut discovery. Trace explicit donation and registration paths when making discovery claims.</p><p>The widget's MarkDoseTakenIntent passes an occurrence identity to shared mutation logic and then requests reload. That identity guards against recomputing “today” from a stale entry. Its source suppresses some store failures, which means returning a result is not proof a write succeeded. A production success contract needs explicit durable evidence and an intentional user-facing failure policy.</p>"
+        },
+        {
+          "id": "shared-mutations",
+          "title": "App Groups do not serialize read-modify-write",
+          "html": "<p>A shared file can be read by the app and widget at the same time. Atomic replacement protects complete-file visibility; it does not merge two mutations based on the same old contents. An actor in the app and another actor in the extension are unrelated owners. A MainActor method in each process is also unrelated. Choose a transactional store, coordinated command protocol, or other reviewed interprocess synchronization mechanism for genuine multi-writer data.</p><p>The inspected widget intent loads a reminder collection, transforms it, saves it, and reloads. The file store atomically replaces JSON. These sources do not establish an interprocess read-modify-write lock. This is a conditional concurrency risk requiring targeted verification, not a claim that a lost update was reproduced. Similarly, try? save followed by reload can leave visible content unchanged without exposing the save error to the caller.</p><p>Stable operation identity protects replay only within the mutation policy that uses it. Account ownership protects which session may apply it. Both must survive the relevant lifetime: a process-local Set of operation IDs is not durable idempotency, and an account string alone does not protect A-to-B-to-A. If logout clears a shared store, a stale widget action must not recreate the old account's records. Validate ownership inside the actual transaction domain.</p><p>The shared location helper centralizes container path and retention and offers app-local fallback when the group is unavailable. That fallback can keep app UI working while the widget cannot see those local records. Diagnose the missing shared capability separately from “the reminders disappeared.” Migration into the group is also an app-owned operation, not a widget entitlement workaround.</p>"
+        },
+        {
+          "id": "synthetic-command",
+          "title": "Practice one bounded surface command",
+          "html": "<p>Use a harmless synthetic card acknowledgment to practice ownership and replay without medical or production data. This standalone actor models one process only; its explicit limitations are part of the lesson:</p><pre><code class=\"language-swift\">struct SurfaceCommand: Sendable {\n    let ownerEpoch: Int\n    let operationID: String\n    let cardID: String\n}\nenum SurfaceOutcome: Equatable, Sendable {\n    case applied, duplicate, stale, unknownCard\n}\n\nactor SyntheticSurfaceStore {\n    private var epoch = 1\n    private var cards: Set&lt;String&gt; = [\"alpha\", \"beta\"]\n    private var applied: Set&lt;String&gt; = []\n    private var acknowledged: Set&lt;String&gt; = []\n\n    func currentEpoch() -&gt; Int { epoch }\n\n    func resetOwner() {\n        epoch += 1\n        cards = []\n        applied = []\n        acknowledged = []\n    }\n\n    func apply(_ command: SurfaceCommand) -&gt; SurfaceOutcome {\n        guard command.ownerEpoch == epoch else { return .stale }\n        guard cards.contains(command.cardID) else { return .unknownCard }\n        guard !applied.contains(command.operationID) else {\n            return .duplicate\n        }\n        acknowledged.insert(command.cardID)\n        applied.insert(command.operationID)\n        return .applied\n    }\n\n    func values() -&gt; Set&lt;String&gt; { acknowledged }\n}</code></pre><p>The command is immutable and Sendable. Set membership gives an explicit replay policy. apply has no suspension between validation and mutation, so resetOwner cannot interleave inside that actor transition. A caller uses await to enter the actor. The code rejects unknown cards and old epochs rather than recreating absent data. A network-facing version must also bound and validate command fields.</p><p>This is a memory fake, not an App Group store or a server. Restarting it loses deduplication history. Two processes would each have their own instance. A durable implementation must make account validation, mutation, and operation recording part of one actual transaction and define how history expires.</p>"
+        },
+        {
+          "id": "adjacent-platforms",
+          "title": "Name specialist branches without claiming implementation",
+          "html": "<p>The same ownership questions help with cross-device features, but sharing Swift types does not establish platform support. watchOS has its own targets, lifecycle, connectivity, background budgets, and complications. visionOS adds distinct scene, input, and spatial design requirements. CloudKit synchronization adds account identity, record versions, conflicts, offline queues, and schema deployment. The inspected app manifest does not declare watchOS or visionOS products, and this unit implements none of them.</p><table><thead><tr><th>Specialist branch</th><th>Further practice required</th></tr></thead><tbody><tr><td>Real-time media and DSP</td><td>Audio/video timing, routing, codecs, interruptions, measured latency</td></tr><tr><td>GPU/Metal and unsafe systems APIs</td><td>Resource lifetimes, memory safety, synchronization, workload measurement</td></tr><tr><td>Bluetooth and ML</td><td>Hardware/model availability, permissions, data flow, failure and performance</td></tr><tr><td>HealthKit/regulatory and StoreKit</td><td>Domain policy, authorization, transactions, review and device evidence</td></tr><tr><td>watchOS/visionOS and CloudKit sync</td><td>Separate targets, interaction/lifecycle, delivery, conflict and account behavior</td></tr><tr><td>Specialized extensions</td><td>Extension-specific host contracts, entitlements, supported APIs and distribution</td></tr></tbody></table><p>These are explicit further-study boundaries, not hidden lessons claimed complete by an API mention. The course teaches still-capture permission and ownership basics, not a real-time media pipeline; timeline reasoning, not a production watch complication; migration fundamentals, not a replicated database. If an actual feature requires one of these branches, create a scoped specialist learning and validation plan.</p><p>Current Apple documentation can expose capabilities newer than the checkout's deployment floor. Record API availability separately from target minimum, toolchain pins, enabled capabilities, and runtime verification. A library present in a lockfile likewise does not prove the product implements its full platform feature set.</p>"
+        },
+        {
+          "id": "integration-review",
+          "title": "Review one workflow across all seven sessions",
+          "html": "<p>Choose a synthetic card that opens from a link, requires login, reads a local cache, optionally chooses an image, and shows an acknowledgment widget. Session 050 supplies bounded execution and notification outcomes. Session 051 parses and gates the route. Session 052 supplies explicit time, text, and file policy. Session 053 defines a context/snapshot or alternate store boundary. Session 054 constrains any embedded web/auth path. Session 055 owns device effects. This session owns extension and surface commands.</p><p>For each boundary write input, trust level, owner, isolation or process, durable effect, terminal outcome, and acceptance evidence. Control ordering with gates: logout before a delayed response, second route before login finishes, new document before script callback, stopped camera before permission returns, duplicate widget action, and shared-store failure before reload. The same case can cross several layers; do not declare success because each individual helper passes its happy path.</p><p>Separate source observations, executed synthetic checks, planned target/device checks, and specialist branches in the handoff. Verify active source paths and line anchors, not an obsolete duplicate file. No unit exercise authorizes editing app source, changing live accounts, publishing an extension, or pre-completing learner progress. Use standalone scratch work and synthetic data.</p><p>A useful integration review ends with precise residual risks: actual shared-store serialization, signed App Group access, archived extension resources, widget snapshot privacy, real notification and universal-link delivery, locked-device failures, and authentication/device-service behavior. This is a substantial foundation for platform work, not a claim to exhaust all of iOS.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "The app and extension both use MainActor. Do they share one serialization domain?",
+          "options": [
+            "Yes, MainActor is global across every installed process.",
+            "No; each process has its own memory and actor execution.",
+            "Only if they import the same package."
+          ],
+          "answer": 1,
+          "explanation": "Shared code and entitlements do not share actors. Cross-process mutation needs an actual transactional or coordination protocol."
+        },
+        {
+          "question": "WidgetCenter.reloadTimelines is called after logout. What can be promised?",
+          "options": [
+            "Every cached system snapshot disappears instantly.",
+            "A reload was requested; privacy design and observed system refresh still need verification.",
+            "The backing file must already be readable while locked."
+          ],
+          "answer": 1,
+          "explanation": "The system controls timeline refresh. Minimize sensitive surface content and validate actual stale/locked presentation rather than equating a request with immediate rendering."
+        },
+        {
+          "question": "SyntheticSurfaceStore rejects a repeated operation in memory. Is that durable cross-process idempotency?",
+          "options": [
+            "Yes, Sendable persists the Set.",
+            "No; persistence, transaction ownership, process coordination, and history retention remain to be designed.",
+            "Only if the operation ID is a UUID."
+          ],
+          "answer": 1,
+          "explanation": "Sendable concerns safe transfer, not disk durability. Separate processes or restarts do not share this actor's in-memory Set."
+        }
+      ],
+      "exercise": {
+        "brief": "Build the synthetic surface-command actor and an integration evidence ledger. Review actual widget, intent, and App Group sources without changing client code or learner progress.",
+        "steps": [
+          "Apply one command twice and assert applied then duplicate with one visible acknowledgment.",
+          "Reset ownership before releasing a delayed command and assert stale with no recreated data.",
+          "Add unknown-card and failed-durable-write rows to the design.",
+          "Trace manifest embedding, shared store location, timeline placeholders, and intent routing.",
+          "Create a ledger for explained behavior, executed fakes, pending target/device/distribution checks, and the listed specialist branches."
+        ],
+        "acceptance": [
+          "Repeated commands cannot duplicate the synthetic effect.",
+          "Old ownership cannot resurrect cleared records.",
+          "The actor is labeled memory-only and single-process.",
+          "Widget reload is not described as an exact scheduling or instant privacy guarantee.",
+          "Repository support is distinguished from unimplemented specialist platforms.",
+          "The final ledger includes all seven sessions with measurable boundary outcomes."
+        ],
+        "solution": "<p>The worked test starts with the actor's current epoch and builds a SurfaceCommand for card alpha with a synthetic operation ID. The first apply returns applied; the second returns duplicate; values contains alpha once. Start another command, hold its release in a fake, resetOwner, and then apply it. The result is stale and the acknowledged Set remains empty. Apply a current-epoch unknown card to verify unknownCard without mutation.</p><p>The integration ledger makes ownership and evidence reviewable:</p><table><thead><tr><th>Boundary</th><th>Acceptance</th><th>Evidence still needed</th></tr></thead><tbody><tr><td>Background/notification</td><td>One completion; expired or old-account work cannot commit</td><td>Signed-device APNs and execution observations</td></tr><tr><td>Route/login</td><td>Bounded parser; only current pending route navigates</td><td>AASA, installed identity, cold/warm taps, App Clip invocation</td></tr><tr><td>Foundation/storage</td><td>Named civil-time policy; correct ranges; preserved failures</td><td>Locked-file attributes, upgrade fixtures, backup behavior</td></tr><tr><td>Web/device services</td><td>No stale cookie, document, permission, or selection commit</td><td>Controlled provider, WebKit, hardware and Settings behavior</td></tr><tr><td>Widget/intent</td><td>Stable command identity; no stale record resurrection</td><td>Interprocess transaction, signed App Group, cached snapshot review</td></tr></tbody></table><p>A durable command design records operation identity and effect atomically under current account ownership. The process that renders a timeline reads an immutable projection, not an app-owned managed object. If the write fails, define a bounded visible failure outcome and do not report durable success merely because perform returned a result. Request reload after successful state changes and cleanup, while acknowledging system-controlled rendering.</p><p>The source review records active MedicationWidget embedding, the placeholder/snapshot distinction, the group path helper and its fallback, BookAgain's app-opening route, and MarkDoseTaken's shared mutation path. It calls out read-modify-write coordination and suppressed write errors as questions needing verification, not reproduced incidents. The specialist ledger names media/DSP, Metal, Bluetooth, HealthKit/regulatory, StoreKit, watchOS/visionOS, CloudKit, ML, specialized extensions, and unsafe APIs as further study.</p><p>Run only the synthetic actor and parser/service fakes in your scratch work. No signed extension, real widget refresh, production account, or course progress is changed by this worked answer. Your submission adds actual results to the ledger and leaves unexecuted checks clearly pending.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: App Extension Programming Guide",
+          "url": "https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/"
+        },
+        {
+          "label": "Apple: Configuring App Groups",
+          "url": "https://developer.apple.com/documentation/xcode/configuring-app-groups"
+        },
+        {
+          "label": "Apple: Keeping a widget up to date",
+          "url": "https://developer.apple.com/documentation/widgetkit/keeping-a-widget-up-to-date"
+        },
+        {
+          "label": "Apple: Adding interactivity to widgets and Live Activities",
+          "url": "https://developer.apple.com/documentation/widgetkit/adding-interactivity-to-widgets-and-live-activities"
+        },
+        {
+          "label": "Apple: AppIntent",
+          "url": "https://developer.apple.com/documentation/appintents/appintent"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Embedded extension targets",
+          "path": "ios-client/Projects/Apps/Zocdoc/Project.swift",
+          "line": 152,
+          "why": "MedicationWidget is declared as an app extension; the app later depends on widget, notification, and App Clip targets."
+        },
+        {
+          "label": "Widget placeholder, snapshot, and timeline",
+          "path": "ios-client/Projects/Apps/Zocdoc/Extensions/MedicationWidget/MedicationWidgetTimelineProvider.swift",
+          "line": 19,
+          "why": "Gallery paths avoid real data; actual entries read the shared store and use atEnd without an exact refresh guarantee."
+        },
+        {
+          "label": "Widget mutation and reload boundary",
+          "path": "ios-client/Projects/Features/ZDMedicationReminders/Sources/ZDMedicationRemindersCore/Widget/MarkDoseTakenIntent.swift",
+          "line": 47,
+          "why": "The intent loads, transforms, saves, and reloads shared data; suppressed errors and cross-process serialization require separate scrutiny."
+        },
+        {
+          "label": "Single shared path and fallback",
+          "path": "ios-client/Projects/Features/ZDMedicationReminders/Sources/ZDMedicationRemindersCore/MedicationRemindersStoreLocation.swift",
+          "line": 65,
+          "why": "The group container is preferred and app-local support is fallback; this is not automatic shared-memory or migration success."
+        },
+        {
+          "label": "App-opening intent and explicit discovery policy",
+          "path": "ios-client/Projects/Infra/ZDIntents/Sources/ZDIntents/Intents/BookAgainIntent.swift",
+          "line": 8,
+          "why": "openAppWhenRun and isDiscoverable are explicit; perform routes through an injected app owner."
+        },
+        {
+          "label": "Intent before UI readiness",
+          "path": "ios-client/Projects/Infra/ZDModules/Sources/ZDModules/Intents/IntentRouter.swift",
+          "line": 12,
+          "why": "A bounded pending destination is consumed once after app routing becomes available."
+        }
+      ],
+      "checklist": [
+        "I can explain code sharing versus process and storage sharing.",
+        "I can design timelines without exact refresh promises.",
+        "I can distinguish app-opening intents from extension-safe effects.",
+        "I can identify the missing durable interprocess transaction contract.",
+        "I can hand off measured acceptance and specialist limitations across this unit."
+      ]
+    }
+  ]
+}

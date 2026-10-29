@@ -1,0 +1,1460 @@
+{
+  "questions": [
+    {
+      "id": "iq-029-a",
+      "lesson": "029",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Explain which view grows and which shrinks in a title-and-badge row. How do hugging and compression priorities express different decisions?",
+      "scenario": "A synthetic row needs a 180-point title, a 60-point badge, and 12 points of spacing. Its parent supplies either 300 or 220 points.",
+      "minutes": 5,
+      "androidBridge": "ConstraintLayout and Compose measurement help frame size negotiation, but Swift intrinsic-size priorities are optional inequalities, not Kotlin layout weights or Compose hard constraints. Raising hugging does not raise compression resistance.",
+      "rubric": [
+        "States that hugging resists growth and compression resistance resists shrinkage.",
+        "Calculates 48 points of surplus and 32 points of shortage.",
+        "Assigns separate horizontal priorities according to the desired product behavior.",
+        "Explains how known width and multiline wrapping affect height.",
+        "Identifies required-constraint conflicts and a minimum-width fallback."
+      ],
+      "answerHTML": "<p>Intrinsic content size describes a view's preferred size. Horizontal hugging roughly prefers actual width no greater than intrinsic width; compression resistance prefers width no smaller. These are independent preferences. At 300 points, the row has 48 surplus points. Giving the title lower hugging lets it absorb that surplus while the badge stays compact. At 220 points, the row starts with a 32-point shortage. Giving the title lower compression resistance makes it the initial narrowing participant.</p><p>A multiline title can convert narrower width into additional height, provided its width is determined and vertical constraints allow growth. The arithmetic predicts negotiation, not real font measurements. Inspect the actual instance priorities rather than assuming every control uses identical defaults. Required priority is 1000; making all competing preferences required can produce unsatisfiable constraints. If the badge and minimum readable title cannot fit, change to a vertical arrangement or another declared overflow policy. Verify narrow width, long localized text, and accessibility text sizes before accepting the row.</p>",
+      "followUps": [
+        "What changes if the title has no determined width or permits only one line?",
+        "How would you verify the intended winner without relying on equal competing priorities?"
+      ],
+      "pitfalls": [
+        "Treating higher hugging as protection against truncation.",
+        "Reporting synthetic width arithmetic as a device measurement."
+      ]
+    },
+    {
+      "id": "iq-029-b",
+      "lesson": "029",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Diagnose a hosted scrolling form whose bottom gap doubles and whose focused field remains obscured. Which layout owner and guides would you inspect?",
+      "scenario": "A UIKit controller adds safe-area insets, its scroll wrapper adjusts content insets, and a SwiftUI child also avoids the keyboard.",
+      "minutes": 8,
+      "androidBridge": "Kotlin Compose WindowInsets consumption suggests tracing inset ownership. UIKit safe areas, scroll adjustment, and keyboardLayoutGuide have distinct contracts; they do not follow Compose inset-consumption rules or automatically describe a floating keyboard.",
+      "rubric": [
+        "Traces insets through controller, scroll wrapper, and hosted child.",
+        "Distinguishes safe area, readable width, keyboard, and scroll content guides.",
+        "Chooses one keyboard-avoidance owner and preserves reachable content.",
+        "Checks hosting containment and the component-specific sizing contract.",
+        "Plans narrow-width, large-text, and floating-keyboard observations."
+      ],
+      "answerHTML": "<p>Start by mapping every contributor to the bottom space: controller constraints, automatic scroll adjustment, explicit content insets, and the hosted child's safe-area or keyboard behavior. Safe areas describe obscuring system and container UI; they are not a complete keyboard-overlap model. Readable-width and margin guides serve different horizontal purposes. Removing all safe-area participation would hide the cause and can put interactive content under system UI.</p><p>Choose one keyboard-avoidance owner. UIKit's keyboardLayoutGuide can express keyboard relationships, while a scrolling form may instead manage keyboard-aware insets and scroll the active field into view. Floating keyboards require a deliberate policy. Constrain scroll content to its content guide and viewport width appropriately so large text can grow vertically. Check child-controller containment, hosting sizing, and the specific component's safe-area contract together; a local bridge convention is not universal guidance. Verify focus, dismissal, resizing, and accessibility text in a running scratch target. A corrected inset calculation alone does not prove the field is reachable or editing state survives.</p>",
+      "followUps": [
+        "How would you distinguish a doubled inset from an incorrect scroll-content height?",
+        "What additional behavior must you verify for an undocked iPad keyboard?"
+      ],
+      "pitfalls": [
+        "Ignoring every safe area to eliminate the visible gap.",
+        "Assuming keyboard avoidance supplies focus or a number-pad Done action."
+      ]
+    },
+    {
+      "id": "iq-030-a",
+      "lesson": "030",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Why can a diffable list keep the right rows yet show an outdated subtitle? Explain identity, content updates, and complete cell configuration.",
+      "scenario": "The snapshot remains [A, B], but the content lookup for A changes. Later, C is inserted and the order becomes [C, B, A].",
+      "minutes": 6,
+      "androidBridge": "Kotlin/Java RecyclerView stable IDs and DiffUtil suggest separating item identity from displayed content. UIKit snapshots use Hashable identifiers and explicit reconfiguration; RecyclerView payload and onBindViewHolder behavior is not an exact counterpart.",
+      "rubric": [
+        "Separates immutable domain IDs, positions, cell instances, and reuse identifiers.",
+        "Keeps mutable subtitle data out of snapshot identity.",
+        "Explicitly reconfigures surviving changed IDs after updating the lookup.",
+        "Explains that reconfiguration does not require prepareForReuse.",
+        "Routes selection by current domain ID after insertion and reorder."
+      ],
+      "answerHTML": "<p>A diffable snapshot describes section and item identity plus order. An unchanged identifier does not necessarily cause UIKit to configure its cell again when an external content dictionary changes. Keep A as an immutable identifier, update its content in the lookup, and explicitly mark surviving changed IDs for reconfiguration. A newly inserted C receives initial configuration; it is not a surviving item. Identifiers must be unique across the snapshot.</p><p>Do not synthesize identity from the entire mutable display model: changing a subtitle could then look like replacing the item. Reconfiguration preserves an existing cell and does not call prepareForReuse for that update, so configuration must set every relevant visual and accessibility property. Reserve reload behavior for changes such as needing a different cell kind. Apply the content revision and snapshot through a serialized UI owner. Selection should resolve or capture A's domain ID rather than offset zero, which becomes C after insertion. Test subtitle changes, reorder, duplicate IDs, and delayed image completion separately.</p>",
+      "followUps": [
+        "When would reloading an item be more appropriate than reconfiguring it?",
+        "How would you prevent an old image completion from decorating a reused cell?"
+      ],
+      "pitfalls": [
+        "Hashing mutable presentation fields as permanent item identity.",
+        "Expecting prepareForReuse to clear every reconfiguration."
+      ]
+    },
+    {
+      "id": "iq-030-b",
+      "lesson": "030",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Diagnose duplicate page loads and an old query error replacing newer results. How should pagination differ from thumbnail prefetch ownership?",
+      "scenario": "Repeated end-of-list callbacks start cursor p1 twice. Query B succeeds before query A fails, and canceling prefetch also cancels a visible row's shared image.",
+      "minutes": 10,
+      "androidBridge": "Kotlin coroutine jobs and RecyclerView prefetch offer ownership analogies. Swift actor isolation does not make response order equal page order, and UIKit prefetch cancellation expresses predicted interest rather than ownership of every shared request.",
+      "rubric": [
+        "Guards each in-flight cursor within a query generation.",
+        "Rejects obsolete success and failure outcomes.",
+        "Clears only the matching request's in-flight marker.",
+        "Keeps visible loading functional without prefetch.",
+        "Separates shared resource cancellation from an individual consumer's interest."
+      ],
+      "answerHTML": "<p>Give the page owner a query generation, next cursor, matching in-flight cursor, ordered IDs, and end state. Repeated threshold callbacks should start work only when that generation and cursor have no active request. Capture both before suspension. On success or failure, verify they still belong to the current query before changing rows, error state, or the in-flight marker. An old completion must not unlock a newer request. Serialize cursor-based loads or define explicit buffering if pages may finish out of order.</p><p>Preserve useful rows on a later-page failure and retry the failed cursor under the same guard. Define duplicate-ID merging and repeated-cursor behavior. Prefetch is a separate resource-interest mechanism: translate callback positions to current IDs, and ensure visible configuration can load missing content without any prefetch callback. Canceling one speculative interest should not cancel a shared image still needed by a visible consumer. Use controlled start signals and completion gates to release B before A, then exercise A's success and error paths.</p>",
+      "followUps": [
+        "What policy handles an empty page that still returns a next cursor?",
+        "Which assertions would distinguish duplicate-load prevention from stale-result rejection?"
+      ],
+      "pitfalls": [
+        "Guarding only successful responses with the query generation.",
+        "Making prefetch the only path that loads required content."
+      ]
+    },
+    {
+      "id": "iq-031-a",
+      "lesson": "031",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Explain SwiftUI's proposal, response, and placement contract. What should a custom column do with unspecified, zero, and finite widths?",
+      "scenario": "A column measures multiline Text in a narrow parent and a vertical ScrollView. Its implementation currently replaces every nil proposal with zero.",
+      "minutes": 6,
+      "androidBridge": "Compose measure and placement provide a useful sequence, but ProposedViewSize is a proposal rather than Compose Constraints. A nil Swift dimension asks for ideal behavior; it is not Kotlin null meaning an absent child.",
+      "rubric": [
+        "Separates parent proposal, child-reported size, and final placement.",
+        "Distinguishes unspecified, zero, and unbounded probes.",
+        "Explains width-dependent multiline height.",
+        "Uses consistent measurement and placement policies with bounds origin.",
+        "Keeps sizing free of requests and observable-state mutation."
+      ],
+      "answerHTML": "<p>The parent proposes dimensions, each child chooses a size, and the parent places the resulting children. A child need not accept an exact proposed size, and the parent can probe several times. An unspecified dimension asks about ideal size; zero asks about minimum behavior; infinity probes maximum behavior. Replacing nil with zero changes the question and can collapse content. A concrete reported size still needs a meaningful finite result.</p><p>For a finite column width, measure text with that width and sum the returned heights plus spacing between children. Place using a consistent width policy and the final bounds origin. A narrower multiline Text may become taller, so cached measurements must remain valid for the actual inputs. Empty children should not create a phantom gap. A vertical ScrollView commonly leaves the scrolling dimension unspecified rather than imposing viewport height. Define overflow behavior for children that exceed the budget. Layout methods can run repeatedly, so they are unsuitable lifecycle hooks for networking or state mutation. Verify different probes and final rendering separately.</p>",
+      "followUps": [
+        "How could a GeometryReader used as the main child alter the size being measured?",
+        "Which inputs would invalidate a cached multiline measurement?"
+      ],
+      "pitfalls": [
+        "Treating every proposed dimension as a hard size constraint.",
+        "Returning infinity as the layout's concrete reported height."
+      ]
+    },
+    {
+      "id": "iq-031-b",
+      "lesson": "031",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Diagnose a scroll control that flickers after adding a second geometry reporter. How do preference reduction, coordinate spaces, and feedback affect correctness?",
+      "scenario": "A bottom-marker PreferenceKey overwrites contributions. A second child now reports geometry, and showing the scroll control changes the measured content.",
+      "minutes": 8,
+      "androidBridge": "Compose onGloballyPositioned offers a geometry-observation analogy, but SwiftUI PreferenceKey reduces descendant contributions upward. Kotlin callback order and Compose coordinates do not define SwiftUI reduction or layout-feedback semantics.",
+      "rubric": [
+        "Identifies the original single-contributor assumption.",
+        "Selects a deliberate reduction rule for multiple contributors.",
+        "Compares positions in the same named coordinate space.",
+        "Explains the geometry-state-layout feedback cycle.",
+        "Plans no-op guards and stable control geometry."
+      ],
+      "answerHTML": "<p>The original overwrite reducer had a single bottom-marker contract. Adding another emitter changes its meaning: the last contribution is not automatically the bottom or the maximum. First decide what the ancestor needs. Use one dedicated marker, a maximum with compatible semantics, or an ID-keyed collection with an explicit merge rule. Do not choose a reducer merely because it removes flicker.</p><p>Measure positions in the intended named scroll coordinate space. A global position and local viewport height are not comparable just because both are numbers. Put an observing GeometryReader in a background or overlay when it should inspect existing assigned geometry rather than become the main sizing child. Then trace the loop: a preference updates state, state shows a control, the control changes geometry, and a new preference reverses the decision. Ignore unchanged values and keep the control's geometry from destabilizing its own threshold. Test keyboard, safe-area, content, and window changes. Prefer direct layout calculation when the value serves only layout rather than interaction.</p>",
+      "followUps": [
+        "When is taking the maximum a valid reducer, and when would it lose identity?",
+        "How would you distinguish a coordinate-space error from a feedback loop?"
+      ],
+      "pitfalls": [
+        "Assuming overwrite reduction remains valid with several emitters.",
+        "Mirroring every child frame into observable model state."
+      ]
+    },
+    {
+      "id": "iq-032-a",
+      "lesson": "032",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Explain what withAnimation changes and how it differs from a transition. How should repeated taps and reduced motion affect a disclosure's final state?",
+      "scenario": "A disclosure inserts details when expanded. A broad animation modifier also animates validation errors, and code waits for the animation duration before committing selection.",
+      "minutes": 5,
+      "androidBridge": "Compose animate-as-state suggests interpolation toward state, but SwiftUI transactions and insertion transitions have their own scope. Neither a Kotlin delay nor an animation duration is a correctness boundary for delivering a result.",
+      "rubric": [
+        "Makes semantic state authoritative before visual completion.",
+        "Distinguishes animating an existing value from insertion or removal.",
+        "Explains transaction scope and simultaneous unrelated changes.",
+        "Preserves final meaning under interrupted animation.",
+        "Treats reduced motion as a visual policy rather than a disabled action."
+      ],
+      "answerHTML": "<p>withAnimation attaches animation information to a synchronous state mutation. The Boolean changes immediately; eligible visual differences interpolate toward that destination. It does not delay business state, make every property animatable, or keep unrelated async work alive. A transition describes a child entering or leaving the hierarchy. Applying an opacity transition to a permanently present child does not create insertion.</p><p>Keep disclosure visibility derived from the latest Boolean, so repeated taps can interrupt interpolation without leaving a contradictory final hierarchy. A value-watching animation modifier can affect other simultaneous changes inside its scope. Narrow that scope if an unrelated error or keyboard adjustment should update directly. Selection delivery needs its own ownership and exactly-once policy; waiting for a nominal duration cannot establish completion or freshness. Reduced motion should change or remove the visual interpolation while preserving the action and final state. Verify rapid toggling, interrupted navigation, and reduced-motion completion in a running target. A static screenshot demonstrates appearance at one instant, not interruption behavior.</p>",
+      "followUps": [
+        "What state can be lost if the implementation replaces identity to trigger an effect?",
+        "How would you test semantic completion without depending on animation timing?"
+      ],
+      "pitfalls": [
+        "Using animation duration as synchronization for selection delivery.",
+        "Assuming a transition animates any permanently present property."
+      ]
+    },
+    {
+      "id": "iq-032-b",
+      "lesson": "032",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Diagnose a draggable row that jumps, steals scrolling, and loses keyboard focus after reordering. Define the state and identity boundaries before adjusting gestures.",
+      "scenario": "Every onChanged adds the full drag translation to a saved offset. Scroll callbacks retain an old proxy, and two text fields share the same focus case.",
+      "minutes": 10,
+      "androidBridge": "Compose pointer input and focus requesters suggest transient interaction owners. SwiftUI GestureState reset, gesture precedence, ScrollViewReader proxy scope, and FocusState cases are distinct contracts rather than exact Kotlin API equivalents.",
+      "rubric": [
+        "Renders committed offset plus current translation without repeated accumulation.",
+        "Commits once and defines cancellation and movement bounds.",
+        "Investigates recognizer competition and provides a semantic alternative.",
+        "Uses stable current scroll IDs and the current reader proxy.",
+        "Assigns unique focus cases without reconstructing the draft."
+      ],
+      "answerHTML": "<p>Drag translation is relative to the gesture's start. Adding the whole translation on every update double-counts movement. Keep committed offset in persistent state and current translation in GestureState. Render their sum, clamp the candidate to the allowed container if required, and commit the bounded result once on successful ending. GestureState resets on cancellation; do not convert a canceled transient displacement into a second commit.</p><p>A row drag competes with scrolling and navigation recognizers. Define the target region, direction, and minimum distance before choosing simultaneous or higher-priority composition. Those modifiers cannot certify correct arbitration. Provide buttons or accessibility actions for essential operations. After reorder, scroll to a stable domain ID through the proxy inside the current ScrollViewReader context rather than a retained appearance-time closure. Give each field a distinct optional focus case and clear focus explicitly on dismissal. Resizing or keyboard dismissal should preserve the draft owner. Verify cancellation, actual scrolling, focus progression, and alternative input; directly invoking callbacks tests logic but not recognizers.</p>",
+      "followUps": [
+        "Which geometry should bound movement when the scene resizes?",
+        "How would you prove reordering preserves the intended scroll target and field identity?"
+      ],
+      "pitfalls": [
+        "Accumulating start-relative translation repeatedly.",
+        "Applying highPriorityGesture as a universal fix for scrolling conflicts."
+      ]
+    },
+    {
+      "id": "iq-033-a",
+      "lesson": "033",
+      "level": "Senior",
+      "kind": "Code",
+      "prompt": "Write the safe replacement step for a UITextFieldDelegate edit, then explain its units and its limitations during text composition.",
+      "scenario": "The current text is A🙂B. The text system supplies NSRange(location: 1, length: 2) and replacement X; paste and deletion must use the same path.",
+      "minutes": 8,
+      "androidBridge": "Java and Kotlin String indexing also exposes UTF-16 units. Swift String.Index is not an integer offset, and its Character iteration follows grapheme clusters; neither Java char arithmetic nor String.count can replace range conversion.",
+      "rubric": [
+        "Converts the supplied NSRange against the exact current string.",
+        "Handles failed conversion without force-unwrapping.",
+        "Replaces the entire supplied range with the entire replacement.",
+        "Predicts AXB and distinguishes UTF-16 units from Character count.",
+        "Preserves marked text and acknowledges separate grapheme-boundary validation."
+      ],
+      "answerHTML": "<p>Use Foundation's conversion against the same buffer that received the edit:</p><pre><code class=\"language-swift\">guard let edit = Range(range, in: current) else {\n    return nil\n}\nreturn current.replacingCharacters(in: edit, with: replacement)</code></pre><p>The helper returns an optional String so an invalid range has an explicit failure path. UIKit's range is in UTF-16 units. In A🙂B, the emoji occupies two such units, so location 1 and length 2 replace it with X and produce AXB. The replacement may contain several characters or be empty for deletion; do not process only its first character.</p><p>Swift Character count, UTF-8 byte count, and UTF-16 length are different units. Successful conversion alone does not certify a fabricated range aligns to whole grapheme clusters; validate that separately if the domain requires it. While markedTextRange exists, aggressive rewriting or truncation can break input-method composition and selection. Prefer a raw editing buffer and a declared commit-time validation policy. Test actual paste, selected replacement, caret behavior, and composition in UIKit; the string helper proves only the transformation boundary.</p>",
+      "followUps": [
+        "What would change if the replacement were empty or contained several grapheme clusters?",
+        "Why does a pure replacement test not prove marked-text or caret behavior?"
+      ],
+      "pitfalls": [
+        "Treating NSRange.location as a Swift Character offset.",
+        "Assuming every partial-surrogate or partial-grapheme range must fail conversion."
+      ]
+    },
+    {
+      "id": "iq-033-b",
+      "lesson": "033",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Diagnose a code form that loses a leading zero, rejects composition mid-edit, and shows an obsolete validation error. Separate input assistance from product rules.",
+      "scenario": "A five-ASCII-digit demo code is converted to Int on each keystroke. The number pad has no Return key, and an older server validation finishes after the text changes.",
+      "minutes": 9,
+      "androidBridge": "Kotlin raw text state, InputType, and coroutine revision checks are useful analogies. UIKit keyboardType does not validate input, submitLabel cannot add a missing number-pad Return key, and Swift string units require an explicit rule.",
+      "rubric": [
+        "Keeps the code as raw String data with its leading zero.",
+        "Names the ASCII-only submission contract and permits provisional editing.",
+        "Separates keyboard traits from paste and validation behavior.",
+        "Rejects obsolete validation success and failure by input revision.",
+        "Provides explicit dismissal and field-specific repairable errors."
+      ],
+      "answerHTML": "<p>Keep the editing code as a String. Integer conversion discards the leading zero and imposes numeric meaning on an identifier. For this synthetic rule, submission accepts exactly five ASCII digits; that is narrower than accepting all Unicode decimal digits. Permit provisional raw input and evaluate eligibility at a declared boundary instead of rewriting every intermediate buffer. Normalize only what the domain allows.</p><p>The number-pad keyboard assists entry but cannot prevent paste or prove validity. submitLabel changes an available action label; it does not create a Return key on a number pad. Supply an explicit Done action and a hardware-keyboard submit path, clearing focus without clearing buffers. Tag async validation with the input revision and check it before publishing either success or failure. Preserve the draft on server rejection and explain the field needing repair. Localize persistent labels and error text, allowing expansion at large text sizes. Pure rule tests cover leading zeros and invalid characters; actual keyboard, marked-text, selection, and scrolling interactions require separate runtime observations.</p>",
+      "followUps": [
+        "How would the acceptance tests change if the domain allowed non-ASCII decimal digits?",
+        "When should an error first appear, and how should invalid submission move focus?"
+      ],
+      "pitfalls": [
+        "Using the keyboard type as the only validator.",
+        "Publishing an old error because only successful validation checks freshness."
+      ]
+    },
+    {
+      "id": "iq-034-a",
+      "lesson": "034",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Assign owners for account services, navigation, focus, and draft data in a two-window iPad feature. What does resizing or scene disconnection imply?",
+      "scenario": "Window A edits draft alpha while window B browses beta. A singleton stores both selection and presenter, and developers assume rotation recreates the screen.",
+      "minutes": 7,
+      "androidBridge": "Kotlin/Java Activity and Android task lifetimes help discuss independent surfaces, but an iOS scene is not one Activity. Resizing does not imply Android configuration recreation, and a scene identifier is not a domain draft ID.",
+      "rubric": [
+        "Separates process, scene, window, controller, and domain lifetimes.",
+        "Keeps navigation, presentation, and focus local to the initiating scene.",
+        "Declares whether drafts are shared or independently edited.",
+        "Distinguishes scene disconnection from permanent session or process destruction.",
+        "Routes logout invalidation across affected scenes and late work."
+      ],
+      "answerHTML": "<p>The process can own an authenticated service and account-scoped repository. Each scene root should own its navigation path, modal presentation, selected record, and focus requests. A window presents that scene's hierarchy; a controller owns a screen or container. Draft lifetime follows the product's editing and persistence contract, which may outlive a controller. If both windows edit the same document, explicitly choose live sharing, independent tentative buffers, or conflict resolution.</p><p>Route presentation through the scene or controller receiving the action. Selecting an arbitrary connected scene or global key window can present login in the wrong surface. Resizing changes available geometry; it does not inherently recreate an Android-style configuration instance or justify replacing the model. Scene disconnection can release scene-owned subscriptions and tasks without deleting a durable draft, and the session may reconnect later. Conversely, in-memory state cannot survive process death by itself. Logout must invalidate account-bound presentation, restoration, caches, and old async results in every relevant scene. A declared iPad destination is not evidence that these two-window semantics work.</p>",
+      "followUps": [
+        "How would independent tentative buffers reconcile commits to the same draft?",
+        "Which state should survive scene disconnection but not an account transition?"
+      ],
+      "pitfalls": [
+        "Using the first connected scene as the universal presenter.",
+        "Equating window resize with automatic controller and draft recreation."
+      ]
+    },
+    {
+      "id": "iq-034-b",
+      "lesson": "034",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design adoption of scene restoration for a draft feature. Assign ownership, compare storage alternatives, and define evidence, staged rollout, and recovery.",
+      "scenario": "The current feature restores a selected ID globally. A deleted record, account switch, or second window can replay an invalid destination after launch.",
+      "minutes": 15,
+      "androidBridge": "Kotlin SavedStateHandle values and Room-backed drafts suggest separating presentation restoration from data persistence. SceneStorage and AppStorage have different scene versus defaults scopes; neither reproduces Android process-restoration semantics or grants access to a restored record.",
+      "rubric": [
+        "Assigns scene restoration, durable storage, and account invalidation owners.",
+        "Compares lightweight scene state with repository-backed drafts.",
+        "Uses a versioned non-sensitive envelope and validates current records.",
+        "Defines two-window and process-restart evidence with explicit failure cases.",
+        "Stages adoption and provides fallback without replaying side effects."
+      ],
+      "answerHTML": "<p>Let the scene owner persist minimal presentation meaning: envelope version, account-scope marker, draft ID, and optional selected record. The repository owner protects durable draft data, while the account owner invalidates old envelopes and late work. Compare lightweight SceneStorage for selection with repository-backed drafts; AppStorage's shared defaults key can unintentionally couple windows. None of these wrappers alone supplies a sensitive document persistence model.</p><p>Restore dependencies normally, validate the envelope version and current account, load the draft, and resolve the selection against current data. Unknown versions, corrupt state, deleted records, or account mismatch fall back to a valid root. Do not restore credentials, stale proxies, or automatic submission. Require independent-window, resize, logout-during-load, and process-restart fixtures, measuring successful restoration and safe fallback by cause. Stage adoption for one bounded feature after its actual scene configuration is verified. Keep a recovery path that ignores incompatible envelopes and opens the list while preserving durable drafts. Disabling restoration should not delete user data or imply a completed app-wide scene migration.</p>",
+      "followUps": [
+        "How would the rollout distinguish an invalid envelope from a failed durable draft load?",
+        "What must be revalidated before an encoded navigation destination becomes visible?"
+      ],
+      "pitfalls": [
+        "Treating decoded navigation state as authorization or permission to resubmit.",
+        "Deleting durable drafts when disabling a presentation-restoration feature."
+      ]
+    },
+    {
+      "id": "iq-035-a",
+      "lesson": "035",
+      "level": "Senior",
+      "kind": "Design",
+      "prompt": "Design the source-of-truth and sizing boundaries for a SwiftUI editor, reusable picker, and UIKit review summary. How do Cancel and reorder preserve meaning?",
+      "scenario": "A scratch draft owns name, code, and provider A. Review copies these values into new local state; the picker mutates selection while merely highlighting rows.",
+      "minutes": 10,
+      "androidBridge": "Kotlin Compose state hoisting and AndroidView updates suggest a shared editing owner and an adapter. SwiftUI State preserves a locally owned observable instance, and UIViewRepresentable has distinct creation, update, and proposal-based sizing contracts.",
+      "rubric": [
+        "Keeps raw buffers and committed selection in one scene-owned draft.",
+        "Separates tentative highlight from committed selection when Apply is required.",
+        "Resolves reordered providers by stable ID.",
+        "Updates the UIKit summary from current shared input.",
+        "Explains finite-width fitting and distinguishes view from controller containment."
+      ],
+      "answerHTML": "<p>The scene root owns the draft and navigation. The draft owns raw name and code buffers, committed provider ID, and current provider content. Review reads that same model rather than seeding new local State copies that drift. With Observation, a locally created observable reference can be held in root State; an editor needing projected bindings uses the appropriate binding boundary.</p><p>A picker that commits immediately should mutate only on deliberate selection. An Apply-style picker instead owns a tentative highlight and copies it on confirmation; Cancel leaves the prior committed ID untouched. Resolve IDs against current content after insertion or reorder, and block Review if the selected provider disappears. The UIKit representable creates a label once, updates its text from current input, and fits multiline content against finite proposed width. Larger text or narrower width may increase height; unspecified sizing can defer to the bridge's default strategy. A UILabel needs no child-controller containment, whereas a hosted controller does. Verify reorder, cancellation, wrapping, focus dismissal, and shared model identity as separate contracts.</p>",
+      "followUps": [
+        "How should Review respond when its selected provider is removed?",
+        "Which evidence proves the label wraps rather than merely compiling its sizeThatFits method?"
+      ],
+      "pitfalls": [
+        "Creating independent review state from an initial draft snapshot.",
+        "Committing tentative picker changes during cancellation."
+      ]
+    },
+    {
+      "id": "iq-035-b",
+      "lesson": "035",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Propose an acceptance and adoption plan for the integrated UI flow. Compare evidence layers, assign owners, and define rollout gates and recovery for invalid selection or stale work.",
+      "scenario": "A synthetic demo looks correct once, but paging, IME composition, large text, restoration, and two-window behavior remain unverified.",
+      "minutes": 15,
+      "androidBridge": "Kotlin/Java unit tests, Android screenshots, and instrumentation tests motivate layered evidence. A Swift logic fake cannot certify UIKit recognizer or IME behavior, and an iOS simulator snapshot does not establish independent-window or physical-device performance.",
+      "rubric": [
+        "Maps sizing, editing, identity, and scene risks to distinct owners.",
+        "Chooses focused logic, rendering, and interaction evidence.",
+        "Uses explicit start/completion gates for stale success and failure.",
+        "Defines bounded staged adoption and correctness gates.",
+        "Provides recoverable selection and restoration outcomes with honest coverage limits."
+      ],
+      "answerHTML": "<p>Assign the draft owner validation and committed selection, the page owner query freshness, the bridge owner sizing updates, and the scene owner navigation and restoration. Compare pure tests for format and generation rules with snapshots for long text and actual interactions for keyboard, cancellation, and window behavior. A single end-to-end script is broader but less precise at locating each failure.</p><p>Use explicit fake start signals, complete B before A, then release both old success and old failure. Assert current rows, error state, selection, and matching in-flight markers. Add reorder-safe selection and Cancel fixtures. Measure the UIKit summary at declared widths and text categories, and observe composition and focused-field reachability in a running target. Stage adoption behind a bounded feature boundary only after applicable gates pass; record unexecuted device or two-window rows as pending. If a selection vanishes or restoration fails, preserve editable buffers and offer a valid root or renewed choice. Retain a known-good flow for recovery, without erasing drafts or treating the teaching reference as completed production work.</p>",
+      "followUps": [
+        "Which minimal fixture would expose an old completion incorrectly clearing a newer in-flight marker?",
+        "How would you decide whether a rendering difference blocks adoption or needs a baseline review?"
+      ],
+      "pitfalls": [
+        "Claiming one screenshot proves editing, restoration, and asynchronous ownership.",
+        "Re-recording baselines to conceal an unexplained regression."
+      ]
+    },
+    {
+      "id": "iq-036-a",
+      "lesson": "036",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Define a trustworthy search-to-usable-results measurement and its signposts. How does a mapping interval differ from the full operation?",
+      "scenario": "A synthetic search awaits data, maps rows, and presents results. Its current timer ends immediately after constructing a Task.",
+      "minutes": 7,
+      "androidBridge": "Android trace sections and coroutine timing suggest operation boundaries. Swift signpost interval identity and lifetime still need explicit pairing; constructing a Task, like launching a Kotlin coroutine, does not measure its awaited work.",
+      "rubric": [
+        "Defines start, usable endpoint, fixture, and outcome denominator.",
+        "Keeps mapping as a nested diagnostic interval.",
+        "Pairs overlapping interval identities through success, failure, and cancellation.",
+        "Separates elapsed time, CPU work, and presented responsiveness.",
+        "Records environment and bounded non-sensitive metadata."
+      ],
+      "answerHTML": "<p>Define the operation before selecting the tool. Start at an accepted synthetic search action and end when the correct results are presented and the declared interaction is usable. Specify fixture, cache state, device, OS, build configuration, and failure classification. A timer ending after Task construction measures scheduling rather than the task's awaited outcome. Await the relevant work and pair the interval through successful completion, thrown failure, and cancellation.</p><p>Keep a separate mapping interval inside the larger operation to test a CPU-transformation hypothesis. Give overlapping operations distinct interval identities while retaining bounded names. Elapsed time includes waiting; Time Profiler can investigate CPU stacks; rendering evidence establishes presentation and responsiveness. These answer different questions. Retain raw observations and failed or canceled outcomes according to the declared denominator, rather than silently dropping them. Metadata should identify bounded phases and fixtures without logging raw queries or account data. A source signpost establishes instrumentation intent only; actual traces and minimally instrumented confirmation runs are still required for a performance claim.</p>",
+      "followUps": [
+        "How would cancellation count in the denominator for latency and wasted-work reports?",
+        "Which tool would distinguish queue wait from synchronous mapping CPU cost?"
+      ],
+      "pitfalls": [
+        "Timing task creation and calling it completed search latency.",
+        "Treating a mapping microbenchmark as proof of usable-screen improvement."
+      ]
+    },
+    {
+      "id": "iq-036-b",
+      "lesson": "036",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Review a performance report that averages device p95 values and adds phase p95 values. What can its samples actually support?",
+      "scenario": "One cohort has five samples; another has twenty. The report calls nearest-rank p50 the conventional median and deletes failed runs.",
+      "minutes": 8,
+      "androidBridge": "Kotlin benchmark libraries may expose percentile summaries, but a library result does not define the experiment's denominator. Swift array indexing and nearest-rank arithmetic differ only syntactically; cohort and statistical limits remain essential.",
+      "rubric": [
+        "Calculates nearest-rank selection using ceil(p times n) minus one.",
+        "Explains that five-sample p95 is the maximum.",
+        "Distinguishes nearest-rank p50 from an even-sample conventional median.",
+        "Rejects averaging cohort p95 or summing unrelated phase p95.",
+        "Retains raw order, outcomes, conditions, and sample-size limits."
+      ],
+      "answerHTML": "<p>Nearest-rank p95 sorts n samples and selects one-based rank ceil(0.95 times n), then subtracts one for a Swift array index. For twenty ordered values from 1 through 20, it selects 19. For five samples, it selects the maximum. These are reproducible arithmetic results, not strong evidence about a population tail. Nearest-rank p50 selects the tenth of twenty values, while a conventional even-sample median averages the tenth and eleventh.</p><p>Keep device cohorts separate. Averaging their p95 values does not produce a fleet percentile; combining raw observations requires an explicit weighting and sampling model. Likewise, total-operation p95 is not generally the sum of phase p95 values, because different operations can be slow in different phases. Retain paired phase observations to attribute the actual tail. Restore failed, canceled, and invalid-preparation records with declared classifications. Report raw samples, count, range, units, estimator, and thermal/cache conditions. More decimal places do not repair a small, drifting, or selectively filtered experiment.</p>",
+      "followUps": [
+        "How would paired per-operation phases help explain the slowest observed searches?",
+        "What preparation rule could justify rerunning a sample without silently deleting it?"
+      ],
+      "pitfalls": [
+        "Calling the average of two p95 values the fleet p95.",
+        "Removing slow failures after seeing the result."
+      ]
+    },
+    {
+      "id": "iq-037-a",
+      "lesson": "037",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Explain the launch critical path and why delegate completion, first frame, and first usable interaction are different endpoints.",
+      "scenario": "A synthetic app assigns its root quickly, but account reconciliation and store migration continue behind a spinner before a deep link can open.",
+      "minutes": 7,
+      "androidBridge": "Kotlin/Java Android startup initializers suggest a dependency graph, but iOS process preparation, delegate or scene callbacks, and presentation metrics have different contracts. Completing a callback is not equivalent to Android fully drawn or usable content.",
+      "rubric": [
+        "Includes runtime preparation before familiar app callbacks.",
+        "Draws routing dependencies on account and migration readiness.",
+        "Defines first frame and usable content separately.",
+        "Identifies the longest required chain rather than summing concurrent work.",
+        "Declares terminated-process and resume preparation conditions."
+      ],
+      "answerHTML": "<p>Launch begins before the app delegate: code loading, runtime preparation, and initializers can contribute. App setup then creates the root, performs layout, commits a frame, and eventually presents it. That frame may still be a loading screen. Define usable content separately: required initialization is complete, the permitted route is visible, and a meaningful first interaction succeeds. Root assignment or viewDidAppear alone cannot certify all of those conditions.</p><p>Draw dependencies explicitly. A consumer needing migrated data waits for migration; an authenticated route waits for account reconciliation. The critical path is the longest necessary dependency chain, not the sum of every concurrent phase. Extra parallel work can add contention without shortening it. Specify preparation for terminated-process launches, returning-account launches, deep links, and process-surviving resume; do not call every case cold. Record uncertain OS cache state. Use supported launch measurements for first-frame evidence and a defined readiness boundary for usability, then verify the first tap. Source tracing identifies candidate phases, but supplies no timing or completed launch measurement.</p>",
+      "followUps": [
+        "How would you classify telemetry that must start early enough to observe launch?",
+        "Why can a faster first frame still make the first interaction worse?"
+      ],
+      "pitfalls": [
+        "Ending the launch experiment at root-controller assignment.",
+        "Summing all concurrent startup spans as the critical path."
+      ]
+    },
+    {
+      "id": "iq-037-b",
+      "lesson": "037",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design a bounded startup optimization proposal. Compare deferral and dependency or resource reduction, assign owners, and define measurement, rollout, and recovery.",
+      "scenario": "A team proposes lazily initializing several SDKs and changing framework linkage to improve launch and reduce size, without a matched baseline.",
+      "minutes": 15,
+      "androidBridge": "Kotlin lazy initialization and Android APK size analysis suggest tradeoffs. Swift Task creation can inherit MainActor isolation, and static or dynamic iOS linkage has different packaging costs; no fixed per-framework saving follows from the analogy.",
+      "rubric": [
+        "Assigns dependency, feature-readiness, and release-artifact ownership.",
+        "Compares alternatives against a measured critical phase.",
+        "Preserves account, migration, and instrumentation ordering.",
+        "Separates launch, first-interaction, download, and installed-size evidence.",
+        "Stages one change with corrective-build and behavior-recovery criteria."
+      ],
+      "answerHTML": "<p>First obtain matched launch and exported-artifact baselines, then select one measured bottleneck. Assign the startup owner dependency ordering, feature owners readiness and first-use behavior, and the release owner packaging verification. Compare deferring independent initialization with removing unused work or reducing a dependency/resource boundary. A linkage change deserves its own loader and packaging investigation; framework count does not imply a fixed timing penalty.</p><p>Classify work as required before presentation, required before usability, or opportunistic. Preserve account reconciliation, migration, and early instrumentation dependencies. Give deferred work a lifetime and failure policy; Task creation inside MainActor code does not automatically move synchronous initialization off the UI executor. Measure first frame, usable route, and first interaction under identical fixtures. Track executable, resources, download, and installed size as separate quantities. Stage one bounded candidate only after correctness and artifact checks. Define recovery as restoring prior initialization order or producing a verified corrective build for packaging changes. Record pending device observations rather than promising gains from the design.</p>",
+      "followUps": [
+        "What evidence would show lazy initialization merely moved the stall to the first tap?",
+        "Which rollback inputs are needed if the candidate also changes a binary dependency?"
+      ],
+      "pitfalls": [
+        "Assuming Task makes synchronous startup work background execution.",
+        "Using one file-size figure as download and installed-size evidence."
+      ]
+    },
+    {
+      "id": "iq-038-a",
+      "lesson": "038",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Explain commit hitches, render hitches, and hangs. How would you choose evidence for a scrolling screen that misses presentation deadlines?",
+      "scenario": "One candidate trace shows main-thread row mapping near a missed commit; another shows expensive compositing after the app commits on time.",
+      "minutes": 6,
+      "androidBridge": "Kotlin/Java Android View traversal and RenderThread offer a pipeline analogy. UIKit or SwiftUI commits through Core Animation and downstream rendering have distinct tracks; Android frame-stage names and budgets are not exact iOS counterparts.",
+      "rubric": [
+        "Separates app commit work from downstream rendering and presentation.",
+        "Distinguishes continuous-motion hitches from discrete unresponsiveness.",
+        "Correlates selected missed deadlines with stacks and render tracks.",
+        "Avoids assigning the entire frame interval to each function.",
+        "Confirms a candidate under a matched minimally instrumented gesture."
+      ],
+      "answerHTML": "<p>A frame passes through event handling and UI updates, Core Animation commit, downstream rendering, and display presentation. A commit hitch occurs when app work misses its commit deadline. A render hitch can occur after a timely commit when rendering misses its own deadline. A hang describes a period of unresponsiveness, often around a discrete interaction; a hitch interrupts continuous motion. One blocking operation can contribute to either depending on timing.</p><p>For the mapping hypothesis, select a missed commit interval and inspect relevant main-thread stacks and signposts. For the compositing hypothesis, inspect the render portion after the timely commit rather than assuming more background CPU work will help. Refresh cadence supplies deadline context, not a complete allowance for each method. Average CPU can hide a short badly timed burst. Keep gesture, content, image-cache state, text size, and device conditions fixed. After diagnosis, confirm the candidate with lighter instrumentation and the same interaction. A smooth-looking simulator pass or a print count cannot establish physical-device frame behavior.</p>",
+      "followUps": [
+        "How could a background worker still contribute to a UI deadline miss?",
+        "What would you inspect if the commit improved but scrolling still hitches?"
+      ],
+      "pitfalls": [
+        "Diagnosing all scrolling problems from average CPU alone.",
+        "Giving every function an entire refresh interval as its budget."
+      ]
+    },
+    {
+      "id": "iq-038-b",
+      "lesson": "038",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Diagnose a SwiftUI list that recomputes sorting during progress updates and loses row state after insertion. What does body evaluation prove?",
+      "scenario": "A 500-row synthetic list reads progress in its parent, sorts in body, and identifies rows by offsets. A print statement is being used as a redraw counter.",
+      "minutes": 9,
+      "androidBridge": "Kotlin Compose recomposition dependencies and stable keys suggest narrowing reads and preserving identity. SwiftUI Observation tracks accessed properties differently from ObservableObject publication, and body evaluation is not a direct Compose recomposition or displayed-frame count.",
+      "rubric": [
+        "Moves unchanged projection work to the accepted data-revision boundary.",
+        "Narrows progress reads to a relevant leaf.",
+        "Uses stable domain IDs rather than offsets.",
+        "Separates evaluation, reconciliation, layout, commit, and presentation.",
+        "Verifies behavior before claiming measured hitch improvement."
+      ],
+      "answerHTML": "<p>The parent establishes a dependency by reading progress, so frequent updates can trigger evaluation that repeats sorting. Compute the unchanged row projection when a new data revision is accepted and expose the result. Move progress reads into a relevant leaf, checking helper calls and aggregate inputs that may still broaden dependencies. Splitting functions alone does not guarantee narrower updates. Observation tracks accessed observable properties, while ObservableObject publication can have broader effects.</p><p>Use stable domain IDs in ForEach. Offsets change after insertion and can attach local state or actions to the wrong row. Preserve the observable owner's lifetime rather than recreating it during body evaluation. A body print counts evaluations with added overhead; it does not count displayed frames. Evaluation, reconciliation, layout, layer commit, and presentation are separate work. Prove sorting semantics, insertion identity, titles, actions, and cancellation before timing. Correlate update duration with actual hitch intervals and confirm on a matched gesture. Do not claim the dependency cleanup eliminates image decode or render-server cost.</p>",
+      "followUps": [
+        "How could passing a frequently changing aggregate to every row preserve broad invalidation?",
+        "Which fixture would catch an equality shortcut that hides a changed action?"
+      ],
+      "pitfalls": [
+        "Using body prints as a presented-frame counter.",
+        "Replacing stable item identity with array offsets."
+      ]
+    },
+    {
+      "id": "iq-039-a",
+      "lesson": "039",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Explain Swift Array value semantics and copy-on-write. Why can a small slice retain substantial memory, and what does copying class elements actually copy?",
+      "scenario": "A synthetic history keeps old array versions while mutating the newest. Another component retains a short ArraySlice after releasing the original binding.",
+      "minutes": 6,
+      "androidBridge": "Assigning a Kotlin List usually shares a reference; the read-only interface does not promise an independent snapshot. Swift Array preserves value semantics with possible shared storage, but arrays of class instances still share the referenced objects.",
+      "rubric": [
+        "Distinguishes logical value independence from immediate buffer copying.",
+        "Explains shared versus uniquely owned mutation.",
+        "Identifies retained old versions and slice backing storage.",
+        "Distinguishes element references from deep-copied objects.",
+        "Separates semantic assertions from allocation measurements and thread safety."
+      ],
+      "answerHTML": "<p>Assigning a Swift Array creates another logical value. Storage can initially be shared through copy-on-write, and mutating shared storage can require separation. A uniquely owned mutation can avoid that copy. Verify that the original value remains unchanged, but do not promise a particular allocation instruction: optimization and bridging affect implementation details. Retaining many old snapshots while editing the newest can keep several buffers alive.</p><p>An ArraySlice can retain a large backing allocation even when its visible range is small. Converting the needed range to a small Array trades immediate copying for potentially releasing that backing storage. Measure the actual allocation and retention under an equivalent optimized configuration. If elements are class instances, array storage contains references: copying or separating the array does not clone the objects, so mutating an element's properties can be visible through both arrays. Copy-on-write also does not make concurrent mutation of the same variable safe. Separate tests for value semantics, object ownership, transient copying cost, and retained memory population.</p>",
+      "followUps": [
+        "How would you keep both values observable in an optimized copy-on-write experiment?",
+        "When might copying a tiny slice be preferable despite its immediate work?"
+      ],
+      "pitfalls": [
+        "Assuming every assignment eagerly deep-copies array storage and objects.",
+        "Treating copy-on-write as synchronization for a shared mutable variable."
+      ]
+    },
+    {
+      "id": "iq-039-b",
+      "lesson": "039",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Diagnose memory peaks in an 80-point thumbnail grid. Why are compressed bytes, view bounds, retained cache size, and concurrent decoding different budgets?",
+      "scenario": "Several 4000-by-3000 JPEGs decode concurrently on a scale-three display. The final cache is small, but the report assumes small UIImageView frames imply small decoded buffers.",
+      "minutes": 10,
+      "androidBridge": "Android Bitmap decoding and thumbnail sampling offer a pixel-budget analogy. UIImageView bounds do not set ImageIO decode dimensions, and Objective-C autorelease lifetime differs from Kotlin garbage collection or coroutine suspension.",
+      "rubric": [
+        "Calculates 48 million bytes for the stated four-byte pixel estimate.",
+        "Converts 80 points at scale three to a 240-pixel display requirement.",
+        "Explains downsampling before needless full-source materialization.",
+        "Bounds concurrent decodes and treats panorama or multi-frame policy separately.",
+        "Separates estimated pixels, transient peak, retained objects, and measured footprint."
+      ],
+      "answerHTML": "<p>A four-byte-per-pixel estimate for 4000 by 3000 pixels is 48 million bytes, about 45.8 MiB, before padding, intermediates, or other overhead. Compressed JPEG size does not describe that decoded budget. An 80-point destination on a scale-three display suggests roughly 240 pixels per side. Resizing the view or scaling an already decoded image does not ensure the source was decoded at that size.</p><p>Use a bounded ImageIO thumbnail path with orientation transformation, then verify output dimensions and quality. A longest-edge bound preserves aspect ratio; a panorama filling a square needs a separate crop or accepted-quality policy. Bound active decodes as well as retained cache cost, because several large intermediates can dominate the peak. Inspect allocations, footprint, and route-exit retention independently. A synchronous autorelease pool can shorten some Objective-C temporary lifetimes, but it should not enclose await or be expected to drain future callbacks. Compare equivalent source fixtures and appearance, and label pixel arithmetic as estimated until actual memory evidence exists.</p>",
+      "followUps": [
+        "How would you distinguish a decode peak from a retained screen-owner cycle?",
+        "Which additional limits would you declare for animated or untrusted image sources?"
+      ],
+      "pitfalls": [
+        "Using compressed file bytes as the decoded-cache budget.",
+        "Claiming small view bounds guarantee downsampled decoding."
+      ]
+    },
+    {
+      "id": "iq-040-a",
+      "lesson": "040",
+      "level": "Senior",
+      "kind": "Code",
+      "prompt": "Outline a task-group loader with a positive concurrency window and ordered output. Which limits and cancellation checks does that algorithm establish?",
+      "scenario": "A batch has many synthetic inputs. The current version creates one task per input, waits for permits, then compactMaps incomplete output after cancellation.",
+      "minutes": 10,
+      "androidBridge": "Kotlin coroutine workers or a semaphore suggest bounded execution. Swift task groups return completion order and join their children; a semaphore around thousands of created tasks, in either language, does not bound queued captures or payload bytes.",
+      "rubric": [
+        "Seeds at most the positive limit and replenishes after completion.",
+        "Returns input indexes and lets the parent own output mutation.",
+        "Checks cancellation before replacement work and publication.",
+        "Preserves cancellation and failures instead of publishing incomplete success.",
+        "Distinguishes active-task, queue, payload-byte, and request-rate limits."
+      ],
+      "answerHTML": "<p>Reject a nonpositive limit and return an empty result for empty input. Seed the group with at most the limit's worth of inputs. Each child returns its input index and loaded immutable value. As the parent receives a completion, store it in that index's slot and add at most one replacement after checking cancellation. Only the parent mutates the output array, preserving input order even when completion order differs.</p><p>Let meaningful child failure escape under the declared policy so the structured scope cancels and joins remaining work. Children must cooperate; the group cannot force an unresponsive legacy call to stop. Check cancellation before admission and before publishing. Validate that every expected output exists rather than using compactMap to disguise missing work as success. This window bounds initially created and active children, but not final output size, each payload's bytes, or requests per second. Give those separate budgets. Use gated fakes to complete later inputs first and verify ordering, peak active calls, empty input, and cancellation without timing sleeps.</p>",
+      "followUps": [
+        "What happens to scope completion if a canceled fake never resumes?",
+        "How would you specify partial failure without silently changing the successful-output contract?"
+      ],
+      "pitfalls": [
+        "Calling a permit-limited queue of thousands of tasks bounded memory.",
+        "Using compactMap to turn cancellation into a shorter successful result."
+      ]
+    },
+    {
+      "id": "iq-040-b",
+      "lesson": "040",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design a shared loading service under memory and energy constraints. Compare loss policies and coalescing alternatives, assign owners, and define measurement, staged rollout, and recovery.",
+      "scenario": "Visible and prefetched rows share downloads. A callback stream outpaces decoding, logout occurs during transfer, and one departing waiter cancels everyone's work.",
+      "minutes": 18,
+      "androidBridge": "Kotlin Flow suspension and shared coroutine ownership suggest demand and waiter policies. AsyncStream bufferingNewest drops buffered elements rather than suspending producers, and awaiting an unstructured Swift Task does not automatically propagate waiter cancellation.",
+      "rubric": [
+        "Assigns shared-operation, waiter, cache-commit, and UI-publication ownership.",
+        "Compares replacement progress with lossless ordered-event handling.",
+        "Declares queue bytes, active work, priority, and rate budgets separately.",
+        "Validates account epoch at cache commit and feature generation at publication.",
+        "Defines device measurements, phased adoption, and bounded fallback."
+      ],
+      "answerHTML": "<p>Let the service own a coalesced operation and each consumer own its interest. Canceling one waiter should follow policy without abandoning other active waiters; define what happens when the last leaves. Compare coalescing with independent requests using transfer, latency, and memory evidence. Prioritize visible demand over speculative prefetch through a documented admission policy.</p><p>For streams, replaceable progress may use a newest-value buffer. Ordered tokens or commands need demand-aware delivery, a pull source, or explicit overflow failure and recovery. An element count is not a byte budget. Independently bound queued bytes, active transfers, decoding, and request rate. The cache owner checks account epoch in its commit domain, while the UI owner checks its query generation before publication. Stage one consumer after gated cancellation/logout fixtures and matched device comparisons of throughput, p95, peak memory, and supported energy observations. Under pressure, stop optional admission and recover gradually; avoid restart storms. Keep a known-good loading policy for rollback and never report battery savings from request-count reduction alone.</p>",
+      "followUps": [
+        "Which signals would distinguish beneficial coalescing from visible-demand priority inversion?",
+        "What recovery contract applies if a lossless stream exceeds its bounded byte budget?"
+      ],
+      "pitfalls": [
+        "Describing a dropping AsyncStream buffer as producer backpressure.",
+        "Checking account ownership only in the foreground caller before a later cache write."
+      ]
+    },
+    {
+      "id": "iq-041-a",
+      "lesson": "041",
+      "level": "Senior",
+      "kind": "Code",
+      "prompt": "Sketch stable deduplication using a membership index. Explain order, equality, complexity, and memory before proposing it as a performance improvement.",
+      "scenario": "The input is [b, a, b, c]. A baseline repeatedly scans its output; a proposed replacement converts directly to Set and returns its elements.",
+      "minutes": 8,
+      "androidBridge": "Kotlin LinkedHashSet suggests preserving first occurrence, but a plain Swift Set does not preserve the input-order contract. Swift String equality and hashing are not Java UTF-16 or byte-comparison semantics, so keep the declared identity policy.",
+      "rubric": [
+        "Traverses input once and appends only newly inserted keys.",
+        "Predicts the full ordered output [b, a, c].",
+        "Explains quadratic scanning versus expected linear membership work.",
+        "Accounts for hashing, key projection, Unicode equality, and extra memory.",
+        "Requires semantic equivalence before matched optimized measurements."
+      ],
+      "answerHTML": "<p>Keep an output array and a Set of seen keys. Traverse the original input and append an element only when <code>seen.insert(key).inserted</code> is true. For [b, a, b, c], the result is [b, a, c]. The Set answers membership; the array preserves first-occurrence order. Returning arbitrary Set elements would change that observable contract.</p><p>Repeated contains checks on a growing array have quadratic worst-case membership comparisons for many distinct items. Indexed membership usually reduces that work to expected linear behavior over the input, with additional storage. Hashing and equality still cost time, particularly for long strings, and an expensive identity projection should be evaluated deliberately. Do not change case folding or normalization while claiming equivalence. Check complete outputs for empty, all-equal, all-distinct, mixed, and Unicode fixtures. Keep results observable under the same optimized configuration and construct fixtures outside a clearly named mapping-only interval. A microbenchmark can establish the mapping tradeoff; it does not independently establish screen responsiveness or energy gains.</p>",
+      "followUps": [
+        "How would a key projection change duplicate selection and its cost model?",
+        "Why might reserving excessive capacity hurt the memory tradeoff?"
+      ],
+      "pitfalls": [
+        "Returning an unordered Set while claiming stable first-occurrence output.",
+        "Calling theoretical expected complexity an observed device improvement."
+      ]
+    },
+    {
+      "id": "iq-041-b",
+      "lesson": "041",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Review a claim that splitting a Swift module sped up both compilation and scrolling. What experiments distinguish build critical paths from runtime algorithms?",
+      "scenario": "A no-op build is compared with a clean build on another toolchain. A set-backed mapping is timed with fixture creation included only in the baseline.",
+      "minutes": 9,
+      "androidBridge": "Gradle incremental-build and Kotlin algorithm analysis suggest separate investigations. Swift tools version, language mode, optimization, and generated module graph are independent inputs; faster type checking does not imply faster iOS execution.",
+      "rubric": [
+        "Separates build-time and runtime hypotheses and reports.",
+        "Matches clean, no-op, and edit-triggered build preparation.",
+        "Inspects the build dependency critical path and earliest bottleneck.",
+        "Uses equivalent runtime boundaries and semantic assertions.",
+        "States module overhead and pending screen-level evidence."
+      ],
+      "answerHTML": "<p>The claim combines two different performance domains. For compilation, compare like preparation states: clean with clean, no-op with no-op, and a declared private or public edit with its equivalent. Keep host, compiler, destination, resolved graph, generated inputs, configuration, and cache policy fixed. Inspect the build timeline to locate type checking, dependency emission, linking, resources, or scripts. Module splitting can change rebuild scope and add graph overhead; its benefit is conditional.</p><p>For runtime mapping, first verify complete output equivalence, ordering, duplicate policy, and errors. Construct fixtures outside both mapping-only intervals or include them consistently in a broader named operation. Use the same optimized configuration, keep results observable, alternate matched runs, and retain raw samples. Expected algorithm growth predicts a candidate but is not measured speed. A faster build or mapping does not establish scrolling improvement. That needs a separate stable-identity gesture experiment and hitch evidence. Correct the report's mismatched denominators before attributing either result to the module change.</p>",
+      "followUps": [
+        "Why might a public API edit have a different incremental cost from a private implementation edit?",
+        "Which build evidence would justify a typed-expression rewrite before module splitting?"
+      ],
+      "pitfalls": [
+        "Comparing clean and warm builds as if their work were equivalent.",
+        "Including fixture construction in only one candidate's runtime interval."
+      ]
+    },
+    {
+      "id": "iq-042-a",
+      "lesson": "042",
+      "level": "Senior",
+      "kind": "Design",
+      "prompt": "Design a controlled investigation for moving row projection out of repeated body evaluation. What must be proven before collecting and reporting timings?",
+      "scenario": "A synthetic candidate computes the same projection on accepted data revisions. Only a short profiler run exists, and an async timeout was recorded as a latency sample.",
+      "minutes": 12,
+      "androidBridge": "Kotlin/Java Android benchmark and macrobenchmark harnesses suggest distinct boundaries. An XCTest timing harness, signposted iOS interaction, and physical-device trace each prove different contracts; a timeout is not completed latency in either ecosystem.",
+      "rubric": [
+        "Freezes baseline, candidate, fixture, and falsifiable hypothesis.",
+        "Checks order, identity, empty/error states, and cancellation first.",
+        "Separates diagnostic tracing from matched confirmation samples.",
+        "Retains outcome classifications and paired phase observations.",
+        "Labels measured, source-derived, theoretical, and pending conclusions."
+      ],
+      "answerHTML": "<p>Freeze the two revisions, synthetic fixture, cache preparation, cohort, and hypothesis: moving an unchanged projection should reduce repeated synchronous work. Before timing, assert full ordering and equality, empty/error behavior, insertion identity, actions, and cancellation. A candidate that hides a changed action or stale result fails regardless of speed.</p><p>Use a diagnostic trace to correlate projection work with relevant commit or hitch intervals. Then collect matched, lighter-instrumentation operation samples under a declared warm-up and outcome policy, alternating or randomizing batches to reduce drift. Record raw order, units, sample count, estimator, cache and thermal conditions, failures, cancellation, and invalid preparation. An async timeout is an unfinished operation, not a successful latency sample. Keep paired phase data rather than adding unrelated phase p95 values. Add memory route cycles only when the change affects retention or peak. The handoff separates arithmetic and source reasoning from executed tests and device measurements, with reproducible commands and artifacts. Hardware-dependent results remain pending until actually collected.</p>",
+      "followUps": [
+        "What could heavier profiling change that requires a confirmation batch?",
+        "How would you make another engineer reproduce one cohort without guessing warm-up state?"
+      ],
+      "pitfalls": [
+        "Timing a candidate before checking equivalent observable behavior.",
+        "Counting an unfinished async timeout as a completed latency observation."
+      ]
+    },
+    {
+      "id": "iq-042-b",
+      "lesson": "042",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design ownership and adoption of performance regression gates. Compare absolute and paired budgets, define noise handling, and specify rollout and recovery decisions.",
+      "scenario": "A proposed gate uses an arbitrary p95 threshold and retries until green. Simulator measurements are being presented as phone smoothness and energy acceptance.",
+      "minutes": 15,
+      "androidBridge": "Kotlin/Java Android performance CI suggests artifact retention and cohort budgets. Simulator XCTest baselines do not reproduce phone thermal, GPU, or energy behavior, just as host or emulator benchmarks cannot certify every Android device cohort.",
+      "rubric": [
+        "Makes correctness the first hard gate.",
+        "Assigns fixture, budget, runner, and release decision owners.",
+        "Compares absolute user budgets with matched relative controls.",
+        "Uses observed variance and bounded rerun rules.",
+        "Stages gate enforcement and defines inspect, revert, or corrective-release outcomes."
+      ],
+      "answerHTML": "<p>Make correctness a hard gate before performance: stale or incomplete output never passes. Assign a fixture owner, runner owner, budget owner, and release decision role. Derive cohort-specific thresholds from baseline observations, variance, and product requirements. An absolute budget expresses user needs; a paired control helps expose runner drift. Compare both rather than inventing a threshold that merely accepts the current candidate.</p><p>Keep simulator CI and device release evidence separate. A simulator pass cannot certify phone rendering, memory pressure, or energy. Retain raw results, matching traces, failures, skips, and environmental changes so reviewers can distinguish regression from harness failure. Use a predeclared bounded rerun policy; repeated attempts until green hide instability. Stage new gates in observation mode, review noise and actionability, then enforce the validated boundaries. On failure, inspect or reproduce under the same protocol, revert the bounded candidate when regression is established, and use a corrective release if already distributed. Budget changes require an explained owner decision, not automatic relaxation.</p>",
+      "followUps": [
+        "What artifact would let a reviewer distinguish fixture preparation failure from a real regression?",
+        "When should a toolchain or fixture change require a new baseline rather than direct comparison?"
+      ],
+      "pitfalls": [
+        "Retrying without a bound until one run passes.",
+        "Treating a simulator gate as physical-device energy acceptance."
+      ]
+    },
+    {
+      "id": "iq-043-a",
+      "lesson": "043",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Explain target, scheme action, configuration, destination, and runtime environment. Why does a scheme called Sandbox not prove the resulting app's identity or endpoint?",
+      "scenario": "A synthetic workspace can run a Debug production app or archive a Release sandbox app. Developers describe both choices as one flavor.",
+      "minutes": 6,
+      "androidBridge": "Gradle product flavors and build types declared in Kotlin DSL form a variant graph, but an Xcode scheme is an action selection rather than one flavor. Swift compilation conditions, bundle identity, resources, and runtime endpoint are separate choices.",
+      "rubric": [
+        "Defines each build axis and its responsibility.",
+        "Separates optimization configuration from service environment.",
+        "Explains scheme action-specific target and configuration selection.",
+        "Distinguishes declared settings from effective and built-artifact evidence.",
+        "Checks bundle identity and capabilities rather than trusting names."
+      ],
+      "answerHTML": "<p>A target defines a component and its output, such as an app, framework, extension, or test bundle. A scheme selects participants and settings for Run, Test, Archive, and other actions. A configuration provides build settings, while a destination chooses platform and runtime. Runtime service environment is another decision. Debug can use production services, and Release can use a sandbox if that contract is explicitly configured.</p><p>Scheme names describe intent, not the effective compiler conditions, installed bundle identifier, or endpoint. Follow the chosen action to its consuming target and configuration, then trace configuration includes, target overrides, resources, and the application's environment mapping. A user-defined build setting is not automatically readable by Swift code. Inspect bounded effective settings and compiler inputs, and verify the built bundle's identity and capabilities when artifact evidence is needed. Keep declaration, effective value, and observed behavior separate. Do not assume Xcode generates the same flavor cross-product as Gradle or that a directory named Sandbox participates in the selected action.</p>",
+      "followUps": [
+        "Why could Run and Archive under the same scheme select different configurations?",
+        "How would a build-setting environment value reach application code deliberately?"
+      ],
+      "pitfalls": [
+        "Equating a scheme name with a Gradle flavor and endpoint.",
+        "Assuming Release always means production services."
+      ]
+    },
+    {
+      "id": "iq-043-b",
+      "lesson": "043",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Diagnose a sandbox build overwriting production while ignoring a new Swift condition. Which evidence resolves identity and setting-precedence failures?",
+      "scenario": "An xcconfig appends COURSE_SANDBOX with inheritance, but the target supplies its own condition list. Both installed artifacts unexpectedly use the same bundle identifier.",
+      "minutes": 10,
+      "androidBridge": "Android applicationIdSuffix and Kotlin/Java BuildConfig access suggest separate installation and behavior inputs. Xcode bundle identifiers and SWIFT_ACTIVE_COMPILATION_CONDITIONS follow layered setting precedence; they are not automatically generated from Gradle flavor semantics.",
+      "rubric": [
+        "Resolves the exact scheme action, target, configuration, and SDK.",
+        "Traces includes, inherited lists, conditions, and target overrides.",
+        "Inspects effective Swift conditions and the compiler invocation.",
+        "Checks the built bundle identifier and matching capability contract.",
+        "Separates flag-driven behavior from runtime endpoint configuration."
+      ],
+      "answerHTML": "<p>First identify the actual scheme action, consuming target, configuration, and SDK for each artifact. Trace the xcconfig include chain and subsequent assignments. Inherited expansion preserves lower-layer list values, but a higher-precedence target assignment can still replace the list. Inspect the effective compilation conditions and relevant compile invocation before concluding that the appended condition reaches Swift.</p><p>For installation overwrite, inspect the built bundle identifier rather than the scheme label. Trace its prefix expansion and target overrides, then review compatible signing and capability inputs without dumping sensitive settings. The identifier governs installation identity; changing a Swift condition alone does not create another app identity. Separately inspect how the runtime endpoint is selected, because compiler flags do not automatically configure a server. Compare bounded declared, effective, and artifact observations, and classify any Release-only import failure by target dependency and conditional membership. Avoid a broad cache reset until the graph and precedence evidence identify an actual stale artifact.</p>",
+      "followUps": [
+        "Could inherited expansion preserve an unwanted condition as well as a needed one?",
+        "What changes if the target edge exists in a generated graph but not a retained project?"
+      ],
+      "pitfalls": [
+        "Assuming an xcconfig append survives every target override.",
+        "Changing only a compilation flag to solve installation identity."
+      ]
+    },
+    {
+      "id": "iq-044-a",
+      "lesson": "044",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Trace package, product, target module, requirement, and resolved revision. How do a version-looking branch and a framework filename mislead compatibility reasoning?",
+      "scenario": "The lesson's dependency audit includes a branch named 4.1.3 and a mocks product with different linkage declarations across graph routes.",
+      "minutes": 7,
+      "androidBridge": "Gradle coordinates and dependency locks for Kotlin/Java modules suggest requirements versus selections. SwiftPM products expose target modules, and package resolution belongs to a consumer graph; Maven-style versions and AAR filenames do not define Swift linkage or module stability.",
+      "rubric": [
+        "Separates package identity, product exposure, and importable target module.",
+        "Distinguishes requirement semantics from a selected revision.",
+        "Treats a version-looking branch as a branch.",
+        "Separates static or dynamic linking from framework packaging.",
+        "Distinguishes source, ABI, module, and runtime compatibility."
+      ],
+      "answerHTML": "<p>A package is a dependency unit with a manifest; a product exposes one or more targets for consumers; a target commonly defines an importable module. A requirement describes allowed selections, while the relevant consumer's Package.resolved records the selected revision and version or branch state. A branch named 4.1.3 remains a branch, not an exact semantic-version requirement. A dependency's own lockfile does not universally force downstream resolution.</p><p>Static and dynamic describe linking behavior, not just whether an artifact ends in framework. Different graph routes can declare different linkage, which deserves consumer review rather than an automatic bug claim. Source compatibility asks whether code compiles against the API. ABI describes compiled calling and layout contracts; module stability concerns compiler consumption of interfaces. Swift runtime ABI stability does not make arbitrary vendor binaries interchangeable. Check interfaces, platform variants, minimum OS, resources, and the consuming route. A resolved pin is neither proof of runtime execution nor a claim that the dependency is the latest available release.</p>",
+      "followUps": [
+        "Why must an arm64 device slice be distinguished from an arm64 simulator slice?",
+        "Which inputs would reproduce the selected graph after a bounded dependency change?"
+      ],
+      "pitfalls": [
+        "Reading a branch name that looks like a version as an exact release pin.",
+        "Inferring linkage and compatibility from a framework suffix alone."
+      ]
+    },
+    {
+      "id": "iq-044-b",
+      "lesson": "044",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design a review and adoption plan for a synthetic VendorCodec XCFramework. Compare source and binary alternatives, assign owners, and define compatibility evidence, rollout, and reconstruction.",
+      "scenario": "The vendor supplies only a device build and a compiler-specific swiftmodule. An initial import succeeds on one machine, and the team proposes immediate broad adoption.",
+      "minutes": 18,
+      "androidBridge": "Kotlin/Java libraries packaged in Android AARs and native-library review suggest provenance and ABI coverage. XCFramework platform variants, swiftinterface module stability, and library evolution are separate Swift distribution contracts rather than JVM bytecode compatibility.",
+      "rubric": [
+        "Assigns API, graph, packaging, provenance, and license review responsibilities.",
+        "Compares rebuilt source with independently distributed binaries.",
+        "Checks device/simulator variants, interfaces, dependencies, resources, and runtime floor.",
+        "Separates compile, link, load, and runtime availability evidence.",
+        "Stages one consumer and preserves prior artifact inputs for recovery."
+      ],
+      "answerHTML": "<p>Assign the contract owner API semantics, the graph owner dependency inputs, the platform owner destination and packaging checks, and appropriate reviewers provenance, licensing, and data behavior. Compare a source package rebuilt with the app against the vendor binary's distribution constraints. A successful local import is only one gate. Inspect distinct device and simulator variants, minimum OS, dependencies, resources, checksums, and interfaces.</p><p>A compiler-specific swiftmodule can limit consumption across compiler versions; textual interfaces and appropriate distribution support address a different boundary from stable runtime ABI. Classify import, duplicate-symbol, missing-framework, and unavailable-API failures separately. Verify supported consumers through compile, link, artifact inspection, and runtime checks, including extensions when affected. Stage one bounded consumer after its semantic and integration evidence passes. Retain the prior manifest, resolution, generator/compiler inputs, resource contents, and binary checksum for reconstruction. Define containment and a corrective-build path if the candidate is distributed. Do not call checksum verification license approval, or assume rebuilding prior source downgrades installed clients.</p>",
+      "followUps": [
+        "When is BUILD_LIBRARY_FOR_DISTRIBUTION useful, and why not enable it indiscriminately?",
+        "What additional evidence is required if the binary imports successfully but its resources are missing?"
+      ],
+      "pitfalls": [
+        "Treating one compiler import as complete distribution compatibility.",
+        "Assuming equal CPU architecture makes device and simulator variants interchangeable."
+      ]
+    },
+    {
+      "id": "iq-045-a",
+      "lesson": "045",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "What evidence establishes a library's responsibility and migration status? Explain the lesson's ZDRxCore naming mismatch and promise-to-async boundary.",
+      "scenario": "A guide calls a module RxSwift-based, but the lesson traces a ReactiveKit dependency and re-export. PromiseKit bridges coexist with preferred Swift Concurrency guidance.",
+      "minutes": 7,
+      "androidBridge": "Android dependencyInsight and RxJava-to-coroutines migrations suggest graph and consumer audits. A Swift module name does not establish its implementation, and converting a promise to async does not automatically inherit Kotlin structured cancellation semantics.",
+      "rubric": [
+        "Uses active manifests, consumer edges, pins, and source imports together.",
+        "Distinguishes remote, local, system, vendored, and tooling dependencies.",
+        "Interprets the lesson's ReactiveKit evidence over a misleading module name.",
+        "Treats preferred concurrency direction as distinct from completed migration.",
+        "Checks bridge cancellation, failures, buffering, and completion ownership."
+      ],
+      "answerHTML": "<p>Start with the graph route being evaluated: dependency manifest, consumer target edges, relevant resolution, and source membership/imports. A pin can be transitive or test-only, and a build plugin is not automatically a runtime SDK. Separate transport, generated models, domain operations, UI, identity, and observability responsibilities instead of listing names without consumers.</p><p>The lesson's audit traces ZDRxCore to ReactiveKit despite RxSwift wording in a guide. That concrete dependency and re-export evidence should govern the explanation. The same audit finds PromiseKit bridges alongside guidance preferring Swift Concurrency; preference does not prove removal. An async wrapper changes the calling surface but does not automatically cancel underlying promise work or make its lifetime structured. Inspect task handles, continuation completion, actor isolation, and failure translation. Likewise, a publisher-to-stream bridge that finishes on failure can erase a thrown error distinction. State a migration claim per verified consumer and preserve empty success, failure, cancellation, and buffering semantics. Names and documentation alone cannot establish runtime adoption.</p>",
+      "followUps": [
+        "What evidence would distinguish a declared SDK edge from actual feature initialization?",
+        "How would you test a bridge that turns publisher failure into ordinary stream completion?"
+      ],
+      "pitfalls": [
+        "Teaching an unverified library because its name resembles a module prefix.",
+        "Claiming legacy removal from a preference document or async wrapper."
+      ]
+    },
+    {
+      "id": "iq-045-b",
+      "lesson": "045",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design one vendor-independent catalog seam and its migration plan. Assign interface, adapter, and composition-root owners; compare alternatives, evidence, staged rollout, and rollback.",
+      "scenario": "A feature exposes vendor promise types and resolves services at runtime. The proposed wrapper renames dozens of SDK methods but leaves offline errors indistinguishable from empty results.",
+      "minutes": 16,
+      "androidBridge": "A Kotlin interface plus Dagger binding suggests separating product contract from adapter wiring. A runtime Swift container can fail during resolution rather than receiving Dagger's generated graph validation, and Swift async throws has separate cancellation rules.",
+      "rubric": [
+        "Defines a narrow product operation with meaningful result and error semantics.",
+        "Assigns interface, adapter, graph, and composition-root responsibilities.",
+        "Compares a stable seam with direct vendor exposure and a broad wrapper.",
+        "Checks runtime registration, empty success, failure, cancellation, and consumers.",
+        "Stages one seam and preserves the old adapter for recovery."
+      ],
+      "answerHTML": "<p>Expose a narrow operation such as loading immutable catalog entries with async throws. Keep successful emptiness distinct from offline or malformed failure, and define ordering and cancellation. Compare direct vendor exposure, a product-sized seam, and a broad wrapper that merely renames the SDK. The narrow seam makes substitution testable without importing unnecessary vendor types into every consumer.</p><p>The interface owner maintains semantics, the adapter owner translates vendor behavior, the graph owner maintains dependency inputs, and the composition-root owner validates registration and lifetime. Runtime resolution needs actual selected-flow checks; importing the interface does not prove registration exists. Use independent fakes and adapter fixtures for empty success, mapped errors, termination, cancellation, and account changes. Stage migration for one consumer with a bounded behavior and observability gate, listing remaining legacy consumers explicitly. Preserve the prior adapter and graph inputs for rollback, and exercise both registrations without duplicate effects. A seam migration can be complete while promises remain elsewhere; no repository-wide removal or named human ownership follows from this design.</p>",
+      "followUps": [
+        "Which vendor behavior should remain explicit rather than being erased by a generic error?",
+        "How would you detect missing runtime registration before a user enters the migrated flow?"
+      ],
+      "pitfalls": [
+        "Building a large renaming wrapper without a stable product contract.",
+        "Treating runtime dependency resolution as compile-time Dagger validation."
+      ]
+    },
+    {
+      "id": "iq-046-a",
+      "lesson": "046",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Explain resource ownership from manifest to lookup. Why can a package compile while its JSON, font, or translated string is unavailable to a consumer?",
+      "scenario": "A synthetic CourseResources target owns bootstrap.json, but a test host and an extension both use Bundle.main to find it.",
+      "minutes": 7,
+      "androidBridge": "Kotlin/Java access to Android R and Context-based resources suggests an ownership chain. SwiftPM Bundle.module is generated for a resource-bearing target and is not Android R or a universal bundle accessor exposed by every imported module.",
+      "rubric": [
+        "Connects input, target declaration, processing, owning bundle, and lookup.",
+        "Distinguishes Bundle.main from a package-owned resource bundle.",
+        "Explains process versus copy and generated accessor scope.",
+        "Preserves missing, I/O, decode, and domain-validation failures.",
+        "Separates host lookup evidence from app or extension packaging."
+      ],
+      "answerHTML": "<p>A resource participates through its target's build declaration, not merely because it sits in a directory named Resources. Trace the file or catalog through processing, target membership, generated support, owning bundle, and lookup code. Bundle.main identifies the running process's main bundle, which changes under a test host or extension. SwiftPM generates Bundle.module for the resource-bearing target; the owner can expose a deliberate public accessor or loader.</p><p>Process requests supported transformations, while copy preserves specified content or structure. A static code product can still require a separate resource bundle. Asset catalogs, localized tables, and fonts have additional processing or registration contracts. The JSON loader should distinguish missing lookup from read failure, malformed decoding, and unsupported schema rather than returning a generic empty result. Test known, absent, and corrupt fixtures through the correct owner. Then inspect applicable consumer packaging and actual lookup. A host decoding test proves its package fixture, not an app archive, extension bundle, translated UI, font registration, or privacy-manifest sufficiency.</p>",
+      "followUps": [
+        "How should a module expose resources without leaking an incidental bundle layout?",
+        "Why can a static framework still require packaged non-code resources?"
+      ],
+      "pitfalls": [
+        "Using Bundle.main for every library resource.",
+        "Conflating missing files, decoding failures, and unsupported schema."
+      ]
+    },
+    {
+      "id": "iq-046-b",
+      "lesson": "046",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Diagnose generated models that change repeatedly and a privacy manifest absent from an archive. Which input and packaging chains need separate investigation?",
+      "scenario": "A generated model was edited manually. Generator, schema modifier, and operation inputs differ across runs; a PrivacyInfo file exists in source but its target membership is unclear.",
+      "minutes": 10,
+      "androidBridge": "Kotlin KSP and Android manifest/resource merging suggest reproducible inputs and packaged outputs. Swift macros, GraphQL generation, and PrivacyInfo resources are different mechanisms; a privacy manifest is not an Android permission declaration or runtime authorization.",
+      "rubric": [
+        "Records generator pin, schema, operations, modifier, configuration, and output ownership.",
+        "Explains why hand-edited generated output can be overwritten or pruned.",
+        "Requires repeated generation from identical inputs without unexplained diff.",
+        "Traces the privacy file into the affected target and final artifact.",
+        "Distinguishes packaging evidence from accurate data-use declarations."
+      ],
+      "answerHTML": "<p>Treat model generation as a pipeline: tool selection, schema acquisition, schema modification, operation validation, output generation, and compilation. Record exact input hashes, generator version, configuration, output module, and membership. A manual edit can disappear during regeneration, and pruning can remove stale generated files. Compare runs with identical pinned inputs; unexplained output differences require investigation before attributing failure to consumer code. Preserve handwritten support only under the generator's declared ownership rules.</p><p>The missing privacy file has a separate chain. Trace its resource declaration into the affected app, extension, or dependency and inspect the final packaged artifact. Source presence is insufficient. PrivacyInfo describes relevant data use and required-reason API declarations; it is not an entitlement or runtime permission. Packaging the file still does not prove its contents match shipped behavior. Review the selected SDK and implementation with appropriate privacy expertise. Use isolated local generation fixtures for reproduction, keeping live schema fetches and client regeneration outside this interview exercise. A compiler macro failure would be yet another host-tool boundary.</p>",
+      "followUps": [
+        "What would distinguish a generator-version mismatch from changed schema-modifier input?",
+        "Why must accurate privacy content and archive inclusion be separate acceptance checks?"
+      ],
+      "pitfalls": [
+        "Hand-editing generated models as the durable source of truth.",
+        "Treating a source privacy file as permission or a compliance verdict."
+      ]
+    },
+    {
+      "id": "iq-047-a",
+      "lesson": "047",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Explain stored-value inspection versus LLDB expression evaluation. How would you inspect a counter without accidentally changing the stopped program?",
+      "scenario": "CourseCounter starts at zero, recordTap increments it, and label is computed. A debugger command that calls recordTap is being described as harmless inspection.",
+      "minutes": 5,
+      "androidBridge": "Java/Kotlin debugger evaluation can also execute getters and methods. LLDB frame-variable inspection and Swift expression compilation have their own module and optimization constraints; po is not guaranteed passive field inspection.",
+      "rubric": [
+        "Predicts stored count zero before and one after one ordinary call.",
+        "Identifies label as a getter rather than a stored snapshot.",
+        "Distinguishes inspecting debug information from executing expressions.",
+        "Avoids mutating calls and sensitive diagnostic values.",
+        "Records stop context and accounts for optimized-away variables."
+      ],
+      "answerHTML": "<p>Break inside recordTap in the synthetic program and inspect the selected thread, frame, and stored count. Before the increment it is zero; after stepping over one ordinary call it is one. Frame-variable inspection reads through available debug information. Evaluating label invokes its getter and constructs the string, even if this example's getter is simple. Evaluating recordTap deliberately mutates the process and cannot be called passive inspection.</p><p>Expression-based commands can allocate, lock, invoke descriptions, or perform other application work. Start with stored fields when they answer the hypothesis. A failed Swift expression may reflect debugger module or type-context problems while the compiled program remains valid. Optimization can inline code, remove variables, and move work relative to source lines, so an unoptimized reproduction is informative but not identical release evidence. Record artifact identity, configuration, stop reason, and whether an observation was executed or only predicted. Keep account, token, request, and full environment values out of diagnostic output.</p>",
+      "followUps": [
+        "How could a custom description or computed getter change a debugger observation?",
+        "What would you retain when an optimized variable is unavailable but the release failure matters?"
+      ],
+      "pitfalls": [
+        "Calling a mutating method through expression during supposed inspection.",
+        "Assuming a debugger expression failure proves application compilation is broken."
+      ]
+    },
+    {
+      "id": "iq-047-b",
+      "lesson": "047",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Classify an unrecognized selector, missing generated Swift header, and unsymbolicated release frame. Which interoperability and artifact boundaries explain each?",
+      "scenario": "A UIKit callback owner is not retained, its method lacks the expected Objective-C exposure, and crash analysis uses symbols from another build with the same marketing version.",
+      "minutes": 10,
+      "androidBridge": "Android listeners and Java/Kotlin interoperability suggest registration and owner lifetime. Objective-C selectors, bridging headers, generated ProductModuleName-Swift.h, and UUID-matched dSYMs are different mechanisms rather than Java method references or JNI equivalents.",
+      "rubric": [
+        "Distinguishes Objective-C-to-Swift and Swift-to-Objective-C header directions.",
+        "Checks selector signature and Objective-C representability.",
+        "Identifies retained callback and closure-capture ownership.",
+        "Explains that Objective-C exposure does not automatically hop to MainActor.",
+        "Requires symbols matching the actual release binary UUID."
+      ],
+      "answerHTML": "<p>An unrecognized selector suggests checking the actual Objective-C method name, argument positions, target type, and exposure. #selector references a representable Objective-C method; @objc exposes it but does not retain its owner or make captured closures weak. Retain the callback owner for the interaction lifetime and review closure cycles separately. MainActor expresses Swift isolation, while arbitrary Objective-C callers do not automatically dispatch onto that actor.</p><p>A bridging header exposes selected Objective-C headers to Swift within its build context. The generated ProductModuleName-Swift.h serves the opposite direction for compatible Swift declarations. A missing generated header calls for module identity, target membership, build-order, and representability checks, not manual header editing. Nullable imported results require optional handling. For release symbolication, match the actual binary UUID to its dSYM; a shared marketing version is insufficient. Keep compile, link, load, callback, and debugger failures separate. Preserve optimized artifacts and the earliest diagnostic before any narrow regeneration or cache experiment, and label unexecuted target/action behavior as pending.</p>",
+      "followUps": [
+        "Why does exposing a method with @objc not make an arbitrary generic Swift API interoperable?",
+        "How would you distinguish a deallocated callback owner from a selector signature mismatch?"
+      ],
+      "pitfalls": [
+        "Using any same-version dSYM for a release crash.",
+        "Assuming @objc automatically retains the owner or changes callback thread."
+      ]
+    },
+    {
+      "id": "iq-048-a",
+      "lesson": "048",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Explain what a green test result means and how build-for-testing pairs with test-without-building. Which coordinates and discovery evidence must travel with it?",
+      "scenario": "A shared-resource change passes a host package test. CI builds test products but reports that step as executed tests, then reuses them after a compilation condition changes.",
+      "minutes": 7,
+      "androidBridge": "Gradle assemble and connected Kotlin/Java test stages suggest build versus execution. Xcode test-plan configurations are not Gradle build types, and build-for-testing products must match the later execution graph, SDK, architecture, and settings.",
+      "rubric": [
+        "Separates build configuration, test-plan options, destination, and fixtures.",
+        "States that build-for-testing does not execute tests.",
+        "Preserves compatible product inputs for test-without-building.",
+        "Records expected, discovered, executed, skipped, and retried cases.",
+        "Limits host results to their actual contract."
+      ],
+      "answerHTML": "<p>A green result has coordinates: graph route, source revision, resolved dependencies, toolchain, build configuration, test plan and options, destination, environment, and fixture. A test-plan configuration selects execution options; it is not the same as Debug or Release build settings. Record expected and discovered test counts, filters, skips, and retries so an empty or narrowed run cannot masquerade as full coverage.</p><p>Build-for-testing compiles app and test products and prepares execution metadata; it does not run them. Test-without-building consumes those products. The pair needs compatible source, graph, conditions, resources, compiler, architecture, and SDK inputs. A relevant input change requires rebuilding rather than using arbitrary cached products. Retain separate build and execution outcomes, including first-failure and retry artifacts. A host resource test proves that package fixture's lookup and decoding, not app signing, extension packaging, minimum-runtime behavior, or a physical device. Likewise, a workflow declaration is configured evidence until actual run artifacts establish execution.</p>",
+      "followUps": [
+        "How could a filter or skip produce a green result with no relevant executed cases?",
+        "Which changes invalidate reuse of existing build-for-testing products?"
+      ],
+      "pitfalls": [
+        "Reporting successful test-product compilation as executed test coverage.",
+        "Treating a host package pass as app and extension packaging acceptance."
+      ]
+    },
+    {
+      "id": "iq-048-b",
+      "lesson": "048",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design a bounded CI matrix for a shared-resource dependency change. Compare coverage alternatives, assign owners, and define evidence, gate rollout, and failure recovery.",
+      "scenario": "The change reaches an app and extension through generated and retained graphs. Running every destination is costly, while current CI uses one recent simulator.",
+      "minutes": 16,
+      "androidBridge": "Android variant matrices for Kotlin/Java consumers suggest representative coverage, but Tuist and retained Xcode graphs can differ independently of destinations. A recent iOS simulator pin is not the deployment minimum, and signing context may matter even for simulator-hosted tests.",
+      "rubric": [
+        "Selects rows by changed graph, packaging, and runtime boundaries.",
+        "Assigns resource, graph, CI, and release-evidence owners.",
+        "Includes pure contract, affected consumers, Release artifact, and extension checks.",
+        "Preserves cache inputs, test discovery, and pending minimum-runtime evidence.",
+        "Stages enforcement and defines rebuild, investigation, or candidate rollback."
+      ],
+      "answerHTML": "<p>Assign the resource owner lookup semantics, graph owners generated and retained membership, the CI owner execution identity, and the release owner artifact acceptance. Compare a broad destination cross-product with representative rows selected by affected boundaries. Start with host contract fixtures, relevant generated and retained consumers, Release device compilation and artifact inspection, the extension's actual lookup path, and minimum-runtime compatibility when an appropriate environment exists. Add locale or sizing rows only when visible behavior changes.</p><p>Record configuration, plan options, destination, source/pins, generator, resources, and pass criteria for each row. A recent simulator does not establish the deployment floor. Signing context can matter for hosted capability tests, so do not universally disable it. Preserve cache-key inputs and execution counts; rebuild when product identity changes. Stage the matrix against baseline and candidate before enforcing gates. On failure, separate harness, packaging, and behavior causes, retain artifacts, and perform bounded reconstruction or revert the candidate. Pending device or distribution checks remain explicit release limits rather than implied passes.</p>",
+      "followUps": [
+        "Which row could be removed if the change affects only a pure policy with no resources?",
+        "How should first-failure and retry results influence the release decision?"
+      ],
+      "pitfalls": [
+        "Exhausting destinations while missing a distinct extension or graph route.",
+        "Inferring minimum-runtime compatibility from a newer CI simulator."
+      ]
+    },
+    {
+      "id": "iq-049-a",
+      "lesson": "049",
+      "level": "Senior",
+      "kind": "Code",
+      "prompt": "Implement the bounded schema policy and describe the cross-module integration. Which fixtures prevent an opt-in from accidentally accepting every future version?",
+      "scenario": "Version 1 always accepts, version 2 accepts only with allowNext, and every other integer rejects. CourseResources must retain distinct lookup and decoding errors.",
+      "minutes": 10,
+      "androidBridge": "A Kotlin public policy module and BuildConfig flag suggest a separate acceptance contract. Swift library products, public declarations, and target product edges govern visibility; COURSE_NEXT_SCHEMA is independent of DEBUG, PROD, and runtime flags.",
+      "rubric": [
+        "Implements exhaustive bounded decisions for versions 1, 2, and default.",
+        "Exposes an ordinary public API across the module boundary.",
+        "Adds package declaration, consuming product edge, and source import.",
+        "Checks ten independent version and opt-in fixtures.",
+        "Preserves missing, I/O, decode, and unsupported-schema failures."
+      ],
+      "answerHTML": "<p>A small public policy keeps the acceptance rule explicit:</p><pre><code class=\"language-swift\">public func acceptsSchema(_ version: Int, allowNext: Bool) -&gt; Bool {\n    switch version {\n    case 1: return true\n    case 2: return allowNext\n    default: return false\n    }\n}</code></pre><p>Expose it through a library product, add the local package and consuming target's product edge, then import the module normally. Public visibility matters: tests inside the policy module are insufficient proof that another module can call it.</p><p>Declare expected results for -1, 0, 1, 2, and 3 under both opt-in states. Those ten rows catch an implementation that accepts every version when opted in. Keep resource loading in CourseResources and invoke policy only after successful decoding. Missing lookup, I/O failure, malformed JSON, and unsupported schema remain distinct. The compile-time condition controls the caller's allowNext decision independently of Debug and production environment. Verify consumer behavior with the condition absent and present; changing it requires rebuilding and does not create a runtime rollback switch.</p>",
+      "followUps": [
+        "Why is an ordinary cross-module import stronger visibility evidence than @testable alone?",
+        "Which fixture first exposes an accept-everything implementation under opt-in?"
+      ],
+      "pitfalls": [
+        "Treating opt-in as permission to accept all future schema integers.",
+        "Replacing resource and decoding failures with unsupported-schema errors."
+      ]
+    },
+    {
+      "id": "iq-049-b",
+      "lesson": "049",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design rollout and rollback for the bounded policy dependency. Assign owners, compare removing the opt-in versus removing the dependency, and distinguish reconstruction from installed-client recovery.",
+      "scenario": "A compile-time schema opt-in ships in a candidate. The proposed rollback reverts only its manifest edge while leaving source imports and calls, and assumes store users can receive an older binary.",
+      "minutes": 16,
+      "androidBridge": "Gradle dependency and Kotlin/Java build-flag rollback suggest restoring a coherent graph. Swift compile-time conditions also require rebuilding; reverting source or pausing distribution does not downgrade already installed App Store clients or add a runtime flag they never supported.",
+      "rubric": [
+        "Assigns policy, consumer, graph, and release decision ownership.",
+        "Compares opt-in removal with complete dependency removal.",
+        "Restores imports, calls, edges, pins, inputs, and tests coherently.",
+        "Uses baseline and candidate behavior plus artifact evidence as rollout gates.",
+        "Defines containment limits and a verified corrective-release path."
+      ],
+      "answerHTML": "<p>Assign the policy owner bounded acceptance, the consumer owner resource/error behavior, the graph owner dependency inputs, and the release owner distribution decisions. Compare two recoveries: remove the compile-time opt-in while retaining the dependency, or remove the dependency and restore the previous consumer implementation. The latter must restore imports, calls, manifest edges, and tests together; reverting one edge leaves an incoherent build.</p><p>Freeze baseline and candidate evidence for all version/opt-in fixtures, consumer errors, graph routes, and relevant packaged artifacts. Stage adoption only after these gates and required reviews pass. Reconstruction of a remote graph also needs prior pins, revisions or checksums, compiler/generator inputs, resources, and matching symbols. A compile-time switch requires a new build. Source reconstruction does not downgrade installed store clients; distributed recovery needs a verified corrective release. A runtime containment flag helps only behavior the existing binary already honors, with offline and cached limits. Retain an honest ledger of executed, predicted, and pending checks before any distribution decision.</p>",
+      "followUps": [
+        "How would a migrated on-disk schema change the safe reconstruction plan?",
+        "What evidence distinguishes a known-good source revision from an accepted corrective artifact?"
+      ],
+      "pitfalls": [
+        "Reverting only a dependency edge while leaving its imports and calls.",
+        "Promising an installed-client downgrade from source rollback."
+      ]
+    },
+    {
+      "id": "iq-050-a",
+      "lesson": "050",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Explain the ownership contract for a background refresh that can expire. How do cancellation, exactly-once completion, and account-safe commit differ?",
+      "scenario": "A fake refresh lease expires while a response is gated. The response later succeeds after an A-to-B-to-A account transition.",
+      "minutes": 8,
+      "androidBridge": "WorkManager and Kotlin coroutine cancellation suggest eligibility and cooperative stopping. iOS execution opportunities are not exact retry clocks, and ending a UIKit lease or completing a BGTask does not automatically cancel a retained Swift Task.",
+      "rubric": [
+        "Separates execution opportunity, underlying work, and durable commit ownership.",
+        "Retains a cancellation handle and invalidates commits on expiration.",
+        "Serializes terminal state before reporting completion once.",
+        "Checks account epoch in the actual commit domain.",
+        "Tests late success and distinguishes unavailable protected data from emptiness."
+      ],
+      "answerHTML": "<p>A background opportunity gives bounded eligibility, not a guaranteed execution time or unlimited lifetime. Its adapter owns the framework completion contract, retains the underlying task handle, and gives the store a separate commit policy. On expiration, invalidate commit ownership, cancel work, and report the appropriate terminal outcome. Cancellation is cooperative, so a late response still needs explicit rejection.</p><p>Serialize the completion gate and set its terminal state before invoking the reporter, preventing duplicate or reentrant completion. Ending a UIKit lease, calling BGTask completion, and reporting a fetch result have different meanings; none automatically stops networking. Capture an account epoch before suspension and validate it where mutation actually commits. Comparing the textual account name misses A-to-B-to-A. Do not validate on one actor and then await an unguarded write elsewhere. Preserve existing data on failure, including protected-data unavailability while locked. Use controlled gates for success, expiration, late success, duplicate finish, and account reset. These fixtures prove adapter decisions, not actual scheduler cadence or notification delivery.</p>",
+      "followUps": [
+        "What must change if the durable store writes on a different queue?",
+        "Why can canceling a local upload waiter fail to undo a server-side effect?"
+      ],
+      "pitfalls": [
+        "Assuming task cancellation prevents every late commit.",
+        "Treating a background opportunity as an exact retry or delivery guarantee."
+      ]
+    },
+    {
+      "id": "iq-050-b",
+      "lesson": "050",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Diagnose a missing remote-notification banner without assuming registration or provider acceptance proves presentation. Which identity, artifact, and user-setting boundaries matter?",
+      "scenario": "A synthetic server has a device token and accepts a request. A source entitlements file has a production-looking name, but no signed-artifact or current notification-setting evidence exists.",
+      "minutes": 10,
+      "androidBridge": "Kotlin/Java FCM registration callbacks and Android notification permission suggest separate delivery and presentation checks. APNs token, topic, signed environment, provider endpoint, and UNUserNotificationCenter settings have distinct iOS contracts; FCM success semantics do not map directly.",
+      "rubric": [
+        "Separates APNs registration from alert authorization and presentation.",
+        "Checks signed environment, bundle topic, and provider endpoint together.",
+        "Validates current token/account binding without treating the token as permanent identity.",
+        "Distinguishes alert, background update, and notification response handling.",
+        "Requests actual device observations and avoids exposing tokens or credentials."
+      ],
+      "answerHTML": "<p>Start by separating registration, provider transport, notification payload behavior, and visible presentation. An APNs token does not establish permission to display alerts, and provider acceptance is not proof the person saw a banner. Read current notification settings, including changes made outside the app. Identify whether the payload requests an alert or background update and which foreground or response path applies.</p><p>Check the installed app's bundle identity and signed APNs environment against the provider topic and endpoint. A source file named production is only declared input; inspect the signed artifact and export/provisioning path before diagnosing environment mismatch. Treat the token as opaque app/device/environment data, update its server account binding, and handle registration or obsolete-token failures. Keep credentials on the service and omit full tokens and sensitive payloads from diagnostics. Record the actual build, device, settings, request outcome, and observed presentation or routing. A fake response can test classification but cannot verify APNs delivery, background wake timing, or banner behavior.</p>",
+      "followUps": [
+        "How should logout and login affect token-to-account registration?",
+        "What evidence distinguishes transport rejection from allowed delivery without a foreground banner?"
+      ],
+      "pitfalls": [
+        "Inferring the signed APNs environment from an entitlements filename.",
+        "Equating provider acceptance with visible notification delivery."
+      ]
+    },
+    {
+      "id": "iq-051-a",
+      "lesson": "051",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Explain universal-link association, URL parsing, routing, and authorization as separate gates. Where do custom schemes and App Clips change the contract?",
+      "scenario": "A synthetic HTTPS lesson URL passes the local parser. The team calls that verified universal-link support and assumes the full app and App Clip share identical invocation setup.",
+      "minutes": 7,
+      "androidBridge": "Android intent filters and Kotlin/Java handling of verified App Links suggest association plus routing. iOS Associated Domains, AASA identifiers and matching rules, scene callbacks, and App Clip invocation are distinct; a custom scheme is not verified website ownership.",
+      "rubric": [
+        "Requires matching signed app entitlement and website association.",
+        "Distinguishes applinks, other associated-domain services, and custom schemes.",
+        "Parses bounded route values independently of association.",
+        "Keeps session authentication separate from resource authorization.",
+        "Separates local fixtures from installed-device and App Clip invocation evidence."
+      ],
+      "answerHTML": "<p>A universal link requires both sides of an association: the app's signed Associated Domains request and the website's valid HTTPS AASA file with matching application identity and rules. Source declarations alone do not prove installed behavior. The application identifier prefix must be checked rather than assumed. Custom URL schemes use another opening mechanism and do not establish website ownership. Associated-domain services such as applinks and webcredentials are not interchangeable.</p><p>After delivery, parse the URL into a bounded route using exact scheme, host, path, encoding, and query policies. Association eligibility does not validate every app-supported route. Then wait for UI readiness, establish the current session when required, and authorize the requested resource. App Clips have their own target, association, invocation, and distribution boundaries; parser reuse does not merge those contracts. Local fixtures prove accepted and rejected inputs. Actual cross-app taps, installation identity, browser fallback, website/CDN state, and Clip invocation need separate observations. Neither parser success nor association promises immediate opening in every browsing context.</p>",
+      "followUps": [
+        "Why can typing a URL in a browser differ from tapping it in another app?",
+        "What evidence would verify an App Clip invocation beyond a shared route parser?"
+      ],
+      "pitfalls": [
+        "Reporting parser success as verified universal-link delivery.",
+        "Treating authentication as authorization to access every routed record."
+      ]
+    },
+    {
+      "id": "iq-051-b",
+      "lesson": "051",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Diagnose an old login completion opening the wrong deep link or window. Define the pending-route, account, and scene ownership checks.",
+      "scenario": "Route alpha waits for login before the root exists. Route beta then arrives, the account changes, and alpha's callback presents through a global window.",
+      "minutes": 10,
+      "androidBridge": "Kotlin navigation queues and coroutine generation checks suggest bounded pending work. iOS cold inputs may arrive through scene connection options or app-delegate routes, and a global key-window assumption does not reproduce Android Activity ownership.",
+      "rubric": [
+        "Selects a bounded pending-route policy such as latest wins.",
+        "Tracks route and account generations across suspension.",
+        "Consumes the current pending destination once after readiness.",
+        "Validates the initiating scene and current resource authorization.",
+        "Defines cancellation and controlled superseded-login fixtures."
+      ],
+      "answerHTML": "<p>Choose a bounded pending-route policy before wiring callbacks. Under latest wins, accepting beta invalidates alpha's ticket even if their route values happen to match. Capture route and account ownership before awaiting login. After it returns, verify cancellation, current generations, UI readiness, scene ownership, and present-day resource authorization before consuming and navigating. Consume synchronously so duplicate callbacks cannot replay the destination.</p><p>The entry path depends on the target's actual lifecycle: cold scene connection options, warm scene callbacks, or app-delegate handling are distinct. Wiring all of them without a deduplication owner can route twice. Present through the initiating scene rather than an arbitrary global window. Login cancellation should clear or invalidate pending work under policy and avoid a prompt loop. Use explicit fake start signals, accept alpha, accept beta, then release alpha's login and assert no navigation. Repeat account reset and A-to-B-to-A. These tests establish route decisions, while website association and installed cold/warm link delivery remain separate device checks.</p>",
+      "followUps": [
+        "What policy should apply if the initiating scene disconnects while login is pending?",
+        "How would you prove duplicate delivery cannot consume the same route twice?"
+      ],
+      "pitfalls": [
+        "Checking only that login succeeded before replaying an old destination.",
+        "Presenting through the first connected scene or global window."
+      ]
+    },
+    {
+      "id": "iq-052-a",
+      "lesson": "052",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Choose representations for an appointment, a birthday, a floating daily reminder, and elapsed duration. Explain civil-day arithmetic across daylight saving.",
+      "scenario": "The synthetic fixture advances New York noon on 9 March 2024 by one civil day. Another implementation simply adds 86,400 seconds to every date-like value.",
+      "minutes": 7,
+      "androidBridge": "Java Instant, LocalDate, LocalTime, ZonedDateTime, and Duration provide a precise semantic starting point. Foundation Date stores an instant without zone or locale, while Calendar and DateComponents interpret civil fields rather than reproducing every java.time type.",
+      "rubric": [
+        "Separates instants, civil dates, floating times, and elapsed duration.",
+        "Treats zone, calendar, and locale as distinct inputs.",
+        "Explains the expected 23-hour fixture versus fixed-duration addition.",
+        "Declares missing-time, repeated-time, and travel policies.",
+        "Keeps transport encoding and presentation formatting separate."
+      ],
+      "answerHTML": "<p>Date represents an instant, without an attached timezone, calendar, or locale. Store an appointment's service-defined instant together with the venue-zone meaning when needed. A birthday is a civil date; a floating reminder is hour/minute plus an explicit travel policy. Elapsed duration belongs to a suitable duration or monotonic-clock contract. Converting them all to device-midnight Date values loses meaning.</p><p>Calendar interprets DateComponents with a chosen zone. Advancing New York noon on 9 March 2024 by one civil day preserves the selected civil meaning across spring daylight saving; the fixture expects 23 elapsed hours. Adding 86,400 seconds answers a fixed-duration question instead. A region zone retains transition rules that a fixed numeric offset cannot. Choose policies for a missing 02:30 and repeated 01:30 rather than accepting whichever match appears. Locale controls human-facing conventions, not transport semantics. Inject interpretation inputs and retain fixture context. The expected calendar result is a correctness fixture, not evidence of executed device scheduling or a guaranteed reminder delivery time.</p>",
+      "followUps": [
+        "What should daily at 09:00 mean when the person travels to another zone?",
+        "Why should a stopwatch avoid using wall-clock date subtraction as its only contract?"
+      ],
+      "pitfalls": [
+        "Treating every civil day as exactly 86,400 elapsed seconds.",
+        "Assuming Date stores the timezone used to format it."
+      ]
+    },
+    {
+      "id": "iq-052-b",
+      "lesson": "052",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Diagnose a draft that disappears after cleanup or a locked-device read failure. How do directory choice, error taxonomy, and atomic replacement limit the fix?",
+      "scenario": "An irreplaceable synthetic draft lives in Caches. A catch-all returns an empty document for read failure, while two writers atomically replace snapshots based on the same old contents.",
+      "minutes": 10,
+      "androidBridge": "Kotlin/Java use of Android filesDir, cacheDir, and atomic-file helpers suggests durability and error separation. iOS Application Support, file protection, backup attributes, and App Group containers have distinct policies; atomic replacement in either ecosystem does not serialize read-modify-write.",
+      "rubric": [
+        "Moves irreplaceable app-managed data to an appropriate durable location.",
+        "Separates missing, corrupt, protected-unavailable, and failed-write outcomes.",
+        "Uses FileManager directories and URL file-path operations.",
+        "Explains complete-file replacement versus transaction serialization.",
+        "Plans device protection and recovery evidence without inventing it."
+      ],
+      "answerHTML": "<p>Caches is for recreatable content that the system may remove; it cannot be the only copy of an irreplaceable draft. Choose Application Support for app-managed durable data or Documents when the product intends user-facing document behavior. Obtain the directory through FileManager, construct file URLs, create required parents, and bound or generate internal filenames rather than accepting path traversal.</p><p>Preserve missing-file, corrupt-data, protected-unavailable, and write-failed outcomes separately. A file inaccessible while locked is not necessarily absent or empty, so a catch-all empty document can overwrite recoverable data. Define retry and repair without weakening protection by assumption. Atomic replacement helps readers avoid partially written contents, but two writers can still read one revision and overwrite each other's changes. Serialize the transaction in the actual shared ownership domain or choose reviewed coordination. Test failure classification with synthetic fixtures, then verify protection and backup attributes on suitable devices. Host file tests do not establish locked-device access, document-provider interoperability, or cross-process safety.</p>",
+      "followUps": [
+        "Which recovery should differ between a missing cache and a corrupt irreplaceable draft?",
+        "How would you demonstrate a lost update despite both writes being individually atomic?"
+      ],
+      "pitfalls": [
+        "Treating protected-data unavailability as a fresh empty document.",
+        "Assuming atomic file replacement serializes the whole read-modify-write operation."
+      ]
+    },
+    {
+      "id": "iq-053-a",
+      "lesson": "053",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Explain Core Data context confinement, snapshot transfer, save, and merge. Why does placing a context inside a Swift actor not replace perform?",
+      "scenario": "A private-context fetch returns live managed objects to SwiftUI. A child-context save is reported as durable, and an inserted object's ID is passed to another context immediately.",
+      "minutes": 8,
+      "androidBridge": "Room entities and transactions suggest storage boundaries, but Core Data maintains context-owned live object graphs and faults. A Kotlin data-class DTO analogy fits immutable snapshots; Swift actor serialization does not replace the context's own queue contract.",
+      "rubric": [
+        "Keeps fetch and managed-property access inside the context owner.",
+        "Returns immutable snapshots or resolves appropriate object IDs elsewhere.",
+        "Distinguishes temporary identity from permanent and visible persisted identity.",
+        "Explains child save versus parent/store durability.",
+        "Defines UI merge, deletion, and reset behavior explicitly."
+      ],
+      "answerHTML": "<p>A context owns its managed object graph and concurrency contract. A private-queue context is accessed through perform or performAndWait; an unrelated Swift actor serializes its own state but does not move that context onto the actor executor. Fetch and read managed properties inside the context, then return immutable snapshots with an appropriate transfer contract. Do not hand live managed objects to arbitrary tasks or UI owners.</p><p>When another context needs a reference, use an appropriate object ID and refetch there. An inserted object can have a temporary ID; obtain permanent identity and ensure necessary saves are visible before resolving it elsewhere. Even a permanent ID does not guarantee existence or authorization. A child-context save pushes changes to its parent and may require another save before persistence. Background saves also need an explicit UI merge or refresh policy; loaded objects do not necessarily update automatically. Handle deleted records, unloaded stores, and reset contexts. Define durability and conflict semantics before telling the UI that an edit succeeded.</p>",
+      "followUps": [
+        "Why might existingObject(with:) fail even for a previously permanent object ID?",
+        "How would a merge policy affect two contexts editing the same user-authored field?"
+      ],
+      "pitfalls": [
+        "Treating an actor as a replacement for Core Data queue confinement.",
+        "Reporting a child-context save as guaranteed durable store completion."
+      ]
+    },
+    {
+      "id": "iq-053-b",
+      "lesson": "053",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design an account-scoped persistence and migration change. Compare store layouts and migration alternatives, assign owners, and define upgrade evidence, rollout, and data-compatible recovery.",
+      "scenario": "A V1 title field is renamed, V2 adds a required field, and a delayed account-A write can arrive after logout. A cache recovery helper deletes the store on some failures.",
+      "minutes": 18,
+      "androidBridge": "Kotlin/Java Room migrations and account predicates suggest versioned data contracts. Core Data inferred mappings, context queues, parent saves, and store-specific object IDs differ; neither SwiftData declaration nor an actor guard before awaiting persistence guarantees migration or commit safety.",
+      "rubric": [
+        "Classifies recreatable cache versus irreplaceable data before recovery.",
+        "Compares per-account stores and fully scoped shared records.",
+        "Validates ownership in the actual serialized transaction domain.",
+        "Tests real old-store migration values, counts, relationships, and defaults.",
+        "Stages adoption with compatibility review and non-destructive recovery."
+      ],
+      "answerHTML": "<p>Assign the model owner schema meaning, the storage owner transaction and migration behavior, the account owner invalidation, and the release owner compatibility gates. Compare per-account stores with a shared store whose every query, mutation, and uniqueness key is scoped. Validate an epoch inside the same serialized command domain as writes and account reset; an actor check before awaiting context work leaves another ordering gap.</p><p>For migration, preserve the rename identity and define valid historical values for the required field. Compare supported inferred mapping with explicit transformation when semantics demand it; adopting SwiftData does not erase compatibility work. Build actual V1 store fixtures and assert values, relationships, and counts after upgrade, including failure paths. Classify data before allowing deletion: a rebuildable cache and irreplaceable draft need different recovery. Stage the change after old-store and delayed-write gates pass. Recovery must preserve repair evidence and account isolation, and review whether the prior binary can read upgraded data. Source rollback alone is not a data-compatible downgrade.</p>",
+      "followUps": [
+        "How would A-to-B-to-A expose a guard based only on account text?",
+        "What evidence is missing from an in-memory test that merely opens the V2 model?"
+      ],
+      "pitfalls": [
+        "Deleting a failed store without proving all contents are recreatable.",
+        "Assuming a previous binary can read a successfully upgraded store."
+      ]
+    },
+    {
+      "id": "iq-054-a",
+      "lesson": "054",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Explain embedded browsing, system authentication, native transport, and cookie ownership. Why are a trusted starting URL and initial bearer header insufficient for later web trust?",
+      "scenario": "A synthetic WKWebView receives cookies before loading. Developers assume URLSession shares that state automatically and every redirect inherits the initial credential policy.",
+      "minutes": 8,
+      "androidBridge": "Kotlin/Java WebView, Custom Tabs, and OkHttp integration suggests different surfaces and cookie owners. WKWebsiteDataStore, HTTPCookieStorage, URLSession, and system authentication do not inherit Android sharing semantics or automatically share a login session.",
+      "rubric": [
+        "Chooses WKWebView, system browsing, authentication, or native transport by task.",
+        "Separates WebKit data store from native cookie boundaries.",
+        "Awaits cookie readiness under current account ownership.",
+        "Distinguishes navigation permission, credential eligibility, and bridge capability.",
+        "Preserves TLS trust and checks callback decisions exactly once."
+      ],
+      "answerHTML": "<p>WKWebView embeds content, SFSafariViewController offers system-managed browsing, ASWebAuthenticationSession serves web authentication, and URLSession is native transport. Choose by task and identity boundary rather than treating them as interchangeable browser wrappers. WKWebsiteDataStore and its cookie store own WebKit state; native HTTP cookie handling is a separate boundary. Writing one store does not establish instant sharing across every surface.</p><p>Await required cookie setup, then verify current account and document ownership before loading. A header on the initial request does not guarantee equivalent policy for later navigation, redirects, or subresources. Match allowed origins using parsed scheme, host, and port, and keep navigation permission distinct from credential eligibility and native bridge commands. A trusted initial page can navigate elsewhere or host compromised content. Resolve each navigation decision once and preserve normal TLS evaluation rather than accepting every challenge. Logout needs its actual store and pending-work cleanup traced separately. Source wiring can explain the intended sequence but cannot prove runtime cookie isolation or identity-provider behavior.</p>",
+      "followUps": [
+        "How would logout during awaited cookie setup prevent an old-account page load?",
+        "Why should credential eligibility be narrower than general navigation permission?"
+      ],
+      "pitfalls": [
+        "Assuming URLSession and every web surface automatically share cookies.",
+        "Extending initial-request credentials to every later navigation by assumption."
+      ]
+    },
+    {
+      "id": "iq-054-b",
+      "lesson": "054",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design a web/authentication boundary change. Compare embedded and system-session alternatives, assign capability and protocol owners, and define validation evidence, rollout, and recovery.",
+      "scenario": "A bridge exposes arbitrary native commands, handlers outlive replaced documents, and a canceled login callback can install credentials for a superseded attempt.",
+      "minutes": 18,
+      "androidBridge": "Android JavaScript interfaces and browser authentication suggest narrow capabilities and attempt validation. WebKit handler retention, content worlds, scene presentation anchors, and ASWebAuthenticationSession callbacks have distinct contracts; browser isolation does not replace OAuth protocol checks.",
+      "rubric": [
+        "Assigns document, bridge, authentication-attempt, and account owners.",
+        "Compares embedded content needs with system authentication behavior.",
+        "Bounds command schema, origin, frame, and handler lifetime.",
+        "Validates current callback destination and required protocol fields.",
+        "Stages one flow with controlled-provider evidence and a safe recovery path."
+      ],
+      "answerHTML": "<p>Assign the web owner navigation and document lifetime, the bridge owner narrow native capabilities, the authentication owner attempt validation, and the account owner credential installation. Compare embedded content requiring specific UI integration with a system authentication session; neither alternative automatically shares all cookies or removes protocol responsibility. Replace arbitrary native dispatch with bounded commands, strict payload fields, and an explicit main-frame/origin policy.</p><p>Retain required session and presentation owners, anchor to the initiating scene, and remove handlers when capability ends. A weak UI reference prevents one cycle but does not unregister a stale document. Track document and authentication generations, rejecting superseded callbacks. Validate exact callback destination and the flow's state, PKCE, or nonce requirements before account installation. Handle failed start and user cancellation distinctly without prompt loops. Stage one flow after pure policy fixtures and controlled-provider, WebKit, and scene tests. Measure rejection and terminal outcomes without sensitive URLs or tokens. Keep a reviewed prior flow for recovery while preserving protocol checks; ephemeral preference is not a server-side logout guarantee.</p>",
+      "followUps": [
+        "Which stale-callback schedules should the attempt owner reject even after valid protocol parsing?",
+        "Why does removing a strong cycle not eliminate a stale JavaScript capability?"
+      ],
+      "pitfalls": [
+        "Using browser isolation as a substitute for protocol and service authorization.",
+        "Treating an ephemeral preference as guaranteed identity-provider logout."
+      ]
+    },
+    {
+      "id": "iq-055-a",
+      "lesson": "055",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Explain why one permission Boolean cannot describe location, photo selection, and camera readiness. Choose useful fallbacks for each distinct state.",
+      "scenario": "A synthetic search receives reduced-accuracy location, the photo library is limited, and a device lacks a camera even though code and usage descriptions exist.",
+      "minutes": 7,
+      "androidBridge": "Android runtime permissions and approximate location suggest multiple dimensions, but iOS framework scopes differ. PhotoKit limited access, selected-item PhotosPicker transfer, Core Location accuracy, and camera hardware availability cannot be mapped to one Kotlin grant enum.",
+      "rubric": [
+        "Separates API availability, hardware, authorization, service state, and eligibility.",
+        "Distinguishes denied, restricted, limited, and reduced-accuracy behavior.",
+        "Chooses a picker when broad library access is unnecessary.",
+        "Separates location permission from fix freshness and quality.",
+        "Provides manual or alternate paths without assuming Settings repairs every state."
+      ],
+      "answerHTML": "<p>Separate OS API availability, hardware capability, authorization scope, current service usability, and product eligibility. A usage description explains a request but does not grant it. Camera authorization can be denied or restricted while hardware is independently absent or interrupted. Restricted policy may not be repairable through the person's Settings, so offer a useful alternative rather than repeatedly prompting.</p><p>Location authorization does not prove a fresh fix. Check accuracy authorization, timestamp, reported accuracy, global service state, and the owner's lifetime. Reduced accuracy can be valid for search; manual city selection keeps browsing useful when location cannot meet the contract. A map need not require the person's current position. Limited PhotoKit access is usable scoped access, not equivalent to denial. If choosing one upload image is sufficient, a system picker may avoid broad library authorization. Its selected item still loads asynchronously and may require download or conversion. Model framework-specific outcomes and test fallbacks; code declarations and simulator placeholders do not establish permission or hardware observations.</p>",
+      "followUps": [
+        "What should happen if location is authorized but its fix is stale or unavailable?",
+        "Why does one selected PhotosPicker item not imply unrestricted library access?"
+      ],
+      "pitfalls": [
+        "Treating reduced-accuracy or limited access as blanket denial.",
+        "Assuming a usage-description string proves authorization or available hardware."
+      ]
+    },
+    {
+      "id": "iq-055-b",
+      "lesson": "055",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Diagnose a camera starting after dismissal and an older photo replacing the current preview. Which lifetime and execution domains need independent fixes?",
+      "scenario": "Authorization returns after the feature stops. Capture start and stop use unrelated global-queue jobs, and two selected photo transfers finish in reverse order.",
+      "minutes": 10,
+      "androidBridge": "Kotlin camera lifecycle owners and canceled photo-loading coroutine jobs suggest scoped work. AVFoundation session configuration and start/stop need a serialized owner, while Swift cancellation remains cooperative; global background dispatch is not CameraX lifecycle management.",
+      "rubric": [
+        "Checks active flow generation after asynchronous authorization.",
+        "Serializes session configuration, start, stop, and interruption recovery.",
+        "Keeps potentially blocking session startup away from UI execution.",
+        "Guards preview publication by the current selection generation.",
+        "Separates controlled fake checks from real capture, rotation, and permission evidence."
+      ],
+      "answerHTML": "<p>Retain a feature task and capture a flow generation before requesting authorization. Dismissal marks the flow inactive, advances ownership, and cancels work. After authorization returns, check cancellation and current active ownership before asking the session owner to start. A grant alone cannot revive a stopped feature. The serialized session owner must also reject obsolete commands so a queued start cannot run after its matching stop.</p><p>Serialize configuration, start, stop, and interruption recovery. Moving each call to a global background queue avoids some UI blocking but does not guarantee lifecycle ordering. Retain photo delegates for their required callback lifetime and define terminal cleanup. For picker transfers, give every selection a new generation, cancel obsolete work, and verify the current ticket before replacing the preview. Bound decoding separately. Use gates to finish old authorization and old selection last, asserting no stale start or preview. Actual hardware capability, interruptions, preview/output rotation, Settings return, and permission behavior need device observations; a simulator placeholder cannot certify them.</p>",
+      "followUps": [
+        "Where must the generation check live if capture start is queued after the UI check?",
+        "How would you distinguish preview rotation from captured-output orientation verification?"
+      ],
+      "pitfalls": [
+        "Calling unrelated global-queue operations serialized session management.",
+        "Publishing an image solely because its canceled transfer eventually returned data."
+      ]
+    },
+    {
+      "id": "iq-056-a",
+      "lesson": "056",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Explain app, extension, shared module, App Group, widget timeline, and App Intent boundaries. Which state and scheduling assumptions cannot cross them?",
+      "scenario": "A synthetic widget imports shared code, expects the app's singleton session to exist, and promises an exact refresh immediately after an intent returns.",
+      "minutes": 8,
+      "androidBridge": "Kotlin/Java Android widgets, services, and providers suggest process and storage boundaries. A Swift module shares code rather than heap instances, App Groups grant container access rather than a shared actor, and WidgetKit scheduling is not an exact Android worker or timer analogue.",
+      "rubric": [
+        "Describes an extension's separate executable and constrained lifecycle.",
+        "Distinguishes shared code from shared live instances and authorization.",
+        "Explains App Group capability and separate Keychain sharing controls.",
+        "Separates placeholder, snapshot, timeline, and reload request semantics.",
+        "Treats intent result and MainActor as insufficient durable-write or app-process evidence."
+      ],
+      "answerHTML": "<p>An extension is a separate executable with its own bundle identity and constrained invocation contract. Importing a shared module shares definitions, not the containing app's heap, singleton session, window, or DI container. App Groups permit entitled targets to access a named shared container; they do not create shared actors or synchronize accounts. Keychain sharing uses separate controls. Verify extension-safe APIs and actual signed capability inputs.</p><p>A widget provider supplies placeholder, snapshot, and timeline content for system-managed rendering. Timeline entries describe predicted states; the extension need not remain alive as an ordinary screen. Reload policies and reload requests ask for opportunities, not exact presentation times. An App Intent declares a capability, but its execution context still needs valid dependencies and authorization. MainActor refers to the selected process's actor, not automatically the app's process. Returning an intent result does not prove a durable write succeeded. Design stale-content and error outcomes deliberately, and distinguish shared-store or pure-timeline fixtures from device scheduling, container access, and cached-snapshot observations.</p>",
+      "followUps": [
+        "What can a placeholder or gallery snapshot safely show before account data is available?",
+        "Why can deleting backing data fail to immediately remove already rendered widget content?"
+      ],
+      "pitfalls": [
+        "Expecting an imported shared module to expose the app's live singleton instances.",
+        "Promising exact or immediate widget refresh after a reload request."
+      ]
+    },
+    {
+      "id": "iq-056-b",
+      "lesson": "056",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design a durable shared widget command for acknowledging a synthetic card. Compare interprocess mutation alternatives, assign owners, and define idempotency evidence, rollout, and recovery.",
+      "scenario": "App and widget both load and atomically replace shared JSON. A repeated command can duplicate an effect, and a stale widget action may recreate records cleared on logout.",
+      "minutes": 20,
+      "androidBridge": "Android ContentProvider or database transactions suggest a shared mutation authority. Separate Swift actors in app and extension do not coordinate across processes; atomic file replacement and a process-local Kotlin or Swift deduplication set cannot establish durable idempotency.",
+      "rubric": [
+        "Assigns shared mutation, account ownership, command identity, and projection responsibilities.",
+        "Compares transactional storage with a coordinated command protocol.",
+        "Records operation identity and effect atomically under current ownership.",
+        "Tests replay, stale commands, concurrent writers, unknown records, and failed writes.",
+        "Stages one surface with signed-container evidence and explicit recovery limits."
+      ],
+      "answerHTML": "<p>Assign one reviewed mutation protocol to shared data, with account-epoch ownership, stable operation IDs, and immutable widget projections. Compare transactional storage with a coordinated command protocol rather than assuming two process-local actors cooperate. Atomic file replacement prevents partial-file visibility but cannot merge two changes derived from one old snapshot. Record the operation's identity and effect atomically within current ownership, rejecting stale or unknown-card commands before mutation.</p><p>Use independent fixtures for first apply, duplicate replay, failed durable write, logout before delayed apply, and competing writers. A memory-only actor proves only its single-process decisions; durable replay and interprocess coordination need separate evidence. Stage one surface after signed App Group resolution, transaction tests, account cleanup, and actual cached-snapshot review. Request reload after committed changes while designing minimal sensitive display and stale outcomes, since refresh timing remains system-controlled. Recovery can disable the new mutation path and preserve or repair valid shared records. Surface write failures explicitly and prevent old commands from recreating cleared data; returning an intent result is not durable-success evidence.</p>",
+      "followUps": [
+        "What must survive process death for a repeated operation ID to remain harmless?",
+        "How would app-local fallback storage change the widget's visibility and recovery contract?"
+      ],
+      "pitfalls": [
+        "Treating a process-local actor or deduplication set as durable cross-process coordination.",
+        "Suppressing write failures and reporting successful intent execution as persistence."
+      ]
+    }
+  ]
+}

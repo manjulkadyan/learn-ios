@@ -1,0 +1,1176 @@
+{
+  "unit": {
+    "id": "ui-engineering",
+    "title": "UI engineering in depth",
+    "summary": "Measure and adapt UIKit and SwiftUI interfaces, preserve list and editing identity, design interactions, and separate scene restoration from durable data in a source-backed UI lab.",
+    "order": 5
+  },
+  "lessons": [
+    {
+      "id": "029",
+      "title": "Auto Layout: priorities, intrinsic sizing, safe areas, and traits",
+      "summary": "Predict how constraints resolve extra and missing space, size dynamic content, and adapt to window geometry without assuming Android Activity recreation.",
+      "duration": 120,
+      "level": "Deep dive",
+      "prerequisites": [
+        "008",
+        "022"
+      ],
+      "objectives": [
+        "Translate intrinsic size into hugging and compression inequalities and predict which optional constraint yields.",
+        "Build a multiline, accessible row with a deliberate shrinking and scrolling policy.",
+        "Distinguish safe-area, readable-width, keyboard, and scroll-content layout guides.",
+        "Respond to traits and window resizing while preserving controller and editing identity."
+      ],
+      "sections": [
+        {
+          "id": "measurement-model",
+          "title": "Begin with the size negotiation, not the screenshot",
+          "html": "<p>Think of an Android ConstraintLayout containing a name, a status badge, and a trailing action. When the translated name becomes twice as long, somebody must wrap, shrink, truncate, or move. Auto Layout expresses those choices as relationships between attributes, then solves the relationships together. It does not perform Android's exact measure-spec negotiation, and a constraint priority is not layout_weight. Session 008 explained installing constraints; this session teaches how to predict their behavior when the available space changes.</p><p>A constraint has the shape first attribute = multiplier × second attribute + constant, with a relation that can instead be less than or equal or greater than or equal. An anchor provides a typed way to create it. Leading and trailing express semantic reading directions; left and right express physical edges. Use the former for ordinary localized content. A height anchor cannot be equated with a leading anchor: typed anchors catch some nonsensical relationships before runtime, but cannot prove that the whole system is satisfiable.</p><p>Separate position from size and horizontal from vertical. For each axis ask what fixes the origin, what determines the extent, and which rule may yield. A label often supplies intrinsic size; an empty UIView usually does not. A row can therefore be fully determined without explicit width and height constants on every child. Conversely, adding more constraints does not necessarily remove ambiguity: redundant equalities can conflict while another dimension remains unconstrained. Draw the relationships and predict the result before opening the visual debugger.</p>"
+        },
+        {
+          "id": "priority-algebra",
+          "title": "Hugging and compression resistance are directional inequalities",
+          "html": "<p>Intrinsic content size is the size a view prefers from its content. For an intrinsic width w, horizontal content hugging roughly expresses actual width ≤ w, while compression resistance expresses actual width ≥ w. Hugging resists growing; compression resistance resists shrinking. The same pair exists independently for height. These are preferences supplied to Auto Layout, not promises that text can never truncate. UIView.noIntrinsicMetric means no intrinsic contribution on that axis; it does not mean zero width.</p><p>Required priority is 1000. Optional priorities are lower, and higher optional priorities are protected before lower ones when preferences compete. Apple's guide describes ordinary defaults of 250 for hugging and 750 for compression resistance; actual controls and Interface Builder settings can differ, so inspect the instance rather than treating a default as universal. If label A hugs at 251 and field B at 250, extra horizontal space tends to expand B. If A resists compression at 751 and B at 750, missing space tends to shrink B first. These are two separate decisions; increasing hugging does not prevent shrinking.</p><p>A practical arithmetic fixture makes the distinction observable. Suppose a row needs 180 points for its title, 60 for its badge, and 12 for spacing. At 300 points, 48 extra points must go somewhere; lower hugging identifies the expandable participant. At 220 points, 32 points must be recovered; lower compression identifies the participant allowed to shorten, unless wrapping changes the solution. Those numbers describe a synthetic model, not a measured device. Avoid equal competing priorities when the product requires a clear winner. Do not set every preference to required: incompatible required constraints produce a runtime conflict, not stronger accessibility.</p>"
+        },
+        {
+          "id": "worked-row",
+          "title": "Read an accessible row line by line",
+          "html": "<p>This UIKit example belongs in a scratch iOS target. It returns a view to embed and constrain in a controller. The title may wrap vertically, while the short badge should preserve its horizontal extent. The container controls width; neither child is given an arbitrary fixed height.</p><pre><code class=\"language-swift\">import UIKit\n\n@MainActor\nfunc makeDemoRow() -&gt; UIView {\n    let title = UILabel()\n    title.text = \"Demo provider with a deliberately long display name\"\n    title.numberOfLines = 0\n    title.font = .preferredFont(forTextStyle: .body)\n    title.adjustsFontForContentSizeCategory = true\n\n    let badge = UILabel()\n    badge.text = \"Demo\"\n    badge.font = .preferredFont(forTextStyle: .caption1)\n    badge.adjustsFontForContentSizeCategory = true\n    badge.setContentHuggingPriority(UILayoutPriority(251), for: .horizontal)\n    badge.setContentCompressionResistancePriority(UILayoutPriority(751), for: .horizontal)\n    title.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)\n\n    let row = UIStackView(arrangedSubviews: [title, badge])\n    row.axis = .horizontal\n    row.alignment = .top\n    row.spacing = 12\n    return row\n}</code></pre><p>The arrow declares the return type. UILayoutPriority(251) constructs the value expected by the setter; for: labels the axis argument. The leading dot on .horizontal abbreviates an enum case because the parameter type supplies context. numberOfLines = 0 removes the line-count cap. preferredFont selects a semantic text style, and adjustsFontForContentSizeCategory enables subsequent category updates. The stack creates arrangement constraints for its children; the caller must still determine the stack's position and available width.</p><p>Embed the row once, disable translatesAutoresizingMaskIntoConstraints on the externally constrained row, and connect its top and horizontal anchors to an appropriate guide. A multiline label's height depends on the resolved width. Re-measure after changing that width or text size; a screenshot at one width cannot certify it. This particular title is allowed to narrow and wrap while the badge resists narrowing. At extremely small widths even this policy may need a vertical arrangement or scroll container. Priority values cannot create physical space.</p>"
+        },
+        {
+          "id": "fitting-and-scroll",
+          "title": "Intrinsic size, fitting size, and scroll content answer different questions",
+          "html": "<p>Intrinsic content size is an input from a view's content; systemLayoutSizeFitting is a question to the constrained hierarchy about its resulting size. For a self-sizing cell, a common measurement fixes the horizontal fitting dimension with required priority and lets vertical fitting use fittingSizeLevel. The complete top-to-bottom constraint chain inside contentView then determines height. Missing the bottom edge can make a cell's height ambiguous even when its label draws correctly in a large preview. Calling sizeToFit, which adjusts a frame, is not a substitute for a coherent Auto Layout contract.</p><p>When content changes a custom view's intrinsic size, call invalidateIntrinsicContentSize. When constraints or arrangement need updating, use the relevant invalidation methods and let UIKit perform the next pass. setNeedsLayout requests layout; layoutIfNeeded performs pending layout in the hierarchy now. Repeatedly forcing layout while mutating sizing state can create feedback. Never install the same constraints on each layout callback. Store a constraint if its constant must change; remake a bounded set only when the structure actually changes.</p><p>For a UIScrollView form, contentLayoutGuide describes the scrollable content edges, while frameLayoutGuide describes the viewport. Constrain the content's four edges to the content guide, then match its width to the frame guide for vertical-only scrolling. Its internal vertical chain determines content height. Matching content height to viewport height as a required equality can unintentionally prevent scrolling. A long form needs a way to reach its last control at large text sizes; compressing every row until it fits is not that way. Session 033 adds keyboard-aware behavior to this geometry.</p>"
+        },
+        {
+          "id": "safe-areas",
+          "title": "Safe area, margins, readable width, and keyboard avoidance",
+          "html": "<p>Safe-area insets reflect obscuring system and container UI for the current hierarchy. They may change after presentation, rotation, or container changes. They are not fixed notch constants and do not automatically describe every keyboard overlap. layoutMarginsGuide adds container-defined spacing, while readableContentGuide limits comfortable text width in wide environments. A full-bleed background can reach the root edges while its interactive content follows a safe or readable guide. Avoid applying the same inset at the outer controller, an intermediate wrapper, and a hosted SwiftUI child without understanding who owns it.</p><p>For a form anchored above the keyboard, UIKit's keyboardLayoutGuide, available from iOS 15, provides layout relationships that track the keyboard. Its handling of an undocked keyboard is configurable; a floating iPad keyboard is not simply a full-width strip at the bottom. A scrolling form may instead combine keyboard-aware insets with scrolling the active field. Choose one avoidance owner and verify the full interaction. The guide does not select a text field, submit a value, or provide a Return key on a number pad.</p><p>The active address form's UIKit binding factory explicitly asks callers to establish child-controller containment and clears the hosting controller's safeAreaRegions for its particular scroll integration. That is an observed component contract, not a universal SwiftUI embedding recipe. A screen-level host often needs ordinary safe-area participation. When bridging, inspect the parent scroll view's adjustment behavior, the host's sizing options, and the child's safe-area policy together. A doubled bottom gap is usually a relationship problem, not evidence that every safe area should be ignored.</p>"
+        },
+        {
+          "id": "traits-and-resize",
+          "title": "Traits and orientation do not imply Android recreation",
+          "html": "<p>Android can recreate an Activity for configuration changes, depending on manifest handling and platform circumstances. UIKit normally adapts the existing controller and view hierarchy when the window changes size or interface orientation. Rotation is therefore not an automatic draft-reset boundary. Preserve the model and first responder unless the product explicitly ends the flow. Controllers can still be reconstructed for other reasons, and process termination remains a separate persistence problem.</p><p>Trait collections describe environment dimensions such as horizontal size class, vertical size class, interface style, and preferred content-size category. Compact versus regular is a coarse classification, not a precise width, device model, or orientation. Two different widths can share the same class; an iPad window can become narrow without rotating the device. Use actual container geometry for continuous decisions, and relevant traits for semantic alternatives. Do not read UIScreen.main.bounds as the width of a particular scene or embedded child.</p><p>On iOS 17 and later, registerForTraitChanges can observe a specific set of trait definitions. Configure an initial state too: registration is for changes, not a promise of an initial callback. Earlier deployment support may require traitCollectionDidChange with relevant comparisons. viewWillTransition(to:with:) lets a controller coordinate size-transition work with UIKit's transition coordinator; layout callbacks can follow many times. Neither callback should refetch data just because geometry changed. Verify orientation support in the actual target and plist: production's inspected plist declares portrait on iPhone and four orientations on iPad. That configuration does not prove every feature adapts correctly.</p>"
+        },
+        {
+          "id": "repo-and-diagnosis",
+          "title": "Use active sizing code as evidence and inspect failure modes",
+          "html": "<p>BookingTextField demonstrates why a custom intrinsic-size contract must grow with text. Its usesCompactHeight property invalidates intrinsic sizing, its preferred-content-size trait handler invalidates again, and its override supplies no intrinsic width while computing height from scaled font or design metrics. Text, editing, and placeholder rectangles have separate overrides because the placeholder's paragraph line height can differ from the display font. Increasing the outer box alone would not necessarily prevent clipped descenders. This is concrete usable instruction beyond session 008's simple stack.</p><p>AddressFormSectionView gives the error icon required horizontal hugging and compression resistance. Read that as a deliberate nonstretching icon decision, then examine whether the error label has enough width and unlimited lines. The infrastructure strictContentSize helper sets both preferences to required, while laxContentSize lowers both; these local conveniences are not neutral style helpers. Copying them onto a multiline label changes the failure policy. Use their implementation to understand the outcome before using their names.</p><p>For a broken layout, distinguish ambiguity, unsatisfiable constraints, and intentional truncation. Inspect hasAmbiguousLayout, use the view debugger, and add a symbolic breakpoint on UIViewAlertForUnsatisfiableConstraints in a scratch run. Give important constraints identifiers so diagnostics name the intended relationship. A conflict log often shows the constraint UIKit chose to break; that choice is not your product policy. Acceptance evidence should include narrow width, larger Dynamic Type, longer localized text, and visible final controls, plus an absence of unexpected conflict logs. Reading source alone does not establish those runtime results.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A title and badge must lose horizontal space. Which preference directly determines their resistance to shrinking?",
+          "options": [
+            "Content hugging on the horizontal axis.",
+            "Content compression resistance on the horizontal axis.",
+            "The view's alpha."
+          ],
+          "answer": 1,
+          "explanation": "Hugging resists expansion; compression resistance resists being smaller than the intrinsic extent. A lower compression priority yields first when competing optional preferences cannot all be satisfied."
+        },
+        {
+          "question": "A custom view returns UIView.noIntrinsicMetric for width. What does that mean?",
+          "options": [
+            "Its width must be zero.",
+            "It ignores all horizontal constraints.",
+            "It supplies no intrinsic width; other constraints or the container must determine it."
+          ],
+          "answer": 2,
+          "explanation": "The sentinel removes intrinsic sizing on that axis. It neither removes external constraints nor makes the view zero-sized."
+        },
+        {
+          "question": "An iPad window narrows without changing size class. What should the layout use?",
+          "options": [
+            "Current container geometry for the width-dependent decision.",
+            "A guaranteed new controller created by rotation.",
+            "UIScreen.main.bounds as the width of every window."
+          ],
+          "answer": 0,
+          "explanation": "Size class is coarse and may stay regular across multiple widths. iOS resizing usually preserves the existing hierarchy, and the physical screen need not match the scene or child width."
+        }
+      ],
+      "exercise": {
+        "brief": "In a separate scratch UIKit target, make a long title and short badge row adapt to changing width and Dynamic Type; document its priority policy.",
+        "steps": [
+          "Embed makeDemoRow once with top and horizontal constraints, then place a second version inside a correctly constrained vertical scroll view.",
+          "Explain the 300-point and 220-point synthetic width budgets before running.",
+          "Exercise long text, right-to-left layout, and accessibility text categories; switch to a vertical alternative if the product's minimum width cannot fit the badge.",
+          "Inspect actual constraints and ambiguity; capture the observed width, category, and conflict-log result.",
+          "Compare the active BookingTextField height and placeholder contracts with the ordinary UILabel row."
+        ],
+        "acceptance": [
+          "The badge remains readable at the declared minimum supported width, or the documented alternative arrangement activates.",
+          "The title wraps without clipping and all scroll content remains reachable at accessibility sizes.",
+          "Constraints are installed once and there are no unexplained unsatisfiable-constraint logs.",
+          "The report distinguishes synthetic arithmetic, source evidence, and actual scratch observations."
+        ],
+        "solution": "<p>The lower title compression priority makes it the initial narrowing participant. Multiline wrapping then turns narrower width into greater height. Higher badge hugging also discourages allocating surplus width to the badge. The external row width must be fixed by its parent for that prediction to be meaningful. A suitable scratch installation, after obtaining the row, is:</p><pre><code class=\"language-swift\">row.translatesAutoresizingMaskIntoConstraints = false\nview.addSubview(row)\nlet guide = view.safeAreaLayoutGuide\nNSLayoutConstraint.activate([\n    row.topAnchor.constraint(equalTo: guide.topAnchor, constant: 16),\n    row.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 16),\n    row.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -16)\n])</code></pre><p>This is a fragment inside a UIViewController method, not another standalone program. If the final content can exceed the viewport, use a scroll view rather than a required bottom equality that crushes the title. The arithmetic predicts a 32-point shortage at 220 points before wrapping; it is not a pixel-perfect prediction for a real font. The actual measurement must account for font metrics, text, and the layout's constraints.</p><p>A custom-height field also needs invalidation when its inputs change, as the repository example shows. Do not infer that a larger frame proves correct placeholder drawing. Record the largest text fixture and a keyboard-visible screenshot if appropriate. An unexecuted scratch run remains pending learner work; no production controller or baseline is changed by this solution.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple Auto Layout Guide: Anatomy of a Constraint",
+          "url": "https://developer.apple.com/library/archive/documentation/UserExperience/Conceptual/AutolayoutPG/AnatomyofaConstraint.html"
+        },
+        {
+          "label": "Apple Auto Layout Guide: Views with Intrinsic Content Size",
+          "url": "https://developer.apple.com/library/archive/documentation/UserExperience/Conceptual/AutolayoutPG/ViewswithIntrinsicContentSize.html"
+        },
+        {
+          "label": "Apple: UIKeyboardLayoutGuide",
+          "url": "https://developer.apple.com/documentation/uikit/uikeyboardlayoutguide"
+        },
+        {
+          "label": "Apple: registerForTraitChanges(_:handler:)",
+          "url": "https://developer.apple.com/documentation/uikit/uitraitchangeobservable/registerfortraitchanges(_:handler:)"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Dynamic intrinsic height and invalidation",
+          "path": "ios-client/Projects/Features/ZDForms/Sources/ZDForms/Views/Booking/BookingTextField.swift",
+          "line": 203,
+          "why": "Separates compact line-height sizing and scaled design height, returning no intrinsic width; inspect trait invalidation at line 67 and placeholder sizing at line 132."
+        },
+        {
+          "label": "Error-icon priority policy",
+          "path": "ios-client/Projects/Features/ZDForms/Sources/ZDForms/Views/Booking/AddressFormSectionView.swift",
+          "line": 43,
+          "why": "Provides explicit horizontal hugging and compression choices beside a multiline error label."
+        },
+        {
+          "label": "Local priority helpers",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDMezzanineBase/Extensions/UIKit/UIView+Extensions.swift",
+          "line": 190,
+          "why": "Shows that strictContentSize changes both priorities to required, while laxContentSize lowers both."
+        },
+        {
+          "label": "Hosted scroll-component containment",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/AddressForm/BookingAddressFormViewModel+UIKit.swift",
+          "line": 11,
+          "why": "Documents caller-owned containment and this component's safe-area treatment."
+        }
+      ],
+      "checklist": [
+        "I can predict expansion and compression separately.",
+        "I can distinguish intrinsic size from constrained fitting size.",
+        "I can size vertical scroll content with the correct guides.",
+        "I can adapt a retained controller to width and text traits.",
+        "I can report runtime layout evidence without inventing a device run."
+      ]
+    },
+    {
+      "id": "030",
+      "title": "Reusable lists: stable identity, diffable snapshots, layout, and pagination",
+      "summary": "Keep list data, cell reuse, selection, image work, and page generations consistent while teaching the active carousel alongside modern UIKit APIs.",
+      "duration": 135,
+      "level": "Deep dive",
+      "prerequisites": [
+        "008",
+        "011",
+        "015",
+        "029"
+      ],
+      "objectives": [
+        "Separate domain identity, index paths, cell instances, and reuse identifiers.",
+        "Apply unique diffable identifiers and explicitly reconfigure changed content.",
+        "Design self-sizing compositional sections with bounded work and correct selection.",
+        "Specify pagination and prefetch cancellation with request-generation and resource ownership rules."
+      ],
+      "sections": [
+        {
+          "id": "four-identities",
+          "title": "RecyclerView is a useful starting point, then split four identities",
+          "html": "<p>Imagine a RecyclerView whose visible provider card starts an image request, then scrolls offscreen before the request finishes. UIKit has the same hazards, but distinguish four identifiers before writing code. Domain identity names the provider or occurrence. An IndexPath describes a current section and item position. A cell is a reusable UIView instance. A reuse identifier or CellRegistration describes how to obtain and configure that kind of cell. None of those four is interchangeable.</p><p>UITableView is primarily a vertically scrolling row interface; UICollectionView supports more general sections and layouts. Both reuse cells to bound the materialized hierarchy. Create permanent subviews in the cell's initializer or established setup hook, then apply complete content for the item being represented. If configure only sets an optional subtitle when nonempty, a later item without a subtitle can inherit the old text. Reset both presence and absence: set text, hidden state, accessories, callbacks, image placeholder, and accessibility content according to the current model.</p><p>Stable identity should survive content changes and reordering. Array offsets are therefore unsuitable identifiers for mutable lists. A label is unsuitable when localized or nonunique. A server provider ID may also be insufficient if the same provider legitimately appears twice in different sections: a displayed occurrence may need a composite ID. DiffUtil and stable RecyclerView IDs provide useful analogies, but UIKit's snapshot and reconfiguration contracts remain specific. Session 009's SwiftUI identity lesson becomes concrete here: the same record can move while retaining identity, and a cell object can represent entirely different records over time.</p>"
+        },
+        {
+          "id": "snapshot-contract",
+          "title": "A snapshot describes identity and order, not every content change",
+          "html": "<p>A diffable data source uses Hashable section and item identifiers. Hashable includes equality; synthesized hashing for a whole mutable model can change when its subtitle changes, making UIKit treat it as a different identifier. Prefer an immutable ID in the snapshot and resolve display content from a separate store keyed by that ID. Diffable APIs arrived in iOS 13; snapshot reconfigureItems arrived in iOS 15. The inspected production deployment minimum is iOS 17, but verify the target you actually edit rather than generalizing that setting to all consumers.</p><p>Every item identifier must be unique across a snapshot, not merely within each section. Append sections before assigning items to them. A snapshot with unchanged IDs does not necessarily rerun configuration just because an external dictionary changed. Mark surviving changed IDs for reconfiguration, or use the appropriate reload operation when the required cell kind changes. reconfigureItems preserves existing cells and does not call prepareForReuse for that update; complete configuration must therefore work without relying on reuse cleanup. Newly inserted IDs already need configuration and should not be treated as previously surviving items.</p><p>Apply through one serialized UI owner so the content store and snapshot describe the same revision. Do not mix manual insert/delete calls with a diffable update for the same transition. An animation flag controls visual differences, not whether the underlying data is correct. A full reload can be appropriate for a deliberate wholesale reset, but destroys useful continuity if used after every keystroke. Empty, loading, and error states need explicit policies too; an empty snapshot cannot tell users whether no results were found or a request is still outstanding.</p>"
+        },
+        {
+          "id": "worked-snapshot",
+          "title": "Build and explain a small snapshot update",
+          "html": "<p>The following helper is type-checkable in a UIKit iOS 15+ target. It focuses on identity, so the caller still owns the collection view, cell registration, data source, and content dictionary. previousIDs refers to the already applied snapshot, not an arbitrary old page.</p><pre><code class=\"language-swift\">import UIKit\n\nenum DemoListSection: Hashable {\n    case main\n}\n\n@MainActor\nfunc makeDemoSnapshot(\n    ids: [String],\n    previousIDs: Set&lt;String&gt;\n) -&gt; NSDiffableDataSourceSnapshot&lt;DemoListSection, String&gt; {\n    precondition(Set(ids).count == ids.count, \"Duplicate demo IDs\")\n    var snapshot = NSDiffableDataSourceSnapshot&lt;DemoListSection, String&gt;()\n    snapshot.appendSections([.main])\n    snapshot.appendItems(ids, toSection: .main)\n    let surviving = ids.filter { previousIDs.contains($0) }\n    snapshot.reconfigureItems(surviving)\n    return snapshot\n}</code></pre><p>Angle brackets supply generic arguments: the section enum and String item identifier. Set removes duplicates, so comparing counts checks uniqueness for this synthetic helper. precondition stops a programmer-invalid call; it is not user-facing validation or a good recovery policy for untrusted backend data. var is required because append and reconfigure mutate the snapshot value. $0 is the candidate ID in filter. This intentionally reconfigures all surviving items for simplicity; a larger list should determine which content actually changed.</p><p>At a render event, first publish the content for the new revision into the lookup store, then make and apply its snapshot on the owner's isolation context. In a cell provider, use the identifier argument supplied by the data source to look up content. For selection, resolve the current item identifier from the selected index path at the event boundary, then route by that ID. Capturing row number 3 when creating a callback can select a different record after insertion. The callback should either capture immutable identity or perform a current lookup, according to the feature contract.</p>"
+        },
+        {
+          "id": "reuse-and-images",
+          "title": "Reuse cleanup, image completion, and configuration must agree",
+          "html": "<p>prepareForReuse is a hook before a dequeued cell is repurposed; call super and clear cell-owned transient work. It is not a universal disappearance notification, and reconfiguration may skip it. Keep request ownership explicit. A cell can store representedID and an image-task handle. Before applying a completed image on the UI actor, verify both that the task is still relevant and that representedID matches the requested item. Cancellation alone is insufficient because the operation may finish despite the cancellation request. Session 015's freshness rule applies even when the cell still exists.</p><p>If an image request is shared by a cache or loader, cancelling one cell's interest should not cancel data needed by another visible cell. A loader can deduplicate by a resource key and manage separate consumer interests. Reset the placeholder when configuration changes; otherwise an old image remains visible while the new request waits. Downsampling and decoding are performance-specialist topics developed in the performance unit. Here the essential acceptance criterion is correctness: after rapid scrolling and reordering, every visible card must show the content associated with its current ID.</p><p>Callbacks also count as reusable content. Replace the old action during every configuration and avoid installing another target or gesture recognizer each time. A retained closure can keep an obsolete model or owner alive, even when the displayed text is fresh. Accessibility labels, values, selected states, and custom actions must likewise match the represented item. UIKit's cell highlight and selection styling are interaction state; do not accidentally persist them as the business selection. A row selected for a detail route and a checkbox toggled in a draft often need different state owners.</p>"
+        },
+        {
+          "id": "compositional-sizing",
+          "title": "Compositional layout describes section geometry, including estimates",
+          "html": "<p>A compositional layout combines items into groups and groups into sections. Fractional dimensions are relative to the containing item or group environment; absolute dimensions are point values; estimated dimensions seed sizing and can be replaced by measured content. An estimated height is not a final height or proof that a cell's internal constraints are correct. For vertically growing text, the item and group sizing choices must allow the intended self-sizing chain. An absolute height that fits English at default text can still clip a larger localized label.</p><p>Orthogonal scrolling lets a section scroll along an axis independent of the main collection's direction, such as a horizontal carousel in a vertical page. groupPagingCentered describes that section's paging behavior; it is not a blanket pagination API. A section provider receives a layout environment with effective container geometry. Choose one or two columns from that geometry rather than the physical screen width. Insets and inter-item spacing must be included in the width budget. Stable item IDs continue to matter when a width change rearranges columns.</p><p>Table rows need the equivalent complete sizing contract: automaticDimension, a useful estimated row height, and constraints from contentView's top through all required children to its bottom. Estimates help initial scroll geometry, but large systematic errors can cause visible jumps. Avoid nesting an unconstrained scrolling list inside another scroll view merely to make content height automatic. The active carousel uses a custom grow-only intrinsic-height floor to bootstrap an estimated orthogonal layout. That narrowly documented compromise leaves trailing whitespace after shorter content and should not become a universal list-sizing recipe.</p>"
+        },
+        {
+          "id": "pagination-prefetch",
+          "title": "Pagination and prefetch are distinct state machines",
+          "html": "<p>Pagination obtains another logical page. Prefetch prepares resources for items likely to become visible. UICollectionViewDataSourcePrefetching supplies index paths that you should translate to current IDs at the callback boundary. Prefetch is opportunistic: cell configuration must still work if data was never prefetched. UIKit may cancel predicted interest, and scrolling direction can change. Prefetching should not become the only route that loads required content, nor should every callback blindly create another request.</p><p>Model pagination with a query generation, current cursor, in-flight cursor, ordered IDs, and an end state. Trigger near the end using a threshold, but guard against duplicate loads for the same generation and cursor. Append identities with a declared duplicate policy, such as updating existing content without adding a second occurrence. A repeated cursor or an empty page with a next cursor needs a contract so the UI cannot loop forever. Retry should preserve already useful rows while visibly marking the failed additional page.</p><p>When a query changes, increment its generation, clear or deliberately retain old presentation according to the product policy, and reject old results in both success and failure paths. If page B can finish before page A, either serialize cursor-based loads or buffer results with an explicit ordering rule. Actor isolation alone does not make arrival order equal page order. Keep requests in the feature model or service owner, not arbitrary recycled cells. A page affects the list; a thumbnail request affects one resource interest. Record these owners separately when debugging scrolling stalls or wrong results.</p>"
+        },
+        {
+          "id": "active-carousel-audit",
+          "title": "Read the active carousel and bound the performance claims",
+          "html": "<p>CareTeamCarousel is an active Projects implementation referenced by PracticeViewController behind iOS_PracticePageQuerySplit. Its comments describe the intended benefit of materializing reusable cards instead of the legacy carousel. Those comments and the feature gate establish implementation and intent, not measured launch or scrolling improvement, nor proof the experiment is enabled for every user. The old ProfessionalCarousel remains in the alternative render branch.</p><p>The diffable data source uses ProfessionalId, while modelsById resolves current card content. Tap handling resolves that ID again rather than retaining a row position. display collapses both the title's arranged wrapper and the collection for an empty model before its unchanged guard; otherwise the first empty update would leave an unwanted blank band. It skips equivalent model updates, reconfigures persisting IDs, rebuilds layout when crossing the single-versus-many boundary, and crossfades particular reorders. Each decision solves a concrete state or geometry contract, not an abstract instruction to animate every snapshot.</p><p>The shared RedisplayableCollectionViewCell forwards prepareForReuse to its reusable subview. Compare that generic hook with the carousel's complete configure method: reconfiguration still needs correct content when reuse cleanup does not run. For audit evidence, record the ID sequence, selected ID, configuration count, and outstanding resource interests under a controlled fixture. Source reading can establish the guard and lookup design; only a scratch or authorized client run can establish runtime correctness and cost. Instruments work, representative devices, and frame distributions belong to the performance unit. Avoid converting a recycling comment into a fabricated benchmark.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A diffable item keeps its ID but its subtitle changes. What is the reliable update policy?",
+          "options": [
+            "Only change the backing dictionary and assume every visible cell reruns.",
+            "Explicitly reconfigure the surviving ID and fully apply its new content.",
+            "Replace its ID with a random UUID on every render."
+          ],
+          "answer": 1,
+          "explanation": "Identity describes which item persists, not every content mutation. Reconfiguration requests new content while preserving cell identity; complete configuration must not depend on prepareForReuse."
+        },
+        {
+          "question": "Why is a captured IndexPath unsafe as a delayed selection identity?",
+          "options": [
+            "It cannot refer to a collection item.",
+            "It is always nil after a network request.",
+            "Its position can refer to a different item after insertion or reordering."
+          ],
+          "answer": 2,
+          "explanation": "IndexPath is positional. Resolve an identifier at the event boundary or retain the intended immutable identifier, then use current domain content."
+        },
+        {
+          "question": "A query changes while an old additional page is pending. What protects the replacement list?",
+          "options": [
+            "A generation check on both success and error paths.",
+            "Only using @MainActor.",
+            "Only cancelling a thumbnail request."
+          ],
+          "answer": 0,
+          "explanation": "Main-actor isolation prevents unsynchronized access but not obsolete post-await updates. Cancellation is cooperative; generation checks express which query owns the page."
+        }
+      ],
+      "exercise": {
+        "brief": "Build a scratch reusable collection of synthetic providers, then demonstrate content reconfiguration, reorder-safe selection, and obsolete page rejection.",
+        "steps": [
+          "Use immutable demo IDs and a separate content lookup; initialize a main section snapshot and a self-sizing layout.",
+          "Start with IDs A and B, change A's subtitle without changing its ID, then insert C before A and reorder B.",
+          "Record selected IDs through callbacks rather than row offsets; exercise rapid scrolling with delayed synthetic image completions.",
+          "Design a fake page loader with explicit start/completion controls; replace query generation while an old page is pending.",
+          "Read the gated carousel branch and document which decisions are source-observed and which remain runtime checks."
+        ],
+        "acceptance": [
+          "A subtitle update appears without changing A's identity.",
+          "Selecting the moved A still reports A, and reused cards do not display another ID's image or accessibility label.",
+          "Duplicate snapshot identifiers are rejected or normalized before applying a snapshot.",
+          "An old page success and old page failure cannot overwrite the current generation.",
+          "Prefetch absence does not prevent required content from loading."
+        ],
+        "solution": "<p>Apply A/B first, then place A's updated content in the lookup dictionary and call makeDemoSnapshot with previousIDs taken from dataSource.snapshot().itemIdentifiers. The helper marks A and B as surviving. After inserting C, only previously present IDs are reconfigured. Newly inserted C receives initial configuration. A production-scale implementation would compute the changed subset rather than reconfigure every survivor.</p><p>A controlled identity fixture is: initially [A, B], then [C, B, A]. A callback retaining A routes to A. A callback retaining index 0 routes to C after the insertion and therefore fails the contract. For delayed image work, complete the request for A only after its cell has been configured for B; the represented-ID check must suppress the old application. That checks a schedule, not merely a quick-scroll screenshot.</p><p>The pagination answer needs a separate transition table: generation 1 starts cursor p1; generation 2 replaces the query; generation 2 succeeds; generation 1 then succeeds or fails. Both old completions leave generation 2 unchanged. An in-flight cursor guard prevents repeated end-of-list callbacks from starting p1 twice. Prefetch interests may be cancelled without invalidating visible-cell interests in a shared loader. Record planned versus actually executed checks, and keep the lab outside the production checkout.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Updating collection views using diffable data sources",
+          "url": "https://developer.apple.com/documentation/uikit/updating-collection-views-using-diffable-data-sources"
+        },
+        {
+          "label": "Apple: Make blazing fast lists and collection views",
+          "url": "https://developer.apple.com/videos/play/wwdc2021/10252/"
+        },
+        {
+          "label": "Apple: UICollectionViewCompositionalLayout",
+          "url": "https://developer.apple.com/documentation/uikit/uicollectionviewcompositionallayout"
+        },
+        {
+          "label": "Apple: UICollectionViewDataSourcePrefetching",
+          "url": "https://developer.apple.com/documentation/uikit/uicollectionviewdatasourceprefetching"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Stable-ID diffable card configuration",
+          "path": "ios-client/Projects/Features/ZDProfile/Sources/ZDProfile/Practice/CareTeamCarousel.swift",
+          "line": 62,
+          "why": "Resolves content by ProfessionalId, dequeues cells, and uses an identity-based tap closure."
+        },
+        {
+          "label": "Snapshot and surviving content update",
+          "path": "ios-client/Projects/Features/ZDProfile/Sources/ZDProfile/Practice/CareTeamCarousel.swift",
+          "line": 125,
+          "why": "Applies ordered IDs and explicitly reconfigures persisting items; update decision logic starts at line 154."
+        },
+        {
+          "label": "Estimated orthogonal layout",
+          "path": "ios-client/Projects/Features/ZDProfile/Sources/ZDProfile/Practice/CareTeamCarousel.swift",
+          "line": 184,
+          "why": "Shows group geometry and section paging; intrinsic-height bootstrap begins at line 283."
+        },
+        {
+          "label": "Gated modern and legacy render branches",
+          "path": "ios-client/Projects/Features/ZDProfile/Sources/ZDProfile/Practice/PracticeViewController.swift",
+          "line": 385,
+          "why": "References CareTeamCarousel in one branch and ProfessionalCarousel in the alternative; source presence is not global rollout evidence."
+        },
+        {
+          "label": "Reuse forwarded to component",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDUI/Controllers/Collections/RedisplayableCollectionViewCell.swift",
+          "line": 32,
+          "why": "Makes cell cleanup responsibilities concrete without assuming reconfiguration invokes reuse."
+        }
+      ],
+      "checklist": [
+        "I can distinguish item identity, position, reusable cell, and registration.",
+        "I can update surviving content with an explicit snapshot contract.",
+        "I can explain estimated self-sizing and its required internal constraints.",
+        "I can specify page generation and shared resource cancellation.",
+        "I can distinguish recycling intent from measured performance evidence."
+      ]
+    },
+    {
+      "id": "031",
+      "title": "SwiftUI layout: proposals, modifiers, builders, preferences, and custom contracts",
+      "summary": "Reason through SwiftUI measurement and placement, understand the generic tree produced by builders, and audit a real wrapping layout without confusing it with Compose or Auto Layout.",
+      "duration": 135,
+      "level": "Deep dive",
+      "prerequisites": [
+        "003",
+        "009",
+        "029"
+      ],
+      "objectives": [
+        "Explain proposal, child response, and parent placement including unspecified and unbounded dimensions.",
+        "Predict how modifier order changes size, drawing, and hit testing.",
+        "Write a generic ViewBuilder container and explain structural identity.",
+        "Implement and audit a Layout with consistent measurement/placement and a defined overflow policy.",
+        "Use geometry preferences without creating state-layout feedback loops."
+      ],
+      "sections": [
+        {
+          "id": "proposal-response",
+          "title": "Compose measurement helps, but SwiftUI proposals are not hard constraints",
+          "html": "<p>In Compose, a parent supplies constraints to measure a child, then places the resulting placeable. SwiftUI also separates asking for a size from placement, but its ProposedViewSize is a proposal, not a guarantee that every child accepts an exact bounded size. A parent proposes dimensions; the child chooses and reports a size; the parent places it according to its layout rules. The parent may ask more than once with different proposals. Do not treat a single measurement call as a durable lifecycle event or a place to fetch data.</p><p>Each proposed dimension is optional. nil means unspecified, asking for the child's ideal size on that axis; zero asks about minimum behavior; infinity probes maximum behavior. These meanings are different. Replacing every nil with zero collapses ideal-size content. Returning an infinite actual CGSize from a custom layout is also wrong: a proposal can ask about unbounded behavior, but your reported concrete size needs a meaningful finite result. Define a policy for each probe and for empty children.</p><p>Text responds differently when width is constrained because line wrapping changes height. A vertical ScrollView commonly gives its content an unspecified proposal on the scrolling axis rather than a fixed viewport height. A GeometryReader tends to occupy available proposed space, so placing one as the main child of a small row can alter the row's size instead of merely observing it. A view's semantic font and localization are inputs to this negotiation. The lesson's measurements use synthetic views; the active repository's layout math supplies useful source evidence, not a claim that every SwiftUI child follows identical fitting behavior.</p>"
+        },
+        {
+          "id": "modifier-order",
+          "title": "A modifier wraps the previous description",
+          "html": "<p>Read a modifier chain from the original view outward. Text(\"Demo\").padding(12).background(.yellow) draws a background behind the padded result. Text(\"Demo\").background(.yellow).padding(12) pads outside the background, leaving the added spacing uncolored. Neither chain mutates a single Android View's properties in place. Each modifier constructs another view description whose measurement and drawing behavior can affect the next wrapper. This explains why swapping two apparently cosmetic lines can change an interface.</p><p>frame(width:height:alignment:) introduces a sizing and alignment wrapper; it does not directly assign a UIKit frame to its child. A child can still draw beyond that wrapper depending on its behavior. clipped controls drawing overflow; it does not recover hidden information for VoiceOver or define a comfortable touch target. offset changes visual placement without allocating corresponding layout space, so neighboring views keep their prior positions. padding participates in sizing. Use those distinctions to diagnose overlap rather than adding arbitrary spacer values until a screenshot matches.</p><p>fixedSize asks a view to preserve ideal behavior along chosen axes. fixedSize(horizontal: false, vertical: true) can help text use required vertical extent while negotiating width, but it is not a universal clipping remedy and can exceed a fixed-height ancestor. layoutPriority influences how a container allocates space among children; it is not a direct equivalent of Auto Layout's separate hugging and compression inequalities. HStack, VStack, Spacer, overlays, and backgrounds have different layout participation. For an overlay badge, ask whether the badge should determine the parent's size or merely decorate it. Also inspect contentShape and control semantics before assuming the drawn rectangle is the hit target.</p>"
+        },
+        {
+          "id": "builder-types",
+          "title": "ViewBuilder transforms expressions into a typed view tree",
+          "html": "<p>Session 009 introduced some View. It is an opaque result type: callers need not name the concrete return type, but the compiler still knows it. A ViewBuilder combines multiple view expressions and conditional branches into concrete generic compositions. It is not a runtime array of unrelated View objects. An ordinary function returning some View cannot arbitrarily return Text on one path and Button on another without a builder or another structure that unifies the result. A builder encodes conditional alternatives in the resulting type.</p><pre><code class=\"language-swift\">import SwiftUI\n\nstruct DemoPanel&lt;Content: View&gt;: View {\n    private let content: Content\n\n    init(@ViewBuilder content: () -&gt; Content) {\n        self.content = content()\n    }\n\n    var body: some View {\n        VStack(alignment: .leading, spacing: 8) {\n            content\n        }\n        .padding()\n    }\n}\n\nstruct BuilderDemo: View {\n    let showHint: Bool\n\n    var body: some View {\n        DemoPanel {\n            Text(\"Demo form\")\n            if showHint {\n                Text(\"The hint is optional\")\n            }\n        }\n    }\n}</code></pre><p>Content: View constrains the generic type parameter. () -&gt; Content is a zero-argument closure returning that content. The trailing closure in DemoPanel { ... } supplies it. The builder annotation belongs to the initializer parameter, so the caller can write several expressions. The initializer evaluates the closure and stores its resulting description; this version does not store an escaping closure or run work on later events.</p><p>Conditional structure also influences identity. Switching unrelated branches can replace local state; a consistent tree with changing inputs often preserves it. AnyView erases a concrete type when a boundary needs that flexibility, but adding type erasure everywhere does not solve poor identity or ownership. For repeated data use ForEach with stable IDs, not a language-level for loop that performs arbitrary mutations inside body. Keep side effects in actions or defined lifetime hooks, and treat builder errors as type/structure problems before blaming rendering.</p>"
+        },
+        {
+          "id": "custom-layout",
+          "title": "Write a small Layout with an explicit width and overflow policy",
+          "html": "<p>The Layout protocol is available from iOS 16. It gives measurement and placement methods subview proxies rather than mutable UIKit views. This scratch example stacks children vertically, fills a finite proposed width, otherwise uses the widest ideal child, and gives children unspecified height. Its policy allows a child that refuses the proposed width to overflow horizontally; it does not silently truncate or claim to solve every child type.</p><pre><code class=\"language-swift\">import SwiftUI\n\nstruct DemoColumn: Layout {\n    var spacing: CGFloat = 8\n\n    private func width(for proposal: ProposedViewSize, subviews: Subviews) -&gt; CGFloat {\n        if let width = proposal.width, width.isFinite {\n            return max(0, width)\n        }\n        return subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0\n    }\n\n    func sizeThatFits(\n        proposal: ProposedViewSize,\n        subviews: Subviews,\n        cache: inout Void\n    ) -&gt; CGSize {\n        guard !subviews.isEmpty else { return .zero }\n        let width = width(for: proposal, subviews: subviews)\n        let childProposal = ProposedViewSize(width: width, height: nil)\n        let heights = subviews.map { $0.sizeThatFits(childProposal).height }\n        let gaps = max(0, spacing) * CGFloat(subviews.count - 1)\n        return CGSize(width: width, height: heights.reduce(0, +) + gaps)\n    }\n\n    func placeSubviews(\n        in bounds: CGRect,\n        proposal: ProposedViewSize,\n        subviews: Subviews,\n        cache: inout Void\n    ) {\n        let childProposal = ProposedViewSize(width: bounds.width, height: nil)\n        var y = bounds.minY\n        for child in subviews {\n            let size = child.sizeThatFits(childProposal)\n            child.place(at: CGPoint(x: bounds.minX, y: y),\n                        anchor: .topLeading, proposal: childProposal)\n            y += size.height + max(0, spacing)\n        }\n    }\n}</code></pre><p>inout Void satisfies the protocol's cache parameter without storing a cache. guard handles empty content before subtracting one from its count. reduce(0, +) sums heights using the addition operator as a function. bounds.minX and bounds.minY preserve a nonzero assigned origin. Child placement receives the same width policy used during measurement of the assigned bounds. Assume child responses are finite, as valid layout responses should be; do not conceal malformed children with an arbitrary giant fallback size.</p><p>This layout deliberately ignores a proposed height and reports the height its content needs. A fixed-height ancestor may therefore require scrolling or a separate compact design. It also omits baseline alignment, RTL-specific ordering, and caching optimization. State those limits when reviewing it. A valid narrow contract is more useful than an unexplained imitation of VStack whose behavior differs in edge cases.</p>"
+        },
+        {
+          "id": "layout-audit",
+          "title": "Audit cache validity, repeated probes, and the repository's flow layout",
+          "html": "<p>A custom layout's cache can store intermediate measurements, but cached results are correct only for the inputs they describe. Child count, text, font, proposal width, spacing, and environment changes can invalidate prior arrangements. makeCache and updateCache manage protocol cache lifecycle; proposal-dependent work still needs an appropriate key or recalculation. Do not mutate observable screen state while measuring to remember the last size: the parent can probe again, and that mutation may trigger a new layout cycle.</p><p>The active FlowLayout measures each child with .unspecified, calls pure arrange math with proposal.width, and recomputes arrangement for bounds.width during placement. It adds the assigned bounds origin before placing children. Its documented rows align to the widest row, not automatically the outer container. Thus an external frame alignment is a separate choice. A pill wider than the line budget is placed and allowed to overflow; that is a source-defined policy you should verify against the intended content, not label as universally responsive.</p><p>The pure arrangement tests cover empty input, one item, wrapping, oversize children, distributions, and vertical alignment. Read those assertions to discover the contract, then separately ask whether the SwiftUI subviews provide appropriate measurements. Ideal-size measurement of every child may be suitable for short chips but needs investigation for long multiline content at accessibility sizes. Algorithm tests do not exercise the text renderer or input environment. The accompanying snapshot tests add another boundary of evidence, but their source presence does not mean they were run in this audit.</p>"
+        },
+        {
+          "id": "preferences",
+          "title": "Geometry preferences flow upward and need a reduction rule",
+          "html": "<p>Environment usually supplies values downward. Preferences let descendants report values for ancestors to consume. A PreferenceKey defines Value, a defaultValue, and reduce(value:nextValue:), whose job is to combine contributions. inout means the first argument can be updated in place; nextValue is a closure, so calling nextValue() obtains the next contribution. If several descendants report heights, overwriting with the last contribution is a different contract from taking a maximum or collecting values by stable ID.</p><p>Use GeometryReader in a background or overlay when you intend to observe an existing view's assigned size without making the reader the principal sizing child. Choose a named coordinate space when positions should be relative to a particular scrolling container. A global y coordinate and a local viewport height cannot be subtracted meaningfully just because both are CGFloat. Remember that geometry can change after a keyboard, safe-area, content, or window transition even when the data model stays the same.</p><p>The active AI chat reports a zero-height bottom marker's position in the named aiChatScroll coordinate space. Its preference key overwrites because that marker is the intended single contributor. Introducing multiple emitters without changing reduction would silently change the meaning. The receiver updates bottom-marker state to decide whether a scroll control appears. Guard no-op changes and avoid a loop where the displayed control changes geometry, which changes the preference, which toggles the control again. Prefer directly deriving layout inside Layout where possible; use stateful geometry reporting for an actual interaction need, not to reproduce every child's frame as model data.</p>"
+        },
+        {
+          "id": "bridges-and-verification",
+          "title": "Cross-framework sizing and evidence have different boundaries",
+          "html": "<p>For a UIKit view represented in SwiftUI, sizeThatFits(_:uiView:context:), available from iOS 16, can participate in SwiftUI proposal negotiation. Returning nil uses the framework's default strategy; supplying a concrete size requires a coherent UIKit measurement policy. A width-dependent label should be measured at the intended width, not just read once from intrinsicContentSize before layout. updateUIView applies input changes; measurement must not also publish a user-edit callback. Session 010's stable coordinator rules still apply.</p><p>For SwiftUI content hosted in UIKit, UIHostingController sizingOptions can request intrinsicContentSize or preferredContentSize updates, with the relevant iOS 16-era availability. Those values serve different parent-container contracts. Setting both does not replace parent constraints, containment, or a scroll policy. The repository's wrappers add their own resizing behavior, so inspect the actual helper rather than assuming it is an unmodified Apple host. Ordinary UIKit constraints surrounding a host and SwiftUI proposals inside it can both be correct while disagreeing at their boundary.</p><p>A useful acceptance record identifies finite, unspecified, zero, and wide-width proposals; empty content; a nonzero placement origin; larger text; and an RTL fixture. First type-check a scratch example against its declared deployment version. Then exercise actual layout; a compiler does not prove measured sizes. Record whether bounds exceed the reported extent and whether that is the declared overflow policy. Special topics such as baseline guides, layout-value keys, right-to-left custom placement, and complex cache optimization need additional focused practice beyond this introductory custom layout.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does a nil ProposedViewSize width request?",
+          "options": [
+            "An unspecified width, allowing the child to report ideal behavior.",
+            "Exactly zero width.",
+            "The physical screen's width."
+          ],
+          "answer": 0,
+          "explanation": "nil and zero are different proposals. A custom layout should define ideal-size behavior rather than collapse unspecified dimensions or read the global screen."
+        },
+        {
+          "question": "Why does moving background before padding change its painted extent?",
+          "options": [
+            "Padding only changes color.",
+            "Each modifier wraps the preceding result, so its position determines which sized description gets the background.",
+            "SwiftUI randomly orders modifiers."
+          ],
+          "answer": 1,
+          "explanation": "The background observes the description produced before it in the chain. Padding before background expands the region behind which that background draws."
+        },
+        {
+          "question": "A PreferenceKey uses value = nextValue(). What must you inspect before adding a second emitter?",
+          "options": [
+            "Whether both emitters have the same font.",
+            "Whether AnyView can replace the key.",
+            "Whether overwriting is still the intended aggregation contract."
+          ],
+          "answer": 2,
+          "explanation": "Last-contribution reduction differs from maximum, sum, or an ID-keyed collection. A reduction appropriate for one bottom marker may lose information from multiple markers."
+        }
+      ],
+      "exercise": {
+        "brief": "In a scratch SwiftUI target, implement DemoColumn and a builder panel, then review a wrapping layout's measurement and overflow contract.",
+        "steps": [
+          "Place short and multiline Text children inside DemoColumn at a narrow finite width and inside an unconstrained context.",
+          "Explain and inspect empty, zero-width, unspecified-width, and wide-width behavior.",
+          "Apply background before and after padding and draw each wrapper's expected bounds.",
+          "Read FlowLayout.arrange and two existing test fixtures, then calculate a wrap by hand.",
+          "Plan a named-coordinate-space preference fixture with one contributor and explain how its reduction would change for several contributors."
+        ],
+        "acceptance": [
+          "The explanation distinguishes unspecified and zero proposals.",
+          "Measurement and placement use a consistent child-width policy and account for bounds origin.",
+          "The modifier demonstration paints the predicted extent.",
+          "Oversize content has a documented overflow or alternative-layout policy.",
+          "No request or observable-state mutation occurs inside sizing methods."
+        ],
+        "solution": "<p>For two synthetic children measured at heights 24 and 40 with spacing 8, DemoColumn reports height 72, then places their origins at y = bounds.minY and y = bounds.minY + 32. At a finite width of 200 it proposes 200 to both. If a Text becomes taller at 100 points, the layout recomputes that height; it should not reuse the 200-point measurement. Empty children return zero, with no phantom gap.</p><p>For a wrapping fixture with widths 200 and 200, a 300-point budget, and spacing 8, the second item cannot fit because 200 + 8 + 200 exceeds 300. With first height 32 and run spacing 12, its next-row origin is y = 44. A second height of 40 yields total height 84. These numbers mirror a source-test contract and are calculated values, not a new executed snapshot. FlowLayout hugs the 200-point widest row in that fixture rather than filling all 300 points.</p><p>The builder panel supplies a stable generic container; changing showHint alters its optional child. Background after padding colors the padded area. For the preference review, a single bottom marker can use overwrite reduction; several row sizes might need an ID-keyed collection merged deliberately. Document the compiler check and actual fixture runs separately. Advanced baseline/RTL placement and production wrapper changes remain outside this scratch solution.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Layout",
+          "url": "https://developer.apple.com/documentation/swiftui/layout"
+        },
+        {
+          "label": "Apple: ProposedViewSize",
+          "url": "https://developer.apple.com/documentation/swiftui/proposedviewsize"
+        },
+        {
+          "label": "Apple: ViewBuilder",
+          "url": "https://developer.apple.com/documentation/swiftui/viewbuilder"
+        },
+        {
+          "label": "Apple: PreferenceKey",
+          "url": "https://developer.apple.com/documentation/swiftui/preferencekey"
+        },
+        {
+          "label": "Swift: Opaque and Boxed Protocol Types",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/opaquetypes/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Active custom layout measurement and placement",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDMezzanine/Views/SwiftUI/FlowLayout.swift",
+          "line": 75,
+          "why": "Measures ideal children, arranges with proposed width, and later places with final bounds width and origin."
+        },
+        {
+          "label": "Pure wrapping and overflow contract",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDMezzanine/Views/SwiftUI/FlowLayout.swift",
+          "line": 170,
+          "why": "Separates layout math from framework proxies, allowing its wrapping policy to be inspected and tested."
+        },
+        {
+          "label": "Calculated arrangement test fixtures",
+          "path": "ios-client/Projects/Infra/ZDUI/Tests/ZDMezzanineTests/FlowLayoutTests.swift",
+          "line": 69,
+          "why": "Provides expected wrap positions and total extents; reading these assertions is not executing them."
+        },
+        {
+          "label": "Single bottom-marker preference reduction",
+          "path": "ios-client/Projects/Features/ZDSearch/Sources/ZDAISearch/AIChat+ProdView.swift",
+          "line": 446,
+          "why": "Shows a concrete upward geometry report with a single-contributor overwrite policy."
+        }
+      ],
+      "checklist": [
+        "I can explain a proposal and a child's response separately.",
+        "I can predict modifier order and structural builder types.",
+        "I can define finite measurement and overflow behavior for Layout.",
+        "I can justify a preference reduction and coordinate space.",
+        "I can separate pure math tests from actual SwiftUI rendering evidence."
+      ]
+    },
+    {
+      "id": "032",
+      "title": "Interaction: animation transactions, gestures, scrolling identity, and focus",
+      "summary": "Make state transitions and user input agree across SwiftUI and UIKit, including interrupted animations, accessible alternatives, current scroll proxies, and responder focus.",
+      "duration": 120,
+      "level": "Deep dive",
+      "prerequisites": [
+        "010",
+        "011",
+        "022",
+        "030",
+        "031"
+      ],
+      "objectives": [
+        "Distinguish state changes, interpolation, transitions, and transaction scope.",
+        "Implement a gesture with transient and committed state and a semantic accessible alternative.",
+        "Preserve stable scroll targets and use the current scroll proxy.",
+        "Model focus with one unambiguous owner and clear dismissal behavior.",
+        "Choose evidence for interruption, keyboard, reduced-motion, and navigation cancellation."
+      ],
+      "sections": [
+        {
+          "id": "state-versus-animation",
+          "title": "Animate a state transition whose final meaning is already correct",
+          "html": "<p>In Compose, an animation can interpolate a value as state changes. SwiftUI similarly uses state to describe the destination and animation to interpolate eligible differences. withAnimation wraps a synchronous state mutation with animation information. It does not delay the business mutation until the pixels arrive, make every property animatable, or keep a task alive until an arbitrary visual effect finishes. A network response should still have a freshness policy even if its resulting list fades into place.</p><p>An animatable value changes within a persistent identity, such as opacity, scale, or a supported layout position. A transition describes insertion or removal across the hierarchy, such as an optional detail appearing. Setting .transition(.opacity) on a permanently present child does not create an insertion. Conversely, replacing identity may invoke transition behavior and discard state instead of smoothly changing the existing view. Ask whether the interface is changing an attribute, inserting a child, or replacing an entire flow.</p><p>The Android analogy breaks at exact modifier and runtime contracts. SwiftUI's .animation(_:value:) watches the supplied Equatable value and applies animation within its subtree when that value changes; other simultaneous changes in that scope can inherit the same transaction. A broad animation modifier can therefore animate unrelated error, keyboard, or layout updates. Place scope deliberately, and do not use animation duration as a synchronization primitive for data or navigation. A visual completion is not the same as exactly-once selection-result delivery.</p>"
+        },
+        {
+          "id": "transaction-example",
+          "title": "Read a scoped animation and reduced-motion policy",
+          "html": "<p>A Transaction carries information associated with an update, including animation. withTransaction supplies it for a state change, and a .transaction modifier can adjust a subtree's transaction. A nil animation and the disablesAnimations flag have related but distinct roles; disabling also prevents ordinary animation modifiers from supplying an animation in that transaction. Test the intended scope rather than globally disabling every visual update.</p><pre><code class=\"language-swift\">import SwiftUI\n\nstruct DemoDisclosure: View {\n    @Environment(\\.accessibilityReduceMotion) private var reduceMotion\n    @State private var expanded = false\n\n    var body: some View {\n        VStack(alignment: .leading) {\n            Button(expanded ? \"Hide demo details\" : \"Show demo details\") {\n                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {\n                    expanded.toggle()\n                }\n            }\n            .accessibilityValue(expanded ? \"Expanded\" : \"Collapsed\")\n\n            if expanded {\n                Text(\"Synthetic details remain readable without motion.\")\n                    .transition(.opacity)\n            }\n        }\n    }\n}</code></pre><p>The backslash key path identifies the environment value. The conditional expression chooses no explicit animation when reduced motion is enabled. expanded.toggle() changes the final state immediately; SwiftUI handles eligible visual interpolation. The if makes the detail enter or leave the tree, so its transition applies to an actual insertion/removal. The button supplies a semantic action and reports its expanded state to accessibility rather than relying on an unexplained tap gesture.</p><p>Reduced motion is a product policy, not necessarily a demand to eliminate all feedback. A subdued fade or immediate update may communicate the same outcome without large movement. Check VoiceOver order after insertion, large text expansion, and repeated taps during interpolation. The final visible state must correspond to the final Boolean even if an earlier animation was interrupted. Do not leave an invisible interactive overlay intercepting touches after a transition.</p>"
+        },
+        {
+          "id": "uikit-animation",
+          "title": "UIKit animation needs initial geometry and an interruption policy",
+          "html": "<p>UIKit's UIView.animate closure describes eligible property changes, such as alpha or a constraint-driven layout result. To animate a constraint constant, first ensure the relevant ancestor has laid out the initial state, then change the constant and call layoutIfNeeded inside the animation block on the hierarchy that owns the affected relationship. Calling layoutIfNeeded on a child while its parent owns the moving constraints can fail to capture the intended change. Animating frame assignments while Auto Layout later recomputes the frame often causes a snap.</p><p>UIViewPropertyAnimator offers explicit start, pause, continuation, reversal, and fraction-complete controls for interruptible interactions. Know the difference between its current visual position and the model's intended final state. A user can reverse or cancel an interactive transition; do not commit a domain operation solely because an animation started. Navigation container transitions have their own coordinators and cancellation information. Session 010's exactly-once result policy still needs a terminal event that represents the actual outcome.</p><p>The active care-team carousel uses a cross-dissolve around a nonanimated snapshot apply, followed by layoutIfNeeded, because its implementation documents unreliable per-cell moves in that orthogonal layout. This is a narrowly chosen implementation, not advice that all diffable lists should crossfade. It skips equivalent state and treats initial population differently from a reorder. No timing measurement was performed in this course audit. If replacing that strategy, specify the visual requirement and compare actual interrupted interactions on representative environments before claiming an improvement.</p>"
+        },
+        {
+          "id": "gesture-state",
+          "title": "A gesture has transient state, committed state, and competition",
+          "html": "<p>Use a gesture when the product needs continuous manipulation, not as a substitute for a standard Button. @GestureState holds transient gesture state and resets when the gesture ends or is cancelled. @State can hold the committed result. A drag's translation is relative to its start, so repeatedly adding every onChanged translation to the stored origin double-counts movement. Render committed offset plus current translation, then commit once in onEnded when that is the desired interaction.</p><pre><code class=\"language-swift\">import SwiftUI\n\nstruct DemoDrag: View {\n    @State private var savedOffset = CGSize.zero\n    @GestureState private var translation = CGSize.zero\n\n    var body: some View {\n        Text(\"Demo draggable label\")\n            .padding()\n            .background(.thinMaterial)\n            .offset(x: savedOffset.width + translation.width,\n                    y: savedOffset.height + translation.height)\n            .gesture(\n                DragGesture(minimumDistance: 10)\n                    .updating($translation) { value, state, _ in\n                        state = value.translation\n                    }\n                    .onEnded { value in\n                        savedOffset.width += value.translation.width\n                        savedOffset.height += value.translation.height\n                    }\n            )\n            .accessibilityAction(named: Text(\"Reset demo position\")) {\n                savedOffset = .zero\n            }\n    }\n}</code></pre><p>updating receives the gesture value, an inout transient state, and transaction; the underscore discards the unused transaction. The code is a syntax and lifetime demonstration, not a complete bounded draggable component. It lacks edge clamping and keyboard directional controls. Add those for a real movable item, and ensure every essential operation has a non-drag route.</p><p>Gesture composition matters inside a scroll view. simultaneousGesture allows recognition alongside another gesture; highPriorityGesture changes precedence. Neither is a universal fix for conflicts. A broad drag on a row can steal scrolling or back navigation, and a zero minimum distance can turn ordinary taps into drags. Specify the recognized direction, target region, cancellation behavior, and accessible alternative, then observe actual interaction rather than assuming modifier order settles every recognizer conflict.</p>"
+        },
+        {
+          "id": "scroll-targets",
+          "title": "A scroll request uses current identity in a current layout context",
+          "html": "<p>ScrollViewReader supplies a proxy whose scrollTo call targets an ID in its contained scrollable content. The ID must be stable and currently represented by the intended hierarchy. A displayed row's accessibilityIdentifier is a different mechanism; it is useful for automation but is not a scroll target. An array index changes meaning after insertions, while a random ID generated during body evaluation may no longer exist when the event arrives. Session 030's domain-identity rules apply again.</p><p>Keep the proxy near the event that uses it. Capturing a proxy in a closure stored during onAppear can leave a stale layout context when content collapses, expands, or the hierarchy changes without another appearance event. The active AI chat observes its scroll request subject inside ScrollViewReader and calls the current proxy there. Its source comment documents a full/text-entry-only/full resize problem in the former captured-closure strategy. That is checked implementation evidence; the course has not reproduced the original runtime bug.</p><p>Do not auto-scroll to the bottom after every incoming item if the user intentionally scrolled upward. Define whether the viewport was near the bottom before insertion, whether this message was the user's own submission, and whether a visible New messages action should appear. A zero-height stable bottom marker can be a valid target. Newer scroll-position and target-layout APIs beginning in iOS 17 provide additional control, but do not retroactively appear in every repository component. Verify availability, target placement, and identity before adopting them. Programmatic scrolling also needs a reduced-motion policy and must not fight interactive keyboard dismissal.</p>"
+        },
+        {
+          "id": "focus-contract",
+          "title": "Focus is a request to the responder system, not just a Boolean",
+          "html": "<p>@FocusState binds SwiftUI's focus to a Boolean or optional Hashable value. An optional enum is useful for a form because it names exactly which field should focus; nil represents no focused field. Apply .focused($field, equals: .name) to the actual focusable control. Assigning the same enum case to multiple controls makes programmatic selection ambiguous. Keep one authoritative focus contract even if a view model mirrors requests for navigation or validation.</p><p>UIKit's becomeFirstResponder returns a Bool indicating whether the responder accepted the request. It needs a valid responder context; a text field constructed but not yet attached to a presented hierarchy may not show the keyboard. Similarly, assigning SwiftUI focus in an early construction callback is not a guarantee of immediate keyboard visibility. Task scheduling or a delay does not prove a particular lifecycle milestone. Where a repository uses a deferral, inspect the guard and actual target behavior; do not turn its comment into a universal one-run-loop recipe.</p><p>Keyboard visibility, text-input focus, and VoiceOver accessibility focus are separate. A hardware keyboard can edit a focused field without a software keyboard, and moving VoiceOver to an error is not necessarily the same as making that text field first responder. Session 033 uses focus for submit progression and error recovery. During a sheet dismissal or a navigation return, decide whether focus should resume, remain cleared, or move to an invalid field. Avoid resetting all form state to gain focus: that sacrifices editing identity and can erase an unsaved draft.</p>"
+        },
+        {
+          "id": "interaction-evidence",
+          "title": "Acceptance must cover interruption and alternative input",
+          "html": "<p>Build an event notebook for state changes, navigation outcomes, focus requests, accepted responder changes, and scroll actions. Those events may occur in different orders from the visible animation. Test repeated disclosure taps, drag cancellation, a cancelled back gesture, a keyboard-visible scroll, and a programmatic scroll after changing the viewport. A screenshot certifies one final visual state; it cannot prove a cancelled gesture preserved the draft or an action reported exactly one result.</p><p>Preserve semantic controls. Button supports activation and accessibility behavior that a Text with onTapGesture does not automatically reproduce. A custom drag should expose an alternative action, suitable hit region, and a meaningful accessibility value. Make decorative overlays ignore hit testing when appropriate. Verify larger text does not cover another control, and test reduced motion with the same final content and actions. A hover or keyboard shortcut may help iPad interaction, but declaring iPad support alone does not prove pointer, focus traversal, or external-keyboard quality.</p><p>The active BookingAddressFormView has one optional field FocusState and maps submit events through its field enum. CreatePatientView mirrors model/view focus and requests initial focus from its appearance path; read those concrete boundaries without declaring their scheduling comments guaranteed platform behavior. The lab acceptance report should identify exact fixtures and any executed UI path. Detailed spring tuning, matched geometry across complex trees, gesture arbitration inside custom containers, and assistive-input user testing remain specialist practice. This session supplies the contracts needed to approach that work safely and explain failures.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does withAnimation do in the disclosure example?",
+          "options": [
+            "Waits until a network operation completes.",
+            "Associates animation information with the synchronous state change.",
+            "Delays expanded.toggle() until after the animation duration."
+          ],
+          "answer": 1,
+          "explanation": "The state expresses the destination immediately. Eligible visual differences interpolate according to the transaction; business timing and asynchronous completion need separate contracts."
+        },
+        {
+          "question": "Why keep a drag's current translation in GestureState?",
+          "options": [
+            "It persists a position to disk.",
+            "It replaces all committed state.",
+            "It is transient and resets when the gesture ends or is cancelled."
+          ],
+          "answer": 2,
+          "explanation": "Render committed position plus transient translation, then commit the final displacement once if required. Accumulating every intermediate translation double-counts movement."
+        },
+        {
+          "question": "Two text fields use .focused(..., equals: .name). What is the problem?",
+          "options": [
+            "Programmatic focus on .name has an ambiguous target.",
+            "Hashable enums cannot be used for focus.",
+            "Both controls automatically share one text binding."
+          ],
+          "answer": 0,
+          "explanation": "Focus identity should uniquely name the intended control. Focus bindings do not merge text ownership or choose a predictable target for duplicate enum cases."
+        }
+      ],
+      "exercise": {
+        "brief": "Build a scratch disclosure, bounded draggable item, and scrollable two-field editor; verify interruption, focus, and alternative input.",
+        "steps": [
+          "Implement DemoDisclosure and toggle it repeatedly with reduced motion both off and on.",
+          "Extend DemoDrag with a bounded movement area and buttons or accessible actions for required movement/reset behavior.",
+          "Give list items stable IDs and perform a scroll after a content/viewport change using the proxy inside its current reader.",
+          "Add one optional focus enum, unique cases per field, and a clear-focus action.",
+          "Record cancellation, repeated-action, keyboard, and VoiceOver fixtures separately from static screenshots."
+        ],
+        "acceptance": [
+          "The final disclosure visibility always matches its state after interrupted animation.",
+          "Cancelled transient drag input does not accidentally double-commit position.",
+          "Essential actions can be completed without performing a drag.",
+          "Programmatic scrolling targets the intended current ID after reordering or resizing.",
+          "Each focus case names exactly one field, and keyboard dismissal does not clear the draft."
+        ],
+        "solution": "<p>The disclosure's Boolean is the source of truth. Repeated taps may interrupt interpolation, but the final hierarchy must follow its latest value. Reduced motion changes the visual policy while preserving that outcome. For a bounded draggable component, clamp the committed-plus-transient candidate to the allowed rectangle for display, then commit the bounded final candidate once. Reset is already a semantic accessibility action; add ordinary controls when repositioning itself is required. A geometry calculation should use the actual container, not UIScreen.main.bounds.</p><p>A two-field focus enum has distinct name and note cases. Return from name requests note; Done or an explicit toolbar action assigns nil. Neither mutation should reconstruct the model. For scrolling, observe the event inside ScrollViewReader and use a stable row or bottom-marker ID after the desired content is present. Do not preserve a proxy in an appearance-time closure just to share it widely.</p><p>The verification record should show one cancelled drag, one cancelled navigation gesture if implemented, one narrow-window keyboard-visible scroll, and one reduced-motion completion. Directly calling a gesture callback is useful for logic but is not evidence that UIKit/SwiftUI recognizers arbitrate correctly. This solution describes the expected design and scratch observations; it does not claim the client UI was run.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Transaction",
+          "url": "https://developer.apple.com/documentation/swiftui/transaction"
+        },
+        {
+          "label": "Apple: GestureState",
+          "url": "https://developer.apple.com/documentation/swiftui/gesturestate"
+        },
+        {
+          "label": "Apple: FocusState",
+          "url": "https://developer.apple.com/documentation/swiftui/focusstate"
+        },
+        {
+          "label": "Apple: ScrollViewReader",
+          "url": "https://developer.apple.com/documentation/swiftui/scrollviewreader"
+        },
+        {
+          "label": "Apple: UIViewPropertyAnimator",
+          "url": "https://developer.apple.com/documentation/uikit/uiviewpropertyanimator"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Current scroll proxy and keyboard dismissal",
+          "path": "ios-client/Projects/Features/ZDSearch/Sources/ZDAISearch/AIChat+ProdView.swift",
+          "line": 214,
+          "why": "Observes scroll events inside ScrollViewReader, uses a stable bottom marker, and dismisses the keyboard interactively."
+        },
+        {
+          "label": "Deliberate UIKit reorder crossfade",
+          "path": "ios-client/Projects/Features/ZDProfile/Sources/ZDProfile/Practice/CareTeamCarousel.swift",
+          "line": 132,
+          "why": "Pairs a nonanimated diffable apply with a transition and forced layout for its specific carousel."
+        },
+        {
+          "label": "One field focus and submit contract",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/AddressForm/BookingAddressFormView.swift",
+          "line": 62,
+          "why": "Binds individual fields to unique enum cases and advances focus on submit."
+        },
+        {
+          "label": "Focus request and mirrored model state",
+          "path": "ios-client/Projects/Features/ZDAccount/Sources/ZDAccount/Profile/CreatePatient/CreatePatientView.swift",
+          "line": 63,
+          "why": "Provides an active example to audit for appearance scheduling, focus ownership, and bidirectional updates; comments alone do not guarantee scheduling milestones."
+        }
+      ],
+      "checklist": [
+        "I can separate final state, interpolation, and insertion transitions.",
+        "I can explain gesture cancellation and transient state.",
+        "I can provide semantic alternatives to essential gestures.",
+        "I can use current scroll identity and avoid stale proxy capture.",
+        "I can distinguish input focus, software keyboard visibility, and accessibility focus."
+      ]
+    },
+    {
+      "id": "033",
+      "title": "Forms: keyboards, editing ranges, validation, and localized input",
+      "summary": "Preserve real editing behavior through typing, paste, AutoFill, IME composition, keyboard avoidance, focus progression, and domain validation.",
+      "duration": 135,
+      "level": "Deep dive",
+      "prerequisites": [
+        "009",
+        "019",
+        "022",
+        "029",
+        "032"
+      ],
+      "objectives": [
+        "Distinguish raw editing buffers, normalized domain values, and submission eligibility.",
+        "Configure keyboard traits without treating them as validators.",
+        "Convert UIKit NSRange edits correctly and preserve marked text and selection.",
+        "Provide keyboard-visible, hardware-keyboard, and accessible error recovery.",
+        "Audit the active address form's local normalization rules without claiming global address support."
+      ],
+      "sections": [
+        {
+          "id": "editing-model",
+          "title": "A text field owns an editing interaction, not just a String",
+          "html": "<p>An Android engineer may start with EditText filters or a Compose value/onValueChange pair. The important iOS distinction is between the editing buffer, the normalized domain value, and the value allowed to submit. A person can be midway through entering a number, composing a character, replacing a selection, or accepting AutoFill. The intermediate text can be temporarily invalid while still representing a valid editing action. Do not force every keystroke into the final serialized format if that makes ordinary input impossible.</p><p>TextField bound to String stores an editable string. A formatter-based or format-style field can parse typed values, but that introduces parsing and incomplete-input behavior you must understand. A blank decimal, a sign without digits, and a locale-specific separator are reasonable intermediate states. For many forms, keep raw strings and derive a parsed optional value for eligibility. Validation at the action boundary then constructs a domain request or reports a recoverable error. Keyboard input and network validation remain separate responsibilities.</p><p>Session 009's single-source rule still applies: a parent and child should not maintain independent copies of the same text synchronized by competing change callbacks. A UIKit representable may need additional editing metadata such as selectedTextRange and markedTextRange, but that does not justify creating a second business draft. State should survive an unrelated render, keyboard dismissal, and return from a detail. A live server error should not reassign identical text and throw the caret to the end. Start with those observable interaction requirements before choosing property wrappers or formatters.</p>"
+        },
+        {
+          "id": "keyboard-traits",
+          "title": "Keyboard type, content type, capitalization, and submit labels",
+          "html": "<p>keyboardType chooses an input presentation, such as emailAddress, numberPad, or decimalPad. It does not enforce an allowed character set. Paste, AutoFill, hardware keyboards, accessibility input, and programmatic updates can supply different text. A number-pad field therefore still needs the domain's numeric policy. Postal codes should normally be strings: converting a demo code such as 01234 to Int loses its leading zero. Whether only five ASCII digits are permitted is a local business rule, not an international postal-address rule.</p><p>textContentType supplies semantic hints for system-assisted input, such as givenName, emailAddress, postalCode, or oneTimeCode. Use the actual meaning, not whichever hint seems to produce a convenient keyboard. Capitalization and autocorrection are also interaction choices. A person's name is not safely normalized by rejecting all non-Latin letters or forcing a culturally assumed casing rule. SecureField changes secure entry behavior; do not casually toggle identity to reveal text because that can affect focus and selection. Credential-specific autofill requires additional focused study.</p><p>submitLabel changes the semantic label of an available submit key; it does not manufacture a Return key on every keyboard. A number pad often lacks one, so provide an explicit Done or Continue path, such as a keyboard toolbar or an always-reachable control. onSubmit can advance to the next unique focus case or validate the final form. A hardware keyboard should have a sensible route too. UIKit exposes corresponding UITextInputTraits and returnKeyType, but their implementation is not simply an Android imeOptions bitmask. Test behavior rather than only the requested trait values.</p>"
+        },
+        {
+          "id": "worked-form",
+          "title": "Read a raw-buffer form with a declared synthetic rule",
+          "html": "<p>This self-contained SwiftUI example requires iOS 17 for the lesson's target baseline. It uses a display name and a synthetic five-ASCII-digit demo code. The rule is intentionally narrow and does not claim email, patient-name, or international-address validation.</p><pre><code class=\"language-swift\">import Foundation\nimport SwiftUI\n\nstruct DemoCodeForm: View {\n    enum Field: Hashable { case name, code }\n    @State private var name = \"\"\n    @State private var code = \"\"\n    @State private var attempted = false\n    @State private var status = \"\"\n    @FocusState private var focused: Field?\n\n    private var validName: Bool {\n        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty\n    }\n    private var validCode: Bool {\n        code.utf8.count == 5 &amp;&amp; code.utf8.allSatisfy { $0 &gt;= 48 &amp;&amp; $0 &lt;= 57 }\n    }\n\n    var body: some View {\n        Form {\n            TextField(\"Demo display name\", text: $name)\n                .focused($focused, equals: .name)\n                .submitLabel(.next)\n                .onSubmit { focused = .code }\n            TextField(\"Five-digit demo code\", text: $code)\n                .keyboardType(.numberPad)\n                .textInputAutocapitalization(.never)\n                .autocorrectionDisabled()\n                .focused($focused, equals: .code)\n                .submitLabel(.done)\n                .onSubmit { submit() }\n            if attempted &amp;&amp; (!validName || !validCode) {\n                Text(\"Enter a name and exactly five ASCII digits.\")\n                    .foregroundStyle(.red)\n            }\n            Button(\"Check demo input\") { submit() }\n            Text(status)\n        }\n        .toolbar {\n            ToolbarItemGroup(placement: .keyboard) {\n                Spacer()\n                Button(\"Done\") { focused = nil }\n            }\n        }\n    }\n\n    private func submit() {\n        attempted = true\n        guard validName &amp;&amp; validCode else {\n            status = \"\"\n            focused = validName ? .code : .name\n            return\n        }\n        focused = nil\n        status = \"Synthetic input is valid; nothing was submitted.\"\n    }\n}</code></pre><p>$name and $code project bindings to their owned buffers. utf8 examines bytes, and the comparisons 48 through 57 explicitly choose ASCII digits. That differs from String.count and Unicode numeric predicates. allSatisfy alone would accept an empty sequence vacuously, so the exact count also matters. guard exits the invalid action path and chooses the first invalid field. The button is deliberately usable while invalid so the learner can receive feedback; merely disabling it would not explain what needs repair.</p><p>The keyboard toolbar clears focus without modifying either buffer. Error text is readable information, not only a red outline. A production form would add localized field-specific messages, server results, accessible error discovery, and a deliberate committed-value construction. This scratch status explicitly states that no request occurred.</p>"
+        },
+        {
+          "id": "range-and-composition",
+          "title": "UIKit edit ranges use UTF-16; Swift strings use grapheme-aware indices",
+          "html": "<p>UITextFieldDelegate's shouldChangeCharactersIn range is an NSRange in the text's UTF-16 representation. Swift String.Index is not an integer character offset. Emoji, combining marks, and some scripts make naive range.location arithmetic incorrect. Convert the Foundation range with Range(range, in: currentText), which can fail if the range cannot be represented correctly. Build the proposed buffer by replacing that Swift range with the entire replacement string. Deletion, paste, and selected replacement can involve more than one character.</p><pre><code class=\"language-swift\">import Foundation\n\nfunc replacingDemoText(_ current: String, range: NSRange, replacement: String) -&gt; String? {\n    guard let swiftRange = Range(range, in: current) else { return nil }\n    return current.replacingCharacters(in: swiftRange, with: replacement)\n}</code></pre><p>The question mark in String? represents a failed conversion honestly; guard unwraps the successful range. A replacement of the emoji in A🙂B uses UTF-16 location 1 and length 2, even though the emoji is one Swift Character. Do not slice a String using those numbers as character positions or assume NSString.length and String.count describe the same unit. Successful conversion also does not certify that a fabricated range respects grapheme boundaries. Use ranges supplied by the text system; if your domain requires whole-Character boundaries, validate them separately against the string's allowed indices. An out-of-bounds range can return nil, but a range through part of a surrogate pair must not be assumed to fail conversion.</p><p>markedTextRange identifies provisional text used by input methods during composition. Aggressively uppercasing, truncating, or rewriting the whole buffer while marked text exists can break composition and selection. A raw-buffer design can permit provisional edits, then validate or normalize at a declared commit/submission boundary. If a bridge must transform committed text, preserve or deliberately remap the caret and selection, and avoid reassigning an identical value in updateUIView. onChange of a String alone does not expose every input-method detail; choose a UIKit bridge only when the interaction contract needs that control, and test actual composition.</p>"
+        },
+        {
+          "id": "avoidance-and-focus",
+          "title": "Keyboard avoidance needs the current container and one owner",
+          "html": "<p>A form should keep the active field and its recovery actions reachable while the keyboard is visible. SwiftUI's normal safe-area and scroll behavior often supplies a useful starting point. A ScrollView or Form can scroll long content; safeAreaInset can place a bottom action while preserving scrollable space. ignoresSafeArea(.keyboard) changes that negotiation and can defeat avoidance. Do not add a global keyboard-height observer simply because an old Android implementation manually applied insets.</p><p>UIKit's keyboardLayoutGuide gives constraint relationships from iOS 15, and scroll integration may need content inset adjustment plus scrolling the active control into view. If using keyboard notifications, their frames are in a screen coordinate space: convert into the actual window/view and use intersection with the visible region. Subtracting the raw reported height from every form fails for floating keyboards, multiple windows, and nested containers. Hardware keyboards can change focus without the same software-keyboard geometry, so do not treat keyboard visibility as an editing-lifetime signal.</p><p>Focus progression needs distinct field identities, as session 032 showed. Advancing when two letters appear may help one fixed state-code field, but can surprise users replacing text or accepting AutoFill. Keep an explicit next/submit route, and inspect the exact rule before copying auto-advance. Clearing focus should leave raw buffers intact. A server error arriving during editing should not rebuild the hosted form or replace its state identity. For dismissal and navigation return, document whether the previous field refocuses; avoid arbitrary sleeps as proof the responder hierarchy is ready.</p>"
+        },
+        {
+          "id": "validation-localization",
+          "title": "Validation, normalization, and localization have separate contracts",
+          "html": "<p>Normalize only what the domain permits. Trimming outer whitespace can be appropriate for submission eligibility without altering internal spacing while typing. Case-folding an email address, accepting Unicode decimal digits, or stripping punctuation from a code needs a specified policy. Regex can check a bounded format, but does not prove an email inbox exists or an address is deliverable. Server validation may add facts the client cannot know; keep its failure recoverable and preserve the user's draft.</p><p>When async validation depends on current text, tag the request with the input revision and reject obsolete success and error results. A delayed answer for an earlier address must not mark the edited address invalid. Decide when errors appear: after blur, after first submit, or during input once correction becomes useful. A hidden disabled Continue action without a reason is weak feedback. Report field-specific errors near their control and consider VoiceOver discovery or an appropriate accessibility announcement without repeatedly interrupting every keystroke.</p><p>Localized strings need room to grow and semantic labels that remain after a placeholder disappears. Number and date entry must use the chosen locale and domain format rather than an assumed period separator or month/day order. Right-to-left layouts need leading/trailing relationships and inspection of mixed-direction text. String length rules should name their unit: bytes, UTF-16 units, Unicode scalars, or grapheme clusters. An ASCII code contract can count bytes; a display-name limit usually needs a different policy. International address schemas, bidirectional-text editing, and locale-aware numeric parsing deserve specialist exercises rather than a claim that this one form covers them.</p>"
+        },
+        {
+          "id": "active-form-audit",
+          "title": "Audit the active address form without generalizing its local rules",
+          "html": "<p>BookingAddressFormView binds its observable model, defines one optional FocusState, assigns semantic address content types, advances on submit, and uses a number pad for ZIP. The model clamps field lengths, uppercases or maps recognized state names to USPS abbreviations, and derives currentAddress by trimming and converting empty strings to nil. These are local address assumptions. The source's digitsOnly uses Character.isWholeNumber, which is broader than ASCII 0–9; do not describe it as an ASCII-only validator or claim it proves backend acceptance of every Unicode digit.</p><p>display(address:) temporarily suppresses delegate notifications during batch prefill. setError guards identical writes because the surrounding booking controller repeatedly reevaluates validity while typing. That is a concrete example of separating programmatic population from user-edit events and limiting unnecessary observed updates. The course's scratch form intentionally avoids rewriting every keystroke; it is a teaching contract, not a claim that the production normalization strategy has been migrated or universally handles IME composition.</p><p>The older UIKit BookingTextField also adjusts editing and placeholder rectangles as text scales. Correct buffers alone do not prove readable input, and correctly sized fields alone do not prove cursor or AutoFill behavior. Acceptance evidence should include paste with a selection, deletion, a leading-zero code, non-ASCII input, composition on an actual input method, and keyboard-visible error recovery. Automated model tests can prove format rules; device interaction is needed for responder, input-method, and keyboard behavior. Read the active tests as a coverage starting point, while leaving unrun client checks and specialist internationalization review explicit.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A number-pad field receives pasted letters. Which conclusion is correct?",
+          "options": [
+            "UIKit cannot accept paste into a number-pad field.",
+            "Keyboard type is a presentation hint; the domain still validates the buffer.",
+            "The value is automatically converted to Int."
+          ],
+          "answer": 1,
+          "explanation": "Paste, AutoFill, hardware input, and programmatic writes are not restricted by the visible keyboard. The action must enforce the actual domain format."
+        },
+        {
+          "question": "How should shouldChangeCharactersIn's NSRange be applied to a Swift String?",
+          "options": [
+            "Use range.location directly as a String character index.",
+            "Assume range.length is always one.",
+            "Convert using Range(range, in: current), handle failure, then replace that range."
+          ],
+          "answer": 2,
+          "explanation": "UIKit supplies UTF-16 ranges, while Swift string indexing respects variable-width representations. Conversion is necessary for emoji and other nontrivial text."
+        },
+        {
+          "question": "Why avoid rewriting the whole buffer during marked text?",
+          "options": [
+            "It can disrupt provisional input-method composition and selection.",
+            "Marked text is already persisted to disk.",
+            "All marked text is invalid user input."
+          ],
+          "answer": 0,
+          "explanation": "Marked text is a normal intermediate editing state. Preserve it and validate or transform at a defined commit boundary rather than destroying the input method's interaction."
+        }
+      ],
+      "exercise": {
+        "brief": "Build DemoCodeForm in a scratch target, verify raw-buffer rules and UTF-16 replacements, and write an editing/keyboard acceptance record.",
+        "steps": [
+          "Try empty/whitespace name, code 01234, pasted letters, non-ASCII digits, and selected replacement.",
+          "Use replacingDemoText on A🙂B with NSRange(location: 1, length: 2) and replacement X; explain the units.",
+          "Add field-specific localized messages and persistent labels without changing raw-buffer ownership.",
+          "Test explicit Done on the number pad, hardware-keyboard submit, and narrow-width large-text error recovery.",
+          "Use a composition-capable keyboard and record whether edits preserve marked text/caret; compare this evidence with the active model's source normalization."
+        ],
+        "acceptance": [
+          "01234 remains a string with its leading zero.",
+          "The synthetic rule accepts exactly five ASCII digits and rejects other characters at submission.",
+          "Replacing the emoji yields AXB without corrupting surrounding text.",
+          "Done dismisses input without clearing the buffers, and invalid submission focuses a repairable field.",
+          "The record distinguishes model-rule checks from actual keyboard and composition observations."
+        ],
+        "solution": "<p>The form should accept Demo Ada plus 01234, preserve that raw code, and show the synthetic success status. Five Arabic-Indic digits fail this explicitly ASCII-only demo rule even though other systems may legitimately accept them. That is why the active repository's isWholeNumber predicate must be described separately. Whitespace-only names remain editable but fail eligibility. An invalid submission keeps the buffers and selects the first field needing repair.</p><p>For A🙂B, the UTF-16 representation has four code units: A, the emoji's surrogate pair, and B. Replacing location 1, length 2 with X yields AXB. Deleting a selected range uses the same helper with an empty replacement. A conversion failure returns nil; the caller must choose a safe no-edit or diagnostic policy rather than force-unwrapping it.</p><p>Provide localized labels and an error that names which rule failed. Keep the explicit Done path because submitLabel cannot supply a missing number-pad Return key. Test composition and selection through the real input method; a pure string helper cannot certify that experience. The report should identify the keyboard, OS, width, text category, and observed outcome, while marking unexecuted device fixtures pending. No live data or client submission is part of this exercise.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: UITextFieldDelegate editing replacement callback",
+          "url": "https://developer.apple.com/documentation/uikit/uitextfielddelegate/textfield(_:shouldchangecharactersin:replacementstring:)"
+        },
+        {
+          "label": "Apple: UITextInput markedTextRange",
+          "url": "https://developer.apple.com/documentation/uikit/uitextinput/markedtextrange"
+        },
+        {
+          "label": "Apple: UITextInputTraits",
+          "url": "https://developer.apple.com/documentation/uikit/uitextinputtraits"
+        },
+        {
+          "label": "Apple: UIKeyboardLayoutGuide",
+          "url": "https://developer.apple.com/documentation/uikit/uikeyboardlayoutguide"
+        },
+        {
+          "label": "Swift: Strings and Characters",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/stringsandcharacters/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Address field bindings and input traits",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/AddressForm/BookingAddressFormView.swift",
+          "line": 62,
+          "why": "Shows content types, capitalization, submit labels, focus cases, and next-field progression."
+        },
+        {
+          "label": "Batch prefill and guarded error updates",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/AddressForm/BookingAddressFormViewModel.swift",
+          "line": 98,
+          "why": "Distinguishes programmatic population from user-edit delegate notifications and avoids identical error writes."
+        },
+        {
+          "label": "Unicode numeric and state normalization rules",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/AddressForm/BookingAddressFormViewModel.swift",
+          "line": 165,
+          "why": "Uses isWholeNumber rather than an ASCII-only predicate and maps recognized state text to abbreviations."
+        },
+        {
+          "label": "Input and placeholder geometry",
+          "path": "ios-client/Projects/Features/ZDForms/Sources/ZDForms/Views/Booking/BookingTextField.swift",
+          "line": 110,
+          "why": "Demonstrates that readable editing/placeholder rectangles are distinct from the field's outer intrinsic height."
+        }
+      ],
+      "checklist": [
+        "I can separate raw input, normalized values, and submit validation.",
+        "I can explain why keyboard traits are not validators.",
+        "I can apply a UTF-16 replacement without integer string indexing.",
+        "I can preserve editing identity and provide reachable error recovery.",
+        "I can describe the checkout's local address rules and remaining internationalization work."
+      ]
+    },
+    {
+      "id": "034",
+      "title": "App and scene lifecycle: iPad adaptation, multiple windows, and restoration",
+      "summary": "Separate process, scene, window, controller, and draft lifetimes; audit the production app-delegate path against the demo's scene setup and current Apple requirements.",
+      "duration": 135,
+      "level": "Deep dive",
+      "prerequisites": [
+        "008",
+        "010",
+        "019",
+        "025",
+        "029",
+        "032",
+        "033"
+      ],
+      "objectives": [
+        "Assign process services, scene navigation, and draft ownership at the correct lifetime.",
+        "Distinguish orientation changes and window resizing from Android configuration recreation.",
+        "Describe actual configured iPhone/iPad support and current scene migration limits.",
+        "Choose scene restoration versus durable draft storage with account/version validation.",
+        "Design independent windows without global key-window or navigation assumptions."
+      ],
+      "sections": [
+        {
+          "id": "five-lifetimes",
+          "title": "Process, scene, window, controller, and document are different owners",
+          "html": "<p>Android's Activity/task model gives useful vocabulary for independent UI surfaces, but do not map an iOS scene one-to-one to an Activity. The app process owns application-level services. A UIScene represents an instance of UI with its own lifecycle. A UIWindowScene hosts windows for that scene. A UIWindow presents a view-controller hierarchy. A controller owns a screen or container, while a document or draft may have a longer or shorter business lifetime than that screen. Each boundary answers a different ownership question.</p><p>A process can host multiple scene sessions, and two windows can show different selections while sharing an authenticated service. A scene can become inactive while another remains active. Scene disconnection does not necessarily mean the process ends or its session is permanently discarded; the system may reconnect it later. Conversely, keeping a scene identifier in memory does not preserve the underlying draft through process death. Design persistence separately from lifetime, as sessions 009 and 019 established.</p><p>Draw ownership before callbacks: process service → account-scoped repository; scene root → navigation path, modal presentation, focus requests; draft owner → editable document values. Put a selection on a global singleton only if the product intends every window to share it. UIKit and SwiftUI can coexist inside a scene, so a hosted SwiftUI view does not create another app process or automatically another window. Multiple windows amplify bugs already familiar from Android: stale global references, leaked editing state, and navigation applied to the wrong surface.</p>"
+        },
+        {
+          "id": "scene-events",
+          "title": "Interpret scene phases and avoid assuming timely termination callbacks",
+          "html": "<p>A scene commonly moves among active, inactive, and background states. Inactive can occur for interruptions and transitions; it is not always a full background departure. In scene-based UIKit, scene delegate callbacks describe the scene's events, while UIApplicationDelegate retains process-level responsibilities such as launch and some application services. After adopting the scene lifecycle, corresponding app-delegate UI lifecycle callbacks are no longer the owner for per-scene transitions. Audit each responsibility instead of copying every old method into a new delegate mechanically.</p><p>SwiftUI exposes scenePhase through the environment. Reading it inside a scene's view hierarchy provides that scene context; reading it at the App level can aggregate scene state. Place pause/resume decisions where their intended lifetime is visible. A timer drawing one window can pause when that scene becomes inactive, but cancelling a shared account service whenever any scene backgrounds would disrupt another active window. Background execution allowances are separate platform contracts; they do not make an arbitrary async task run forever.</p><p>Save important draft data as edits occur or through a deliberate bounded checkpoint. Do not rely on applicationWillTerminate or a single transition callback being delivered before the system kills a suspended process. State restoration is also not a data-integrity journal. Mark unsaved state, encode only what is necessary, and choose durable storage according to sensitivity and account ownership. Session 025's security boundary matters: scene state and restoration activities should not casually contain patient information, authentication tokens, or full network response objects.</p>"
+        },
+        {
+          "id": "scratch-scene",
+          "title": "Read a per-window SwiftUI root with small restoration state",
+          "html": "<p>This illustrative iOS 17+ scratch app keeps navigation-like selection at the scene level and stores only a synthetic selected ID. It does not implement durable document storage. Keep exactly one @main type in an actual target; type-checking the source is not building an app bundle.</p><pre><code class=\"language-swift\">import SwiftUI\n\n@main\nstruct DemoScenesApp: App {\n    var body: some Scene {\n        WindowGroup {\n            DemoSceneRoot()\n        }\n    }\n}\n\nstruct DemoSceneRoot: View {\n    @Environment(\\.scenePhase) private var phase\n    @SceneStorage(\"demo.selectedID.v1\") private var selectedID = \"\"\n    @State private var status = \"Ready\"\n\n    var body: some View {\n        NavigationStack {\n            List {\n                Button(\"Select demo A\") { selectedID = \"demo-A\" }\n                Button(\"Clear selection\") { selectedID = \"\" }\n                Text(selectedID.isEmpty ? \"No demo selection\" : selectedID)\n                Text(status)\n            }\n            .navigationTitle(\"Demo window\")\n        }\n        .onChange(of: phase) { _, newPhase in\n            switch newPhase {\n            case .active:\n                status = \"This scene is active\"\n            case .inactive:\n                status = \"This scene is inactive\"\n            case .background:\n                status = \"This scene is in the background\"\n            @unknown default:\n                status = \"An additional scene phase\"\n            }\n        }\n    }\n}</code></pre><p>WindowGroup describes a family of scene windows; the root's State belongs to its identity within each scene, rather than being an App-owned global selection. SceneStorage uses a named, system-managed scene restoration value. The v1 key suggests a schema boundary; it does not migrate data automatically. The initial Ready value remains until a change occurs, so do not rely on onChange alone for all initial setup. @unknown default handles future enum cases the SDK may add.</p><p>A restored selectedID must be checked against current available records and the current account before routing. This demo shows it as text only. A real root should fall back gracefully if the referenced record was removed or inaccessible. The storage wrapper is not a promise to save every edit immediately and is unsuitable as the sole store for a critical draft. Do not claim the sample enables every runtime's multiple-window UI merely because it contains WindowGroup.</p>"
+        },
+        {
+          "id": "geometry-orientation",
+          "title": "Adapt to the scene's size, not an assumed device rotation",
+          "html": "<p>UIKit ordinarily keeps the same controller hierarchy through interface-orientation and window-size changes. Android often recreates an Activity for configuration changes unless handled differently. Therefore an iOS orientation event is not an automatic new model, restored bundle, or cancelled feature. A draft should usually remain with its owner. SwiftUI view descriptions can be recomputed without resetting identity-associated state. Process death and deliberate flow replacement are different reset boundaries.</p><p>Size classes are coarse environment categories, while window geometry can change continuously within one category. On iPad, a narrow window, a wide window, and an external display can present different available sizes without changing the physical device orientation. Orientation of the interface also differs from UIDevice.orientation, which can include face-up or face-down states. Choose layout from the current container size and relevant traits; request orientation changes only through appropriate platform APIs and product requirements, not by assigning private device values.</p><p>Adaptive navigation may use a split presentation at wide widths and a compact stack when narrow. Preserve selection and route meaning as the presentation changes; avoid reconstructing the draft because a sidebar disappeared. Popovers require correct source anchors and can adapt into other presentation styles. Reevaluate hit targets, readable width, keyboard positioning, and error visibility in each configuration. iOS 26-era windowing and resize APIs add options, but they are not automatically available at the checkout's iOS 17 minimum. Use availability guards or a deliberate raised minimum, and do not confuse installed SDK support with supported deployment versions.</p>"
+        },
+        {
+          "id": "multiwindow-ownership",
+          "title": "Each window needs its own navigation and a shared-data policy",
+          "html": "<p>Scene sessions have stable persistent identifiers useful for associating restoration state, but that identifier is not a domain document ID. A window displaying draft A needs both a scene identity and an explicit draft identity. If two windows open the same draft, choose whether they share live edits, maintain independent tentative changes, or resolve conflicting commits. A shared observable object can mirror changes intentionally; accidental global editing state can silently overwrite another window's work.</p><p>Do not find the first connected scene or an arbitrary global key window to present an alert. connectedScenes is a collection of contexts, not a guarantee that the first element is the user's initiating window. Route presentation through the controller, coordinator, or scene root that received the action. Keep scene-specific focus and scroll requests there too. Process services can be injected into each root, while navigation state stays local. A UIKit scene delegate usually creates its window from the UIWindowScene supplied at connection rather than from a global screen.</p><p>Logout crosses these lifetimes. Clear or invalidate account-bound drafts, restoration routes, and caches in every relevant scene, and reject late async work for the previous account. Backgrounding one scene should not log out or cancel another arbitrarily. When a scene is disconnected, release UI subscriptions and scene-owned tasks according to the contract, while retaining durable documents in their proper repository if needed. An iPad target declaration is not evidence that these semantics were implemented or tested. Specify two-window fixtures before claiming multiwindow support for a feature.</p>"
+        },
+        {
+          "id": "restoration",
+          "title": "Restoration resumes an interaction; persistence protects the data",
+          "html": "<p>SwiftUI SceneStorage is intended for lightweight scene-associated values, and AppStorage uses app-level defaults for supported preference types. The same defaults key can therefore affect multiple windows. Neither wrapper alone provides a complete durable, sensitive document model. A typed NavigationStack path can be encoded explicitly when its route values are Codable, or a NavigationPath can offer a codable representation when all its elements support that representation. Encoding possibility is not a guarantee of valid routes on the next launch.</p><p>UIKit's scene state-restoration activity can identify a document or interaction to reconnect. Older view-controller restoration uses restoration identifiers and encode/decode hooks. These mechanisms have different lifecycles and should not be mixed by assuming the system reconstructs every service or dependency. Recreate dependencies through the normal application boundary, load the identified data, validate the account and schema, then present the surviving route. Restore presentation meaning rather than arbitrary controller pointers or captured closures.</p><p>Use a versioned envelope with a domain identifier, selected record ID, and the minimum necessary route state. Handle corrupt data, an unknown version, a deleted record, and an account mismatch by falling back to a safe root and explaining recovery when needed. A keyboard's exact frame and a stale scroll proxy are not durable restoration data. Do not automatically resubmit a network operation because a confirmation route was restored. Saving a draft and restoring its screen are related but separately testable acceptance criteria. Specialist storage migration, conflict resolution, and security review remain necessary for real health-related documents.</p>"
+        },
+        {
+          "id": "checkout-and-policy",
+          "title": "Actual support, unfinished migration, and current Apple requirements",
+          "html": "<p>The inspected Tuist helpers configure iPhone and iPad destinations for both production and demos. The production main target declares iOS 17.0 in Project.swift; the booking demo declares iOS 18.2. Production's Zocdoc-Info.plist declares only portrait for iPhone and all four ordinary orientations for iPad. It sets UIDesignRequiresCompatibility = true and has no UIRequiresFullScreen key. The inspected QA plist separately sets UIRequiresFullScreen = false; those keys are not interchangeable. The demo has a scene manifest with multiple-scenes enabled and its entry uses WindowGroup. These are configuration/source facts, not executed launch, orientation, or two-window results.</p><p>Production AppDelegate still constructs and retains a window and forwards app-level lifecycle callbacks. Nearby comments describe a future UIWindowScene migration, while an AppLaunchRouter shares forwarding logic in preparation. This audit therefore does not claim production has completed scene adoption. Read current effective build settings and generated plists before a release decision, because this checkout contains legacy SPM and Tuist paths during migration. Configured iPad destinations do not prove responsive feature layouts, multiwindow editing correctness, Catalyst support, native macOS support, or visionOS support.</p><p>Apple's current scene-transition documentation states that beginning with iOS/iPadOS 27 and the listed companion platforms, apps built with the latest SDK must adopt the scene-based lifecycle or fail to launch. This requirement concerns scene adoption; supporting multiple simultaneous scenes is still a separate choice. Apple also documents UIRequiresFullScreen as deprecated beginning in iPadOS 26 and to be ignored in a future release. Do not name an unsupported removal release or claim an actual checkout launch failure without building it. The gap is a source-backed release-readiness concern for further verification, not a migration implemented by this course.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "One window backgrounds while another remains active. Which ownership policy is sound?",
+          "options": [
+            "Always cancel every shared account operation.",
+            "Pause scene-owned work according to that scene's policy and keep shared services governed by their own owners.",
+            "Treat the whole process as terminated."
+          ],
+          "answer": 1,
+          "explanation": "Scene and process lifetimes differ. A shared service may still be needed by another active scene; only the relevant scene-owned work should follow that scene transition."
+        },
+        {
+          "question": "What does SceneStorage provide?",
+          "options": [
+            "A guaranteed immediate durable store for a critical draft.",
+            "One global navigation value shared by every window.",
+            "Lightweight system-managed restoration state associated with a scene."
+          ],
+          "answer": 2,
+          "explanation": "Scene restoration values help resume UI. Their saving lifecycle is system managed; durable documents, sensitive data, account checks, and migrations need separate policies."
+        },
+        {
+          "question": "Does Apple's required scene adoption imply every app must support multiple simultaneous windows?",
+          "options": [
+            "No; adoption and multiple-scene support are separate decisions.",
+            "Yes; every app must open two windows at launch.",
+            "Only if its deployment minimum is iOS 17."
+          ],
+          "answer": 0,
+          "explanation": "Current Apple guidance distinguishes required scene lifecycle adoption from encouraged but separately chosen multiple-scene support. SDK-linked launch policy is not the same as a deployment minimum."
+        }
+      ],
+      "exercise": {
+        "brief": "Design a scratch scene-owned draft experience and a restoration envelope, then audit the checkout's configured device support and migration evidence.",
+        "steps": [
+          "Use DemoScenesApp as a reading/type-check reference, then create a separate target with a confirmed scene/multiple-window configuration for runtime practice.",
+          "Keep a separate selected record and navigation state per window; define whether actual draft data is shared.",
+          "Resize a window and rotate where supported; record whether model identity and editing state persist.",
+          "Define a versioned restoration payload and handle unknown version, missing record, and account mismatch.",
+          "Read production AppDelegate, target helpers, and both target plist contracts; distinguish their behavior and current Apple requirements."
+        ],
+        "acceptance": [
+          "Window A's selection does not change B unless sharing is explicitly specified.",
+          "Resizing does not accidentally reconstruct the draft owner or clear input.",
+          "Restoring a deleted or unauthorized record returns safely to a valid root.",
+          "Logout invalidates old account-bound restoration and late results across relevant windows.",
+          "The audit reports configuration facts and pending launch checks without claiming a completed scene migration."
+        ],
+        "solution": "<p>The process owns a shared account service and repository. Each scene root owns its navigation path, sheet presentation, focus, and selected record. A durable draft is identified by domain ID and loaded from the appropriate account repository. If two windows intentionally share a draft, document synchronization and conflict behavior; otherwise give each edit session an independent tentative buffer and an explicit commit action.</p><p>A minimal restoration envelope can encode version 1, account-scope marker, draft ID, and an optional selected item ID. On restoration, first verify version and current account, then load the draft and resolve the selected item. Fall back to the list when the selected item no longer exists. Never store credentials in this envelope, and never treat decoding a route as authority to resubmit a request. SceneStorage can keep small UI selections while the repository protects the draft.</p><p>The checkout comparison should name production's app-delegate window construction and the demo's WindowGroup/scene manifest, iPhone/iPad configured destinations, production's portrait-phone/four-orientation-tablet plist, production's separate UIDesignRequiresCompatibility declaration, and QA's UIRequiresFullScreen = false. Add Apple's current SDK-linked scene adoption requirement as a separate verified policy. These facts identify what needs a release check; they do not show that a production launch or two-window test passed. Restoration and actual multiwindow interaction remain learner/specialist runtime work.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Transitioning to the UIKit scene-based life cycle",
+          "url": "https://developer.apple.com/documentation/uikit/transitioning-to-the-uikit-scene-based-life-cycle"
+        },
+        {
+          "label": "Apple TN3187: Migrating to the UIKit scene-based life cycle",
+          "url": "https://developer.apple.com/documentation/technotes/tn3187-migrating-to-the-uikit-scene-based-life-cycle"
+        },
+        {
+          "label": "Apple: Restoring your app's state with SwiftUI",
+          "url": "https://developer.apple.com/documentation/swiftui/restoring-your-app-s-state-with-swiftui"
+        },
+        {
+          "label": "Apple TN3192: Migrating from the deprecated UIRequiresFullScreen key",
+          "url": "https://developer.apple.com/documentation/technotes/tn3192-migrating-your-app-from-the-deprecated-uirequiresfullscreen-key"
+        },
+        {
+          "label": "Apple: Supporting multiple windows on iPad",
+          "url": "https://developer.apple.com/documentation/uikit/supporting-multiple-windows-on-ipad"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Production window remains app-delegate owned",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/AppDelegate/AppDelegate.swift",
+          "line": 115,
+          "why": "Constructs TestWindow, simulator DebugShortcutsWindow, or plain UIWindow, with comments describing future scene migration."
+        },
+        {
+          "label": "Production lifecycle forwarding",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/AppDelegate/AppDelegate.swift",
+          "line": 395,
+          "why": "Forwards app-level foreground/background and activation events to the application object."
+        },
+        {
+          "label": "Demo SwiftUI scene entry",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/ZDBookingDemoAppApp.swift",
+          "line": 11,
+          "why": "Uses App and WindowGroup, distinct from production's observed entry path."
+        },
+        {
+          "label": "Configured device destinations",
+          "path": "ios-client/Tuist/ProjectDescriptionHelpers/DemoAppDefaults.swift",
+          "line": 51,
+          "why": "Declares production iPhone and iPad destinations; the demo declaration is at line 30."
+        },
+        {
+          "label": "Actual production orientation declaration",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Resources/Zocdoc-Info.plist",
+          "line": 124,
+          "why": "Declares all four iPad orientations and only portrait on iPhone; production separately declares UIDesignRequiresCompatibility; the inspected QA plist instead declares UIRequiresFullScreen = false."
+        },
+        {
+          "label": "Demo deployment boundary",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Project.swift",
+          "line": 18,
+          "why": "Declares iOS 18.2 rather than production's inspected iOS 17.0."
+        },
+        {
+          "label": "QA compatibility is a distinct plist setting",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Resources/ZocdocQA-Info.plist",
+          "line": 98,
+          "why": "Explicitly sets UIRequiresFullScreen to false; production's UIDesignRequiresCompatibility key has a different purpose and must not be described as full-screen opt-out."
+        }
+      ],
+      "checklist": [
+        "I can draw process, scene, window, controller, and draft ownership.",
+        "I can explain why iOS resizing is not Android Activity recreation.",
+        "I can separate scene adoption from multiple-window support.",
+        "I can validate a restoration route against account and current data.",
+        "I can distinguish configured device support from measured feature quality and migration completion."
+      ]
+    },
+    {
+      "id": "035",
+      "title": "Integrated UI lab: a resilient draft, reusable picker, and scene review",
+      "summary": "Build and review one synthetic UI flow with measurable layout, stable selection, raw editing, interoperable sizing, interruption behavior, and scene restoration contracts.",
+      "duration": 180,
+      "level": "Deep dive",
+      "prerequisites": [
+        "012",
+        "013",
+        "014",
+        "015",
+        "022",
+        "029",
+        "030",
+        "031",
+        "032",
+        "033",
+        "034"
+      ],
+      "objectives": [
+        "Connect sizing, identity, input, navigation, and lifecycle contracts in one scratch feature.",
+        "Define a finite fixture matrix and match each requirement to the smallest useful evidence.",
+        "Keep UIKit/SwiftUI interoperability inside a clear ownership and sizing boundary.",
+        "Reject stale page outcomes and validate restored selection without losing the current draft.",
+        "Write a source-backed review that separates implemented practice, verified results, and specialist gaps."
+      ],
+      "sections": [
+        {
+          "id": "lab-contract",
+          "title": "Turn the introductory UI lab into a precise engineering contract",
+          "html": "<p>Session 013 built a synthetic draft, picker, and review. This lab adds the UI engineering requirements that a plausible first version misses. Create a separate learning target containing a display name, a five-ASCII-digit demo code, a provider picker, and a Review route. Use synthetic provider IDs and deliberately long labels. The picker must survive insertion and reordering, cancellation must preserve an existing committed choice, and invalid submission must explain what to repair. A UIKit label inside Review must size from the available width and update from current input.</p><p>Before implementing, name the product's minimum supported width, largest tested text category, and available orientations in the scratch target. Do not copy production's phone orientation declaration into your target without choosing it. If iPad multiple-window practice is included, specify independent selection/navigation per window and whether drafts themselves are shared. Scene restoration stores only minimal non-sensitive identifiers, while important draft values need an explicit durable policy if persistence is required.</p><p>Write a final-state contract for every action. Choose commits a provider ID and dismisses; Cancel dismisses without changing it; Review validates the current draft before appending its route; Reset clears the draft through an explicit action; resizing preserves its owner; a stale page cannot update a new query generation. A screenshot is useful only after those contracts exist. This is an engineering exercise using synthetic data, not a client feature migration, and the supplied solution remains a reference for your own pending implementation.</p>"
+        },
+        {
+          "id": "owner-map",
+          "title": "Assign each source of truth before drawing controls",
+          "html": "<p>The scene root owns a draft model, a typed navigation path, and modal presentation. The model owns raw strings, the committed provider ID, and the current provider content store. A text field reads and writes the same raw buffer through a binding; a picker can keep a local tentative highlight if selection is confirmed later, but must not silently change the committed value during cancellation. Review reads the root's draft rather than seeding independent State copies from its current properties.</p><p>With Observation, a locally owned @Observable class can live in the root's @State. A receiving editor uses @Bindable when it needs projected property bindings. A read-only summary can receive a plain reference. Main-actor isolation protects UI-facing mutation, while a query revision protects relevance across await. Those annotations solve different problems. A parent retaining a model does not automatically retain the model's weak delegate; if your bridge uses one, draw the separate strong owner.</p><p>Label every lifetime: draft for the scene's editing session; modal for the current picker presentation; UIKit label for its representable identity; page request for its query generation; image interest for its resource consumer; focus for a unique field in the current hierarchy. Keep a scene-level route separate from business data. A restored provider ID must be reconciled against the current store, and logout must invalidate prior account data and late work. This ownership map makes a failure explainable before adding more wrappers or tasks.</p>"
+        },
+        {
+          "id": "layout-checkpoints",
+          "title": "Build geometry in checkpoints and predict what can overflow",
+          "html": "<p>Checkpoint one is the editor with semantic fonts and persistent labels. Start at a narrow finite width and accessibility text rather than assuming a spacious default preview. A number-pad field has an explicit Done path. Error text wraps and remains reachable. Decide whether the field row should be horizontal or vertical when the label becomes long; raising every compression priority to required cannot recover missing space. Use the scrollable container to preserve access to the last action.</p><p>Checkpoint two is the provider picker. On UIKit, use reusable cells and stable diffable identifiers with an explicit reconfiguration policy. On SwiftUI, use List/ForEach with stable domain or occurrence IDs and keep heavy work out of body. Both variants must route selection by current identity, not an old index. A long provider subtitle may increase cell height. Estimated layout values should converge to actual content, while empty, loading, and additional-page failure states have distinct feedback.</p><p>Checkpoint three is Review's UIKit summary. A UIViewRepresentable updates its existing label and measures multiline content at the proposed width. A controller-based integration would additionally need full containment. Verify that the bridge does not publish a user-edit event during rendering and does not assume the screen width. Draw the padding/background wrapper order for its surrounding SwiftUI row. Try a narrower window after Review appears: the summary should remeasure instead of preserving an initial fixed height or rebuilding the entire draft to make layout work.</p>"
+        },
+        {
+          "id": "interaction-checkpoints",
+          "title": "Input and interruption are part of the feature, not finishing touches",
+          "html": "<p>Checkpoint four adds interaction policies. The editor has distinct focus cases and moves from name to code on submit. Invalid Review requests focus the first repairable field, while dismissing the keyboard preserves both strings. Test paste into a selected range and a leading-zero code. If you introduce normalization, preserve provisional input-method composition and selection. A pure String test cannot prove that a real keyboard, AutoFill, or hardware input behaves correctly.</p><p>The picker supports cancellation with no previous selection and with an existing choice. A programmatic dismissal, explicit Cancel button, and interactive sheet swipe should converge on the same cancellation semantics. If your design commits selection immediately, a highlighted row is already the committed value; if it uses Apply, keep the temporary highlight separate. Do not let an animation completion accidentally report a second result. A cancelled back gesture from Review should preserve the route and draft when the navigation container says the transition was cancelled.</p><p>Animate only transitions that communicate a requirement, and preserve the final result with reduced motion. A drag, if added for rearranging the fixture, needs a button or accessible action for the essential operation. Observe scroll requests inside the current reader, use stable targets, and decide whether new results should preserve the user's current viewport. Record actual accepted focus and visible content separately from focus requests and animation starts. These observations distinguish a correct state machine from a UI that merely looked correct at one moment.</p>"
+        },
+        {
+          "id": "controlled-work",
+          "title": "Create controlled asynchronous fixtures instead of relying on tapping speed",
+          "html": "<p>Checkpoint five is a synthetic page loader with explicit start and completion controls. Begin query A at generation 1, replace it with B at generation 2, complete B, then complete A. Run old success and old failure schedules. Both must leave B's presentation unchanged. Cancellation can reduce wasted work, but the generation check states ownership even if a fake ignores cancellation. Do not use a short sleep as evidence that the operation started; await the fake's start signal.</p><p>For paging, record the cursor being requested and prevent a second request for that same generation/cursor. Preserve already useful rows if a later page fails. A retry should request the failed page once and not discard the current selection. Declare how repeated IDs merge into the store and when an obsolete selected provider becomes unavailable. If selection is invalidated, explain the consequence in the UI rather than silently reviewing another provider at the same index.</p><p>The worked reference below covers synchronous fixture replacement and ID-safe selection. Adding the controlled loader is deliberate learner work using sessions 011 and 015, not a claim that the reference implements transport cancellation or production pagination. An image-completion fixture is separate: configure a cell for A, reuse it for B, then complete A's resource. The old result must not decorate B. These deterministic schedules provide stronger evidence than a hurried manual scroll, while real recognizer, keyboard, and layout interaction still needs a running target.</p>"
+        },
+        {
+          "id": "scene-checkpoints",
+          "title": "Exercise resizing and restoration without inventing platform support",
+          "html": "<p>Checkpoint six places the root in a confirmed scene configuration. Resize where the runtime supports it, and rotate only where the scratch target declares the orientation. The root model should remain the same owner as geometry changes. SwiftUI may create new description values and UIKit may relayout existing views; neither observation implies Android-style Activity recreation. Record the available scene size, traits, and preserved draft rather than attributing every change to rotation.</p><p>For multiple windows, open A and B and choose different provider IDs. Changing A's local route or focus must not navigate B. If the application shares an account service, backgrounding A should not automatically cancel B's required work. Restoration should encode minimal route/selection meaning in a versioned envelope, then validate the current account and provider availability before presenting it. A removed provider falls back to the picker; an unknown schema falls back to a safe root. Restoring a screen must not repeat a submission.</p><p>The active checkout offers a SwiftUI WindowGroup demo and an app-delegate-owned production window. Compare them before claiming your lab matches production scene behavior. iPhone/iPad destinations, each plist's distinct compatibility declarations, and orientation declarations are configured support evidence, not runtime feature-quality evidence. Apple now requires scene adoption for the documented latest-SDK/iOS 27 launch case, while multiple simultaneous scenes remain a separate choice. This lab prepares a review of those boundaries; it does not change the app's lifecycle or release configuration.</p>"
+        },
+        {
+          "id": "verification-matrix",
+          "title": "Use a small matrix of evidence rather than one giant UI test",
+          "html": "<p>Choose fixtures by risk. Pure validation tests cover whitespace names, five ASCII digits, leading zero preservation, missing selection, Reset, duplicate IDs, and generation rejection. Pure layout math can cover spacing, wrap positions, empty input, and overflow policy. A snapshot captures long labels and errors at chosen width, text category, appearance, and locale. UI automation or a documented manual run covers sheet cancellation, keyboard progression, an actual selected replacement, and a restored scene. Each layer proves a different boundary.</p><table><thead><tr><th>Requirement</th><th>Smallest useful evidence</th><th>What it does not prove</th></tr></thead><tbody><tr><td>Moved provider selects the same ID</td><td>Controlled reorder plus ID-result assertion</td><td>Real gesture arbitration</td></tr><tr><td>Long error remains reachable</td><td>Large-text narrow-width rendering and scroll interaction</td><td>IME composition</td></tr><tr><td>Old page cannot overwrite B</td><td>Controlled start/completion schedule</td><td>Transport cancellation</td></tr><tr><td>Window selection is independent</td><td>Two-window runtime sequence</td><td>Durable draft integrity after a crash</td></tr></tbody></table><p>Record executed evidence with toolchain/SDK, deployment minimum, runtime/device, fixture, and result. A declaration in a test file is planned coverage until run. The repository's standard snapshot helper fixes particular dimensions and traits; it does not exhaust larger text, RTL, tablet, or dark mode. Do not re-record baselines to conceal a misunderstood diff. Keep performance numbers out of the report unless a measurement actually occurred; an apparently smooth simulator interaction is not a frame-distribution benchmark.</p>"
+        },
+        {
+          "id": "review-and-boundaries",
+          "title": "Review the causal chain and preserve specialist boundaries",
+          "html": "<p>Finish with one user journey: type a demo name and code, choose A, replace/reorder providers, review, return, cancel another picker, resize, then restore. Explain which owner changes at each step and which identities persist. Use the active address model, carousel, custom layout, and demo app as source comparisons. The carousel is gated alongside a legacy branch; the address form has local US-centric constraints; the flow layout allows oversize children; the production scene migration is not complete in the inspected path. Those facts keep the comparison honest.</p><p>A useful finding names a trigger, violated contract, consequence, and evidence. For example, if a callback captures position zero, inserting C before A makes selecting the old A callback resolve C. The fix is identity-based selection, verified with a controlled reorder. If a summary has a fixed 44-point height, increasing text can clip it; the fix requires width-aware measurement and a large-text fixture, not a claim that all fixed sizes are wrong. If restored selection bypasses account checks, propose envelope validation before routing.</p><p>The remaining specialist work should be concrete: real IME and bidirectional editing, VoiceOver and alternative-input sessions, sophisticated custom-layout baselines/caching, iPad pointer and multiwindow conflict semantics, production scene migration, and representative-device profiling. These are further study or pending runtime evidence rather than completed course coverage. Your final review separates taught contracts, your practiced implementation, source-observed behavior, and executed checks. That distinction is the staff-level skill this lab develops alongside the code.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "After provider A moves from index 0 to index 2, what should Review display?",
+          "options": [
+            "Whatever currently occupies index 0.",
+            "The provider resolved by the committed ID A, or an explicit unavailable state if A was removed.",
+            "A fresh random provider ID."
+          ],
+          "answer": 1,
+          "explanation": "Business selection belongs to identity, not position. Reordering preserves the selection; removal needs an explicit reconciliation policy rather than silently selecting another record."
+        },
+        {
+          "question": "Which check establishes obsolete page failure cannot clear query B?",
+          "options": [
+            "A screenshot of B before A completes.",
+            "Annotating the model @MainActor.",
+            "Complete B, then complete A with an error under a controlled generation fixture and assert B remains."
+          ],
+          "answer": 2,
+          "explanation": "A controlled old-error schedule exercises the catch-path freshness contract. Isolation and an earlier screenshot do not prove the post-await outcome."
+        },
+        {
+          "question": "A standard phone snapshot passes. Which conclusion is justified?",
+          "options": [
+            "The configured fixture matched its baseline; keyboard, large text, and two-window behavior need their own evidence.",
+            "Every iPad layout and all input methods are correct.",
+            "Scene migration is complete."
+          ],
+          "answer": 0,
+          "explanation": "A snapshot certifies its configured rendered state. It does not execute keyboard composition, scene reconnection, multiwindow ownership, or every environment."
+        }
+      ],
+      "exercise": {
+        "brief": "Implement and review the synthetic draft flow in a separate iOS 17+ scratch target, including at least one controlled stale-page fixture and one actual editing/layout interaction.",
+        "steps": [
+          "Write the owner map and acceptance contract, then implement the draft/editor/picker/review flow using stable provider IDs.",
+          "Use the worked reference's UIKit summary bridge and explain every sizing/update method.",
+          "Exercise narrow width, accessibility text, long error labels, reduced motion, paste, Done, and cancellation with prior selection.",
+          "Add the controlled page fake and run B-before-A success and old-error schedules; keep the in-flight cursor guard explicit.",
+          "Validate a versioned restored selection and, if available, execute an independent two-window fixture.",
+          "Produce a source comparison with active carousel/address/layout/lifecycle anchors and a concise verification record."
+        ],
+        "acceptance": [
+          "Whitespace-only name, invalid code, and absent selection cannot open Review; invalid attempts provide repairable feedback.",
+          "Selection survives insertion/reorder by ID, and Cancel preserves the committed choice.",
+          "The UIKit summary updates from current input and grows at narrower width or larger text.",
+          "Keyboard dismissal and window resizing preserve the owned draft.",
+          "Old page success/error cannot overwrite the current generation, and repeated triggers cannot duplicate a page load.",
+          "Removed or account-incompatible restoration falls back safely without resubmitting.",
+          "The report names actual executed checks and leaves specialist/device gaps explicit."
+        ],
+        "solution": "<p>The following synchronous reference covers the owner, raw-buffer validation, stable selection, typed review route, cancellation, and width-aware UIKit summary. It is a scratch module, not production code. The provider replacement button supplies a deterministic reorder/insertion fixture. Add your controlled async page owner and restoration envelope as separate checkpoints; this reference intentionally does not claim those are implemented.</p><pre><code class=\"language-swift\">import Foundation\nimport Observation\nimport SwiftUI\nimport UIKit\n\nstruct LabProvider: Identifiable {\n    let id: String\n    let name: String\n}\n\nenum LabRoute: Hashable { case review }\n\n@MainActor\n@Observable\nfinal class LabDraft {\n    var name = \"\"\n    var code = \"\"\n    var selectedID: String?\n    var providers = [\n        LabProvider(id: \"A\", name: \"Demo Alpha with a long descriptive name\"),\n        LabProvider(id: \"B\", name: \"Demo Beta\")\n    ]\n\n    var selectedProvider: LabProvider? {\n        providers.first { $0.id == selectedID }\n    }\n    var validName: Bool {\n        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty\n    }\n    var validCode: Bool {\n        code.utf8.count == 5 &amp;&amp; code.utf8.allSatisfy { $0 &gt;= 48 &amp;&amp; $0 &lt;= 57 }\n    }\n    var canReview: Bool {\n        validName &amp;&amp; validCode &amp;&amp; selectedProvider != nil\n    }\n\n    func reset() {\n        name = \"\"\n        code = \"\"\n        selectedID = nil\n    }\n}\n\n@MainActor\nstruct LabRoot: View {\n    enum Field: Hashable { case name, code }\n    @State private var draft = LabDraft()\n    @State private var path: [LabRoute] = []\n    @State private var showsPicker = false\n    @State private var attempted = false\n    @FocusState private var focused: Field?\n    @Environment(\\.accessibilityReduceMotion) private var reduceMotion\n\n    var body: some View {\n        NavigationStack(path: $path) {\n            Form {\n                Section(\"Synthetic draft\") {\n                    TextField(\"Demo name\", text: $draft.name)\n                        .focused($focused, equals: .name)\n                        .submitLabel(.next)\n                        .onSubmit { focused = .code }\n                    TextField(\"Five ASCII digits\", text: $draft.code)\n                        .keyboardType(.numberPad)\n                        .focused($focused, equals: .code)\n                    Button(draft.selectedProvider?.name ?? \"Choose demo provider\") {\n                        focused = nil\n                        showsPicker = true\n                    }\n                }\n                if attempted &amp;&amp; !draft.canReview {\n                    Text(\"Enter a name, five ASCII digits, and an available provider.\")\n                        .foregroundStyle(.red)\n                }\n                Button(\"Review\") {\n                    attempted = true\n                    guard draft.canReview else {\n                        focused = !draft.validName ? .name\n                            : (!draft.validCode ? .code : nil)\n                        return\n                    }\n                    focused = nil\n                    path.append(.review)\n                }\n                Button(\"Reorder synthetic providers\") {\n                    withAnimation(reduceMotion ? nil : .default) {\n                        draft.providers = [\n                            LabProvider(id: \"C\", name: \"Demo Gamma\"),\n                            LabProvider(id: \"B\", name: \"Demo Beta updated\"),\n                            LabProvider(id: \"A\", name: \"Demo Alpha updated\")\n                        ]\n                    }\n                }\n                Button(\"Reset draft\") {\n                    draft.reset()\n                    attempted = false\n                    focused = nil\n                }\n            }\n            .navigationTitle(\"UI lab\")\n            .navigationDestination(for: LabRoute.self) { _ in\n                LabReview(draft: draft)\n            }\n            .toolbar {\n                ToolbarItemGroup(placement: .keyboard) {\n                    Spacer()\n                    Button(\"Done\") { focused = nil }\n                }\n            }\n            .sheet(isPresented: $showsPicker) {\n                LabPicker(draft: draft)\n            }\n        }\n    }\n}\n\n@MainActor\nstruct LabPicker: View {\n    let draft: LabDraft\n    @Environment(\\.dismiss) private var dismiss\n\n    var body: some View {\n        NavigationStack {\n            List(draft.providers) { provider in\n                Button(provider.name) {\n                    draft.selectedID = provider.id\n                    dismiss()\n                }\n            }\n            .navigationTitle(\"Synthetic providers\")\n            .toolbar {\n                Button(\"Cancel\") { dismiss() }\n            }\n        }\n    }\n}\n\n@MainActor\nstruct LabReview: View {\n    let draft: LabDraft\n\n    var body: some View {\n        Form {\n            LabUIKitSummary(message:\n                \"\\(draft.name) — \\(draft.code) — \\(draft.selectedProvider?.name ?? \"Unavailable\")\")\n            Text(\"Synthetic review only; no request was sent.\")\n        }\n        .navigationTitle(\"Review\")\n    }\n}\n\n@MainActor\nstruct LabUIKitSummary: UIViewRepresentable {\n    let message: String\n\n    func makeUIView(context: Context) -&gt; UILabel {\n        let label = UILabel()\n        label.numberOfLines = 0\n        label.font = .preferredFont(forTextStyle: .body)\n        label.adjustsFontForContentSizeCategory = true\n        return label\n    }\n\n    func updateUIView(_ label: UILabel, context: Context) {\n        if label.text != message {\n            label.text = message\n        }\n    }\n\n    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UILabel, context: Context) -&gt; CGSize? {\n        guard let width = proposal.width, width.isFinite else { return nil }\n        let boundedWidth = max(0, width)\n        let measured = uiView.sizeThatFits(\n            CGSize(width: boundedWidth, height: CGFloat.greatestFiniteMagnitude)\n        )\n        return CGSize(width: boundedWidth, height: measured.height)\n    }\n}</code></pre><p>LabDraft owns the editable buffers and selection. selectedProvider derives the current content by ID instead of persisting an index. canReview combines format validity with the existence of that selection. Reset changes fields explicitly; it does not replace the model's identity or randomly rebuild navigation. @State preserves the locally created observable instance, while the projections used by TextField connect to its actual stored properties. The optional focus enum selects one field at a time.</p><p>NavigationStack binds a typed path; appending review creates the destination after current validation. The destination receives the same model. The picker commits only in its selection button. Cancel and an ordinary interactive dismissal do not modify the selection, so a previous choice remains. An Apply-style picker would need separate tentative state instead. The reorder fixture produces [C, B, A], and selecting A remains A even though its position changes.</p><p>The bridge creates one UIKit label per represented identity, applies current content in updateUIView, and measures against a finite proposed width. Returning nil for unspecified/unbounded width delegates to the default bridge strategy. The width contract and font scaling still need actual rendering evidence; compilation alone cannot certify line wrapping. A UILabel is a view, so this representable needs no child-controller containment. Replacing it with a hosted controller would reintroduce the session 008 containment contract.</p><p>For controlled paging, give the loader an injectable async operation and explicit start signal. Save generation and cursor before await, check both after completion, and apply only to the current owner. Perform the same guard in catch. Test B completing before A and A failing after B; neither may change B. Clear the in-flight cursor only when it belongs to that request, so an old completion cannot unlock a newer load accidentally.</p><p>For restoration, decode a versioned non-sensitive identifier envelope, validate account scope, load current providers, then resolve the selected ID. Do not restore input focus or resubmit work automatically. Finally, write executed results separately from pending two-window, IME, VoiceOver, and representative-device checks. This reference provides a concrete reviewable design while leaving the learner's lab and production application untouched.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: UIViewRepresentable",
+          "url": "https://developer.apple.com/documentation/swiftui/uiviewrepresentable"
+        },
+        {
+          "label": "Apple: NavigationStack",
+          "url": "https://developer.apple.com/documentation/swiftui/navigationstack"
+        },
+        {
+          "label": "Apple: FocusState",
+          "url": "https://developer.apple.com/documentation/swiftui/focusstate"
+        },
+        {
+          "label": "Apple: Restoring your app's state with SwiftUI",
+          "url": "https://developer.apple.com/documentation/swiftui/restoring-your-app-s-state-with-swiftui"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Production form ownership and focus comparison",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/AddressForm/BookingAddressFormView.swift",
+          "line": 12,
+          "why": "Provides a concrete receiving Bindable model, optional field focus, and input/error presentation contract."
+        },
+        {
+          "label": "Identity and change-policy comparison",
+          "path": "ios-client/Projects/Features/ZDProfile/Sources/ZDProfile/Practice/CareTeamCarousel.swift",
+          "line": 154,
+          "why": "Derives unchanged versus apply, persisting IDs, layout boundary changes, and reorder presentation decisions."
+        },
+        {
+          "label": "Pure versus rendering evidence boundary",
+          "path": "ios-client/Projects/Infra/ZDUI/Tests/ZDMezzanineTests/FlowLayoutTests.swift",
+          "line": 14,
+          "why": "Tests arrangement math without claiming full SwiftUI text measurement or a device interaction run."
+        },
+        {
+          "label": "Confirmed demo scene entry",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/ZDBookingDemoAppApp.swift",
+          "line": 11,
+          "why": "Shows the active WindowGroup root used for source comparison, not a completed learner app."
+        },
+        {
+          "label": "Separate app/test target baseline",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Project.swift",
+          "line": 13,
+          "why": "Declares the demo app target and iOS 18.2 minimum; unit and UI-test targets are separate declarations later in the file."
+        }
+      ],
+      "checklist": [
+        "I can connect layout, identity, editing, and navigation in one owner map.",
+        "I can verify a reorder and an old-error schedule with controlled fixtures.",
+        "I can explain a UIKit bridge's update and measurement contracts.",
+        "I can validate scene restoration independently of durable data storage.",
+        "I can report practiced and executed evidence without claiming unrun device or production checks."
+      ]
+    }
+  ]
+}

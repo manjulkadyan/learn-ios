@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "units": [
+    { "file": "unit-01.json", "order": 1, "first": 1, "count": 7, "track": "Core" },
+    { "file": "unit-02.json", "order": 2, "first": 8, "count": 7, "track": "Core" },
+    { "file": "unit-03.json", "order": 3, "first": 15, "count": 7, "track": "Core" },
+    { "file": "unit-04.json", "order": 4, "first": 22, "count": 7, "track": "Core" },
+    { "file": "unit-05.json", "order": 5, "first": 29, "count": 7, "track": "Deep dive" },
+    { "file": "unit-06.json", "order": 6, "first": 36, "count": 7, "track": "Deep dive" },
+    { "file": "unit-07.json", "order": 7, "first": 43, "count": 7, "track": "Deep dive" },
+    { "file": "unit-08.json", "order": 8, "first": 50, "count": 7, "track": "Deep dive" }
+  ]
+}

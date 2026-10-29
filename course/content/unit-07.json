@@ -1,0 +1,1338 @@
+{
+  "unit": {
+    "id": "tooling-libraries-variants",
+    "title": "Build variants, libraries, and tooling",
+    "summary": "Seven source-backed deep dives connect build identities, dependency contracts, the active library landscape, generated resources, debugging, CI matrices, and bounded rollout decisions.",
+    "order": 7
+  },
+  "lessons": [
+    {
+      "id": "043",
+      "title": "Targets, schemes, configurations, and environment identity",
+      "summary": "Trace a build choice through xcconfig inheritance, compiler conditions, app identity, entitlements, and Gradle variant boundaries.",
+      "duration": 140,
+      "level": "Deep dive",
+      "prerequisites": [
+        "005",
+        "007",
+        "026"
+      ],
+      "objectives": [
+        "Separate target membership, scheme actions, configuration settings, destination, and runtime environment.",
+        "Explain xcconfig includes, inheritance, conditional settings, and effective-value inspection.",
+        "Audit bundle identity, compiler flags, and signing boundaries without exposing sensitive values.",
+        "Compare the current Tuist and Gradle graphs without inventing an automatic flavor cross-product."
+      ],
+      "sections": [
+        {
+          "id": "five-axes",
+          "title": "Begin with the artifact you intend to install",
+          "html": "<p>Imagine an Android change that works in prodNormalDebug but fails in a release build. You would inspect the module, selected variant, source sets, generated constants, shrinker settings, and signing inputs. Apply that habit to iOS, while replacing the assumption that one variant name describes everything. An iOS build request combines a workspace or project, a scheme action, one or more targets, a configuration, and a destination. The service environment is another decision. Write those choices before debugging the behavior.</p><p>A target defines a component and its output: an app, extension, framework, or test bundle. A scheme chooses which components participate in actions such as Run, Test, and Archive. A configuration supplies settings for those components. A destination selects a platform and runtime. A production endpoint can be used by a Debug app, and a Release build can be configured for a test environment. Optimization and environment are separate axes even when a team intentionally couples them.</p><p>The active app manifest declares Zocdoc as an app target, alongside an App Clip and extensions. Its explicit Zocdoc scheme runs Debug. The retained legacy scheme is named Zocdoc Prod. Neither name proves that every action uses identical settings. Session 005 introduced the vocabulary; today your job is to trace each choice until it reaches the compiled artifact. A correct trace names the consuming target rather than treating the entire workspace as one uniform configuration.</p>"
+        },
+        {
+          "id": "gradle-boundary",
+          "title": "A scheme is not a product flavor",
+          "html": "<p>The inspected Android app build declares app and environment flavor dimensions. The app dimension contains prod and zdtest; the environment dimension contains normal and integrationTest. Debug and release are build types, and beforeVariants disables zdtest release combinations. This is concrete support for reasoning about prodNormalDebug. Repository prose also mentions browserstack, but that flavor does not appear in the inspected productFlavors block. Prefer the current declaration when describing what this checkout generates.</p><p>Xcode does not automatically multiply every configuration, target, and scheme into the equivalent Gradle variant graph. A team may create several app targets with different identities, use one target with configurations, or use a scheme pre-action to select generated inputs. You must discover the strategy. The active Tuist app target declares Debug and Release configurations, both using Zocdoc.xcconfig. Nearby Local and Sandbox files describe additional inputs; their existence alone does not prove a generated QA scheme selects them.</p><p>Gradle source-set overlays also lack a universal Xcode counterpart. The Tuist source glob and exclusions determine membership, while compiler conditions may select declarations within those files. SwiftPM has its own target paths and settings. A source file in a directory called Debug is not automatically debug-only. To compare the platforms, record intent, membership, dependencies, constants, resources, and installation identity in separate columns. This catches the common mistake of copying a flavor name into a scheme and assuming all its former behavior followed.</p>"
+        },
+        {
+          "id": "xcconfig-reading",
+          "title": "Read configuration files as layered inputs",
+          "html": "<p>An xcconfig file contains build-setting assignments, comments, and includes. It is neither Swift nor a shell script. The active Zocdoc.xcconfig includes ZocdocBaseApp and ZocdocShared. The base file includes the Appstore input, sets a production compilation flag, and leaves the E2E condition empty. The shared file constructs the main bundle identifier using a prefix variable. Sandbox supplies a different prefix; Local includes Sandbox and overrides the environment. Follow the include chain in order instead of reading one isolated line.</p><pre><code class=\"language-shell\">#include \"Base.xcconfig\"\n// Synthetic scratch configuration\nCOURSE_ENVIRONMENT = Sandbox\nSWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) COURSE_SANDBOX\nOTHER_SWIFT_FLAGS = $(inherited)\nONLY_ACTIVE_ARCH[sdk=iphonesimulator*] = YES</code></pre><p>The first line includes another configuration file relative to this file. Double slash begins a comment. The environment assignment creates a user-defined setting; application code cannot read it automatically. The next assignment preserves an inherited condition list and adds a Swift identifier. Parenthesized dollar syntax expands build settings, rather than executing shell substitution. The bracket expression restricts the final assignment to matching SDK names. It does not select a simulator destination by itself.</p><p>Repeated assignments and higher-precedence project or target settings can replace values. Preserve inherited lists deliberately; appending without inheritance can lose search paths or flags. Equally, inheritance can retain an unwanted old value, so inspect the final setting. Be careful with literal URL text: double slash has comment meaning in this format. Use the repository's established representation and verify expansion rather than pasting a secret-bearing URL into a configuration example.</p>"
+        },
+        {
+          "id": "effective-settings",
+          "title": "Resolve the value used by the chosen action",
+          "html": "<p>Reading an xcconfig proves declared intent, not the final compiler invocation. Xcode combines defaults, configuration files, project settings, target settings, conditions, and command-line overrides. Inspect the Levels view or build-settings output for the specific target, configuration, and SDK. In this checkout the production helper explicitly avoids setting version keys because doing so would override the version workflow. That comment explains a concrete ownership boundary: moving an assignment into a convenient dictionary can change precedence.</p><p>The main app's Debug settings supply its compilation conditions and disable optimization. Release supplies its production condition plus the optional E2E condition. Some of these assignments do not contain inherited expansion. Therefore a scratch xcconfig append cannot be assumed to survive the app target's explicit override. Review the effective condition list and the compile command. A build-setting variable whose name starts with ZD is a team convention, not a language feature.</p><p>For read-only discovery in an already prepared client checkout, list the existing workspace and schemes, then inspect settings for the chosen action. Filter output to bundle identifier, module name, deployment target, optimization, and compilation conditions. Full settings dumps may expose injected configuration or signing metadata and are inappropriate course evidence. A command that resolves packages or runs scheme actions has a different scope from reading a manifest. Record whether your result is a declared value, an effective value, or a compiled behavior; those are three different levels of proof.</p>"
+        },
+        {
+          "id": "flags-runtime",
+          "title": "Compile-time conditions do not configure a server",
+          "html": "<p>Swift conditional compilation uses identifiers, not C preprocessor values. A Swift active condition is written COURSE_SANDBOX, without the C-style assignment COURSE_SANDBOX=1. Objective-C's GCC_PREPROCESSOR_DEFINITIONS belongs to a separate compiler. The app manifest configures both families. Updating one does not automatically update the other. Runtime feature flags are yet another mechanism: they choose behavior in an existing binary rather than removing code from it.</p><pre><code class=\"language-swift\">enum CourseEnvironment: String {\n    case production, sandbox\n}\n\n#if COURSE_SANDBOX\nlet compiledEnvironment: CourseEnvironment = .sandbox\n#else\nlet compiledEnvironment: CourseEnvironment = .production\n#endif\n\nfunc environmentLabel(for environment: CourseEnvironment) -&gt; String {\n    environment.rawValue\n}\nprint(environmentLabel(for: compiledEnvironment))</code></pre><p>This standalone Swift example has no network or UIKit dependency. The enum's raw type gives each case a string representation; the annotation on compiledEnvironment makes the intended type explicit. The compiler retains one branch according to its conditions. The for label is used at the call, while environment names the local parameter. With no COURSE_SANDBOX condition, the predicted output is production. A synthetic build adding that condition predicts sandbox. These predictions are not evidence of the client's endpoint configuration.</p><p>Changing a compiler condition does not automatically change an Info.plist, registration callback URL, asset, entitlement, or remote SDK configuration. The retained client uses pre-build tooling, so inspect that path before describing environment switching. The E2E Release condition is a useful example: the default file leaves it empty, and a test build can opt in. Prove the intended branch is absent from an ordinary distribution artifact rather than assuming the word Release guarantees it.</p>"
+        },
+        {
+          "id": "identity-signing",
+          "title": "Installation identity and capability form a contract",
+          "html": "<p>PRODUCT_MODULE_NAME controls a source module identity; PRODUCT_BUNDLE_IDENTIFIER controls an installed bundle identity. They solve different problems. A QA prefix can allow a second app to coexist, but sharing or separating data depends on app groups, Keychain access groups, server accounts, and container policy. An endpoint change alone does not isolate those resources. Compare the complete environment contract before installing two variants with similarly named icons.</p><p>The active main app resolves its bundle identifier from a user-defined setting and selects its Info.plist and entitlement file through settings. The App Clip derives a related identity, while other extensions declare their own identities. That is evidence of separate products, not an instruction to copy the app's capabilities into every extension. For example, the medication widget deliberately depends only on a core module because a broader UI dependency reaches an application API unavailable to extensions.</p><p>Signing adds authorization to this graph. The requested bundle IDs and capabilities must align with provisioning and the signing workflow. You can explain the roles of a certificate, matching private key, profile, and entitlements without copying any value from them. Treat a signing diagnostic as a particular mismatch to investigate, not a reason to rotate shared identities. Simulator success still leaves device installation and distribution verification pending. Session 026 explains the delivery chain; here your acceptance note should identify which target requests each capability and which environment changes could invalidate that request.</p>"
+        },
+        {
+          "id": "failure-investigation",
+          "title": "Turn variant failures into bounded hypotheses",
+          "html": "<p>Suppose Debug imports a module but Release does not. Check whether an import is conditionally compiled, whether the dependency is declared for the consuming target, whether optimization reveals a different linker path, and whether the generated graph matches the retained package route. Do not conclude that the library is debug-only from the symptom. Conversely, a file that compiles on both routes can still load the wrong resource or service configuration at runtime.</p><p>Suppose QA installs over production. Compare the resolved bundle identifiers of the built apps. A different display name cannot establish separate installation identity. Suppose an extension fails validation while the app installs. Inspect that extension's identity, version metadata, capability requests, and linkage rather than changing the app's settings indiscriminately. The unit's later sessions will add resources, dependencies, and CI destinations to this same investigative method.</p><p>Build a small evidence ledger for each case: expected behavior, selected graph route, declared setting, effective setting if inspected, and observed artifact result if tested. Mark missing evidence as pending. Keep representative Debug and Release checks, and include the App Clip or extension when the change reaches their shared dependencies. A configuration matrix should be large enough to expose the affected boundary, yet bounded enough to finish. The exercise below practices this reasoning without rewriting the client's setup, generating credentials, or treating a paper trace as a successful archive.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why can an xcconfig condition fail to reach the Swift compiler?",
+          "options": [
+            "The target can replace the condition list at a higher-precedence layer.",
+            "Swift automatically ignores every custom identifier.",
+            "A scheme name always overrides compiler settings.",
+            "Conditions only work in the simulator."
+          ],
+          "answer": 0,
+          "explanation": "The final target settings can replace rather than append the xcconfig value. Inspect the effective list and compiler invocation. Conditions are valid custom identifiers and are not determined by a scheme's spelling."
+        },
+        {
+          "question": "Which observation supports the current Android variant graph?",
+          "options": [
+            "Every flavor mentioned in a README must be generated.",
+            "The inspected build declares app/environment dimensions and filters zdtest release.",
+            "Xcode automatically generates the same Cartesian product.",
+            "A QA display name proves a separate application ID."
+          ],
+          "answer": 1,
+          "explanation": "Declarations and beforeVariants determine the observed graph. Documentation names need confirmation; Xcode schemes do not supply Gradle flavor multiplication, and display names do not settle installation identity."
+        },
+        {
+          "question": "A Release binary connects to a sandbox service. What follows?",
+          "options": [
+            "Release compilation is impossible.",
+            "The binary must have a different module name.",
+            "Optimization configuration and runtime environment are independent choices.",
+            "Its signing identity must be revoked."
+          ],
+          "answer": 2,
+          "explanation": "Release describes a build-setting choice, not a universal endpoint guarantee. Trace environment injection, identity, and capabilities separately before diagnosing signing or changing module names."
+        }
+      ],
+      "exercise": {
+        "brief": "Create a configuration contract and failure investigation for a synthetic Sandbox app, using the active manifests as read-only evidence.",
+        "steps": [
+          "Trace the main app target, Debug/Release configuration files, explicit scheme, and xcconfig include chain.",
+          "Write a table comparing optimization, Swift/C conditions, bundle identity, resources, runtime environment, and capabilities for two synthetic builds.",
+          "Predict both branches of the standalone Swift snippet, then optionally run it in your scratch environment with and without the condition.",
+          "Explain why merely appending a condition in an xcconfig might not change the client target.",
+          "Choose next checks for a QA app overwriting production and a Release-only missing import."
+        ],
+        "acceptance": [
+          "The contract separates target, scheme action, configuration, destination, and environment.",
+          "The Android comparison cites the two declared dimensions and the disabled zdtest release combination.",
+          "The include trace identifies declared values and explicitly leaves uninspected effective values pending.",
+          "Predicted snippet outputs are production and sandbox, with verification scope stated.",
+          "Identity and capability checks contain no credential, profile, certificate, or private-key values."
+        ],
+        "solution": "<p>A worked trace starts at Zocdoc's app target, follows its two configurations into Zocdoc.xcconfig, then follows BaseApp into the Appstore file and Shared into the bundle-identifier construction. The explicit Tuist Zocdoc scheme uses Debug for Run; the retained legacy scheme is a separate input. Local and Sandbox are available configuration files, but their selection by a generated scheme has not been established by their mere existence.</p><table><thead><tr><th>Synthetic choice</th><th>Production Debug</th><th>Sandbox Release</th></tr></thead><tbody><tr><td>Optimization</td><td>Debug setting</td><td>Release setting</td></tr><tr><td>Compiler condition</td><td>No COURSE_SANDBOX</td><td>COURSE_SANDBOX added effectively</td></tr><tr><td>Installation identity</td><td>example.course.app</td><td>example.course.app.sandbox</td></tr><tr><td>Environment/resources/capabilities</td><td>Explicit production contract</td><td>Separately reviewed sandbox contract</td></tr></tbody></table><p>The enum example predicts production without the custom condition and sandbox when it is passed to the compiler. The client target can override an xcconfig condition list, so this scratch result does not prove the client's flags. For an overwrite, inspect the built bundle identifier; for a missing import, inspect consuming-target dependencies, conditional imports, and generated versus retained graphs. Effective-setting and built-artifact checks remain pending until actually performed. A completed learner submission contains its own predictions and evidence rather than copying the worked table as proof.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple — Build configuration files and setting layers",
+          "url": "https://developer.apple.com/documentation/xcode/adding-a-build-configuration-file-to-your-project"
+        },
+        {
+          "label": "Apple — xcconfig syntax, inheritance, and conditions",
+          "url": "https://help.apple.com/xcode/mac/current/en.lproj/dev745c5c974.html"
+        },
+        {
+          "label": "Apple — Configure target build settings",
+          "url": "https://developer.apple.com/documentation/xcode/configuring-the-build-settings-of-a-target"
+        },
+        {
+          "label": "Android — Flavor dimensions, build types, and variants",
+          "url": "https://developer.android.com/build/build-variants"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Main app membership and identity",
+          "path": "ios-client/Projects/Apps/Zocdoc/Project.swift",
+          "line": 194,
+          "why": "App product, identifier expansion, deployment target, source glob, and resources establish the consuming target."
+        },
+        {
+          "label": "Explicit Debug and Release condition lists",
+          "path": "ios-client/Projects/Apps/Zocdoc/Project.swift",
+          "line": 412,
+          "why": "Both configurations use the same xcconfig, while target dictionaries provide different compiler conditions."
+        },
+        {
+          "label": "Configuration include chain",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Supporting Files/Configs/Zocdoc.xcconfig",
+          "line": 1,
+          "why": "Follow BaseApp and Shared rather than inferring final environment from a scheme name."
+        },
+        {
+          "label": "Default E2E condition boundary",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Supporting Files/Configs/ZocdocBaseApp.xcconfig",
+          "line": 4,
+          "why": "A test-specific condition is empty by default and is intended for an explicit CI override."
+        },
+        {
+          "label": "Android dimensions and filtering",
+          "path": "android-client/app/build.gradle",
+          "line": 310,
+          "why": "Actual productFlavors and beforeVariants support the analogy and expose the limit of stale flavor descriptions."
+        },
+        {
+          "label": "Explicit Tuist app scheme",
+          "path": "ios-client/Projects/Apps/Zocdoc/Project.swift",
+          "line": 627,
+          "why": "The scheme selects build, test plan, and Debug run actions instead of acting as a Gradle flavor."
+        }
+      ],
+      "checklist": [
+        "I can map each build choice to its owning target or action.",
+        "I can explain includes, inherited values, and why effective settings can differ.",
+        "I can distinguish compiler conditions from runtime configuration.",
+        "I can compare bundle, module, and capability identities without copying sensitive values.",
+        "I can write a bounded matrix and identify evidence still pending."
+      ]
+    },
+    {
+      "id": "044",
+      "title": "SwiftPM products, pins, binary frameworks, and compatibility",
+      "summary": "Evaluate a dependency as a build, runtime, compatibility, and supply-chain contract rather than a package name and version.",
+      "duration": 155,
+      "level": "Deep dive",
+      "prerequisites": [
+        "043"
+      ],
+      "objectives": [
+        "Trace package identity, product exposure, target modules, requirements, and resolved revisions.",
+        "Explain automatic, static, and dynamic linkage separately from framework packaging.",
+        "Distinguish source compatibility, ABI stability, module stability, and library evolution.",
+        "Review platform availability, resources, licenses, provenance, and rollback inputs before adopting a library."
+      ],
+      "sections": [
+        {
+          "id": "dependency-contract",
+          "title": "A dependency has several identities and consumers",
+          "html": "<p>In Gradle, a dependency coordinate does not tell you every class, transitive artifact, native library, or resource it contributes. SwiftPM deserves the same scrutiny. A package has an identity and a manifest. Its products are the public build outputs consumers request. Its targets define modules and tests. A library product may expose several targets. Import statements name modules, so package, product, target, and import names need not match.</p><p>The checkout supplies an instructive example. ZDAssets exposes a ZDAssets product containing several asset and font targets. ZDCore exposes a product containing core Swift, Objective-C, Sentry-related, and tracing targets, alongside a separate ZDPromiseCore product. ZDNetworking exposes Base, Lite, Full, definitions, and testing products. Selecting an umbrella product can therefore pull a larger graph than a particular feature requires. Names such as Lite suggest intent; inspect the dependencies to establish the actual boundary.</p><p>Write a dependency contract before choosing a new library: which consumer needs which operation, which product supplies it, what modules it imports, and what other targets it brings. Then list resource, platform, startup, privacy, and test implications. A manifest establishes declared edges, while the linked artifact establishes inclusion. An import discovered in an inactive copy proves neither. This session builds on session 043's target map and prepares you to audit real library roles in session 045.</p>"
+        },
+        {
+          "id": "read-manifest",
+          "title": "Read the manifest one initializer at a time",
+          "html": "<p>This complete synthetic client manifest assumes you separately created a sibling CourseCodec package exposing a CourseCodec library. It demonstrates dependency syntax; it is not a runnable client until that package and both source directories exist. It uses tools 5.9 and an iOS 17 platform floor, keeping manifest APIs separate from the installed compiler and effective language mode.</p><pre><code class=\"language-swift\">// swift-tools-version: 5.9\nimport PackageDescription\n\nlet package = Package(\n    name: \"CourseConsumer\",\n    platforms: [.iOS(.v17)],\n    products: [\n        .library(name: \"CourseConsumer\", targets: [\"CourseConsumer\"])\n    ],\n    dependencies: [\n        .package(path: \"../CourseCodec\")\n    ],\n    targets: [\n        .target(\n            name: \"CourseConsumer\",\n            dependencies: [\n                .product(name: \"CourseCodec\", package: \"CourseCodec\")\n            ]\n        ),\n        .testTarget(\n            name: \"CourseConsumerTests\",\n            dependencies: [\"CourseConsumer\"]\n        )\n    ]\n)</code></pre><p>PackageDescription is the manifest API, not a runtime library for the application. The package name labels the container. Platforms declares a deployment constraint; it does not make UIKit run on a default macOS host. Products exposes the production target. Dependencies makes a local package available for resolution, using a path relative to the manifest. The production target then selects a product from that package. Declaring the package alone would not grant every target access to it.</p><p>The test target depends on the production target, and its import still names the compiled module. Square brackets construct arrays; the leading dot on library, target, and product uses type inference to select a static member. Argument labels distinguish name, package, and targets. Read nested arrays from the outside inward. This small discipline prevents a common review mistake: moving a dependency into a package-level list while forgetting the particular consuming target.</p>"
+        },
+        {
+          "id": "pins-resolution",
+          "title": "Separate a requirement from its selected revision",
+          "html": "<p>A version requirement describes allowed choices. An exact requirement selects a specific semantic version; from permits compatible versions up to the next major version for an ordinary stable release. Branch and revision requirements have different update semantics. A branch called 4.1.3 remains a branch requirement, even if its name looks like a release. The checkout uses precisely that form for lottie-spm and uses main for the internal AWS wrapper.</p><p>Package.resolved records the selected state of a resolution graph, including revisions and versions or branches. It is not a list of libraries proven to execute in production. A package can be present transitively or only for tests. A top-level consumer's resolution file governs its resolution context; a dependency's own lockfile does not universally force downstream consumers to use its selections. Locate the leaf application or tooling graph before promising reproducibility.</p><p>The two inspected resolution files are not identical. For example, Tuist resolves swift-crypto at 4.5.0 while the retained workspace file records 4.2.0. Other transitive selections differ too. Do not repair this learning exercise by forcing every pin to match. First determine the consuming routes, constraints, reasons for the difference, and expected parity. Reproducible review records the manifest, relevant lockfile, selected revision, toolchain, and generator. A broad update can silently change unrelated transitive code, so a bounded upgrade includes a diff of every changed pin rather than just the requested direct dependency.</p>"
+        },
+        {
+          "id": "linkage-packaging",
+          "title": "Static versus dynamic describes linking, not the filename",
+          "html": "<p>Static linking incorporates selected library object code into a consumer's linked binary. Dynamic linking leaves a dependency to be loaded at runtime, with corresponding embedding, signing, and search-path responsibilities for non-system frameworks. A framework is a packaging form; it can contain a static or a dynamic binary. An XCFramework is a container for platform and architecture variants, not a third linkage mode. An AAR analogy helps you ask about packaged code and resources, but it does not predict the Mach-O linkage model.</p><p>SwiftPM library products can request static or dynamic behavior, or omit the type so the consuming build chooses an appropriate form. The retained ZDModulesMocks product explicitly requests dynamic linkage. Its Tuist target is declared as a static framework. That is an observed route difference to review, not proof of a runtime defect or of semantic equivalence. The core Tuist manifests also declare many static frameworks while selecting the external Sentry-Dynamic product.</p><p>Linkage choices have tradeoffs. Static code may be repeated across separately linked executables, such as an app and an extension, but dead stripping can remove unused portions. Dynamic frameworks bring loader and packaging costs and can still introduce substantial size. Duplicate symbols can arise from multiple copies of the same definitions; missing framework embedding can cause launch failure after compilation succeeds. Measure size and launch effects for representative artifacts before claiming a faster choice. Session 044 teaches the mechanism; actual linker maps and device profiling remain further verification.</p>"
+        },
+        {
+          "id": "binary-compatibility",
+          "title": "ABI stability and module stability answer different questions",
+          "html": "<p>Source compatibility asks whether client source still compiles against an API. An application binary interface, or ABI, describes compiled calling and layout conventions. Swift's stable runtime ABI on supported Apple platforms does not make every third-party library binary interchangeable. The library's own public contract, build options, and evolution promises still matter. A source package rebuilt with the app has a different distribution problem from a binary supplied by a vendor.</p><p>Module stability concerns whether a compiler can consume a module interface produced by another compiler version. Serialized swiftmodule files are compiler-specific; textual swiftinterface files support a more stable distribution boundary. Library evolution gives independently distributed libraries room to make compatible changes without requiring old clients to be rebuilt. Xcode's BUILD_LIBRARY_FOR_DISTRIBUTION enables the relevant distribution support. It is not a universal optimization to enable on every internal target compiled and shipped together.</p><p>An XCFramework combines appropriate slices for platforms and variants. An arm64 iPhone binary is not interchangeable with an arm64 simulator binary just because the CPU architecture label matches. Inspect platform metadata, minimum OS, interfaces, and supported destinations. A binary module still cannot expose an unsupported API to every deployment runtime. Frozen layout or exhaustive enum assumptions can constrain future evolution; changing public declarations needs a compatibility review. Treat a compiler-version import failure, a linker symbol failure, and a runtime unavailable-API failure as separate boundaries with different evidence.</p>"
+        },
+        {
+          "id": "availability-resources",
+          "title": "A successful import is only one compatibility gate",
+          "html": "<p>Use availability as a two-part question: can this target compile the declaration using its selected SDK, and can the oldest supported runtime execute the path? A newer installed SDK answers the first question, not the second. A declaration's @available annotation expresses its supported platform range; a runtime #available check narrows where a call executes. Conditional canImport checks module availability to the compiler. It does not replace an operating-system runtime check.</p><p>Resources are another independent gate. A linked static library can still require a generated module resource bundle. Binary frameworks can include assets or privacy information that must survive packaging. A test that constructs a pure model will not detect a missing font, storyboard, localization, or privacy manifest. Add a resource lookup and inspect the relevant packaged product when adopting a resource-bearing dependency. Session 046 will practice this with Bundle.module and synthetic JSON.</p><p>Transitive platforms can also raise the effective floor. A package's broad platform declaration does not guarantee every target can build on every advertised platform, especially when sources import UIKit or rely on extension-unavailable APIs. Follow imports and dependencies for the actual product you select. The checkout's generated GraphQL packages advertise platforms below the main app's iOS 17 floor; that does not lower the app floor. Record SDK, deployment, language mode, host-tool requirements, and resource needs as separate compatibility fields rather than compressing them into one version number.</p>"
+        },
+        {
+          "id": "supply-chain",
+          "title": "Review provenance, licenses, and update ownership",
+          "html": "<p>A checksum verifies that a downloaded binary archive matches the declared bytes. It does not prove those bytes are trustworthy, appropriately licensed, vulnerability-free, or free of data collection. A verified XCFramework signature adds origin evidence; it still does not substitute for understanding behavior. Record repository origin, resolved revision, binary source where applicable, checksum, signature evidence, and which trusted workflow produced or obtained the artifact. Build plugins and macros deserve review because they participate in the build, even when their code is not bundled into the app.</p><p>License review starts with the actual selected version and its included license and notice files. Transitive libraries and bundled fonts or media can carry separate terms. A familiar package name is not evidence of a particular license, so this course does not assign license verdicts without reading those artifacts. Legal interpretation and vulnerability triage require the appropriate specialists. Your engineering contribution is a complete inventory, usage boundary, distribution form, and reproducible evidence.</p><p>Ownership makes the review operational. Identify a maintainer for upgrades, a consumer for behavior validation, and a recovery owner for a failed rollout. Prefer a wrapper or protocol when it isolates a real substitution seam; avoid wrapping an entire vendor API mechanically. Keep credential material in the approved configuration path and out of dependency reports. The bounded decision should explain benefit, compatibility costs, affected app and extension products, test evidence, remaining license or security review, and how to reconstruct the previous graph. None of these checks establishes that the checkout's old pins are safe or unsafe merely from their age.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "The manifest says branch: 4.1.3 for lottie-spm. How should it be classified?",
+          "options": [
+            "An exact semantic version because it contains digits.",
+            "A branch requirement whose resolved commit belongs in the evidence ledger.",
+            "An ABI guarantee.",
+            "An automatic static library."
+          ],
+          "answer": 1,
+          "explanation": "The API label determines requirement semantics. A version-shaped branch name remains mutable as a branch; the resolution file records the selected revision. Neither linkage nor ABI follows from its spelling."
+        },
+        {
+          "question": "Which statement correctly separates packaging and linking?",
+          "options": [
+            "Every framework is dynamic.",
+            "An XCFramework is a fourth compiler language mode.",
+            "A framework may contain static or dynamic code; an XCFramework groups platform variants.",
+            "Static libraries never need resources."
+          ],
+          "answer": 2,
+          "explanation": "Packaging, linkage, and resources are separate dimensions. The consumer must inspect the contained binary and bundle requirements rather than infer dynamic behavior from a suffix."
+        },
+        {
+          "question": "What does a matching binary checksum establish?",
+          "options": [
+            "The archive bytes match the declared checksum.",
+            "The dependency has no exploitable defect.",
+            "The license permits every distribution.",
+            "All simulator and device slices are interchangeable."
+          ],
+          "answer": 0,
+          "explanation": "A checksum is integrity evidence for bytes. Provenance, security, license interpretation, platform metadata, and runtime behavior need their own reviews and verification."
+        }
+      ],
+      "exercise": {
+        "brief": "Write a dependency contract for the observed ZDModulesMocks linkage difference and one synthetic vendor binary without changing client manifests.",
+        "steps": [
+          "Trace the retained ZDModulesMocks product and sibling Tuist target, recording declared linkage separately for each route.",
+          "Compare one direct requirement and its resolved state; include lottie-spm's branch semantics.",
+          "For a synthetic VendorCodec XCFramework, list required simulator/device slices, interfaces, runtime floor, resource packaging, origin, and license evidence.",
+          "Classify a compiler module-version error, duplicate symbol, missing framework at launch, and absent resource.",
+          "Propose the smallest verification and a reconstruction plan for the prior graph."
+        ],
+        "acceptance": [
+          "Package, product, module, target, and selected revision are distinguished.",
+          "The dynamic-versus-static route difference is reported as an observation requiring review, not a confirmed bug.",
+          "Device arm64 and simulator arm64 are treated as distinct platform variants.",
+          "Checksum, signature, license, security, and runtime checks have separate evidence fields.",
+          "No pin is described as latest and no upgrade, license approval, or app build is claimed performed."
+        ],
+        "solution": "<p>The retained package exposes ZDModulesMocks with type dynamic; the sibling Project.swift declares it as a staticFramework. A sound report preserves both observations and identifies test consumers before recommending parity. It does not assume the same suffix or name produces identical packaging. For lottie-spm, record branch 4.1.3 and the resolution file's commit, not an invented exact-version requirement.</p><p>VendorCodec's contract names its consumer product, supported device and simulator variants, minimum OS, public interfaces, linked dependencies, resource bundles, privacy information, checksum, and origin evidence. License and vulnerability decisions remain pending until the selected artifact and its dependencies are reviewed. Module-version failure suggests interface/toolchain inspection; duplicate symbols suggest repeated definitions or linkage; a loader failure suggests embedding and run paths; a nil resource URL suggests bundle membership and lookup.</p><p>Reconstruction uses the prior manifest, relevant resolution file, source revision or binary checksum, generator and compiler versions, and unchanged resource inputs. A narrow source-package build can establish a compilation boundary, while an app or test-host build checks integration. Packaging and device execution require their own evidence. This is a worked review, not proof that either observed linkage route or the synthetic binary has been executed.</p>"
+      },
+      "references": [
+        {
+          "label": "SwiftPM — PackageDescription, products, and dependencies",
+          "url": "https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html"
+        },
+        {
+          "label": "Apple — Package dependency resolution",
+          "url": "https://developer.apple.com/documentation/packagedescription/package/dependency"
+        },
+        {
+          "label": "Swift — ABI, module stability, and library evolution",
+          "url": "https://www.swift.org/blog/library-evolution/"
+        },
+        {
+          "label": "Apple — Multiplatform XCFramework bundles",
+          "url": "https://developer.apple.com/documentation/xcode/creating-a-multi-platform-binary-framework-bundle"
+        },
+        {
+          "label": "Apple — Distributing binary frameworks through packages",
+          "url": "https://developer.apple.com/documentation/xcode/distributing-binary-frameworks-as-swift-packages"
+        },
+        {
+          "label": "Apple — Verify XCFramework origin",
+          "url": "https://developer.apple.com/documentation/xcode/verifying-the-origin-of-your-xcframeworks"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Direct requirements and branch-form pins",
+          "path": "ios-client/Tuist/Package.swift",
+          "line": 62,
+          "why": "Read exact requirements and the branch labels for lottie-spm and the AWS wrapper before making inventory claims."
+        },
+        {
+          "label": "Retained dynamic mock product",
+          "path": "ios-client/Projects/Infra/ZDModules/Package.swift",
+          "line": 18,
+          "why": "Explicit dynamic linkage belongs to the retained SwiftPM route."
+        },
+        {
+          "label": "Tuist mock target linkage",
+          "path": "ios-client/Projects/Infra/ZDModules/Project.swift",
+          "line": 33,
+          "why": "The generated graph declares a static framework, exposing a real route difference."
+        },
+        {
+          "label": "Selected Tuist resolutions",
+          "path": "ios-client/Tuist/Package.resolved",
+          "line": 1,
+          "why": "Read selected revisions in the graph consumed by Tuist rather than assuming direct requirement strings are the whole inventory."
+        },
+        {
+          "label": "Selected retained-workspace resolutions",
+          "path": "ios-client/Zocdoc.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+          "line": 1,
+          "why": "The alternative leaf graph has different transitive selections; compare rather than silently merge."
+        },
+        {
+          "label": "Product with several asset targets",
+          "path": "ios-client/Projects/Infra/ZDAssets/Package.swift",
+          "line": 18,
+          "why": "A product exports several targets, showing why product, module, and package cannot be treated as synonyms."
+        }
+      ],
+      "checklist": [
+        "I can trace one consumer to its selected product and revision.",
+        "I can explain static/dynamic linkage without guessing from a framework suffix.",
+        "I can distinguish source, ABI, module, and runtime compatibility.",
+        "I can identify license, provenance, privacy, and vulnerability evidence still needed.",
+        "I can reconstruct a previous dependency graph without a broad update."
+      ]
+    },
+    {
+      "id": "045",
+      "title": "The active library and internal-module landscape",
+      "summary": "Build a verified responsibility map, distinguish retained and preferred patterns, and assign concrete review ownership to library changes.",
+      "duration": 150,
+      "level": "Deep dive",
+      "prerequisites": [
+        "017",
+        "019",
+        "044"
+      ],
+      "objectives": [
+        "Inventory declared libraries using active manifests, pins, and consumer sources.",
+        "Explain the boundaries between transport, models, state, UI, identity, engagement, and observability.",
+        "Identify ReactiveKit, PromiseKit, Combine, and Observation without claiming a completed migration.",
+        "Design a small vendor-independent contract and state the ownership and verification limits of a migration."
+      ],
+      "sections": [
+        {
+          "id": "inventory-evidence",
+          "title": "Verify the graph before explaining the names",
+        "html": "<p>An Android dependency report is useful, but it cannot tell you whether an SDK owns transport, lifecycle, storage, or the business rule you are changing. Build the iOS landscape around responsibilities and evidence. Start with the active Tuist dependency manifest, then the consumer Project.swift, the retained Package.swift where relevant, and the resolution file for the route you are evaluating. Source imports confirm which module a file uses; target membership confirms whether that file belongs to the graph.</p><p>The course's searchable dependency catalogue supplies the reproducible remote pin snapshot. Use it to compare direct requirements, selected revisions, and graph differences; this lesson adds consumer behavior and ownership. A resolved entry can be transitive, test-only, or tooling-related. The catalogue's remote scope does not enumerate every local module, vendored source, system framework, or resource that reaches an artifact.</p><p>The inspected Tuist graph and retained workspace graph also differ in membership: Peasy and SwiftLintPlugins appear in the retained resolution file but not the Tuist resolution file. The retained Xcode project contains their package references, including a Peasy product reference. This is route evidence, not proof that both execute at runtime or that a plugin is bundled. Classify a lint plugin as build tooling before treating it like a feature SDK. Explain a difference before proposing removal or parity.</p><p>For each row, ask which target consumes the product and what it initializes. A declared app dependency establishes a build edge; it does not prove consent behavior, startup order, or current operational ownership. Record those as additional questions, with source evidence where inspected.</p>"
+        },
+      {
+        "id": "dependency-origins",
+        "title": "Remote, local, vendored, and system are distinct origins",
+        "html": "<p>A remote dependency is resolved from a repository or artifact location. Tuist/Package.swift declares such requirements, including internally maintained remote packages. Remote therefore does not mean external company ownership. A local package or Tuist project is built from the checkout; ZDCore, ZDNetworking, ZDAssets, and feature projects are examples. Their code is pinned by the source revision and their manifests, rather than by a remote Package.resolved entry for each local target.</p><p>Vendored code is maintained inside the repository under a chosen update policy. TestableMacro is a verified example under Vendors, with both a package and a Tuist project. Its SwiftSyntax dependency remains remote and its macro implementation runs as a host build tool. A vendor-looking framework search path is merely a setting until its actual artifact is found and consumed. System frameworks, such as UIKit, Foundation, CoreData, and CoreLocation, come through the selected SDK and OS runtime; imports and link settings provide their evidence, rather than SwiftPM pins.</p><p>These origins change review work. A remote upgrade needs origin and transitive-diff review; a local module change needs consumer and composition-root checks; a vendored update needs upstream provenance plus local patch accounting; a system API adoption needs deployment and runtime availability checks. None of them automatically settles human ownership, licensing, or resource packaging. Keep the graph maintainer, behavior owner, and specialist reviewer distinct.</p><p>Lifetime is a second axis. A UI helper may live with a view, a media room with a call, a request adapter with an operation, and a telemetry or engagement service with an account or process. Confirm actual allocation, registration scope, callbacks, and teardown. Moving a scene-owned SDK into a process singleton can retain data or work across account changes even when the package pin stays identical. Conversely, constructing a new process-level service for every view can duplicate observers or exporters. Ask who starts, cancels, resets, and releases each integration.</p>"
+      },
+        {
+          "id": "network-models",
+          "title": "Transport, generated models, and domain operations differ",
+          "html": "<p>ZDNetworking is not synonymous with Alamofire. Its manifest defines internal operation, client, definitions, multipart, dispatcher-tool, and adapter targets. AlamofireExtension depends on Alamofire and PromiseKit alongside internal contracts. Another adapter, ZDUrlSessionExtension, also retains PromiseKit. Replacing a third-party HTTP layer therefore involves request construction, error mapping, security behavior, cancellation, and consumers of those internal interfaces, not just changing an import.</p><p>The GraphQL side is equally specific. ZDGqlPhi and ZDGqlNonPhi are generated schema modules that depend on ApolloAPI. Their generated model requirement does not establish that every consumer needs the full Apollo client, transport, or cache. The main app declares ApolloAPI explicitly, while the app unit-test target includes Apollo. Read product edges at that level of precision. The PHI and NonPhi namespaces describe separate schema-generation boundaries; the names do not certify that arbitrary logged payloads are safe.</p><p>ZDData owns model-related targets and ZDApiOperations owns operation definitions in the repository architecture. Those responsibilities can overlap in a concrete feature, so trace one request end to end before changing the seam. An Android analogy is distinguishing Retrofit or Apollo runtime, generated wire types, DTO-to-domain mapping, and a repository/interactor. The boundary breaks when you assume a named product is equivalent to a Kotlin package or that all GraphQL models imply one global cache. Verify the exact consumer and runtime owner.</p>"
+        },
+        {
+          "id": "identity-engagement",
+          "title": "Security-sensitive SDKs need lifecycle and data owners",
+          "html": "<p>ZDAuthentication declares Auth0.swift and its internal feature dependencies. The main app separately declares the internal AWS framework wrapper on a branch. Both can coexist in a transitional identity landscape. A manifest cannot establish which login flow uses which system, which token store is authoritative, or whether an old integration is fully retired. Trace registration and call sites with synthetic account cases before proposing removal. Never copy credentials, tokens, signing inputs, or whole account stores into an inventory.</p><p>The active app graph includes BrazeKit, BrazeUI, BranchSDK, and DataDome products. The notification service extension depends on BrazeNotificationService. This connects a dependency update to multiple products and lifecycle paths. Engagement, attribution, protection, and authentication are distinct responsibilities even if several SDKs initialize near launch. Identify what each integration receives, when it can run, how account changes reset state, and how opt-in or authorization policy is enforced where required.</p><p>On Android you would review Application startup, consent gates, manifest components, and SDK network behavior. On iOS add scene and extension boundaries, signed capabilities, resource packaging, and the actual distribution artifact. A disabled feature flag may prevent one screen while leaving an SDK initializer active. Therefore a rollout owner needs an explicit containment seam. This lesson teaches the review questions; it does not conclude that the checkout has a particular consent defect or that any library is currently vulnerable.</p>"
+        },
+        {
+          "id": "ui-and-specialized",
+          "title": "UI helpers and specialized runtimes have different costs",
+          "html": "<p>SnapKit supplies a constraint-construction API used by inspected UIKit source files. It does not replace Auto Layout's measurement, priorities, safe areas, or constraint solver. Lottie supplies the app's animation product, with imports in loading and intake UI. It does not remove the need to budget decoding, animation work, accessibility, or reduced-motion behavior. A familiar Android analogy is a layout DSL or animation library; the underlying rendering and lifecycle rules still belong to the platform.</p><p>ZDUI is itself a package with several products and targets, including Mezzanine components, legacy UI, Objective-C support, and App Clip UI. Its manifest pulls assets, internal data and networking contracts, and retained asynchronous libraries. The App Clip comment warns about dependency and resource size. Do not treat the design system as free of runtime implications simply because it looks like presentation code. Also avoid deriving an App Clip policy limit from a historical comment; current distribution requirements need current official verification.</p><p>TwilioVideo is consumed by ZDVideoVisit's target and imported in room and media sources. Its update surface includes device permissions, interruption, audio routing, participant state, network reconnection, and teardown. Those cases need specialist device practice beyond a compiler check. Figma's code-connect package and the font-subset tooling serve different purposes again: design description and build/resource preparation. Put these dependencies in their own responsibility rows rather than categorizing every library near a view as a interchangeable UI utility.</p>"
+        },
+        {
+          "id": "reactive-migration",
+          "title": "Names and preference documents do not prove migration",
+          "html": "<p>The repository guide calls ZDRxCore a legacy RxSwift-based module, but the inspected active manifest depends on ReactiveKit 3.17.1 and the module source re-exports ReactiveKit. That is the concrete evidence for this course. Do not teach RxSwift operators as if they are the verified implementation solely because Rx appears in the local name. An underscored exported-import attribute is observed source behavior; it is not a recommendation to introduce the same nonstandard API into your own package.</p><p>PromiseKit remains explicitly declared and imported. The guide says it is deprecated in favor of Swift Concurrency, which establishes direction rather than completion. The inspected bridge offers Promise initializers backed by Task and async methods backed by continuations. Bridging a promise to async does not automatically propagate task cancellation into the underlying work, or make its lifetime structured. Read ownership, completion, and actor isolation separately.</p><p>The guide prefers Observation and mentions Combine helpers. Active Combine-to-stream extensions are verified in ZDCoreBase; do not advertise a standalone ZDCombineCore product from the guide alone. One extension finishes an AsyncStream for both successful and failed publisher completion, so it does not preserve the publisher's error as a thrown stream failure. A migration test must protect product error distinctions, termination, cancellation, and buffering semantics. Session 017 gives stream foundations; here the key lesson is to compare contracts before celebrating replacement of a framework name.</p>"
+        },
+        {
+          "id": "internal-contracts",
+          "title": "Separate interfaces from container implementation",
+          "html": "<p>ZDModules describes interfaces for dependency injection and flow entry points. Its README asks callers to pass runtime data and configuration rather than app-specific services or giant singleton objects. ZDCoreBase declares Swinject, while the app graph consumes internal modules and the container-related infrastructure. Swinject is therefore an implementation ingredient, not the whole architectural contract. A feature depending on an interface does not need to understand every registration detail.</p><p>The Android comparison is separating an interface from the Dagger binding that supplies its implementation. The analogy has limits: the inspected Swift container can resolve values at runtime, so missing or ambiguous registration may emerge during execution rather than as the same compile-time graph validation you expect from generated Dagger code. Validate registration at the actual composition root and exercise the selected flow. Importing ZDModules is not proof that every dependency can be resolved.</p><p>Internal ownership should follow responsibility: the interface owner maintains the contract, the implementation owner maintains the adapter, and the composition-root owner maintains registration and lifecycle. These are review roles, not a claim about named teams or people. The manifests and README do not prove current human ownership. Tests may use the ZDModulesMocks product, whose route-specific linkage was covered in session 044. A change to an interface, mock, and registration can reach many consumers even if the vendor dependency itself stays pinned.</p>"
+        },
+        {
+          "id": "wrapper-example",
+          "title": "Design a seam that preserves meaningful failures",
+          "html": "<p>Use a wrapper when it expresses a stable product operation and isolates a dependency you may replace. This synthetic library source uses ordinary Swift and can belong to a host-compatible package. It neither calls a vendor SDK nor implements a production client.</p><pre><code class=\"language-swift\">enum CatalogFailure: Error { case offline }\nstruct CatalogEntry: Equatable {\n    let id: String\n    let title: String\n}\nprotocol CatalogServing {\n    func entries() async throws -&gt; [CatalogEntry]\n}\nstruct CatalogFixture: CatalogServing {\n    let result: Result&lt;[CatalogEntry], CatalogFailure&gt;\n    func entries() async throws -&gt; [CatalogEntry] {\n        try result.get()\n    }\n}</code></pre><p>CatalogFailure conforms to Error so a failure can participate in throwing APIs. CatalogEntry stores immutable fields and gains synthesized equality. The protocol declares the operation's suspension and error effects explicitly. The fake stores a Result; get returns its success or throws its failure. An empty successful array remains different from an offline error. A consumer must use try await; making an operation async does not guarantee background execution or automatic cancellation of a vendor request.</p><p>A real adapter would translate vendor results into this contract and define cancellation, ordering, and retry behavior. Avoid exposing a vendor-specific type unless the consumer truly needs it. Equally, avoid a generic wrapper with dozens of methods that merely renames the SDK: that creates maintenance work without a substitution seam. Kotlin suspend and a sealed error model are useful starting analogies, but Swift's throws, actor isolation, and task cancellation have their own rules. Session 049 will use a smaller pure policy change to practice bounded adoption evidence.</p>"
+        },
+        {
+          "id": "ownership-review",
+          "title": "A migration claim needs a measurable boundary",
+          "html": "<p>Write the migration claim as a behavior: this consumer obtains equivalent synthetic entries through the new adapter, preserves empty success and offline failure, and releases underlying work on cancellation according to the agreed policy. List consumers still using the old route. If legacy promises remain elsewhere, say the selected seam changed rather than claiming PromiseKit is gone. A smaller, truthful completion statement makes a later rollback possible.</p><p>Assign the graph maintainer to manifests and pins, the feature maintainer to behavior, the platform maintainer to destination and packaging coverage, and relevant specialists to security or licensing questions. Actual people must be confirmed through established ownership evidence; the course does not infer them from authorship comments. Include test baselines, generated code, privacy resources, and the App Clip or extension when their dependencies are affected. A dependency update can be operationally significant without changing visible UI.</p><p>The evidence ledger should separate declared, compiled, tested, packaged, and distributed observations. Reading active source supports the first category and sometimes a code-level behavior explanation, but it is not a profiling session or SDK network audit. The exercise asks you to construct this ledger and identify remaining work. No learner progress is automatically completed by the table, and no migration status should be upgraded simply because the course describes a preferred future API.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What is verified about ZDRxCore in this checkout?",
+          "options": [
+            "Its name proves it uses RxSwift.",
+            "Its manifest and exported import identify ReactiveKit.",
+            "It has already been entirely replaced by Observation.",
+            "It only contains tests."
+          ],
+          "answer": 1,
+          "explanation": "The active Package.swift and source establish ReactiveKit. The architecture guide's historical wording and future preferences do not outweigh the current edges or prove completed migration."
+        },
+        {
+          "question": "Why distinguish ApolloAPI from Apollo in an inventory?",
+          "options": [
+            "They are always interchangeable names.",
+            "ApolloAPI supplies generated-model contracts while the broader client product has another role.",
+            "Generated GraphQL models cannot be used without a live network.",
+            "Every test dependency ships in the App Clip."
+          ],
+          "answer": 1,
+          "explanation": "Product selection matters. Generated modules declare ApolloAPI, and the inspected app-test target declares Apollo. A model dependency is not proof that the whole runtime/client graph is needed by every consumer."
+        },
+        {
+          "question": "Which is a defensible migration completion statement?",
+          "options": [
+            "The selected adapter preserves stated behavior; listed consumers still use the old route.",
+            "A preference for async means all promises have disappeared.",
+            "A wrapper guarantees SDK cancellation without tests.",
+            "The package version proves legal approval."
+          ],
+          "answer": 0,
+          "explanation": "Completion should name the changed seam and its verified behavior. Preferences, wrappers, and pins do not establish cancellation, graph-wide retirement, or license decisions."
+        }
+      ],
+      "exercise": {
+        "brief": "Build a six-row responsibility and ownership ledger, then design and test or paper-trace one synthetic adapter contract.",
+        "steps": [
+          "Choose transport, generated models, state/async, UI, identity, and observability rows from the verified map.",
+          "For each, record requirement, relevant resolution route, product, active consumer edge, responsibility, and reviewer role.",
+          "Contrast ReactiveKit evidence with the legacy guide wording and identify one retained PromiseKit bridge.",
+          "Predict CatalogFixture behavior for nonempty success, empty success, and offline failure; add cancellation as an explicit unimplemented policy.",
+          "Write a migration boundary and list evidence still needed for device, privacy, license, or human ownership."
+        ],
+        "acceptance": [
+          "Every named active library has a manifest/product edge, with source imports recorded where inspected.",
+          "The ledger does not confuse package names, modules, latest versions, or test-only inclusion.",
+          "ReactiveKit and incomplete PromiseKit migration are described accurately.",
+          "Empty success and offline failure stay distinct, and async is not described as automatic background execution.",
+          "Ownership is recorded as confirmed evidence or a proposed reviewer role; no names or approvals are invented."
+        ],
+        "solution": "<p>A worked ledger maps Alamofire to the adapter target in ZDNetworking, ApolloAPI to generated schema modules, PromiseKit and ReactiveKit to retained asynchronous contracts, SnapKit to Mezzanine/UIKit consumers, Auth0 to the authentication feature declaration, and OpenTelemetry/Sentry to ZDCore tracing and error-related targets. Each row includes its checkout pin and selected graph route. The complete unit inventory is wider than these six examples.</p><p>The CatalogFixture returns its entries for nonempty success, returns an empty successful array unchanged, and throws CatalogFailure.offline for failure. Its Result.get call preserves that distinction. It has no cancellation handler, live transport, resource lookup, or account policy. A test can check these three cases with local fixtures; passing them still leaves those missing requirements pending.</p><p>The migration statement can say that a chosen consumer would adopt a vendor-independent CatalogServing seam after behavior and lifecycle checks. It cannot say the client has migrated, because this lab changes no client source. Record the ZDRxCore naming mismatch and retained PromiseKit bridge as audit findings. Review roles are proposed until actual maintainers are confirmed. Device media, SDK data flow, selected-version licensing, and production startup measurements remain specialist or integration work.</p>"
+      },
+      "references": [
+        {
+          "label": "SwiftPM — Products and target dependency declarations",
+          "url": "https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html"
+        },
+        {
+          "label": "ReactiveKit — Maintainer documentation",
+          "url": "https://github.com/DeclarativeHub/ReactiveKit"
+        },
+        {
+          "label": "Apollo — Version 1 code-generation contracts",
+          "url": "https://www.apollographql.com/docs/ios/v1/code-generation/introduction"
+        },
+        {
+          "label": "Apple — Observation state tracking",
+          "url": "https://developer.apple.com/documentation/observation"
+        },
+        {
+          "label": "Auth0 — SDK maintainer documentation",
+          "url": "https://github.com/auth0/Auth0.swift"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Verified direct library requirements",
+          "path": "ios-client/Tuist/Package.swift",
+          "line": 51,
+          "why": "The inventory starts with active declarations, then checks products and consumer membership."
+        },
+        {
+          "label": "App and App Clip dependency consumers",
+          "path": "ios-client/Projects/Apps/Zocdoc/Project.swift",
+          "line": 250,
+          "why": "Observe concrete external products and internal-module edges rather than infer runtime ownership from pins alone."
+        },
+        {
+          "label": "ReactiveKit implementation evidence",
+          "path": "ios-client/Projects/Infra/ZDRxCore/Sources/ZDRxCore/ZDRxCore.swift",
+          "line": 8,
+          "why": "The active module re-exports ReactiveKit, correcting the RxSwift assumption suggested by historical guide wording."
+        },
+        {
+          "label": "Promise and async coexistence",
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDPromiseCore/Extensions/Thenable+AsyncAwait.swift",
+          "line": 14,
+          "why": "A real Task/continuation bridge establishes retained PromiseKit use and raises explicit cancellation and isolation questions."
+        },
+        {
+          "label": "Combine stream conversion",
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDCoreBase/Extensions/Publisher+AsyncStream.swift",
+          "line": 7,
+          "why": "Active helpers live in ZDCoreBase; this conversion finishes on publisher failure instead of preserving a thrown stream error."
+        },
+        {
+          "label": "Module interface purpose",
+          "path": "ios-client/Projects/Infra/ZDModules/README.md",
+          "line": 3,
+          "why": "Read the interface/composition boundary before equating the architecture with a container library."
+        },
+        {
+          "label": "Authentication dependency boundary",
+          "path": "ios-client/Projects/Features/ZDAuthentication/Package.swift",
+          "line": 18,
+          "why": "Auth0 and internal feature edges are declared here; operational login ownership requires additional source tracing."
+        },
+        {
+          "label": "Video product consumer",
+          "path": "ios-client/Projects/Features/ZDVideoVisit/Package.swift",
+          "line": 89,
+          "why": "The target selects TwilioVideo, connecting an update to a specialized device/lifecycle integration."
+      },
+      {
+        "label": "Retained-only remote package references",
+        "path": "ios-client/Zocdoc.xcodeproj/project.pbxproj",
+        "line": 1607,
+        "why": "The retained project references SwiftLintPlugins and Peasy; combine this with route-specific pins before reasoning about tooling versus runtime inclusion."
+      },
+      {
+        "label": "Vendored macro project",
+        "path": "ios-client/Vendors/TestableMacro/Project.swift",
+        "line": 25,
+        "why": "Vendored source can contain host tools and remote dependencies; a remote pin inventory is not the complete library graph."
+      },
+      {
+        "label": "System framework import evidence",
+        "path": "ios-client/Projects/Apps/Zocdoc/Sources/Zocdoc-Bridging-Header.h",
+        "line": 5,
+        "why": "UIKit, CoreLocation, and CoreData are SDK imports, not entries that should be invented in the SwiftPM catalogue."
+      }
+      ],
+      "checklist": [
+        "I can verify library roles from manifests and active consumers.",
+        "I can identify retained patterns without claiming a completed migration.",
+        "I can separate module contracts, registration, and vendor implementation.",
+        "I can define reviewer roles without guessing human ownership.",
+        "I can write a behavior-focused migration boundary with honest specialist limits."
+      ]
+    },
+    {
+      "id": "046",
+      "title": "Code generation, module resources, localization, and privacy manifests",
+      "summary": "Trace generated output to its inputs and prove resource lookup and packaging across source packages, apps, and extensions.",
+      "duration": 155,
+      "level": "Deep dive",
+      "prerequisites": [
+        "022",
+        "044",
+        "045"
+      ],
+      "objectives": [
+        "Explain code-generation inputs, pinned generators, deterministic output, and source membership.",
+        "Use Bundle.module through an owning module and distinguish processing from copying resources.",
+        "Diagnose missing assets, localized strings, fonts, and duplicate bundle assumptions.",
+        "Review privacy manifests as artifact and behavior evidence without treating declaration as permission or compliance proof."
+      ],
+      "sections": [
+        {
+          "id": "resources-are-inputs",
+          "title": "Code can compile while the product is incomplete",
+          "html": "<p>An Android engineer expects generated R symbols, merged resources, manifest entries, and KSP or annotation-processor output to participate in a build. iOS has related concerns, but their ownership differs. A Swift module can compile while a font is absent, a JSON fixture is copied into the wrong bundle, a generated operation belongs to an obsolete schema, or an extension omits a privacy manifest. Treat code, generation inputs, and resources as parts of the same product contract.</p><p>Start each investigation with the owner. Is this resource in the app, an extension, a source-package target, or a vendor framework? Which manifest declares it? Which code chooses its bundle? Which generation step produces any accessor? A directory named Resources has meaning through the build declaration, not through its spelling alone. Likewise, a Swift file marked generated still needs active target membership and compatible dependencies.</p><p>The checkout has useful contrasting examples: the main app explicitly includes resource globs and a privacy manifest, ZDAssets declares processed package resources, the app enables assets/strings/fonts synthesizers, and the generated GraphQL packages specify source paths and ApolloAPI dependencies. These observations support different ownership paths. They do not prove the packaged app contains every file or that an old duplicate directory participates in the build. The following sections explain how to turn those declarations into a testable artifact trace.</p>"
+        },
+        {
+          "id": "generation-contract",
+          "title": "Pin and inspect the generator, not only the runtime",
+          "html": "<p>The active GraphQL generation script first checks that apollo-ios-cli exists and matches the version file. That file records 1.25.4, matching the inspected generated packages' exact Apollo requirement. The script then downloads both schemas, runs the schema modifier for each namespace, and generates output. This is a pipeline with distinct failure categories: tool selection, network/schema acquisition, schema transformation, operation validation, output generation, and compilation.</p><p>GqlPhi and GqlNonPhi configurations specify operation and schema search paths, schema namespaces, and output directories. Operations are emitted into their schema modules, test mocks are disabled, and pruning is enabled. The Phi configuration additionally reduces generated schema types. Pruning makes a regeneration a material write: it may remove stale generated files. Reading these settings does not authorize running the script on the client. The lab uses synthetic local inputs and leaves live schema fetches and client source unchanged.</p><p>Review a generated diff from its inputs. Was an operation changed, a schema updated, a modifier altered, or a generator version changed? A hand-edited generated model can disappear on the next run and can hide mismatch between schema and operation. Preserve intentional handwritten scalar or support code according to the generator's actual ownership rules. Record generator version, schema/input hash, configuration, and resulting diff. With the same pinned inputs, a second generation should produce no unexplained output changes; that is a reproducibility acceptance criterion, not an observation claimed in this audit.</p>"
+        },
+        {
+          "id": "macros-accessors",
+          "title": "Several kinds of generated code need different diagnostics",
+          "html": "<p>A Swift macro transforms syntax during compilation; it is not the same operation as downloading a GraphQL schema or synthesizing an asset accessor. The vendored TestableMacro package separates a macro implementation target from the library exposing it. Its implementation consumes SwiftSyntaxMacros and SwiftCompilerPlugin, and the sibling Tuist project wires a macro dependency explicitly. This distinction matters because host compiler plugins and iOS runtime targets have different build destinations.</p><p>The active Tuist dependency manifest includes a specialized OpenTelemetryApi compiler-plugin path setting, with a comment explaining a toolchain integration issue. That is a checked-in workaround to investigate when the appropriate diagnostics appear, not a universal flag to add to every module. A missing macro implementation, invalid generated Swift, and a runtime missing resource are different failures. Inspect the earliest meaningful diagnostic and the owning generator before clearing caches.</p><p>The app enables asset, string, and font resource synthesizers and deliberately omits plist synthesis, with a documented earlier generator problem. ZDAssets sets an empty synthesizer list. Neither declaration alone settles whether a compatible Bundle.module accessor is available on a particular generated route. Verify the generated support code and compilation for that route. Do not commit a second manually created accessor merely to silence a missing symbol without understanding the generator. Session 048 will place host-tool checks and iOS integration checks into different matrix rows.</p>"
+        },
+        {
+          "id": "module-bundles",
+          "title": "Load from the module that owns the resource",
+          "html": "<p>Bundle.main identifies the main bundle of the running process. A package library's resources are not necessarily there, particularly under tests or a different app host. SwiftPM supplies Bundle.module for a resource-bearing target. Its generated accessor belongs to that module rather than becoming a universal lookup on every imported package. The active ZDAssets source exposes a public Bundle.assets convenience value backed by Bundle.module, giving clients a stable way to select the owner's bundle.</p><p>This synthetic manifest and library loader form a host-compatible resource package once you create the named source and test directories. Put bootstrap.json under Sources/CourseResources/Resources with title Course sandbox and schemaVersion 1. They require Foundation and the package build route; the loader is not a standalone script with a magically available module bundle.</p><pre><code class=\"language-swift\">// swift-tools-version: 5.9\nimport PackageDescription\nlet package = Package(\n    name: \"CourseResources\",\n    targets: [\n        .target(\n            name: \"CourseResources\",\n            resources: [.process(\"Resources\")]\n        ),\n        .testTarget(\n            name: \"CourseResourcesTests\",\n            dependencies: [\"CourseResources\"]\n        )\n    ]\n)</code></pre><p>The target owns the resource declaration and SwiftPM creates its bundle support during the build. Process asks the build system to handle supported resource transformations; copy preserves the specified resource content or directory structure. Choose according to lookup and packaging needs, rather than assuming they are interchangeable. In particular, localized resources and asset catalogs require understanding their processing rules. A static code product can still need a separate resource bundle. Always verify file presence and actual lookup instead of deducing resource behavior from the linkage choice.</p>"
+        },
+        {
+          "id": "loader-line-by-line",
+          "title": "Make a missing file distinct from malformed data",
+          "html": "<pre><code class=\"language-swift\">import Foundation\n\nenum ResourceFailure: Error, Equatable { case missing }\nstruct CourseBootstrap: Decodable, Equatable {\n    let title: String\n    let schemaVersion: Int\n}\n\nfunc loadBootstrap(\n    named name: String = \"bootstrap\",\n    in bundle: Bundle = .module\n) throws -&gt; CourseBootstrap {\n    guard let url = bundle.url(forResource: name, withExtension: \"json\") else {\n        throw ResourceFailure.missing\n    }\n    let data = try Data(contentsOf: url)\n    return try JSONDecoder().decode(CourseBootstrap.self, from: data)\n}</code></pre><p>The import supplies Bundle, Data, and JSONDecoder. ResourceFailure is a separate missing-file error; a corrupt JSON document still produces the decoder's own error. Decodable requests synthesized decoding for the stored fields, while Equatable supports fixture comparison. The function's external labels are named and in; name and bundle are local parameter names. Default arguments select the known file and the module bundle, but a test can deliberately request a different name.</p><p>The guard unwraps the optional URL and exits by throwing when it is absent. Data's initializer can fail for I/O reasons, so try preserves that failure too. The final decode uses CourseBootstrap.self to pass the type as a value to the generic decoder. It does not validate that the schema version is supported by the product; that is a separate rule added in the later lab. This separation makes missing-resource, decoding, and business-contract errors observable.</p><p>Synchronous reading is acceptable for this tiny isolated fixture exercise. It is not advice to read large files or decode extensive documents on the UI thread at startup. A production implementation must budget I/O and decoding and choose an appropriate execution boundary. The Android analogy is a typed resource loader supplied with the correct Context or class loader, but Bundle.module's generated module ownership and target-specific packaging are different. Successful decoding on the host does not validate an app archive or extension bundle.</p>"
+        },
+        {
+          "id": "localization-assets",
+          "title": "Keep lookup identity, translation, and target inclusion aligned",
+          "html": "<p>Images, fonts, strings, nibs, and JSON can follow different build processing paths. An asset catalog produces compiled assets rather than a promise that every original file is copied unchanged. Registering a bundled font and finding its file are separate actions. A localized string lookup needs the intended table and owning bundle, and a package containing localized resources needs the appropriate default-localization declaration. A string key is not itself the translated text.</p><p>The main app declares an en.lproj folder reference among its resources, while package targets have their own processed Resources directories. Do not move a localized file between those owners while leaving the lookup unchanged. A host test may select a different Bundle.main than the installed app, and an extension is another process with another main bundle. These are common reasons a default language appears to work while a package test or alternate language fails.</p><p>Plan observable cases: the owner can find a known resource, a missing lookup fails predictably, a deliberately malformed fixture reports decoding failure, a translated key resolves under a selected locale, and missing translations follow the documented fallback. Include plural forms, substitutions, and long text in UI practice rather than assuming one English snapshot settles localization. Session 022 covers accessibility and localization behavior; this lesson adds build and bundle ownership. API-specific string-catalog adoption and translation workflows require their actual toolchain and target settings, so no repository-wide migration is implied.</p>"
+        },
+        {
+          "id": "privacy-artifact",
+          "title": "A privacy manifest declares use; it does not grant permission",
+          "html": "<p>PrivacyInfo.xcprivacy is a property-list resource describing relevant data use and required-reason API usage. It is not an entitlement, a runtime permission prompt, or the App Store privacy answers themselves. A valid declaration must reflect the actual implementation and the current permitted reason. The active app manifest includes the file in its resource list, and the inspected file declares file-timestamp and UserDefaults categories with reason entries. This establishes declarations, not a compliance verdict.</p><p>Privacy review follows the shipped code and every relevant SDK, including static dependencies whose manifests must survive packaging. An SDK update may change data collection or required-reason API use without changing your feature screen. Check the vendor artifact, aggregate privacy reporting where appropriate, the app's own declarations, and the final archive. A manifest in the repository that is absent from the packaged product is a different failure from an inaccurate reason in a packaged manifest.</p><p>Apple's current privacy-manifest and required-reason references were consulted for this lesson. Their availability does not mean the checkout pins automatically meet all current distribution requirements. Recheck policy and the selected SDK artifact before operational submission, and involve privacy specialists for actual data-flow interpretation. Do not copy a reason code from another product as a way to silence a warning. The same discipline applies to licensing notices: a resource's presence is packaging evidence, while its meaning and sufficiency require a separate review.</p>"
+        },
+        {
+          "id": "resource-acceptance",
+          "title": "Prove the chain at the appropriate boundary",
+          "html": "<p>A useful resource ledger connects input, generator if any, target membership, owning bundle, lookup code, and observation. The synthetic JSON needs only a package resource declaration and a loader. GraphQL models additionally need a schema, operations, modifier, generator pin, output path, and ApolloAPI compatibility. A macro needs its host implementation and compiler wiring. A privacy manifest needs correct content and final packaging. Putting all of these into a generic generated-files bucket hides the next useful diagnostic.</p><p>For a local package resource edit, begin with the smallest behavioral test: known fixture decoding, missing-name failure, and malformed-data behavior if a separate corrupt fixture is created. Then test integration only when the affected consumers require it. For a shared asset change that reaches the app and App Clip, add both packaging/lookup paths and representative UI checks. For a privacy SDK update, archive and inspect the privacy resources; a host model test cannot supply that evidence.</p><p>Record pending checks honestly. The audit reads active inputs and source anchors; it does not run the live GraphQL fetch, regenerate the client's code, inspect a newly built archive, or measure resource size. The worked answer gives a test pattern the learner can execute in an isolated package. Your own results, locale choices, error messages, and environment belong in the exercise submission. Source familiarity becomes useful only when you can explain which link in the chain a failure invalidated and which links remain untested.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why can Bundle.main fail to find a package resource?",
+          "options": [
+            "A package resource belongs to its owning module bundle, while main names the process's main bundle.",
+            "Swift never allows JSON in packages.",
+            "All static libraries discard resources.",
+            "The resource name must equal the app bundle ID."
+          ],
+          "answer": 0,
+          "explanation": "Bundle ownership is independent of linkage and installation identity. Bundle.module is generated for the resource-bearing target; clients use the owner's API or exposed bundle rather than assuming their own main bundle contains it."
+        },
+        {
+          "question": "What does a privacy manifest included by a resource glob prove?",
+          "options": [
+            "The app has every runtime permission.",
+            "The manifest is a declared build input; packaged presence and accurate declarations still need verification.",
+            "The selected SDK version is automatically compliant.",
+            "All App Store privacy answers have been submitted."
+          ],
+          "answer": 1,
+          "explanation": "A source declaration is only one step. Permissions, entitlement authorization, accurate data-use reasons, final packaging, and store disclosures are separate concerns."
+        },
+        {
+          "question": "Why must a generated-code review include the generator version and input diff?",
+          "options": [
+            "Generated files cannot compile.",
+            "Those inputs explain and reproduce the output, while hand edits may be overwritten.",
+            "Only generated files can contain tests.",
+            "A lockfile controls downloaded schema contents automatically."
+          ],
+          "answer": 1,
+          "explanation": "Pinned generators and schema/operation/configuration inputs make output auditable. A dependency pin does not pin a live schema fetch, and generated-file edits can disappear during pruning/regeneration."
+        }
+      ],
+      "exercise": {
+        "brief": "Create a synthetic CourseResources package and a resource/generation ledger; keep client code and live schema endpoints untouched.",
+        "steps": [
+          "Independently create the scratch manifest, library source, and bootstrap.json fixture with title Course sandbox and schemaVersion 1.",
+          "Write a decoding test and a missing-name test before comparing the worked answer.",
+          "Trace ZDAssets resources to Bundle.assets and the app privacy manifest to its resource glob.",
+          "Record GraphQL CLI pin, schema/operation inputs, modification stage, and output module membership from the active files.",
+          "State additional lookup, localization, archive, and privacy checks required for a real consumer change."
+        ],
+        "acceptance": [
+          "Known resource lookup decodes the two expected synthetic fields.",
+          "A missing resource throws ResourceFailure.missing, independently of malformed-data and I/O failures.",
+          "The learner explains named/in labels, guard unwrapping, try, and CourseBootstrap.self.",
+          "The ledger distinguishes source resource declarations from packaged-artifact observations.",
+          "No live schema fetch, credential use, generated client edit, translation migration, or privacy approval is claimed."
+        ],
+        "solution": "<p>The synthetic file contents are <code>{\"title\":\"Course sandbox\",\"schemaVersion\":1}</code>. Place them in the owning target's declared Resources directory. The loader above is the worked implementation; the tests below belong in Tests/CourseResourcesTests under the retained XCTest-compatible tools baseline.</p><pre><code class=\"language-swift\">import XCTest\n@testable import CourseResources\n\nfinal class ResourceContractTests: XCTestCase {\n    func testKnownFixture() throws {\n        let value = try loadBootstrap()\n        XCTAssertEqual(value.title, \"Course sandbox\")\n        XCTAssertEqual(value.schemaVersion, 1)\n    }\n\n    func testMissingFixtureHasTypedFailure() {\n        XCTAssertThrowsError(\n            try loadBootstrap(named: \"missing-course-resource\")\n        ) { error in\n            XCTAssertEqual(error as? ResourceFailure, .missing)\n        }\n    }\n}</code></pre><p>The successful case checks lookup and decoding, not merely the file's existence. The missing-name test chooses an absent filename in the same module bundle, avoiding an unreliable assumption about Bundle.main. The error cast is optional; equality with the expected case fails if the thrown type differs. A corrupt-fixture test should expect a decoding error rather than ResourceFailure.missing.</p><p>The repository trace connects ZDAssets's process declaration to its Bundle.assets wrapper, the app's PrivacyInfo file to its explicit resource entry, and the GraphQL version file to fetch, modification, and generation stages. A package test can verify the scratch resource contract. It cannot establish generated client parity, localized UI behavior, device packaging, or privacy sufficiency. Keep those fields pending until checked.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple — Bundling resources with a Swift package",
+          "url": "https://developer.apple.com/documentation/xcode/bundling-resources-with-a-swift-package"
+        },
+        {
+          "label": "Apple — SwiftPM resource processing and copying",
+          "url": "https://developer.apple.com/documentation/packagedescription/resource"
+        },
+        {
+          "label": "Apollo — Version 1 code-generation inputs",
+          "url": "https://www.apollographql.com/docs/ios/v1/code-generation/introduction"
+        },
+        {
+          "label": "Apple — Privacy manifest files",
+          "url": "https://developer.apple.com/documentation/bundleresources/privacy-manifest-files"
+        },
+        {
+          "label": "Apple — Required-reason API declarations",
+          "url": "https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Active GraphQL pipeline",
+          "path": "ios-client/Projects/Infra/ZDCodeGen/scripts/generate.sh",
+          "line": 17,
+          "why": "Version validation precedes schema fetch, modification, and code generation."
+        },
+        {
+          "label": "Apollo CLI version input",
+          "path": "ios-client/Projects/Infra/ZDCodeGen/scripts/apollo-ios-cli-version",
+          "line": 1,
+          "why": "The inspected generator pin is 1.25.4, separate from current documentation versions."
+        },
+        {
+          "label": "Phi code-generation configuration",
+          "path": "ios-client/Projects/Infra/ZDCodeGen/GqlPhi/apollo-codegen-config.json",
+          "line": 18,
+          "why": "Read schema/operation inputs, namespace output, pruning, and reduction behavior."
+        },
+        {
+          "label": "Generated module source and API dependency",
+          "path": "ios-client/Projects/Infra/ZDCodeGen/GqlPhi/ZDGqlPhi/Package.swift",
+          "line": 19,
+          "why": "Generated output belongs to a named target under Sources and depends specifically on ApolloAPI."
+        },
+        {
+          "label": "Package resource declarations",
+          "path": "ios-client/Projects/Infra/ZDAssets/Package.swift",
+          "line": 50,
+          "why": "Target-specific process declarations establish ownership of each module resource bundle."
+        },
+        {
+          "label": "Public owner-bundle wrapper",
+          "path": "ios-client/Projects/Infra/ZDAssets/Sources/ZDAssets/Bundle+Extensions.swift",
+          "line": 10,
+          "why": "Bundle.assets forwards to the generated module bundle from inside its owning target."
+        },
+        {
+          "label": "App privacy resource input",
+          "path": "ios-client/Projects/Apps/Zocdoc/Project.swift",
+          "line": 213,
+          "why": "Declared inclusion is distinct from inspecting the final packaged privacy manifest."
+        },
+        {
+          "label": "Actual declared privacy categories",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Resources/PrivacyInfo.xcprivacy",
+          "line": 5,
+          "why": "The file declares accessed-API categories; presence and content are not a compliance certification."
+        },
+        {
+          "label": "Macro implementation and exposed library",
+          "path": "ios-client/Vendors/TestableMacro/Package.swift",
+          "line": 28,
+          "why": "Host macro targets and runtime-facing declaration targets need different build diagnostics."
+        }
+      ],
+      "checklist": [
+        "I can trace generated output to pinned tools and source inputs.",
+        "I can load a resource from the owning module and explain fallback failures.",
+        "I can distinguish macros, schema codegen, and asset synthesis.",
+        "I can connect localization and privacy files to the correct artifact.",
+        "I can state which packaging and specialist checks remain unperformed."
+      ]
+    },
+    {
+      "id": "047",
+      "title": "LLDB, diagnostic boundaries, and Objective-C interoperability",
+      "summary": "Inspect a stopped process safely, separate toolchain failures from runtime behavior, and understand how Swift and Objective-C expose symbols and selectors.",
+      "duration": 150,
+      "level": "Deep dive",
+      "prerequisites": [
+        "004",
+        "007",
+        "043",
+        "046"
+      ],
+      "objectives": [
+        "Choose breakpoints and LLDB inspection commands that answer a concrete hypothesis.",
+        "Distinguish stored-value inspection from expression execution and account for optimized code.",
+        "Trace bridging headers, public module headers, generated Swift headers, selectors, and nullability.",
+        "Build a diagnostic report with artifact identity and scope rather than clearing caches or exposing sensitive state."
+      ],
+      "sections": [
+        {
+          "id": "debugging-question",
+          "title": "Start with a falsifiable observation",
+          "html": "<p>You already use Android Studio's debugger to ask why a field changed or a callback ran twice. Bring that same question to LLDB. The useful starting point is an invariant with an expected transition: a tap increments a counter once, a missing owner stops a callback, or an offline error stays distinct from empty success. A breakpoint is valuable because it captures evidence at the boundary where that invariant could fail.</p><p>Write the reproduction inputs, selected app or test host, scheme action, configuration, destination, and expected event order. A Debug build can be easier to inspect, but a Release-only bug may require the optimized artifact. A simulator observation has a simulator scope. A crash report from a distributed device build needs that build's symbols, rather than symbols from whichever checkout currently opens in Xcode.</p><p>Choose synthetic state when practicing and inspect only the fields needed to decide the hypothesis. Printing an entire account object, request, preference store, or environment is unnecessary and can expose sensitive information. The repository anchors here show real Objective-C and Swift integration points, but the exercise runs only in your own scratch code if you choose to execute it. Source inspection does not establish that an app has paused in LLDB or that a production crash has been reproduced.</p>"
+        },
+        {
+          "id": "stopped-process",
+          "title": "Read the stop reason, thread, and frame",
+          "html": "<p>When a breakpoint fires, first identify why the process stopped and which thread and stack frame are selected. A source line may correspond to several machine instructions, and a function may have multiple breakpoint locations. A hollow or unresolved breakpoint asks whether symbols are loaded, source paths match, the declaration is compiled into this artifact, or optimization changed the code. It is not proof that the callback never executes.</p><pre><code class=\"language-shell\"># Enter these in LLDB's console, not the shell.\nhelp breakpoint set\nbreakpoint set --file CourseCounter.swift --line 8\nbreakpoint list\nthread backtrace\nthread backtrace all\nframe variable\nframe variable count</code></pre><p>Help uses the installed debugger's command documentation. The file and line are synthetic placeholders to replace with your scratch source. Breakpoint list shows whether locations resolved. Thread backtrace describes the selected thread; adding all gathers other threads. Frame variable reads values in the selected frame using debug information. It does not universally guarantee every local remains available in optimized code. Inspect the intended frame before concluding that a missing variable is a compiler or runtime defect.</p><p>Stepping over stays at the current call level; stepping into follows a call where symbols and code permit; stepping out returns to the caller. Suspension and concurrency complicate the familiar linear stack: an async operation may resume on another thread, and a thread is not an actor's identity. Use Xcode's task/concurrency views when appropriate and combine them with explicit state observations. Breakpoints change timing, so they are poor evidence for a performance measurement or for proving the absence of a race.</p>"
+        },
+        {
+          "id": "values-expressions",
+          "title": "Expression evaluation can run application code",
+          "html": "<p>Frame-variable inspection and expression evaluation have different mechanisms. The debugger can inspect stored values through debug information, while expression builds and executes code in the stopped process. Convenience commands such as p and po commonly use expression evaluation or object-description behavior. A custom description, computed property, formatter, or function call can do work or have side effects. Start with stored fields when they answer the question.</p><pre><code class=\"language-swift\">final class CourseCounter {\n    private(set) var count = 0\n\n    func recordTap() {\n        count += 1\n    }\n\n    var label: String {\n        \"Taps: \\(count)\"\n    }\n}</code></pre><p>This ordinary Swift class is suitable for a standalone scratch program or host package. Private(set) allows callers to read count but limits mutation to the declaration's access context. The stored count starts at zero. RecordTap mutates it once. Label is a computed property and constructs a string every time it is evaluated. The interpolation reads count; it is not a stored snapshot. Set a breakpoint inside recordTap after constructing a counter and invoking the method from your scratch driver.</p><p>Inspect count, then deliberately evaluate label and explain why that second action executes a getter. Do not use expression to call recordTap unless your exercise explicitly intends to mutate the process. In a real program, getters may lock, allocate, or consult other state. A failed Swift expression can also reflect debugger module-import or type-context problems while the compiled program remains valid. Preserve that distinction and report the debugger failure separately from the application's observed behavior.</p>"
+        },
+        {
+          "id": "symbols-toolchain",
+          "title": "Classify compile, link, load, and symbol problems",
+          "html": "<p>A Swift type-checking error, an unavailable module, an undefined linker symbol, a dynamic-loader failure, and a debugger expression failure occur at different stages. Check the first actionable diagnostic rather than applying the same cache fix to all of them. Missing imports suggest target dependency, product exposure, platform, or generated-module inspection. Undefined symbols suggest definitions and linkage. A loader failure after launch suggests embedding, run paths, compatible slices, or signatures. LLDB's symbol view can help establish which binary actually loaded.</p><pre><code class=\"language-shell\"># Shell inspection of the selected tools\nxcode-select -p\nxcrun --find swiftc\nxcrun swift --version\nxcodebuild -version\n\n# LLDB inspection of loaded images\nimage list -u -f\nimage lookup -rn recordTap</code></pre><p>The first group inspects tool selection and versions without claiming an app build. The second belongs in a stopped debugging session; UUIDs and paths connect symbols to the loaded artifact. The regular-expression lookup can find matching functions, subject to emitted symbols and optimization. A release crash needs matching dSYM UUIDs, not merely a matching marketing version or source filename.</p><p>Optimization can inline functions, remove variables, and move work relative to source lines. Debugging an unoptimized reproduction helps understanding but may change the failure. Preserve the optimized artifact when it is the relevant evidence. Use a bounded isolated cache or regeneration check only after identifying the graph and diagnostic. The repository notes a stale-DerivedData issue when switching build actions; that documented symptom does not establish that every missing symbol has the same cause.</p>"
+        },
+        {
+          "id": "interop-imports",
+          "title": "Headers and modules create two directions of visibility",
+          "html": "<p>Swift importing Objective-C and Objective-C importing Swift are separate paths. Within an app target, an Objective-C bridging header exposes selected C/Objective-C headers to Swift through SWIFT_OBJC_BRIDGING_HEADER. The active app manifest points to such a header, whose contents import UIKit, CoreLocation, CoreData, and a C system header. A framework or package with public headers commonly uses module exposure instead. ZDCoreObjc is an inspected Objective-C target with explicit public-header membership.</p><p>In the other direction, the compiler generates a ProductModuleName-Swift.h interface for Objective-C-compatible Swift declarations. Objective-C implementation files import the relevant generated interface according to the app or framework context. Do not hand-edit that generated header, and avoid header cycles by keeping imports and forward declarations in appropriate places. A missing generated header can arise from product module name, target membership, build order, or unsupported declarations rather than from the Swift file's spelling.</p><p>Nullability controls imported optionality. An Objective-C nullable object result generally becomes an optional Swift value, while unspecified nullability can leave less safe imported assumptions. Imported Foundation values can bridge, but Swift value types, associated-value enums, and arbitrary generic APIs do not all acquire Objective-C representations. NSError-based error conventions may import as throwing APIs; an Objective-C exception is a different runtime mechanism and ordinary Swift do/catch is not its recovery boundary. Check the generated Swift interface rather than guessing the imported name or optionality from the original header.</p>"
+        },
+        {
+          "id": "selectors-isolation",
+          "title": "Read selectors and actor isolation separately",
+          "html": "<p>UIKit target/action uses Objective-C selectors for callbacks. A selector names an Objective-C method, including its argument positions, rather than holding a Swift closure. The active BindableTapGestureRecognizer adds self as a target using #selector and exposes the callback with @objc. Its stored closure is another ownership edge; the selector itself does not make that closure weak or cancel it. Review both the callback mechanism and the stored work.</p><pre><code class=\"language-swift\">import UIKit\n\n@MainActor\nfinal class CourseTapTarget: NSObject {\n    private(set) var count = 0\n\n    func configure(_ button: UIButton) {\n        button.addTarget(\n            self,\n            action: #selector(didTap(_:)),\n            for: .touchUpInside\n        )\n    }\n\n    @objc private func didTap(_ sender: UIButton) {\n        count += 1\n        sender.setTitle(\"Taps: \\(count)\", for: .normal)\n    }\n}</code></pre><p>This requires an iOS UIKit target and a caller that retains CourseTapTarget for the interaction lifetime. It is not a complete screen. The underscore in configure removes its external argument label. The selector includes an underscore placeholder for one argument, corresponding to the Objective-C method's colon. @objc exposes a representable method, even though Swift access is private. NSObject supplies an Objective-C-compatible class base.</p><p>MainActor expresses the Swift isolation contract for UI work. It does not make an arbitrary Objective-C caller automatically dispatch from a background thread to the main actor. Respect the actual callback context and use an explicit boundary when adapting legacy callers. An Android listener analogy helps you understand callback registration, but it does not explain selectors, generated headers, or Objective-C dispatch. For diagnosis, a selector breakpoint can help find calls without assuming Swift's source name is the runtime symbol's full name.</p>"
+        },
+        {
+          "id": "runtime-diagnostics",
+          "title": "Choose a diagnostic instrument for the failure",
+          "html": "<p>Xcode's exception breakpoint can stop when Objective-C raises an exception, such as an unrecognized selector. A Swift Error breakpoint is useful for thrown Swift errors, but a thrown error may be expected and caught; stopping does not prove a crash. A trap, failed precondition, or fatalError has another stop path. State which mechanism occurred and inspect the first relevant application frame instead of treating every red console line as the root cause.</p><p>Memory Graph helps inspect retained objects and references. Zombies helps investigate messages to deallocated Objective-C objects, changing normal deallocation behavior. Address Sanitizer targets memory-access errors; Thread Sanitizer targets data races; Main Thread Checker flags certain UI API misuse. Their availability, overhead, and supported destination constraints differ. Choose according to the hypothesis and consult the selected Xcode's diagnostics; no single switch proves ownership, actor correctness, or all memory safety.</p><p>The retained production scheme disables Main Thread Checker for its launch action and enables Zombies as an additional test option. Those are current scheme declarations, not ideal defaults to copy into every exercise and not proof that a particular run used them. The active source also has DEBUG-gated diagnostics. Compiler conditions decide whether code exists; diagnostic run options decide instrumentation; runtime feature flags decide behavior in the existing binary. Keep these three categories separate. For performance checks, record instrumentation and debugger attachment because they can change the phenomenon being measured.</p>"
+        },
+        {
+          "id": "debug-report",
+          "title": "Make a debugger result reviewable",
+          "html": "<p>A strong report contains the expected invariant, reproduction steps, selected artifact identity, stop reason, inspected frame, minimal relevant values, and the next conclusion supported by those observations. For the counter lab, count changes from zero to one at a single invocation. A second observed invocation would support duplicate delivery; seeing count equal two without capturing calls does not establish which registration or caller duplicated work.</p><p>For an interoperability failure, attach the declared callback signature, its selector or generated interface, target membership, and loaded-image evidence. If a nullable result was treated as present, explain the imported optionality and the point where it was unwrapped. If a macro-generated module fails only in expression evaluation, retain the compiler's successful build evidence separately from LLDB's failed expression. This prevents a debugger limitation from being misreported as a platform defect.</p><p>Use the smallest safe experiment to resolve the uncertainty. A pure class can be debugged on the host; a UIKit selector requires a suitable iOS target; an account or device SDK problem needs its own authorized integration environment. Report unexecuted checks as pending. The worked exercise provides predictions and an inspection order, without claiming that source reading reproduced a crash, validated the installed toolchain, or completed specialist Objective-C runtime analysis. Knowing that boundary is part of being ready to debug a production codebase.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why inspect a stored field before evaluating a computed property in LLDB?",
+          "options": [
+            "Stored-value inspection can answer the question without deliberately executing the getter.",
+            "Computed properties never exist in Release.",
+            "LLDB expressions are always read-only.",
+            "Only private values can be printed."
+          ],
+          "answer": 0,
+          "explanation": "Expression/getter evaluation can run code and affect timing or state. Stored debug-information inspection is a better first step when it suffices, though optimization and formatters still require care."
+        },
+        {
+          "question": "What does @objc on a callback establish?",
+          "options": [
+            "The stored closure captures weakly.",
+            "A representable declaration is exposed to Objective-C dispatch.",
+            "A background caller is automatically moved to MainActor.",
+            "Every Swift generic becomes visible to Objective-C."
+          ],
+          "answer": 1,
+          "explanation": "Objective-C exposure, capture lifetime, actor isolation, and representability are separate contracts. #selector chooses the exposed method; it does not repair threading or ownership."
+        },
+        {
+          "question": "An app builds, but LLDB cannot evaluate a Swift expression. What should the report say?",
+          "options": [
+            "The app source is necessarily invalid.",
+            "All caches must be deleted immediately.",
+            "The debugger's expression/module context failed; application behavior needs separate evidence.",
+            "The provisioning profile is certainly expired."
+          ],
+          "answer": 2,
+          "explanation": "Debugger expression compilation has its own context. Preserve the actual successful build and runtime observations while investigating symbols, module imports, and toolchain compatibility."
+        }
+      ],
+      "exercise": {
+        "brief": "Debug or paper-trace CourseCounter, then create an interoperability diagnostic note for the UIKit target/action example.",
+        "steps": [
+          "Predict count before and after one recordTap call and identify whether label is stored or computed.",
+          "In a scratch host program, optionally set a breakpoint on recordTap and inspect stop reason, frame, count, and loaded image; otherwise mark the trace as predicted.",
+          "Compare frame-variable inspection with deliberate evaluation of label, explaining side-effect boundaries.",
+          "Read the active bridging-header and gesture-recognizer anchors; map header direction, @objc, #selector, stored closure, and owner lifetime.",
+          "Classify a nil imported object, unrecognized selector, missing generated header, and mismatched release symbols."
+        ],
+        "acceptance": [
+          "The counter prediction is zero then one, and computed-label evaluation is explained.",
+          "Executed observations include artifact/configuration/stop scope; paper traces remain labeled predictions.",
+          "No debugger command prints an account, token, entire request, environment, or signing configuration.",
+          "The UIKit example is identified as target-dependent, with a retained callback owner and an isolation contract.",
+          "Each failure is assigned an appropriate next check rather than a universal cache or signing fix."
+        ],
+        "solution": "<p>The counter starts at zero and increments to one. The computed label then returns Taps: 1. Set a source breakpoint inside recordTap using the scratch file's actual line, inspect the selected frame, and compare count before and after stepping over the increment. A call to label runs its getter; a call to recordTap through expression would deliberately change the process and is unnecessary for this observation.</p><p>For the UIKit example, an owner must retain CourseTapTarget. Configure removes its external argument label, #selector(didTap(_:)) identifies a one-argument Objective-C method, and @objc exposes that method. MainActor requires appropriate UI access, while Objective-C exposure alone supplies no automatic thread hop. The active gesture source additionally stores a closure, whose captures need an independent ownership review.</p><p>A nil imported result suggests checking nullability and optional handling. An unrecognized selector suggests callback signature and Objective-C exposure. A missing generated Swift header suggests target/module identity and build membership. Mismatched release symbols require the actual binary's UUID-matching dSYMs. Host counter results do not validate UIKit delivery or a production crash; keep those observations pending unless executed in their proper targets.</p>"
+      },
+      "references": [
+        {
+          "label": "LLVM — LLDB commands, breakpoints, and inspection",
+          "url": "https://lldb.llvm.org/use/tutorial.html"
+        },
+        {
+          "label": "Apple — Step through code and inspect variables",
+          "url": "https://developer.apple.com/documentation/xcode/stepping-through-code-and-inspecting-variables-to-isolate-bugs"
+        },
+        {
+          "label": "Apple — Import Objective-C into Swift",
+          "url": "https://developer.apple.com/documentation/swift/importing-objective-c-into-swift"
+        },
+        {
+          "label": "Apple — Import Swift into Objective-C",
+          "url": "https://developer.apple.com/documentation/swift/importing-swift-into-objective-c"
+        },
+        {
+          "label": "Apple — Imported C and Objective-C APIs",
+          "url": "https://developer.apple.com/documentation/swift/imported-c-and-objective-c-apis"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Main app bridging and module settings",
+          "path": "ios-client/Projects/Apps/Zocdoc/Project.swift",
+          "line": 369,
+          "why": "Bridging-header and product-module settings determine import and generated-header identity for this target."
+        },
+        {
+          "label": "Actual app bridging-header imports",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Zocdoc-Bridging-Header.h",
+          "line": 5,
+          "why": "Read the headers exposed to Swift instead of assuming every Objective-C file is automatically visible."
+        },
+        {
+          "label": "Objective-C target and public headers",
+          "path": "ios-client/Projects/Infra/ZDCore/Project.swift",
+          "line": 33,
+          "why": "Separate Objective-C source and public module-header membership from app bridging-header configuration."
+        },
+        {
+          "label": "Active selector and stored closure",
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDCoreBase/Medical Bag (Utilities)/BindableTapGestureRecognizer.swift",
+          "line": 14,
+          "why": "Trace escaping storage, addTarget/#selector, and @objc as independent syntax and ownership contracts."
+        },
+        {
+          "label": "Retained launch diagnostic option",
+          "path": "ios-client/Zocdoc.xcodeproj/xcshareddata/xcschemes/Zocdoc Prod.xcscheme",
+          "line": 112,
+          "why": "Main Thread Checker is disabled for this launch action; the test action also has a Zombies option, so diagnostic defaults must be inspected."
+        },
+        {
+          "label": "Generator-specific plugin-path override",
+          "path": "ios-client/Tuist/Package.swift",
+          "line": 32,
+          "why": "A documented compiler-plugin integration workaround is separate from a runtime failure or a general cache fix."
+        }
+      ],
+      "checklist": [
+        "I can choose a breakpoint that tests a specific invariant.",
+        "I can inspect a selected frame and account for optimized-away values.",
+        "I can explain when debugger commands execute application code.",
+        "I can trace both interop directions and selector syntax.",
+        "I can write a minimal diagnostic report with symbols, scope, and honest limits."
+      ]
+    },
+    {
+      "id": "048",
+      "title": "Test, CI, destination, and configuration matrices",
+      "summary": "Design a risk-based verification matrix and connect each result to its graph, toolchain, artifact, selected tests, and limitations.",
+      "duration": 155,
+      "level": "Deep dive",
+      "prerequisites": [
+        "012",
+        "026",
+        "043",
+        "047"
+      ],
+      "objectives": [
+        "Distinguish build configuration, test-plan configuration, destination, environment, and graph route.",
+        "Trace the active legacy and Tuist CI paths using workflows and current plans.",
+        "Choose host, simulator, device, extension, and packaging checks according to the affected contract.",
+        "Record executed, skipped, retried, and pending verification with reproducible cache and artifact inputs."
+      ],
+      "sections": [
+        {
+          "id": "matrix-purpose",
+          "title": "A green result has coordinates",
+          "html": "<p>On Android, a green unit test for prodNormalDebug does not automatically validate release shrinking, an instrumentation runner, or another flavor. The same reasoning applies to iOS with more independent coordinates. A result belongs to a source revision, dependency graph, toolchain, scheme action, build configuration, test plan, destination, and runtime fixture set. When those coordinates are absent, the phrase tests passed is too vague to support a release decision.</p><p>Start from the changed contract. A pure parsing rule needs deterministic model tests. A UIKit resource change needs the relevant target and bundle lookup. A shared core dependency can reach an app, App Clip, widget, or test host. A compiler macro needs a host-tool path in addition to consumer compilation. An authentication SDK change needs account, cancellation, and device integration cases. This is a risk-based matrix, not a demand to run every possible Cartesian product for every edit.</p><p>The checkout has both retained-workspace and generated Tuist workflows. Neither path's existence proves the other is retired. Read the actual trigger and build commands, then associate results with the path exercised. This session extends session 026's artifact ledger into test selection and reproducibility. The worked matrix is a planning tool until you attach actual results; reading a workflow is evidence of configured automation, not proof that a particular job ran or passed.</p>"
+        },
+        {
+          "id": "matrix-axes",
+          "title": "Two meanings of configuration must stay separate",
+          "html": "<p>Debug and Release are build configurations that affect compilation and linking. A test plan also has named configurations, which can vary test options such as arguments, environment, language, region, or diagnostics. Selecting a test-plan configuration does not automatically rebuild the product in a different Xcode configuration. Likewise, a Run action's environment is not universally the environment used by a Test action or by the application launched from a UI test runner.</p><p>A destination adds platform, device or simulator type, architecture, and runtime. An arm64 simulator and arm64 device require different binaries. The deployment minimum is not the installed simulator version. A successful test on the newest available runtime does not demonstrate correctness on the app's oldest supported runtime. SDK compilation and runtime availability tests answer different questions, as session 044 explained.</p><table><thead><tr><th>Axis</th><th>Example</th><th>What it changes</th></tr></thead><tbody><tr><td>Graph route</td><td>Retained workspace or Tuist</td><td>Manifests, products, generated settings, pins</td></tr><tr><td>Build configuration</td><td>Debug or Release</td><td>Conditions, optimization, testability, linking</td></tr><tr><td>Test plan/configuration</td><td>Unit plan with locale option</td><td>Selected tests and runner options</td></tr><tr><td>Destination</td><td>Simulator runtime/device</td><td>Platform, architecture, execution environment</td></tr><tr><td>Runtime fixtures</td><td>Offline or synthetic account</td><td>Product behavior under controlled inputs</td></tr></tbody></table><p>Use a separate cell for every distinction that matters to the change. Combining all choices into a name such as production test build can conceal that DEBUG and PROD conditions coexist, or that a UI test uses a synthetic runtime override. Inspect the final product's settings and the runner's launch configuration instead of inferring them from the matrix row's title.</p>"
+        },
+        {
+          "id": "actual-ci",
+          "title": "Read the current workflows and plans",
+          "html": "<p>The inspected toolchain workflow selects Xcode 26.5 and an iPhone 17 Pro Max simulator with version 26.5. Those are repository pins, not claims about your installed machine or Apple's latest tools. The Tuist workflow installs dependencies, runs the repository's post-clone setup, generates the workspace, builds for testing, and then tests without building. Its commands select ZocdocUnitTests, disable selective testing, and use a common destination.</p><p>The retained pull-request workflow uses Zocdoc.xcworkspace and the Zocdoc Prod scheme. It computes test shards using timing inputs, builds for testing, and then runs a selected plan and filter arguments without rebuilding. It has explicit unit-failure and UI-retry branches and saves result artifacts. The Tuist workflow also has a pull_request trigger in the inspected file. Therefore historical guide wording that PR CI only builds the retained path is not sufficient to describe the current configured automation.</p><p>Read the actual ZocdocUnitTests.xctestplan rather than stopping at the app scheme's older single-target comment. The current plan includes many package test targets as well as the app-hosted tests. It also has explicit skipped Swift Testing suites/functions and XCTest classes/methods. A stale comment about intended aggregation should not shrink your coverage claim, while a listed target still needs result evidence to prove it executed. This distinction is particularly useful during a generator migration, when plans, target identifiers, and workflow names can drift independently.</p>"
+        },
+        {
+          "id": "build-test-separation",
+          "title": "Build-for-testing and test-without-building form a pair",
+          "html": "<p>Build-for-testing compiles the application and test products and prepares their execution metadata; it does not run the tests. Test-without-building consumes those products. Keeping the pair separate can avoid repeated compilation, but only when the product identity and execution context are compatible. A changed manifest, condition, resource, compiler, or source revision requires the appropriate rebuild rather than reusing whatever happens to be in DerivedData.</p><pre><code class=\"language-shell\"># Discovery from an already prepared retained client checkout:\nxcodebuild -list -workspace Zocdoc.xcworkspace\nxcodebuild -showdestinations -workspace Zocdoc.xcworkspace -scheme \"Zocdoc Prod\"\n\n# Template mirroring the pinned Tuist workflow; not executed here:\n# COURSE_DESTINATION must describe an inspected available simulator.\ntuist test ZocdocUnitTests --build-only --no-selective-testing --configuration Debug -- -destination \"$COURSE_DESTINATION\"\ntuist test ZocdocUnitTests --without-building --no-selective-testing -- -destination \"$COURSE_DESTINATION\"</code></pre><p>The discovery commands can require prepared dependency state, and they do not prove a build. The template's variable is task-specific, not a repurposed system path. The double dash forwards following options to the underlying Xcode build command in this pinned workflow. Use the repository's build instructions and installed-version help before operational execution. Generated support files and setup are required inputs, so the template is not a promise that a fresh unauthenticated checkout can run immediately.</p><p>The Tuist workflow explicitly avoids globally disabling signing for simulator test hosts because Keychain tests rely on entitlement context. Do not copy CODE_SIGNING_ALLOWED=NO into every row. An isolated pure package and an app-hosted test have different requirements. Save separate build and execution results, and report a build failure as such rather than marking every unexecuted test as failed behavior.</p>"
+        },
+        {
+          "id": "bounded-coverage",
+          "title": "Select representative rows that cover the affected boundaries",
+          "html": "<p>A practical dependency-change matrix starts with the smallest affected unit tests, then adds consumer integration on the currently supported CI route. If the app supports iOS 17, a compatibility claim needs a justified minimum-runtime check or a clearly stated limitation when that runtime is unavailable. A current simulator pin alone cannot establish the minimum-runtime row. Add iPad or alternate size checks when resources or layout change, rather than claiming a phone snapshot represents all devices.</p><table><thead><tr><th>Row</th><th>Purpose</th><th>Limit</th></tr></thead><tbody><tr><td>Host pure model tests</td><td>Value/error contract</td><td>No UIKit or app packaging</td></tr><tr><td>Tuist Debug simulator plan</td><td>Generated graph integration</td><td>No production device archive</td></tr><tr><td>Retained Debug unit/UI plans</td><td>Coexistence consumers</td><td>Selected tests and destination only</td></tr><tr><td>Release device build/package review</td><td>Optimized linkage and resource inclusion</td><td>Execution/distribution still separate</td></tr><tr><td>Affected extension or App Clip</td><td>Capability and shared dependency boundary</td><td>Only named product verified</td></tr><tr><td>Minimum/runtime-specific cases</td><td>Availability and compatibility</td><td>Requires an available appropriate runtime/device</td></tr></tbody></table><p>Some rows can be compile-only; others need execution, resource lookup, installation, or archive inspection. Label the evidence type. Include locale, dynamic text, offline behavior, synthetic account transition, or cancellation only when the change affects those contracts. A security SDK or media update warrants specialized device tests. Pairwise sampling can reduce combinations, but it is a strategy with stated exclusions, not a mathematical guarantee that every important interaction was tested.</p>"
+        },
+        {
+          "id": "selection-parallelism",
+          "title": "Test discovery, filtering, and retries affect the claim",
+          "html": "<p>A test target in a manifest does not guarantee it participates in the selected scheme. A test in a plan can be skipped or excluded by filters. A compiled test can also fail discovery because of framework conventions or target membership. Report expected and observed test counts, selected plans, filters, skips, failures, and retry outcomes. A zero-test success is not evidence that the intended behavior passed.</p><p>The active plan distinguishes Swift Testing suites/functions from XCTest classes/methods in its skip structure. The app-hosted target is marked nonparallelizable in this plan, while other targets have their own settings. Swift Testing's within-process parallel execution and Xcode's runner distribution are different controls. A nonparallel test-target declaration is not a blanket guarantee that every test's shared state is safe. Prefer local fixtures and explicit actor or synchronization contracts.</p><p>The retained workflow retries selected UI failures after resetting simulator state and preserves result bundles. A retry success can establish eventual execution success while still leaving a flakiness concern. Keep the first failure, retry input, and final result in the ledger. Do not replace an invariant with a larger sleep or silently remove the failing row. Quarantine is an explicit maintenance decision with scope and ownership, not something inferred from a green aggregate icon. The intentionally skipped CI canary in the plan demonstrates why skip-list correctness itself can be a tested operational boundary.</p>"
+        },
+        {
+          "id": "cache-reproducibility",
+          "title": "A cache key is part of the artifact contract",
+          "html": "<p>The Tuist workflow hashes its Package.swift, Package.resolved, and mise.toml for dependency-cache identity, including the selected Xcode in relevant keys. Its Tuist/.build scratch restore has no broad fallback, while the content-addressed shared cache can use a prefix restore. The distinction reflects different cache semantics: source revisions can be safely reused when verified, but stale mutable resolution state can make generation fail or describe the wrong graph.</p><p>Tuist.swift separately states that the Xcode compilation cache is off, while the Tuist module cache remains a different mechanism. Do not collapse dependency caches, compiler caches, generated projects, DerivedData, and remote module artifacts into one instruction to clear the cache. Identify which inputs feed the questionable artifact and preserve failure evidence before trying a narrow clean reproduction. A cache miss can be expected after a graph change; a cache hit is not proof of correct selection.</p><p>Reproducibility means another authorized environment can reconstruct the intended graph and interpret the result with the same inputs. It does not promise byte-for-byte equality of signed archives across machines. Record commit, resolved revisions, toolchain, generator, generated inputs, configuration, architecture/SDK, test plan and filters, and artifact UUIDs where applicable. Keep credentials outside this ledger. When generation or dependency resolution changes, compare its output and pin diff before attributing a failure to application code.</p>"
+        },
+        {
+          "id": "evidence-handoff",
+          "title": "Distinguish configured, executed, and accepted work",
+          "html": "<p>A matrix row begins as planned, becomes executed when a real run supplies evidence, and becomes accepted when its result satisfies the contract. It can also be blocked by environment or pending specialist review. A workflow file proves configured behavior, not execution. A console compile success proves compilation in that context, not test execution. A passing test proves selected assertions, not all unasserted privacy, installation, or performance properties.</p><p>Keep the handoff small but complete: the changed contract, affected graph rows, actual commands or run identifiers, results and artifacts, skipped/pending cases, and the owner of the next decision. An xcresult retains detailed test evidence, while an archive and matching symbols serve a different purpose. Include original failure and retry evidence if a job eventually passed. A screenshot supports visible state at one time, not an unobserved lifecycle or network guarantee.</p><p>The course author's inspection of workflows and plans is separate from the learner's exercise execution. The worked answer below deliberately leaves real client rows pending. Session 049 combines this ledger with a bounded change and reconstruction plan. Learning to say precisely what was checked is the transferable skill: it allows a reviewer to assess residual risk without either overclaiming completion or rerunning every possible test because the original evidence was too vague.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does build-for-testing establish by itself?",
+          "options": [
+            "The selected test products compiled and execution metadata was prepared.",
+            "All listed tests ran.",
+            "Device installation and archive export succeeded.",
+            "The oldest supported OS passed."
+          ],
+          "answer": 0,
+          "explanation": "Execution belongs to the following test phase, and device/archive/minimum-runtime claims require their own rows. Keep build and test evidence separate."
+        },
+        {
+          "question": "How should the current Tuist plan's coverage be described?",
+          "options": [
+            "Use the older single-target scheme comment without reading the plan.",
+            "The inspected plan lists app and package targets; actual execution and skips still need results.",
+            "Every target in the repository automatically runs.",
+            "Swift Testing skips are identical to XCTest method identifiers."
+          ],
+          "answer": 1,
+          "explanation": "Current plan data outweighs stale aggregation comments. Listed coverage is configured coverage; results, filters, and framework-specific skips determine executed coverage."
+        },
+        {
+          "question": "A failed UI test passes on retry. What belongs in the ledger?",
+          "options": [
+            "Only the final green icon.",
+            "Original failure, retry selection, final result, and remaining flakiness concern.",
+            "A claim that timing cannot affect the test.",
+            "Removal of the test from all future plans."
+          ],
+          "answer": 1,
+          "explanation": "Eventual success and reliability are different facts. Preserving both runs supports diagnosis and an explicit maintenance decision rather than hiding the first failure."
+        }
+      ],
+      "exercise": {
+        "brief": "Build a verification matrix for a synthetic shared-resource dependency change that reaches the app and one extension; execute only your isolated fixtures if desired.",
+        "steps": [
+          "Read both workflow routes, toolchain pins, current Tuist plan, and retained scheme test plans.",
+          "Choose six bounded rows covering pure contract, generated/retained consumers, Release packaging, affected extension, and runtime compatibility.",
+          "For each row, specify build configuration, plan configuration/options, destination, runtime fixtures, evidence type, and pass criteria.",
+          "Write a build-for-testing/test-without-building pairing contract and expected test-discovery checks.",
+          "Leave unexecuted client rows pending and describe how a skipped or retried case changes the coverage claim."
+        ],
+        "acceptance": [
+          "Rows distinguish graph route, build configuration, test plan/options, destination, and fixtures.",
+          "Minimum-runtime compatibility is not inferred from the current CI simulator pin.",
+          "A source-only audit is labeled configured evidence, and no client build or test is fabricated.",
+          "App/extension packaging and pure contract tests have different acceptance evidence.",
+          "The handoff includes test counts/filters/skips/retries, matching product identity, and cache inputs."
+        ],
+        "solution": "<p>A worked matrix uses host fixture tests for the resource contract; Tuist Debug simulator tests for generated consumers; retained Debug tests for coexistence consumers; Release device compilation and artifact review for resource/linkage changes; the affected extension's build and lookup path; and a minimum-supported-runtime check if an appropriate environment is available. Add UI locale/size rows only when the resource changes visible behavior.</p><p>The current workflow pins Xcode and simulator 26.5, while the app manifest's floor is iOS 17. Those numbers describe different axes. The current Tuist plan lists package targets despite older single-target prose. Both are declared observations, not executed results. A report should say client matrix pending unless actual run artifacts are supplied.</p><p>The pairing contract keeps source revision, pins, toolchain, configuration, architecture/SDK, generated resources, and managed build-product location compatible between build and execution. Compare expected tests with discovered/executed tests, account for explicit skips, and retain first-failure and retry bundles. A resource lookup passing on the host establishes only that package fixture; it does not accept the extension's device packaging, signing context, or distribution artifact.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple — Test plans and test configurations",
+          "url": "https://developer.apple.com/documentation/xcode/organizing-tests-to-improve-feedback"
+        },
+        {
+          "label": "Apple — Run tests and interpret result bundles",
+          "url": "https://developer.apple.com/documentation/xcode/running-tests-and-interpreting-results"
+        },
+        {
+          "label": "Apple — Swift packages in continuous integration",
+          "url": "https://developer.apple.com/documentation/xcode/building-swift-packages-or-apps-that-use-them-in-continuous-integration-workflows"
+        },
+        {
+          "label": "Apple — Add test targets to projects",
+          "url": "https://developer.apple.com/documentation/xcode/adding-tests-to-your-xcode-project"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Declared CI toolchain and destination pins",
+          "path": "ios-client/.github/workflows/toolchain.yml",
+          "line": 20,
+          "why": "Checkout Xcode/runtime pins are distinct from installed tools and the deployment floor."
+        },
+        {
+          "label": "Tuist build and execution phases",
+          "path": "ios-client/.github/workflows/tuist_build.yml",
+          "line": 142,
+          "why": "Read --build-only, --without-building, matching destination, selective-test setting, signing comments, and result bundles."
+        },
+        {
+          "label": "Retained workspace build route",
+          "path": "ios-client/.github/workflows/test_pull_request.yml",
+          "line": 214,
+          "why": "The retained path selects Zocdoc Prod, build-for-testing, configuration, workspace, and shared product location."
+        },
+        {
+          "label": "Retained execution and retry policy",
+          "path": "ios-client/.github/workflows/test_pull_request.yml",
+          "line": 256,
+          "why": "Plans, filters, unit failures, UI retries, and merged artifacts affect the resulting coverage claim."
+        },
+        {
+          "label": "Current Tuist test plan",
+          "path": "ios-client/Projects/Apps/Zocdoc/ZocdocUnitTests.xctestplan",
+          "line": 14,
+          "why": "Actual target and skip data lists app/package tests, superseding an older single-target comment."
+        },
+        {
+          "label": "Retained scheme test plans",
+          "path": "ios-client/Zocdoc.xcodeproj/xcshareddata/xcschemes/Zocdoc Prod.xcscheme",
+          "line": 92,
+          "why": "Unit, UI, benchmark, and E2E plans are separate configured choices, not proof they all run in each job."
+        },
+        {
+          "label": "Dependency scratch-cache identity",
+          "path": "ios-client/.github/workflows/tuist_build.yml",
+          "line": 92,
+          "why": "Manifest/pin/tool hashes and exact scratch restores make cache behavior a reproducibility concern."
+        },
+        {
+          "label": "Different compiler and module caches",
+          "path": "ios-client/Tuist.swift",
+          "line": 4,
+          "why": "The Xcode compilation cache is declared off; Tuist module caching is a separate mechanism."
+        }
+      ],
+      "checklist": [
+        "I can attach coordinates to every verification claim.",
+        "I can choose a bounded matrix from affected consumers.",
+        "I can explain build versus execution and compatible product reuse.",
+        "I can account for test discovery, skips, parallelism, and retries.",
+        "I can distinguish cache inputs, configured automation, and actual run evidence."
+      ]
+    },
+    {
+      "id": "049",
+      "title": "Bounded dependency and configuration change lab",
+      "summary": "Add one synthetic local dependency, preserve a compatibility contract, verify independent compiler conditions, and rehearse rollout and reconstruction.",
+      "duration": 180,
+      "level": "Lab",
+      "prerequisites": [
+        "043",
+        "044",
+        "045",
+        "046",
+        "047",
+        "048"
+      ],
+      "objectives": [
+        "Define a small change with explicit behavior, graph, and configuration boundaries.",
+        "Add a local product dependency and preserve a public contract without modifying the client.",
+        "Test supported, unsupported, and opt-in schema cases independently of Debug or production environment.",
+        "Create a verification ledger, rollout gate, and rollback plan that distinguishes source reconstruction from installed-client recovery."
+      ],
+      "sections": [
+        {
+          "id": "lab-boundary",
+          "title": "Change one contract you can explain completely",
+          "html": "<p>In an Android upgrade you may change a Gradle coordinate, generated BuildConfig value, and adapter behavior together. The dangerous part is losing track of which change caused a new behavior. This lab makes those axes explicit. Reuse the synthetic CourseResources package from session 046 and add one sibling local package, CoursePolicy. The new dependency owns a small schema-acceptance rule. An independent compiler condition allows a next schema in the scratch consumer.</p><p>The baseline accepts schema version 1 and rejects every other integer. The candidate accepts version 2 only when a deliberate opt-in is true. Invalid or future versions remain rejected. Missing files, I/O errors, and malformed JSON keep their original failure categories. The visible title and existing version-1 behavior remain stable. Write these invariants before implementation, because the tests should protect the product contract rather than count branches in your solution.</p><p>Work only in your own scratch packages or use a paper design if the needed toolchain is unavailable. The repository manifests are read-only evidence for how a real change would be reviewed. This exercise does not upgrade a client pin, rewrite an xcconfig, generate signing inputs, fetch a live schema, or distribute an app. Its worked answer is reference material, not a completed learner submission. Plan several short sessions for implementation, verification, and the final review note.</p>"
+        },
+        {
+          "id": "baseline-ledger",
+          "title": "Freeze the baseline and name the affected owners",
+          "html": "<p>Begin by recording the scratch source revision or saved baseline, tools version, source layout, resource fixture, test names, and predicted results. The CourseResources fixture contains a synthetic title and schemaVersion 1. Session 046's lookup and missing-file tests establish that package's intended resource behavior. Do not infer that they passed merely because the worked answer contains assertions. Keep your observed output or paper predictions in a separate column.</p><p>For the new package, identify a policy owner, a resource-loader consumer, and a graph maintainer. These are responsibilities in the exercise, not inferred company teams. The policy owner controls allowed versions; the consumer owns loading and user-facing error handling; the graph maintainer owns product selection and target dependencies. A real remote upgrade would additionally need selected-version provenance, transitive pin review, licenses, and relevant security review from session 044.</p><p>The active client keeps Package.swift and Project.swift side by side. For a future authorized client dependency edit, follow the documented manifest-sync workflow and verify both routes; modifying one input does not automatically update the other. The course lab does not dispatch that workflow because it changes no client manifests. Record this as a boundary in your review note. A good baseline ledger lets a reviewer distinguish an implementation failure from a graph, resource, or tool-selection failure.</p>"
+        },
+        {
+          "id": "public-policy",
+          "title": "Expose a product-sized API across the module boundary",
+          "html": "<p>The following policy source belongs under Sources/CoursePolicy in the new scratch package. It uses ordinary Swift and has no UIKit, network, resource, or remote dependency. The public access modifiers matter because the resource consumer is another module; internal declarations would compile inside the policy's own tests but fail at the intended consumer boundary.</p><pre><code class=\"language-swift\">public enum SchemaDecision: Equatable {\n    case accept\n    case reject\n}\n\npublic func schemaDecision(\n    for version: Int,\n    allowNext: Bool\n) -&gt; SchemaDecision {\n    switch version {\n    case 1:\n        return .accept\n    case 2:\n        return allowNext ? .accept : .reject\n    default:\n        return .reject\n    }\n}</code></pre><p>The enum defines the two decisions without exposing a vendor type. Equatable allows an expected-result assertion. The function's external for label makes the call read naturally; version is its local parameter. AllowNext is both an external label and local name. The exhaustive switch explicitly accepts version 1, gates version 2, and rejects every other integer. Its default is appropriate at an open input boundary: an unknown wire version must receive a deliberate rejection rule rather than being silently treated as current.</p><p>This function is deterministic and does not mutate shared state. A Kotlin sealed outcome or enum would be a useful analogy, but this Swift module's public declarations and library product determine cross-module visibility. It does not provide JSON decoding, resource lookup, remote flags, or authorization. Keeping the policy this small makes an adapter replacement or rollback review understandable without exposing the entire implementation of a third-party package.</p>"
+        },
+        {
+          "id": "manifest-change",
+          "title": "Add the dependency and the consuming edge separately",
+          "html": "<p>Give CoursePolicy a tools-5.9 manifest with a library product selecting its production target, plus a test target. Then edit your scratch CourseResources manifest to declare the sibling package and select its product in the resource target. The partial consumer declaration below shows the changed fields; retain its test target and resource processing. It is not a patch to the client.</p><pre><code class=\"language-swift\">// Changed fields inside the scratch CourseResources Package initializer:\ndependencies: [\n    .package(path: \"../CoursePolicy\")\n],\ntargets: [\n    .target(\n        name: \"CourseResources\",\n        dependencies: [\n            .product(name: \"CoursePolicy\", package: \"CoursePolicy\")\n        ],\n        resources: [.process(\"Resources\")]\n    ),\n    .testTarget(\n        name: \"CourseResourcesTests\",\n        dependencies: [\"CourseResources\"]\n    )\n]</code></pre><p>The package dependency makes the sibling graph available. The target dependency grants the specific consumer access to the exported product. Its source still imports CoursePolicy. None of those steps substitutes for the others. Preserve the Resources declaration, because the code dependency does not move bootstrap.json into another bundle. Relative paths describe the scratch layout, not a remote version or lockfile entry for this local target.</p><p>Review the diff as a graph change: one new package, one product, one consuming edge, policy source/tests, and a consumer validation boundary. If unrelated pins, generated files, resources, or settings change, explain or remove those changes in your own lab before accepting the candidate. The real checkout's main app and extensions show why a small declaration can reach several products. Your scratch graph is intentionally narrow; successful compilation here does not prove parity for the production Tuist and retained-workspace routes.</p>"
+        },
+        {
+          "id": "condition-boundary",
+          "title": "Opt-in is independent of Debug and production",
+          "html": "<p>The opt-in condition is named COURSE_NEXT_SCHEMA. It is not DEBUG, PROD, the service environment, or a remote feature flag. A Debug build can keep it absent, and a Release scratch build can deliberately include it. The active client has a useful parallel: its base configuration supplies PROD, while the Swift Debug condition list also supplies DEBUG. Thus production environment and debug compilation can coexist; never use one as an implicit synonym for the other.</p><pre><code class=\"language-swift\">var compiledAllowsNextSchema: Bool {\n    #if COURSE_NEXT_SCHEMA\n    return true\n    #else\n    return false\n    #endif\n}</code></pre><p>This computed value converts a compile-time choice into a Boolean consumed by the pure policy. It does not read a server or change after installation. In a scratch SwiftPM consumer target you can add define for COURSE_NEXT_SCHEMA using that target's swiftSettings, then remove it to reconstruct the baseline. The setting must reach the consuming target; defining it only in CoursePolicy would not change this declaration in CourseResources.</p><p>For the real app, Swift conditions and Objective-C preprocessor definitions need separate inspection. The active ZDFeatureFlags header has a predicate requiring both DEBUG and TESTSECURE before defining its SSL-pinning diagnostic switch. DEBUG alone does not satisfy that predicate. Runtime experiments are separate again. The exercise changes neither trust configuration nor production flags; it practices reading a conjunction and verifying condition ownership. Record effective flags if you actually build, rather than claiming a macro is present because its name appears in a manifest.</p>"
+        },
+        {
+          "id": "consumer-behavior",
+          "title": "Preserve loader errors and add only the new rule",
+          "html": "<p>Keep loading and schema policy at distinct boundaries. Import CoursePolicy in the scratch resource module, decode the existing fixture using loadBootstrap, then ask the policy to accept or reject its version. Unsupported schema is a new typed consumer error. Do not replace all loader errors with it, and do not map rejection to an empty success. Session 006's failure-distinction habit still applies even though this is a build-tooling lab.</p><pre><code class=\"language-swift\">import CoursePolicy\n\nenum ContractFailure: Error, Equatable {\n    case unsupportedSchema(Int)\n}\n\nfunc validateSchema(_ version: Int, allowNext: Bool) throws {\n    guard schemaDecision(for: version, allowNext: allowNext) == .accept else {\n        throw ContractFailure.unsupportedSchema(version)\n    }\n}\n\nfunc validatedBootstrap(\n    named name: String = \"bootstrap\"\n) throws -&gt; CourseBootstrap {\n    let value = try loadBootstrap(named: name)\n    try validateSchema(value.schemaVersion, allowNext: compiledAllowsNextSchema)\n    return value\n}</code></pre><p>The enum stores the rejected version as associated data, so diagnostics can explain the contract without logging the full document. ValidateSchema removes the first external label with an underscore, and its guard throws when the decision is reject. ValidatedBootstrap keeps the named label and default resource name from the loader. Both try expressions preserve their original failures because no broad catch erases them.</p><p>Add a second synthetic fixture with schemaVersion 2 to observe the opt-in through the integrated consumer. Its successful decoding alone should not bypass validation. Test a missing filename too, retaining ResourceFailure.missing. An unsupported schema and missing resource need different recovery: compatibility review versus packaging or lookup repair. The policy is intentionally not a complete schema migration engine and performs no persistence transformation; describe those limits explicitly.</p>"
+        },
+        {
+          "id": "verification-gates",
+          "title": "Use independent fixtures and meaningful failure checks",
+          "html": "<p>Write an expected-decision table before the policy implementation: version 1 accepts with opt-in false or true; version 2 rejects when false and accepts when true; negative, zero, and future version 3 reject in both states. These cases protect the compatibility boundary, not the shape of the switch. Add one deliberately incorrect mutation, such as accepting every version when opt-in is true, predict which row fails, then restore the correct code.</p><p>The consumer matrix adds baseline fixture loading, typed missing-resource failure, unsupported-schema failure, and version-2 behavior under each effective condition selection. Test the public policy through an ordinary import from another module, because @testable alone can hide an accidental access-level problem. Report test methods and fixture rows separately: one looped XCTest method can cover ten decision rows without becoming ten discovered test functions.</p><p>Run only the isolated packages you created if your toolchain supports them. A paper trace is acceptable learning evidence when labeled as such. For a real dependency change, session 048's matrix would add affected retained and Tuist consumers, optimized linkage, resources, extensions, minimum-runtime cases, and specialist SDK checks as needed. No such production result follows from this scratch test. An unexpectedly broad pin diff, missing test discovery, or resource ownership change should stop acceptance until explained, rather than being covered by a green policy assertion.</p>"
+        },
+        {
+          "id": "rollout-reconstruction",
+          "title": "Rehearse rollback before distributing anything",
+          "html": "<p>The scratch rollback has two different operations. Removing the opt-in reconstructs the prior acceptance policy while keeping the dependency available. Removing the dependency entirely also restores the consumer's previous implementation and manifest edges. Record both paths, and rerun the baseline fixture and error cases. Merely reverting a manifest line while leaving an import or validation call behind produces an incomplete reconstruction.</p><p>For a remote change, reconstruction additionally needs the prior manifest, relevant resolution file, selected revisions or binary checksums, generator/compiler versions, generated inputs, and resource contents. A signed archive is an artifact with its own identity, so rebuilding known-good source does not promise identical bytes. Preserve matching symbols and verification results for the candidate and the corrective build. Source rollback, binary reconstruction, and installed-client recovery are different claims.</p><p>Apple's current App Store guidance confirms that a released app cannot be reverted to a previously released version; correction requires a new version. Pausing phased updates limits distribution progression, not already installed behavior. A runtime flag can contain only behavior that existing clients honor, with cached and offline limits. This lab has only a compile-time switch, so changing it requires rebuilding the scratch binary. The rollout exercise is a tabletop gate: baseline evidence, candidate evidence, unresolved reviews, containment limits, and a named decision role. No upload or store operation is performed.</p>"
+        },
+        {
+          "id": "review-handoff",
+          "title": "Submit the change and the evidence as separate artifacts",
+          "html": "<p>Your final learning submission contains the scratch implementation or paper diff, the product/target dependency map, baseline and candidate decision tables, actual or predicted output, and a concise review note. Lead that note with behavior: version 1 remains accepted, version 2 needs explicit opt-in, and every unknown version still rejects. Follow with the changed graph, independent compiler selection, preserved resource ownership, and typed failure evidence.</p><p>List limits alongside the result. This package has no remote supply chain, vendor binary, signing, UIKit screen, network cancellation, account storage, or database migration. Consequently its success cannot settle those specialist concerns. The active repository anchors show where real build conditions, generator inputs, and CI paths would need attention. They are review examples, not evidence that the client was changed or that its release artifact was validated.</p><p>Finally compare your explanation with the worked answer without marking the exercise complete automatically. If your implementation diverges, decide whether it satisfies the same acceptance contract and explain the tradeoff. A good reviewer should be able to reproduce the pure policy, identify the consumer that owns the opt-in, and reconstruct the baseline from your note. That completes this tooling unit's progression from naming build concepts to making a bounded, reviewable engineering decision.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Where must COURSE_NEXT_SCHEMA be effective for compiledAllowsNextSchema to change?",
+          "options": [
+            "In the consuming CourseResources target that compiles the declaration.",
+            "Anywhere in a workspace, because all flags are global.",
+            "Only in CoursePolicy's manifest.",
+            "In the app's runtime experiment dashboard."
+          ],
+          "answer": 0,
+          "explanation": "Conditional compilation is evaluated for the source being compiled. A dependency's private flags do not automatically propagate into its consumer, and runtime experiments cannot add a missing compiled branch."
+        },
+        {
+          "question": "Which fixture reveals an overly broad opt-in implementation?",
+          "options": [
+            "Version 1 with either flag state.",
+            "Future version 3 with opt-in true, which must remain rejected.",
+            "A screenshot of the package directory.",
+            "A toolchain version command alone."
+          ],
+          "answer": 1,
+          "explanation": "Accepting all versions whenever opt-in is true violates the explicit unknown-version boundary. Version 1 success and filesystem or tool discovery would not detect that behavioral error."
+        },
+        {
+          "question": "What does removing a compile-time condition accomplish for already distributed iOS clients?",
+          "options": [
+            "It modifies their installed binary immediately.",
+            "It changes future rebuilt artifacts; installed clients need their own containment or corrective release.",
+            "It downgrades every App Store installation.",
+            "It changes every runtime flag without a network request."
+          ],
+          "answer": 1,
+          "explanation": "Compile-time selections belong to the built artifact. Rebuilding or source rollback does not rewrite installed code, and Apple's store recovery requires a new version rather than a previous-version downgrade."
+        }
+      ],
+      "exercise": {
+        "brief": "Independently add CoursePolicy to your scratch CourseResources graph, verify gated schema acceptance, and submit a rollout/reconstruction rehearsal.",
+        "steps": [
+          "Record or predict the baseline resource tests and version-1-only acceptance contract.",
+          "Create a public CoursePolicy library product, source target, and test target; add only the local package/product edge to CourseResources.",
+          "Write decision fixtures for versions -1, 0, 1, 2, and 3 under both opt-in states before comparing the implementation.",
+          "Add consumer validation, preserve loader failures, and test synthetic schema-1/schema-2 resources with the independent condition absent and present.",
+          "Introduce an overly broad opt-in bug, predict its failing case, restore the policy, and record actual or predicted verification.",
+          "Write separate rollback paths for removing the opt-in and removing the dependency, plus a tabletop distributed-client recovery plan."
+        ],
+        "acceptance": [
+          "Version 1 accepts in both states; version 2 accepts only when explicitly opted in; invalid/future inputs reject.",
+          "The public policy is usable through an ordinary cross-module import, and package declaration, target product edge, and source import are all present.",
+          "Resource ownership stays with CourseResources and missing/decode/unsupported errors remain distinguishable.",
+          "DEBUG, PROD, COURSE_NEXT_SCHEMA, and runtime flags are not conflated.",
+          "The evidence ledger names executed/predicted/pending checks and observed test discovery counts.",
+          "The reconstruction plan restores consumer code, graph inputs, conditions, and tests together; it promises no downgrade of installed store clients."
+        ],
+        "solution": "<p>The worked CoursePolicy manifest exposes its public source through a library product and gives tests their own target. Put the policy implementation from the lesson in Sources/CoursePolicy. The tests use an ordinary import, proving the public access boundary rather than relying on @testable.</p><pre><code class=\"language-swift\">// swift-tools-version: 5.9\nimport PackageDescription\nlet package = Package(\n    name: \"CoursePolicy\",\n    products: [\n        .library(name: \"CoursePolicy\", targets: [\"CoursePolicy\"])\n    ],\n    targets: [\n        .target(name: \"CoursePolicy\"),\n        .testTarget(name: \"CoursePolicyTests\", dependencies: [\"CoursePolicy\"])\n    ]\n)</code></pre><pre><code class=\"language-swift\">import XCTest\nimport CoursePolicy\n\nfinal class PolicyContractTests: XCTestCase {\n    func testSupportedAndUnknownVersions() {\n        let cases: [(Int, Bool, SchemaDecision)] = [\n            (-1, false, .reject), (-1, true, .reject),\n            (0, false, .reject), (0, true, .reject),\n            (1, false, .accept), (1, true, .accept),\n            (2, false, .reject), (2, true, .accept),\n            (3, false, .reject), (3, true, .reject)\n        ]\n        for (version, allowNext, expected) in cases {\n            XCTAssertEqual(\n                schemaDecision(for: version, allowNext: allowNext),\n                expected,\n                \"version=\\(version), opt-in=\\(allowNext)\"\n            )\n        }\n    }\n}</code></pre><p>This is one discovered XCTest method with ten fixture rows. The consumer declaration and validator above complete the dependency seam. To opt in locally, add <code>swiftSettings: [.define(\"COURSE_NEXT_SCHEMA\")]</code> to the scratch CourseResources production target, after its resource field; removing that setting restores the absent-condition branch. This is an independent lab condition, not an instruction to edit Debug or production settings in the client. Keep the consumer test target.</p><p>The schema-1 fixture passes validation in both builds. A schema-2 fixture rejects without the condition and accepts with it. The missing-name path still throws ResourceFailure.missing, and corrupt JSON still fails decoding. For a loader-independent error assertion, call <code>validateSchema(2, allowNext: false)</code> and check the unsupportedSchema associated value. The deliberate accept-everything mutation fails invalid/future opt-in rows.</p><p>Reconstruction first removes the scratch define and reruns baseline behavior. Complete dependency removal also restores pre-change consumer code and removes the local package/product/import together. A real remote rollback would restore the relevant pins and artifact inputs. In the tabletop release note, compiler-condition changes require a new build, runtime containment has explicit limits, and installed App Store clients require a corrective release. All actual client, device, archive, distribution, licensing, and security checks remain pending.</p>"
+      },
+      "references": [
+        {
+          "label": "SwiftPM — Public products and target dependencies",
+          "url": "https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html"
+        },
+        {
+          "label": "Swift — Access control across module boundaries",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/accesscontrol/"
+        },
+        {
+          "label": "Apple — XCTest behavioral assertions",
+          "url": "https://developer.apple.com/documentation/xctest"
+        },
+        {
+          "label": "Apple — New versions and limits on reverting store releases",
+          "url": "https://developer.apple.com/help/app-store-connect/update-your-app/create-a-new-version/"
+        },
+        {
+          "label": "Apple — Phased release controls",
+          "url": "https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Independent Swift Debug/Release condition lists",
+          "path": "ios-client/Projects/Apps/Zocdoc/Project.swift",
+          "line": 412,
+          "why": "The app's production condition, DEBUG, and opt-in E2E condition demonstrate separate predicates."
+        },
+        {
+          "label": "Production compilation flag and empty E2E default",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Supporting Files/Configs/ZocdocBaseApp.xcconfig",
+          "line": 2,
+          "why": "Trace environment-related compilation and test opt-in values without assuming Release or Debug names settle runtime behavior."
+        },
+        {
+          "label": "Objective-C diagnostic conjunction",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Constants/ZDFeatureFlags.h",
+          "line": 13,
+          "why": "DEBUG plus TESTSECURE is a conjunction; DEBUG alone does not enable this diagnostic macro."
+        },
+        {
+          "label": "Real resource-owning target",
+          "path": "ios-client/Projects/Infra/ZDAssets/Package.swift",
+          "line": 58,
+          "why": "A new code dependency must not silently move or drop resources belonging to another target."
+        },
+        {
+          "label": "Manifest coexistence and sync requirement",
+          "path": "ios-client/CLAUDE.md",
+          "line": 129,
+          "why": "Use the documented sibling-manifest synchronization workflow for a future authorized client edit; this lab changes only scratch packages."
+        },
+        {
+          "label": "Configured Tuist consumer verification",
+          "path": "ios-client/.github/workflows/tuist_build.yml",
+          "line": 158,
+          "why": "A real change needs the relevant consumer route beyond the isolated policy test."
+        },
+        {
+          "label": "Dependency-resolution inputs for reconstruction",
+          "path": "ios-client/Tuist/Package.swift",
+          "line": 49,
+          "why": "Remote requirement/pin inputs are additional reconstruction evidence absent from this local-only fixture."
+        }
+      ],
+      "checklist": [
+        "I can define one bounded behavior change before editing a graph.",
+        "I can expose and consume a public library product correctly.",
+        "I can test independent compiler opt-in and unknown-input rejection.",
+        "I can preserve resource, decoding, and contract failure distinctions.",
+        "I can reconstruct source inputs and explain installed-client recovery limits.",
+        "I have submitted my own attempt and labeled executed, predicted, and pending evidence."
+      ]
+    }
+  ]
+}

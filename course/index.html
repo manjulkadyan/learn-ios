@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="A local, practical iOS course for an experienced Android engineer. Learn Swift, iOS architecture, and production engineering with thoughtful cross-platform comparisons.">
+  <title>Across the Stack · Android to iOS</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Course navigation">
+      <a class="brand" href="#home" aria-label="Across the Stack home">
+        <span class="brand-mark" aria-hidden="true">a<span>↗</span></span>
+        <span>Across the Stack<small>ANDROID → iOS</small></span>
+      </a>
+      <button class="search-trigger" id="search-trigger"><span aria-hidden="true">⌕</span> Search the library <kbd>⌘ K</kbd></button>
+      <nav class="primary-nav" aria-label="Main">
+        <a href="#home" data-nav="home"><span aria-hidden="true">◫</span> Learning desk</a>
+        <a href="#plan" data-nav="plan"><span aria-hidden="true">▤</span> Your daily rhythm</a>
+        <a href="#reference" data-nav="reference"><span aria-hidden="true">⇄</span> Reference library</a>
+        <a href="#essentials" data-nav="essentials"><span aria-hidden="true">{ }</span> Swift details</a>
+        <a href="#coverage" data-nav="coverage"><span aria-hidden="true">▦</span> Coverage map</a>
+        <a href="#libraries" data-nav="libraries"><span aria-hidden="true">⌘</span> Libraries & pins</a>
+        <a href="#interviews" data-nav="interviews"><span aria-hidden="true">?</span> Interview ledger</a>
+        <a href="#notes" data-nav="notes"><span aria-hidden="true">✎</span> Notes & bookmarks</a>
+      </nav>
+      <div class="sidebar-label">THE COURSE <span id="lesson-total">56 sessions</span></div>
+      <nav id="curriculum-nav" class="curriculum-nav" aria-label="Course units"></nav>
+      <div class="sidebar-bottom">
+        <div class="progress-meta"><span>Your learning progress</span><strong id="progress-label">0 / 56</strong></div>
+        <div class="progress-track" role="progressbar" aria-label="Sessions marked reviewed" aria-valuemin="0" aria-valuemax="56" aria-valuenow="0" id="course-progress"><div id="progress-fill"></div></div>
+        <p>At your pace. Built on what you know.</p>
+        <button class="theme-toggle" id="theme-toggle" aria-label="Switch color theme">◐ <span>Dark reading mode</span></button>
+      </div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <button class="menu-button" id="menu-button" aria-expanded="false" aria-controls="sidebar" aria-label="Toggle course navigation">☰</button>
+        <div class="breadcrumbs" id="breadcrumbs">Your learning desk</div>
+        <div class="topbar-right"><span class="local-tag"><span></span> LOCAL & OFFLINE</span><button class="icon-button" id="top-search" aria-label="Search course">⌕</button></div>
+      </header>
+      <main id="main" tabindex="-1">
+        <div class="loading"><p class="eyebrow">YOUR NEXT CHAPTER</p><h1>Android experience.<br>iOS understanding.</h1><p>Loading your local course…</p><noscript><p>This course reader needs JavaScript. The original Markdown lessons are available in the parent lessons directory.</p></noscript></div>
+      </main>
+      <footer class="site-footer"><span>Across the Stack <span aria-hidden="true">↗</span></span><span>Made for learning deeply, one session at a time.</span><button id="export-footer" class="text-button">Back up your progress</button></footer>
+    </div>
+  </div>
+  <div class="mobile-scrim" id="mobile-scrim" hidden></div>
+  <dialog id="search-dialog" aria-labelledby="search-title">
+    <div class="search-dialog-head"><h2 id="search-title">Find a concept</h2><button class="icon-button" id="close-search" aria-label="Close search">✕</button></div>
+    <label class="sr-only" for="search-input">Search lessons and references</label>
+    <input id="search-input" type="search" placeholder="Try coroutines, weak self, or Gradle…" autocomplete="off">
+    <div id="search-results" class="search-results" aria-live="polite"></div>
+    <div class="search-hint">Search across explanations, exercises, and Android comparisons. <kbd>Esc</kbd> to close.</div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <input id="import-file" type="file" accept="application/json,.json" hidden>
+  <script src="data.js"></script>
+  <script src="state.js"></script>
+  <script src="interview-state.js"></script>
+  <script src="interview.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

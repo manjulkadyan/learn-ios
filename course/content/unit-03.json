@@ -1,0 +1,1014 @@
+{
+  "unit": {
+    "id": "systems",
+    "title": "Production data and concurrency",
+    "summary": "Own asynchronous work, isolate shared state, preserve stream and network contracts, and build account-aware data boundaries grounded in the active iOS checkout.",
+    "order": 3
+  },
+  "lessons": [
+    {
+      "id": "015",
+      "title": "Structured concurrency: who owns the work?",
+      "summary": "Build task trees, bound parallel requests, and make cancellation and lifetime part of a feature's contract.",
+      "duration": 85,
+      "level": "Production",
+      "prerequisites": [
+        "011",
+        "014"
+      ],
+      "objectives": [
+        "Distinguish async calls, structured children, and unstructured Task handles.",
+        "Choose async let or a bounded throwing task group and preserve result order.",
+        "Propagate cancellation without converting it into success or a user-facing failure.",
+        "Assign an explicit owner and stopping condition to UI-triggered work."
+      ],
+      "sections": [
+        {
+          "id": "ownership",
+          "title": "Start with the lifetime you already understand",
+          "html": "<p>Imagine an Android search screen launching a request in <code>viewModelScope</code>. You first ask which ViewModel owns the job, whether a second query cancels the first, and what survives navigation. Ask those same questions in Swift before choosing syntax. A task is a unit of asynchronous execution, not a dedicated thread. An asynchronous function can suspend while waiting and let its executor run other work. Calling an <code>async</code> function does not, by itself, create another task; the caller continues its current task through that function.</p><p>Swift's structured children come from <code>async let</code> and task groups. Their lifetime is bounded by the enclosing scope: it cannot finish while its children remain unfinished. Cancellation of a parent propagates to those children, which must cooperate. This resembles Kotlin's <code>coroutineScope</code> and its children, but do not transplant every Kotlin exception rule or scheduler assumption. Swift has no automatic equivalent of an Android ViewModel's lifecycle scope for an arbitrary class.</p><p>In <code>func load(id: String) async throws -&gt; Card</code>, <code>id</code> is an argument label, <code>async</code> permits suspension, and <code>throws</code> permits error propagation. The caller writes <code>try await load(id: \"synthetic-7\")</code>. Neither keyword promises background execution. Start by drawing the owning task, its children, and the event that ends ownership; performance decisions follow that drawing.</p>"
+        },
+        {
+          "id": "async-let",
+          "title": "A fixed pair of independent operations",
+          "html": "<p>Use <code>async let</code> when the number of independent results is known. A sequential pair of ordinary <code>await</code> calls waits for the first result before starting the second. Two asynchronous bindings start child tasks whose results you later join. Kotlin's familiar shape is <code>coroutineScope { val a = async { ... }; val b = async { ... }; combine(a.await(), b.await()) }</code>. The analogy concerns ownership and overlap, not exact executor behavior.</p><pre><code class=\"language-swift\">struct Dashboard: Sendable {\n    let title: String\n    let count: Int\n}\nfunc syntheticTitle() async throws -&gt; String {\n    try Task.checkCancellation()\n    return \"Learning dashboard\"\n}\nfunc syntheticCount() async throws -&gt; Int {\n    try Task.checkCancellation()\n    return 3\n}\nfunc dashboard() async throws -&gt; Dashboard {\n    async let title = syntheticTitle()\n    async let count = syntheticCount()\n    return try await Dashboard(title: title, count: count)\n}</code></pre><p>This standalone declaration example needs no UI framework. <code>Sendable</code> describes values safe to cross concurrency boundaries; session 016 develops it. The final expression awaits both bindings and propagates an error. If the scope exits with unfinished children, Swift cancels and waits for them. A child error is observed when the result is awaited; avoid assuming an error instantly interrupts all siblings at the moment it occurs.</p><p>The active search parameter converter starts visit-reason and insurance resolution this way, then combines their results with existing search state. Read both the bindings and their later awaits. Optional fallback is a business rule layered on concurrency, rather than evidence that all request failures should be ignored.</p>"
+        },
+        {
+          "id": "groups",
+          "title": "Dynamic work needs explicit ordering and limits",
+          "html": "<p>A task group fits a variable list of IDs. <code>withThrowingTaskGroup(of:)</code> supplies a scoped group to its closure. <code>of:</code> names the type each child returns, not the final return type of the whole closure. <code>group.addTask</code> adds a structured child. Iterate with <code>for try await</code> or consume <code>group.next()</code>; results arrive in completion order. Attach each input's index if your output must retain input order.</p><p>Do not submit ten thousand requests simply because the API supports ten thousand child tasks. Bound concurrent work to a small window. Seed at most the limit, take one result, then submit the next input. Store results in the parent task's local array; children return immutable values instead of concurrently mutating that array. A group does not turn an unsynchronized collection into a concurrent collection.</p><p>In a throwing group, an error that escapes its body causes remaining children to be canceled and joined. If you catch each child's failure and return a <code>Result</code>, you have deliberately selected partial success; document that policy. Swift groups do not directly correspond to Kotlin's <code>supervisorScope</code>. Decide whether one failed item invalidates the entire result before deciding where to catch.</p><p>A race between work and a timeout also waits for canceled children before leaving the group. If the operation ignores cancellation, that timeout cannot guarantee an immediate return. Deadlines, transport timeouts, and cooperative task cancellation solve related but distinct problems.</p>"
+        },
+        {
+          "id": "cancellation",
+          "title": "Cancellation is a request, not forced termination",
+          "html": "<p><code>cancel()</code> sets cancellation state; it does not kill a thread or unwind arbitrary synchronous code. <code>Task.checkCancellation()</code> throws <code>CancellationError</code>, while <code>Task.isCancelled</code> lets you choose another documented early-exit behavior. Check before expensive work, between chunks, and before committing visible results. A tight CPU loop with no suspension can still respond if it periodically checks; adding an <code>async</code> declaration alone changes nothing.</p><p>Suspending APIs may report cancellation differently. A <code>URLSession</code> request can surface <code>URLError.cancelled</code>. A blanket <code>catch { return [] }</code> turns canceled work into a successful empty result and may overwrite a newer screen. Keep cancellation distinct in the error mapping and rethrow it. For UI tasks, quiet cancellation is usually appropriate, but silence should happen at the owning UI boundary after preserving cancellation through lower layers.</p><p>Use <code>defer</code> for synchronous cleanup that must run when the function exits. It cannot suspend to perform arbitrary asynchronous cleanup. A cancellation handler can cancel an underlying callback operation promptly; its handler can run concurrently with the operation and needs synchronized state. A checked continuation must be resumed exactly once even if cancellation races completion. Resuming a continuation is not itself a cancellation strategy.</p><p>Tests should gate a fake request, cancel its owner, release the fake, and prove no stale result is committed. Arbitrary sleeps make this test depend on timing rather than the event ordering you intended to verify.</p>"
+        },
+        {
+          "id": "unstructured",
+          "title": "Task braces create an ownership obligation",
+          "html": "<p><code>Task { ... }</code> creates an unstructured task, even when written inside another task. It can inherit the surrounding actor context, priority, and task-local values; that inheritance does not establish structured parent-child lifetime or automatic parent cancellation. Returning from the creating function, canceling the creating task, or dropping the task handle does not automatically cancel this new work. Retain a handle if an owner must later stop it.</p><p><code>Task.detached</code> is also unstructured and does not inherit the same actor context, priority, or task-local state. It is not a default replacement for <code>withContext(Dispatchers.IO)</code>. Choose it only with an explicit independent ownership and isolation design. A detached closure must still capture safe values and may continue after the originating screen disappears.</p><p>For a UIKit callback, a stored <code>Task&lt;Void, Never&gt;?</code> can bridge synchronous event handling into async work. Cancel the old handle before starting a replacement and cancel on the lifecycle event your feature defines. <code>deinit</code> alone may be insufficient: a task that strongly retains its owner can prevent deinitialization. A weak capture followed by a strong binding before a long await retains the owner for that await.</p><p>SwiftUI's <code>.task</code> modifier has framework-managed cancellation tied to view identity and disappearance. A manually launched button task does not acquire that same lifetime merely because the button lives in SwiftUI.</p>"
+        },
+        {
+          "id": "review",
+          "title": "Read a concurrent method as a commit protocol",
+          "html": "<p>When reviewing a data-loading method, mark each suspension, each new task, and each write to state. Identify whether cancellation can arrive after a response is received but before state is updated. Cancellation checks reduce wasted work, while a request generation or query identity prevents stale completion from replacing a newer result. They are complementary: a server or legacy callback may finish despite cancellation.</p><p>Read the repository converter at its verified anchor, then follow its two awaits. Ask whether fallback should occur only for absent parameters or also for lookup failures. The code's throwing signature matters here. Reading concurrency syntax without reading business decisions produces migrations that compile but change behavior.</p><p>For a fan-out loader, define maximum simultaneous calls, ordering, duplicate-ID handling, and all-or-nothing versus partial success. Do not infer fairness or start order from task priority. A task group coordinates a lifetime; it does not provide a fixed thread pool or an API request-rate policy. A concurrency limit also differs from a requests-per-second limit.</p><p>Before moving production code, reproduce these decisions with synthetic values in a scratch target. The exercises below contain a worked answer for comparison, but no project feature has been implemented for you. Keeping the experiment separate makes it possible to study cancellation without issuing real requests or editing the existing client.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A parent calls Task { await refresh() } and is then canceled. What is guaranteed?",
+          "options": [
+            "The new task is canceled automatically.",
+            "The new task has structured lifetime because it was created inside async code.",
+            "The new task is unstructured; cancellation needs explicit ownership."
+          ],
+          "answer": 2,
+          "explanation": "Task initialization may inherit context but does not create the lifetime relationship that async let or a task group provides. Keep and cancel a handle when cancellation should propagate."
+        },
+        {
+          "question": "A task group loads IDs in parallel. In what order does for try await receive results?",
+          "options": [
+            "Input order.",
+            "Completion order.",
+            "Priority order."
+          ],
+          "answer": 1,
+          "explanation": "Group iteration delivers completed results. Return an index with each child result and reconstruct the input ordering in parent-owned storage."
+        },
+        {
+          "question": "A timeout child wins a race and cancels a request child that ignores cancellation. Can the group return immediately?",
+          "options": [
+            "Yes, cancellation kills the request.",
+            "No, the structured scope still waits for the child to finish.",
+            "Only if the task priority is low."
+          ],
+          "answer": 1,
+          "explanation": "Cancellation is cooperative. Structured scopes join their children; a timeout race needs a cancellation-responsive operation to provide a useful deadline."
+        }
+      ],
+      "exercise": {
+        "brief": "In a scratch Swift target, write a bounded loader for synthetic string IDs. It must retain input order, allow at most three in-flight loads, and fail rather than publish a partial array.",
+        "steps": [
+          "Define a Sendable async loader closure that returns one String and checks cancellation.",
+          "Tag child results with their input indexes; seed the first min(3, count) children.",
+          "After each completion, save the value and add at most one next input.",
+          "Use a gated fake to compare out-of-order completion, an empty list, and cancellation; explain the lifetime of every task."
+        ],
+        "acceptance": [
+          "At most three children are active at once and results preserve input order.",
+          "An empty input returns an empty array.",
+          "An escaping child error cancels and joins remaining work.",
+          "Cancellation is not converted into empty success; no production client sources change."
+        ],
+        "solution": "<p>This standalone solution accepts its dependency as <code>@Sendable (String) async throws -&gt; String</code>. <code>@escaping</code> permits child closures to retain the supplied closure beyond the immediate call expression. The tuple identifies where a result belongs. Only the parent mutates <code>output</code>, so no lock is needed for that array.</p><pre><code class=\"language-swift\">func loadOrdered(\n    _ ids: [String],\n    using load: @escaping @Sendable (String) async throws -&gt; String\n) async throws -&gt; [String] {\n    try Task.checkCancellation()\n    return try await withThrowingTaskGroup(\n        of: (Int, String).self\n    ) { group in\n        var output = Array(repeating: \"\", count: ids.count)\n        var next = 0\n        for _ in 0..&lt;min(3, ids.count) {\n            let index = next\n            let id = ids[index]\n            next += 1\n            group.addTask {\n                try Task.checkCancellation()\n                return (index, try await load(id))\n            }\n        }\n        while let (index, value) = try await group.next() {\n            try Task.checkCancellation()\n            output[index] = value\n            if next &lt; ids.count {\n                let newIndex = next\n                let id = ids[newIndex]\n                next += 1\n                group.addTask {\n                    try Task.checkCancellation()\n                    return (newIndex, try await load(id))\n                }\n            }\n        }\n        try Task.checkCancellation()\n        return output\n    }\n}</code></pre><p>Each completion frees one slot before its replacement starts. If <code>next()</code> throws, no partial output escapes. Empty input seeds nothing and ends the loop. To test ordering, hold three fake calls behind explicit gates, release index two first, and assert the final array still follows the original IDs. To test the bound, record starts and completions in an actor and check peak activity. To test cancellation, cancel the outer task while children are gated; release or cancel the fake gates so the test itself cannot hang.</p><p>This code bounds concurrency, not memory for the final result and not API rate. A production implementation should choose a domain result instead of arbitrary strings and define an error context without logging sensitive input. Compare it with the fixed two-child repository converter: both are structured, but they solve different cardinalities.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Concurrency",
+          "url": "https://docs.swift.org/swift-book/LanguageGuide/Concurrency.html"
+        },
+        {
+          "label": "Swift Evolution SE-0304: Structured concurrency",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0304-structured-concurrency.md"
+        },
+        {
+          "label": "Kotlin: Coroutine cancellation",
+          "url": "https://kotlinlang.org/docs/cancellation-and-timeouts.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Parallel search parameter resolution",
+          "path": "ios-client/Projects/Features/ZDSearch/Sources/ZDAISearch/AIChat+SearchParamsConverter.swift",
+          "line": 51,
+          "why": "Active feature code starts two async-let children, then awaits them with explicit domain fallback at lines 96 and 98."
+        },
+        {
+          "label": "Streaming producer task cancellation",
+          "path": "ios-client/Projects/Infra/ZDNetworking/Sources/ZDApiClient/ApiClient+Streaming.swift",
+          "line": 104,
+          "why": "Stream termination explicitly cancels its stored producer task; this is ownership wiring rather than automatic Task lifetime."
+        }
+      ],
+      "checklist": [
+        "I can draw the parent-child tree for async let and a task group.",
+        "I can explain why Task braces require a separate owner.",
+        "I can bound concurrency and restore input order.",
+        "I can test cancellation without arbitrary sleeps.",
+        "I can distinguish cancellation from stale-result protection."
+      ]
+    },
+    {
+      "id": "016",
+      "title": "Actors, MainActor, and values that can cross boundaries",
+      "summary": "Separate data-race protection from transaction correctness, understand actor reentrancy, and design Sendable contracts.",
+      "duration": 90,
+      "level": "Production",
+      "prerequisites": [
+        "015",
+        "005"
+      ],
+      "objectives": [
+        "Identify an isolation domain without assuming a dedicated thread.",
+        "Protect actor invariants across suspension with a version or reservation.",
+        "Place UI state on MainActor while keeping expensive synchronous work deliberate.",
+        "Explain Sendable, @Sendable, nonisolated, and the limits of unchecked annotations."
+      ],
+      "sections": [
+        {
+          "id": "isolation",
+          "title": "From mutexes to declared ownership",
+          "html": "<p>On Android you may protect a cache with a <code>Mutex</code> or keep state on a single dispatcher. In Swift, <code>actor</code> declares a reference type whose mutable instance state is isolated to that actor. Its executor serializes actor-isolated execution. It is neither a private thread nor a guarantee that a complete asynchronous method runs uninterrupted. Different actor instances protect different state; annotating a type does not create a global lock around every instance.</p><pre><code class=\"language-swift\">actor Counter {\n    private var value = 0\n    func increment() -&gt; Int {\n        value += 1\n        return value\n    }\n}\nfunc sample(_ counter: Counter) async -&gt; Int {\n    await counter.increment()\n}</code></pre><p><code>increment</code> is synchronous in its declaration because its body needs no suspension. The external caller still uses <code>await</code> to access another isolation domain. Inside the same actor, a direct call to that synchronous method needs no actor hop. <code>private</code> limits visibility; actor isolation separately limits concurrent access. These two protections answer different questions.</p><p>The call returns an <code>Int</code> snapshot instead of handing out mutable storage. In Kotlin, a suspend function guarded by <code>mutex.withLock</code> could offer a comparable access policy, but Swift's compiler checks many isolation violations directly. An actor does not automatically protect objects it returns if those objects expose unrelated mutable state.</p>"
+        },
+        {
+          "id": "reentrancy",
+          "title": "An await divides your invariant into two moments",
+          "html": "<p>Suppose a credential actor reads its current account, awaits a refresh request, then installs the response. During that suspension, logout can execute on the actor. When refresh resumes, blindly installing its result resurrects credentials. There is no simultaneous unsynchronized memory access, yet the business invariant has been violated. This is actor reentrancy: other actor work can run between the suspended method's segments.</p><p>A Kotlin mutex held across a suspending call may block competing callers from entering the critical section; an actor does not implicitly hold such a lock for an entire async method. Avoid waiting for the network while imagining the actor has reserved its state. Record a generation before suspension, then validate it before committing. Alternatively reserve a resource before suspension and define rollback, or make the whole atomic state transition synchronous.</p><p>The active credential manager increments a credential index when authentication ownership changes. Its completion method rejects a response whose starting index no longer matches. Logout also cancels the operation and resumes waiters. Cancellation requests stop unnecessary work; the index preserves correctness even if the request still completes.</p><p>Read each <code>await</code> as “assumptions about actor state may need rechecking here.” Another actor call can suspend without changing your state, but correctness must not depend on the scheduler choosing that benign ordering. Actor queues also do not promise FIFO fairness as a public scheduling contract.</p>"
+        },
+        {
+          "id": "mainactor",
+          "title": "MainActor is the UI isolation contract",
+          "html": "<p><code>@MainActor</code> can annotate a class, function, property, or protocol. A main-actor view model puts its UI state and state transitions in one isolation domain. In an app, the main actor uses the main thread. The important contract is declared isolation, which callers and the compiler can reason about, rather than repeatedly checking <code>Thread.isMainThread</code>.</p><p>This resembles maintaining Android presentation state on <code>Dispatchers.Main</code>, but a dispatcher selection and a global-actor type annotation are not identical features. Calling an isolated async method from another actor requires an await. Code already on MainActor can synchronously call its synchronous isolated methods. <code>MainActor.run</code> accepts a synchronous isolated body; it is useful for a small state commit from another domain, not for inserting an arbitrary async request into the closure.</p><p>A <code>Task</code> created inside a main-actor method normally inherits that isolation. Synchronous work before its first suspension can therefore block rendering. <code>await</code> means a call may suspend; it does not guarantee that a large decode or sorting loop moves off the main actor. Use a deliberate worker boundary and return Sendable snapshots.</p><p>The repository's <code>SearchServiceModule</code> is explicitly MainActor-isolated. That is evidence about this contract, not a recommendation to annotate all networking types identically. Inspect the called implementation and its executor behavior before drawing a performance conclusion.</p>"
+        },
+        {
+          "id": "sendable",
+          "title": "Sendable describes transfer safety, not immutability everywhere",
+          "html": "<p><code>Sendable</code> is a marker protocol with semantic requirements rather than methods you implement. A struct containing only Sendable values can cross isolation boundaries safely. A struct containing a mutable reference does not become safe merely because the outer wrapper is a value type. A <code>let</code> property holding a mutable class freezes the reference assignment, not the referenced object's contents.</p><pre><code class=\"language-swift\">struct SearchSnapshot: Sendable, Equatable {\n    let query: String\n    let identifiers: [String]\n}\ntypealias SnapshotLoader =\n    @Sendable (String) async throws -&gt; SearchSnapshot\n</code></pre><p><code>@Sendable</code> applies to a closure or function type; it constrains what that closure can capture and how captured state is used. <code>Sendable</code> applies to the values themselves. Here the array contains Sendable strings and has value semantics. The loader can capture an actor reference that safely owns its mutable state, rather than a naked mutable test counter.</p><p>Actors are Sendable references because access to their isolated state is controlled. A MainActor-isolated class can also be safely referenced across domains while its isolated members remain accessible only under the proper isolation. This does not permit a detached task to synchronously mutate its UI properties.</p><p><code>@unchecked Sendable</code> is a manual promise, not synchronization. Use it only when every mutable access is protected by a documented mechanism that the compiler cannot prove. <code>@preconcurrency import</code> can ease integration with legacy annotations; it does not repair a race or make an unsafe dependency safe.</p>"
+        },
+        {
+          "id": "language-settings",
+          "title": "Understand what nonisolated actually opts out of",
+          "html": "<p><code>nonisolated</code> permits a declaration to be used without entering an instance actor's isolation. It cannot freely read or write that actor's protected mutable state. A pure formatting helper or immutable Sendable identifier may fit; a token getter reading mutable credentials does not. Making a method nonisolated to silence a diagnostic often removes the very ownership rule you needed.</p><p>Keep compiler version, Swift language mode, package tools version, target isolation defaults, and deployment availability separate. A <code>swift-tools-version: 5.9</code> header specifies manifest and minimum tooling constraints; it does not prove that every target uses the same concurrency checking. This checkout also has Tuist helpers that select Swift 6 for particular package targets.</p><p>There is an important modern distinction: with Swift 6.2's <code>NonisolatedNonsendingByDefault</code> feature enabled, nonisolated async functions can stay on the caller's actor. Earlier semantics commonly moved them to a generic executor. <code>@concurrent</code>, available with a sufficiently new compiler, explicitly selects execution away from an actor. Never teach “nonisolated async always means background work” as a timeless rule.</p><p>For this unit, the minimal examples use explicit actors and stable value contracts instead of relying on a target's default isolation. Before applying an annotation to production, read the target's effective build settings and dependency annotations. Do not turn on a new language feature globally as part of a small data-layer refactor.</p>"
+        },
+        {
+          "id": "ownership",
+          "title": "An actor is not your entire lifecycle design",
+          "html": "<p>Choose the owner before selecting an actor. A feature-owned cache, an account-owned credential store, and an application-owned constants service have different invalidation and stopping rules. An actor makes access safe; it does not decide which scope should retain the actor or when account changes invalidate its values. An application singleton holding account-specific data can be perfectly race-free and still disclose the previous account's state.</p><p>If multiple callers share an in-flight task, decide whether one caller canceling should cancel the shared operation. Often the service owns that operation and an individual waiter only stops waiting. Implementing prompt per-waiter cancellation requires explicit waiter management; merely awaiting an unstructured task's <code>value</code> does not forward cancellation from the waiter to the shared task.</p><p>Review the credential actor alongside its tests for logout during refresh and concurrent refresh coalescing. The tests use controlled events to establish the relevant interleaving. A successful hundred-run stress test can supplement that evidence, but cannot replace an invariant proof.</p><p>Finally, do not claim that data-race safety establishes transaction isolation across actors, disk, and servers. Two separate actor calls can each be safe yet fail to represent one atomic operation. Design a single owning command where possible, and define explicit reconciliation where external systems are involved.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why can an actor install stale credentials after logout?",
+          "options": [
+            "Actors do not serialize memory access.",
+            "The refresh method can suspend, allowing logout before it resumes.",
+            "MainActor fixes all credential ordering."
+          ],
+          "answer": 1,
+          "explanation": "Actors serialize isolated execution segments, not entire async transactions. A version or ownership check after await prevents an older operation from committing into a newer state."
+        },
+        {
+          "question": "A struct has let box: MutableBox. Is let enough to make it Sendable?",
+          "options": [
+            "Yes, the reference cannot be reassigned.",
+            "No, the referenced object still needs a safe sharing design.",
+            "Yes, provided the struct is Equatable."
+          ],
+          "answer": 1,
+          "explanation": "Reference immutability differs from object immutability. MutableBox must provide safe isolation or synchronization; adding unchecked conformance merely promises this and does not implement it."
+        },
+        {
+          "question": "What does a MainActor Task guarantee about a synchronous sorting loop in its body?",
+          "options": [
+            "The sort automatically runs on a background thread.",
+            "It cannot block because Task is async.",
+            "The sort can occupy MainActor until it finishes or reaches an actual suspension."
+          ],
+          "answer": 2,
+          "explanation": "Task inheritance retains the actor context. Async syntax does not move synchronous CPU work away from UI execution; choose and verify a worker boundary."
+        }
+      ],
+      "exercise": {
+        "brief": "Create a synthetic account-owned snapshot store. A load begun before reset must never repopulate the store, even if the fake loader ignores cancellation.",
+        "steps": [
+          "Define an immutable Sendable snapshot and a @Sendable injected async loader.",
+          "Put state and generation in an actor; record the generation before calling the loader.",
+          "On reset, increment generation and clear state.",
+          "Gate the loader, reset while it is suspended, then resume it and inspect both the thrown outcome and cached state."
+        ],
+        "acceptance": [
+          "All mutable cache state is actor-isolated.",
+          "A late pre-reset response is rejected and cannot refill state.",
+          "The test uses event gates and can complete if the loader ignores cancellation.",
+          "The solution explains what happens to the waiting caller, not just the cache."
+        ],
+        "solution": "<p>The following complete declarations are suitable for a standalone scratch Swift target. <code>StaleLoad</code> is a distinct outcome: the operation's account context changed. A screen may translate that into quiet dismissal, but the repository should not pretend the response is valid for the new account.</p><pre><code class=\"language-swift\">struct AccountSnapshot: Sendable, Equatable {\n    let displayName: String\n}\nenum StaleLoad: Error { case accountChanged }\n\nactor SnapshotStore {\n    private var generation = 0\n    private var cached: AccountSnapshot?\n    private let loader:\n        @Sendable () async throws -&gt; AccountSnapshot\n\n    init(loader: @escaping @Sendable () async throws -&gt; AccountSnapshot) {\n        self.loader = loader\n    }\n\n    func load() async throws -&gt; AccountSnapshot {\n        try Task.checkCancellation()\n        let started = generation\n        let snapshot = try await loader()\n        try Task.checkCancellation()\n        guard generation == started else {\n            throw StaleLoad.accountChanged\n        }\n        cached = snapshot\n        return snapshot\n    }\n\n    func reset() {\n        generation += 1\n        cached = nil\n    }\n\n    func current() -&gt; AccountSnapshot? { cached }\n}</code></pre><p><code>load()</code> calls its dependency before committing. While that await suspends, <code>reset()</code> may run. The later guard compares the original generation to the current generation, so the old response is neither cached nor returned as a current success. The cancellation check also rejects canceled callers; it does not replace the generation guard.</p><p>This small store permits two concurrent loads in the same generation and allows whichever completes last to replace the cache. That is an explicit limitation, not an actor bug. If “latest requested wins” is required, add a request generation separate from account generation. If coalescing is required, track an in-flight operation and its owner. Those policies should be added only after their caller-visible behavior is defined.</p><p>Contrast this worked answer with <code>AsyncCache</code>: its documented invalidation policy allows old callers to receive results while preventing insertion into a new cache generation. Both designs reject stale cache writes, but they deliberately differ in what an old caller receives. Choose the policy that matches the account boundary.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift Evolution SE-0306: Actor isolation and reentrancy",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0306-actors.md"
+        },
+        {
+          "label": "Swift: Sendable",
+          "url": "https://docs.swift.org/latest/documentation/swift/sendable/"
+        },
+        {
+          "label": "Swift: Nonisolated async execution defaults",
+          "url": "https://docs.swift.org/latest/documentation/diagnostics/nonisolated-nonsending-by-default/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Credential ownership and stale completion guard",
+          "path": "ios-client/Projects/Infra/ZDNetworking/Sources/ZDApiClient/CredentialManagerActor.swift",
+          "line": 261,
+          "why": "The completion method checks the credential index before applying a refresh; inspect logout at line 155 for the matching ownership transition."
+        },
+        {
+          "label": "MainActor service contract",
+          "path": "ios-client/Projects/Infra/ZDModules/Sources/ZDModules/SearchServiceModule.swift",
+          "line": 12,
+          "why": "The contract declares its isolation explicitly, which constrains callers and implementations."
+        },
+        {
+          "label": "Swift 6 package target settings",
+          "path": "ios-client/Tuist/ProjectDescriptionHelpers/PackageTargetSettings.swift",
+          "line": 20,
+          "why": "Target language settings must be inspected separately from Package.swift tools-version headers."
+        }
+      ],
+      "checklist": [
+        "I can distinguish serialized actor access from transaction correctness.",
+        "I can defend every invariant across await.",
+        "I can explain Sendable versus @Sendable.",
+        "I can justify UI isolation without putting all CPU work on MainActor.",
+        "I can check target settings before making executor assumptions."
+      ]
+    },
+    {
+      "id": "017",
+      "title": "AsyncSequence, Flow, Combine, and the cost of a bridge",
+      "summary": "Choose stream semantics deliberately: iteration, buffering, delivery, failure, cancellation, and subscriber ownership.",
+      "duration": 90,
+      "level": "Production",
+      "prerequisites": [
+        "015",
+        "016"
+      ],
+      "objectives": [
+        "Read for await and for try await as asynchronous iteration.",
+        "Distinguish AsyncSequence from AsyncStream and from hot or cold stream behavior.",
+        "Choose buffering based on whether values represent replaceable state or required events.",
+        "Audit reactive adapters for failure loss, demand, subscription timing, and producer cancellation."
+      ],
+      "sections": [
+        {
+          "id": "iteration",
+          "title": "Start with a collector, then inspect the source",
+          "html": "<p>If an Android screen collects a <code>Flow</code> of search state, your first questions are whether it is cold, whether it replays, and who cancels collection. Swift's <code>AsyncSequence</code> is the protocol for producing values through an iterator whose <code>next()</code> can suspend. A consumer uses <code>for await</code>, or <code>for try await</code> if iteration can throw. It describes how the consumer asks for values, not whether the source is cold, hot, replaying, multicast, finite, or automatically canceled on navigation.</p><pre><code class=\"language-swift\">func sum&lt;S: AsyncSequence&gt;(_ source: S) async throws -&gt; Int\nwhere S.Element == Int {\n    var total = 0\n    for try await value in source {\n        try Task.checkCancellation()\n        total += value\n    }\n    return total\n}</code></pre><p>The generic parameter <code>S</code> preserves the concrete sequence type. <code>where S.Element == Int</code> constrains its element, rather than converting every value at runtime. This standalone function can consume many different sequence implementations. The loop is sequential: it awaits one value, processes it, then requests another.</p><p>A Kotlin <code>flow { emit(...) }</code> often suspends its producer according to the flow pipeline. That is a useful starting analogy, but the protocol alone cannot promise equivalent producer backpressure. Always inspect the actual Swift sequence implementation before porting a Flow operator or lifecycle assumption.</p>"
+        },
+        {
+          "id": "stream",
+          "title": "AsyncStream adapts a producer to an iterator",
+          "html": "<p><code>AsyncStream&lt;Element&gt;</code> is one concrete AsyncSequence for connecting callbacks or independent producers to async iteration. Its continuation can <code>yield</code> an element and <code>finish</code> production. <code>AsyncThrowingStream</code> can also finish with an error. A continuation is a producer handle, not a suspended function result like <code>CheckedContinuation</code>; these similarly named APIs have different responsibilities.</p><p>A closure-based stream initializer executes its builder when the stream is created. If that builder subscribes to a notification source or launches a task, production can begin before iteration starts. Do not call such a factory “cold” merely because its return value is an AsyncSequence. Conversely, a custom iterator that fetches only in <code>next()</code> can have pull-driven behavior. Multiple calls to a factory can create independent producers.</p><p>Do not treat one AsyncStream as a broadcast channel for arbitrary concurrent consumers. Multicast, replay, and current-state delivery need an explicit abstraction and per-subscriber policy. Sharing one value does not imply that every iterator receives every emitted element. A source intended for one consumer should say so in its contract.</p><p>The checkout has both a small stream helper and a networking stream factory. Read where they are constructed and what work starts at creation. A signature alone does not tell you whether retaining an unused stream retains a running producer.</p>"
+        },
+        {
+          "id": "buffering",
+          "title": "A buffer bound is not producer backpressure",
+          "html": "<p>The common continuation-based AsyncStream defaults to unbounded buffering. If a callback produces faster than the consumer handles values, retained elements can grow until memory becomes a problem. Choose a bound from the meaning of the data, not from a convenient number. <code>.bufferingNewest(1)</code> retains the most recent buffered value and drops older buffered values; <code>.bufferingOldest(1)</code> keeps an older buffered value and drops new arrivals when full.</p><p>These policies limit the queue. They do not suspend a callback producer until space exists. <code>yield</code> returns a result such as enqueued, dropped, or terminated. Check that result if loss or source teardown matters. A slow consumer awaiting <code>next()</code> does not automatically communicate demand to the independent producer behind a continuation.</p><p>Latest buffering can suit replaceable progress or a current position. It does not suit an ordered list of deltas, booking commands, or an event stream in which dropping one element corrupts the next. Streaming text tokens are often cumulative dependencies, so “keep the newest token” can silently discard part of a response. Instead buffer complete snapshots, bound the transport and parser carefully, or use a channel that explicitly suspends senders and defines cancellation.</p><p>Remember that a bounded element count does not bound bytes if a single element can contain an enormous payload. Add payload limits, a policy for overflow, and observability that counts drops without exposing sensitive content.</p>"
+        },
+        {
+          "id": "frameworks",
+          "title": "Map semantics before mapping framework names",
+          "html": "<p>Combine's <code>Publisher</code> protocol has typed output and failure plus subscriber demand. A <code>PassthroughSubject</code> does not replay missed values; a <code>CurrentValueSubject</code> represents a current value with different delivery semantics. Combine's <code>values</code> adapter enables async iteration, but a push source may still produce while the consumer is processing. Do not assume it provides an unlimited lossless queue for every publisher.</p><p>RxSwift's <code>Observable</code> is broadly familiar to an RxJava engineer: disposables, scheduling operators, subjects, and error termination. It does not have Combine's demand protocol. <code>DisposeBag</code> lifetime and <code>AnyCancellable</code> lifetime are resource policies, not equivalents of structured child tasks. Delivering on a main scheduler also differs from a compiler-checked MainActor-isolated API.</p><p>This repository's <code>ZDRxCore</code> re-exports <code>ReactiveKit</code>. That is a specific library; do not relabel it RxSwift because its name contains “Rx.” Modern async code, Combine, ReactiveKit, and PromiseKit may coexist at different boundaries. A course comparison can discuss RxSwift while grounding actual repository claims in imports and implementations.</p><p>Flow, SharedFlow, and StateFlow likewise have distinct contracts. Port “a current state value with replay and equality behavior” or “a stream of non-droppable events,” rather than selecting an iOS framework by superficial name similarity. Framework replacement without a semantic inventory is a behavior change.</p>"
+        },
+        {
+          "id": "bridges",
+          "title": "Audit adapters as small public APIs",
+          "html": "<p>The active <code>Publisher.asAsyncStream()</code> extension uses <code>sink</code>, yields received values, and cancels the subscription on termination. Its failure branch finishes normally. That means an upstream failure becomes end-of-sequence, not a thrown iteration error. This may be intentional for a best-effort notification stream, but cannot be silently reused for a data operation whose consumer needs to show an error.</p><p>The same file's reverse adapter launches a Task feeding a <code>PassthroughSubject</code>, then returns the publisher. The producer starts before subscribers attach, and the shown adapter does not connect subscriber cancellation to the task handle. Those are concrete review questions about timing and ownership; they are not proof of a production incident. Keep observations separate from claims about which callers experience them.</p><p>The networking stream factory provides a stronger ownership example: it retains its producer Task and sets <code>onTermination</code> to cancel it. It also funnels initial request and mid-stream errors through throwing iteration, giving consumers one error path. Still inspect buffering and whether cancellation reaches the actual transport.</p><p>A bridge should declare creation time, subscriber count, replay, buffer limit, failure mapping, and stop behavior. If it changes any of these, name that decision and test it. Fewer callbacks in the implementation do not establish semantic equivalence.</p>"
+        },
+        {
+          "id": "termination",
+          "title": "Stopping iteration and stopping production are separate",
+          "html": "<p><code>finish()</code> closes production; buffered elements can still be consumed before iteration ends. Canceling a waiting consumer can trigger stream termination behavior, which you can use to stop a subscription or producer. Breaking out of a loop is different: if other references retain the stream or continuation, do not assume an immediate termination callback. Give the consumer an explicit stop handle when early exit must promptly stop external work.</p><p><code>onTermination</code> is a Sendable callback that can run outside the UI's isolation. It should perform safe cleanup, such as canceling a task, rather than directly mutating a label or view model. If cleanup needs actor state, design an asynchronous hop carefully and account for its new unstructured lifetime. Prefer a producer that owns its resource and can close it without involving presentation code.</p><p>A useful test creates the stream before collection, generates more values than its buffer, then collects. A second test cancels while awaiting a value. A third stops after the first received value. Count producer starts, drops, and stops independently. Also distinguish an upstream error from normal completion.</p><p>Streams that never finish are legitimate for long-lived observation, but only when their owner and teardown are explicit. Infinite observation retained by a screen can keep both the screen and a resource alive indefinitely.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Does AsyncSequence guarantee a cold, multicast, lossless source?",
+          "options": [
+            "Yes, all iterators receive all values.",
+            "No, it specifies async iteration; the implementation defines those behaviors.",
+            "Yes, if the Element is Sendable."
+          ],
+          "answer": 1,
+          "explanation": "AsyncSequence provides the iterator interface. Production timing, fan-out, replay, buffering, and lifetime remain part of the particular sequence's contract."
+        },
+        {
+          "question": "What happens when a continuation yields into a full bufferingNewest(1) queue?",
+          "options": [
+            "The producer suspends until the consumer catches up.",
+            "An older buffered value can be dropped while the newest value is retained.",
+            "The consumer automatically throws."
+          ],
+          "answer": 1,
+          "explanation": "Continuation yield is not a suspending send. A bounded buffering policy limits retention by dropping values; the producer must handle its yield result if loss matters."
+        },
+        {
+          "question": "Why is mapping Publisher failure to continuation.finish() potentially wrong?",
+          "options": [
+            "AsyncStream always rethrows the original publisher error.",
+            "It turns an upstream error into normal completion.",
+            "finish always cancels the consumer's parent."
+          ],
+          "answer": 1,
+          "explanation": "Plain AsyncStream cannot represent a thrown upstream failure. Use AsyncThrowingStream or an explicit error element when consumer behavior depends on that failure."
+        }
+      ],
+      "exercise": {
+        "brief": "Build a synthetic, single-consumer progress stream with the newest buffered value retained. It must have explicit early-stop behavior and no UI dependencies.",
+        "steps": [
+          "Create a stream and continuation with a one-element newest buffer.",
+          "Launch one owned task that produces integer progress with cancellation-responsive sleep.",
+          "Connect termination to task cancellation and return an explicit stop closure.",
+          "Consume only one value and stop in defer; separately create without consuming to observe intentional buffering loss."
+        ],
+        "acceptance": [
+          "The contract permits dropped progress and excludes ordered event deltas.",
+          "The producer checks termination and always finishes on exit.",
+          "A consumer that breaks early can explicitly stop production.",
+          "The test distinguishes dropped values, normal finish, and canceled work."
+        ],
+        "solution": "<p>This standalone Foundation example uses <code>makeStream</code>, an API available on iOS 17 and corresponding modern platform versions. It uses nanosecond sleep to keep the wait primitive broadly familiar. The stop closure captures only a safe task handle. The buffer holds at most one waiting element, plus any value already being processed.</p><pre><code class=\"language-swift\">import Foundation\n\nfunc progressStream() -&gt; (\n    stream: AsyncStream&lt;Int&gt;,\n    stop: @Sendable () -&gt; Void\n) {\n    let (stream, continuation) = AsyncStream&lt;Int&gt;.makeStream(\n        bufferingPolicy: .bufferingNewest(1)\n    )\n    let task = Task {\n        defer { continuation.finish() }\n        do {\n            for value in 0...10 {\n                try Task.checkCancellation()\n                switch continuation.yield(value) {\n                case .terminated:\n                    return\n                case .dropped, .enqueued:\n                    break\n                @unknown default:\n                    break\n                }\n                try await Task.sleep(nanoseconds: 10_000_000)\n            }\n        } catch {\n            // Progress cancellation is quiet completion by contract.\n        }\n    }\n    continuation.onTermination = { _ in task.cancel() }\n    return (stream, { task.cancel() })\n}\n\nfunc observeFirstProgress() async -&gt; Int? {\n    let (stream, stop) = progressStream()\n    defer { stop() }\n    for await value in stream {\n        return value\n    }\n    return nil\n}</code></pre><p>The producer's defer closes the stream on normal completion, cancellation, or termination. The consumer's defer explicitly cancels on early return even if it still holds a stream reference. This example intentionally treats producer cancellation as normal completion because progress is advisory; a request-result stream should preserve its failure contract instead.</p><p>The dropped branch currently accepts loss. In an instrumented exercise, count drops in an actor or another synchronized metric collector. Do not spawn one task per drop, since that can create an unbounded backlog outside the bounded stream. A later requirement for every update would demand a different producer-consumer protocol, not merely a larger magic buffer size.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: AsyncStream",
+          "url": "https://developer.apple.com/documentation/swift/asyncstream"
+        },
+        {
+          "label": "Swift Evolution SE-0314: Stream buffering and termination",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0314-async-stream.md"
+        },
+        {
+          "label": "Apple: Combine Publisher",
+          "url": "https://developer.apple.com/documentation/combine/publisher"
+        },
+        {
+          "label": "Kotlin: Asynchronous Flow",
+          "url": "https://kotlinlang.org/docs/flow.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Combine and async adapters",
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDCoreBase/Extensions/Publisher+AsyncStream.swift",
+          "line": 7,
+          "why": "Inspect failure-to-finish mapping, buffering defaults, termination cleanup, and the reverse adapter's eager task."
+        },
+        {
+          "label": "Networking producer ownership",
+          "path": "ios-client/Projects/Infra/ZDNetworking/Sources/ZDApiClient/ApiClient+Streaming.swift",
+          "line": 55,
+          "why": "The stream creates a Task, preserves failures, and cancels its producer through onTermination."
+        },
+        {
+          "label": "Actual reactive library export",
+          "path": "ios-client/Projects/Infra/ZDRxCore/Sources/ZDRxCore/ZDRxCore.swift",
+          "line": 8,
+          "why": "The active target re-exports ReactiveKit; RxSwift comparisons are conceptual rather than a claim about this import."
+        }
+      ],
+      "checklist": [
+        "I can describe the source semantics behind for await.",
+        "I can explain buffering versus producer backpressure.",
+        "I can choose state or event delivery without silently dropping required events.",
+        "I can audit a bridge's error and lifetime behavior.",
+        "I can stop an independent producer after early consumer exit."
+      ]
+    },
+    {
+      "id": "018",
+      "title": "URLSession, Codable, authentication, and safe retries",
+      "summary": "Design a request pipeline that preserves transport, HTTP, decoding, cancellation, and credential semantics.",
+      "duration": 100,
+      "level": "Production",
+      "prerequisites": [
+        "015",
+        "016",
+        "017"
+      ],
+      "objectives": [
+        "Validate HTTP responses before decoding and keep transport errors distinct.",
+        "Model missing, null, and malformed JSON according to the endpoint contract.",
+        "Attach credentials only at a trusted request boundary and reason about refresh ownership.",
+        "Define a bounded, cancellation-aware retry policy based on idempotency."
+      ],
+      "sections": [
+        {
+          "id": "pipeline",
+          "title": "Think of the OkHttp and Retrofit boundary",
+          "html": "<p>An Android engineer already knows that an OkHttp call succeeding at transport does not mean the HTTP status represents application success. Swift has the same layers. <code>URLSession</code> sends requests and manages transport details. <code>JSONDecoder</code> converts bytes to Decodable values. Neither automatically defines your domain's authorization, validation, retry, or user-message policy. A <code>404</code> or <code>500</code> can arrive as a valid HTTP response without a thrown transport error.</p><p>Separate request construction, credential adaptation, transport, HTTP validation, decoding, domain mapping, and caching. A small injectable transport protocol lets tests supply bytes and responses without hitting a server. A repository can depend on the protocol while app composition provides the real session and any interception required by the product.</p><p>The active <code>URLSessionDispatcher</code> injects a <code>URLSessionDataTaskProvider</code>; its documentation assigns request interception to app composition. This is an actual boundary in the checkout, not permission to bypass interception with <code>URLSession.shared</code> in a feature. The learning examples use synthetic endpoints and fakes; production requests must go through the approved client configuration.</p><p>Write the failure taxonomy before the implementation. A canceled operation, an offline transport, an HTTP rejection, and malformed successful JSON need different recovery decisions even if each eventually becomes one UI error state.</p>"
+        },
+        {
+          "id": "urlsession",
+          "title": "Read the async API and response explicitly",
+          "html": "<p><code>URLRequest</code> is the request value: URL, method, headers, body, and timeout. Use <code>URLComponents</code> and query items for query construction rather than concatenating user input into a URL. Preserve the server's distinction between query encoding and path-segment encoding. <code>setValue</code> replaces a header field's value; <code>addValue</code> appends, which is rarely appropriate for an Authorization header.</p><p><code>try await session.data(for: request)</code> returns <code>(Data, URLResponse)</code>. <code>for:</code> is an argument label, while tuple destructuring names the two results locally. Cast the response to <code>HTTPURLResponse</code> before inspecting status. The data method generally buffers the response body; for incremental processing inspect the bytes API and the sequence's ownership. Async URLSession APIs require an appropriate deployment target, commonly iOS 15 or later.</p><p>A JSON-bearing <code>200</code> response, a successful empty <code>204</code>, and a cache-validation <code>304</code> are different contracts. Do not indiscriminately decode every successful response into the same model. HTTP caches may process conditional responses before your consumer sees them, so integrate application freshness rules with session cache policy rather than inventing a second independent cache.</p><p>Preserve <code>CancellationError</code> and transport cancellation such as <code>URLError.cancelled</code>. The repository dispatcher shows both special cases before mapping offline failures. A broad error transformation can otherwise turn navigation cancellation into an alarming connectivity message.</p>"
+        },
+        {
+          "id": "codable",
+          "title": "Codable models a wire shape, not a universal schema",
+          "html": "<p><code>Codable</code> combines <code>Encodable</code> and <code>Decodable</code>. Use only Decodable for a response type when encoding is unnecessary. Synthesized conformance maps stored properties to keyed JSON fields; a nested <code>CodingKeys</code> enum can rename fields explicitly. Keep DTOs separate from domain models when dates, identifiers, or optional fields have endpoint-specific meaning.</p><pre><code class=\"language-swift\">struct CardDTO: Decodable, Sendable {\n    let id: String\n    let title: String\n    let subtitle: String?\n    enum CodingKeys: String, CodingKey {\n        case id\n        case title = \"display_title\"\n        case subtitle\n    }\n}</code></pre><p><code>String?</code> permits absence or JSON null under synthesized optional decoding. A number where a string is expected still throws; optionality is not permissive type coercion. A default stored-property value does not reliably provide your intended “missing key” decoding behavior. Write an explicit initializer when fallback is part of the schema.</p><p>Choose key and date strategies deliberately. Automatic snake-case conversion is convenient but can be surprising around acronyms and manual CodingKeys. Date strategies do not make every timestamp format equivalent; fractional seconds and timezone rules need fixture coverage. New unknown object keys are usually ignored, while an enum receiving an unknown raw value can fail decoding. Compatibility policy must be explicit rather than accomplished by turning every field optional.</p>"
+        },
+        {
+          "id": "null",
+          "title": "Missing and explicit null can carry different commands",
+          "html": "<p><code>decodeIfPresent</code> returns nil for both a missing key and a key whose JSON value is null. That is often right for read-only display data. It is wrong when a patch endpoint uses omission for “leave unchanged” and null for “clear.” <code>contains</code> detects whether the key exists; after that, <code>decodeNil</code> distinguishes explicit null. A value of the wrong type should still fail.</p><pre><code class=\"language-swift\">enum FieldChange: Sendable, Equatable {\n    case omitted\n    case clear\n    case set(String)\n}\nstruct NoteChange: Decodable, Sendable {\n    let note: FieldChange\n    enum CodingKeys: String, CodingKey { case note }\n\n    init(from decoder: any Decoder) throws {\n        let box = try decoder.container(keyedBy: CodingKeys.self)\n        if !box.contains(.note) {\n            note = .omitted\n        } else if try box.decodeNil(forKey: .note) {\n            note = .clear\n        } else {\n            note = .set(try box.decode(String.self, forKey: .note))\n        }\n    }\n}</code></pre><p>The leading dot uses contextual type inference for enum cases and CodingKeys. This standalone model intentionally decodes only; encoding a patch needs the matching explicit policy: omit the key, encode nil, or encode the string. Synthesized encoding of a normal optional often omits nil keys, so it cannot silently stand in for a clear command.</p><p>Keep fixtures for <code>{}</code>, <code>{\"note\":null}</code>, <code>{\"note\":\"synthetic\"}</code>, and <code>{\"note\":7}</code>. The last fixture proves the distinction does not accidentally accept malformed data.</p>"
+        },
+        {
+          "id": "credentials",
+          "title": "Refresh is shared account work with a commit rule",
+          "html": "<p>Attach a bearer token only to allowed HTTPS hosts and intended endpoints. Redirects, alternate hosts, and caller-provided headers need an explicit policy; never send secrets to whichever URL a feature constructs. URLSession authentication challenges concern transport authentication and are not the same mechanism as adding an OAuth bearer header. Keep token material out of URLs, logs, analytics, and test snapshots.</p><p>The credential actor in this checkout checks a trusted-domain predicate, HTTPS, and whether Authorization already exists before adding a token. It coalesces authentication work and uses a credential index to reject stale completion. Inspect its preconditions rather than teaching “every 401 triggers refresh.” A refresh endpoint must avoid recursively triggering the same credential adaptation or refresh path.</p><p>Multiple callers failing together should not initiate a refresh storm. The account service usually owns one refresh, while callers wait for its outcome. A caller's cancellation and logout are different: an individual canceled screen should not necessarily cancel refresh needed by other screens; logout invalidates account ownership and must prevent any old result from restoring credentials.</p><p>Allow at most the documented number of refresh attempts per request. Refresh failure may mean expired authorization, a temporary transport failure, or a server policy rejection. Do not reduce all three to an automatic retry loop or an unconditional logout without the endpoint's actual contract.</p>"
+        },
+        {
+          "id": "retries",
+          "title": "Retries must preserve the meaning of the operation",
+          "html": "<p>Retry a request only when replay is permitted. A read-only GET is often idempotent, but a booking or payment POST can succeed on the server even when the client sees a timeout. Retrying that POST can create a duplicate. A supported idempotency key, held stable for the logical operation, can permit safe replay; changing the key on each attempt defeats that protection.</p><p>Use an attempt cap, a total deadline, exponential delay with jitter where appropriate, and cancellation-responsive waiting. Honor a valid <code>Retry-After</code> when your endpoint policy requires it. A status such as 429 or 503 is a candidate for policy evaluation, not an unconditional directive to retry. Decoding errors and most validation failures generally need a contract or code correction rather than repetition.</p><p>A request body must also be replayable. A consumed stream, signed request, expiring token, or one-time nonce may require rebuilding the request. Attach freshly adapted credentials after refresh while preserving the logical request identity. Test maximum attempts and cancellation during delay; never swallow cancellation and then schedule another attempt.</p><p>The active app constructs both the existing dispatcher and an alternate URLSession dispatcher, with selection managed elsewhere. This lesson explains the transport boundary; it does not claim the whole application has already migrated. Preserve request hooks, cookies, TLS configuration, interception, and tracing when comparing transports.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "URLSession returns data and an HTTPURLResponse with status 500. Must data(for:) have thrown?",
+          "options": [
+            "Yes, non-2xx always throws.",
+            "No, HTTP status validation belongs to the request pipeline.",
+            "Only if JSONDecoder is configured."
+          ],
+          "answer": 1,
+          "explanation": "A server error can be a successfully delivered HTTP exchange. Validate status before decoding a success model and preserve the distinction from transport failure."
+        },
+        {
+          "question": "A patch field uses omission for unchanged and null for clear. Is String? with decodeIfPresent sufficient?",
+          "options": [
+            "Yes, both meanings should be nil.",
+            "No, inspect key presence and explicit null separately.",
+            "Only if convertFromSnakeCase is enabled."
+          ],
+          "answer": 1,
+          "explanation": "decodeIfPresent intentionally collapses absent and null into nil. contains plus decodeNil can preserve three states while still rejecting a wrong value type."
+        },
+        {
+          "question": "A booking POST times out after the server may have committed it. What permits a safe replay?",
+          "options": [
+            "Increasing the timeout always makes replay safe.",
+            "A verified server idempotency contract and stable logical operation identity.",
+            "Changing the idempotency key on every attempt."
+          ],
+          "answer": 1,
+          "explanation": "Client uncertainty does not prove server failure. Replays need the endpoint's supported idempotency semantics; using a new key can create a new operation."
+        }
+      ],
+      "exercise": {
+        "brief": "Implement a fakeable read client for synthetic cards, then test status, decoding, and cancellation. Keep retries out until the endpoint policy is explicitly supplied.",
+        "steps": [
+          "Define a Sendable transport protocol returning bytes and response metadata.",
+          "Validate an HTTP response and the endpoint's success status before decoding.",
+          "Map DTO fields to a small domain value; preserve nil subtitle.",
+          "Use fake responses for valid JSON, 401, 204, malformed JSON, and cancellation; additionally test NoteChange's four fixtures."
+        ],
+        "acceptance": [
+          "Non-HTTP responses and unacceptable statuses cannot become valid cards.",
+          "Required fields fail if absent or malformed; optional subtitle permits missing and null.",
+          "Cancellation propagates without retry or empty success.",
+          "All fixtures and identifiers are synthetic; no real service is contacted."
+        ],
+        "solution": "<p>These standalone Foundation declarations make transport replaceable and keep decoding out of UI code. The fixture transport in your test should implement the protocol; the client itself never chooses a global session. Its contract expects a JSON representation for successful responses, so it rejects 204 explicitly.</p><pre><code class=\"language-swift\">import Foundation\n\nprotocol CardTransport: Sendable {\n    func data(for request: URLRequest) async throws -&gt; (Data, URLResponse)\n}\nstruct Card: Sendable, Equatable {\n    let id: String\n    let title: String\n    let subtitle: String?\n}\nenum CardReadError: Error {\n    case nonHTTP\n    case status(Int)\n    case emptyRepresentation\n}\nstruct CardClient: Sendable {\n    let transport: any CardTransport\n\n    func read(_ request: URLRequest) async throws -&gt; Card {\n        try Task.checkCancellation()\n        let (data, response) = try await transport.data(for: request)\n        try Task.checkCancellation()\n        guard let http = response as? HTTPURLResponse else {\n            throw CardReadError.nonHTTP\n        }\n        guard (200...299).contains(http.statusCode) else {\n            throw CardReadError.status(http.statusCode)\n        }\n        guard http.statusCode != 204, !data.isEmpty else {\n            throw CardReadError.emptyRepresentation\n        }\n        let dto = try JSONDecoder().decode(CardDTO.self, from: data)\n        return Card(id: dto.id, title: dto.title, subtitle: dto.subtitle)\n    }\n}</code></pre><p><code>any CardTransport</code> stores an existential dependency: a value conforming to the protocol whose concrete type can vary. The protocol's Sendable requirement makes that dependency safe to carry with this client across isolation domains. The local decoder avoids concurrently mutating shared decoder configuration.</p><p>A fixture with status 401 and malformed bytes must yield the status error, proving HTTP validation precedes decoding. A 200 with a numeric title must yield a decoding error. A transport throwing cancellation must keep that cancellation observable. Use <code>https://example.invalid/cards/synthetic-1</code> only to construct request and response metadata for a fake; do not send it over the network.</p><p>This minimal client deliberately has no refresh or retry implementation. Its worked boundary makes those policies testable additions rather than accidental generic behavior. In a production adapter, inject the repository's approved transport, define response size and content-type constraints, and put account refresh policy in its established owner.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: URLSession async data",
+          "url": "https://developer.apple.com/documentation/foundation/urlsession/data(for:delegate:)"
+        },
+        {
+          "label": "Apple: Encoding and decoding custom types",
+          "url": "https://developer.apple.com/documentation/foundation/encoding-and-decoding-custom-types"
+        },
+        {
+          "label": "Swift: KeyedDecodingContainer",
+          "url": "https://docs.swift.org/latest/documentation/swift/keyeddecodingcontainer/"
+        },
+        {
+          "label": "IETF RFC 9110: HTTP semantics and idempotency",
+          "url": "https://www.rfc-editor.org/rfc/rfc9110.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Injectable URLSession data-task boundary",
+          "path": "ios-client/Projects/Infra/ZDNetworking/Sources/ZDApiClient/URLSessionDispatcher.swift",
+          "line": 18,
+          "why": "The Sendable provider contract separates transport from interception; cancellation is preserved before reachability mapping."
+        },
+        {
+          "label": "Credential attachment constraints",
+          "path": "ios-client/Projects/Infra/ZDNetworking/Sources/ZDApiClient/CredentialManagerActor.swift",
+          "line": 81,
+          "why": "Credential adaptation checks domain, HTTPS, and existing Authorization rather than allowing arbitrary feature attachment."
+        },
+        {
+          "label": "App transport composition",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Controllers/API/ApiClient+Extensions.swift",
+          "line": 182,
+          "why": "The active app constructs a configured URLSession and injected interception provider as an alternate dispatcher."
+        }
+      ],
+      "checklist": [
+        "I can distinguish transport success from HTTP and domain success.",
+        "I can preserve missing, null, and malformed values where the API needs them.",
+        "I can explain why token attachment belongs to a trusted boundary.",
+        "I can justify each replay using an idempotency contract.",
+        "I can test decoding and cancellation entirely with synthetic fakes."
+      ]
+    },
+    {
+      "id": "019",
+      "title": "Persistence, protocol contracts, DI, and ZDModules",
+      "summary": "Choose storage by data ownership and durability, then compose isolated implementations behind honest module contracts.",
+      "duration": 95,
+      "level": "Production",
+      "prerequisites": [
+        "016",
+        "018"
+      ],
+      "objectives": [
+        "Separate preferences, cache, durable user data, and credentials.",
+        "Define account ownership, logout invalidation, and migration rules before choosing storage.",
+        "Use protocol dependencies with explicit isolation and composition lifetime.",
+        "Read ZDModules and Swinject boundaries without assuming a framework supplies thread safety."
+      ],
+      "sections": [
+        {
+          "id": "ownership",
+          "title": "Begin with the data's owner and promise",
+          "html": "<p>On Android you distinguish DataStore preferences, a Room database, cached HTTP responses, and credential storage. Start with the same categories on iOS. For each value, name its owner, lifetime, sensitivity, source of truth, and recovery behavior. “Persist this object” is incomplete until you know whether it is a user-authored draft, a server-derived cache, an application preference, or an account credential.</p><p>A cache can usually be discarded and rebuilt. A draft may be the only copy of a user's work. Preferences influence behavior but should not become a hidden database. Credentials authorize access and require a security-specific store. Placing them all in one convenience JSON file makes backup, deletion, and error handling harder to explain.</p><p>Account ownership is distinct from persistence mechanism. An in-memory dictionary shared across accounts can leak prior account data even though nothing is written to disk. An encrypted database can make the same mistake if queries omit account scope. Include account identity or a scoped store instance in the contract, and invalidate pending work when that identity changes.</p><p>Decide what logout clears, what can remain as non-sensitive public cache, and what a late operation is allowed to commit. A task finishing after logout must not recreate the deleted account cache or credential. This is a cross-layer ownership rule rather than a storage API option.</p>"
+        },
+        {
+          "id": "storage-choice",
+          "title": "Match the mechanism to the durability requirement",
+          "html": "<p><code>UserDefaults</code> is suitable for small preference values, such as a synthetic tutorial setting. It is not a secrets vault, not a general transactional repository, and not a promise that a multi-key update is atomic. Distinguish absent values from legitimate false or zero values; a default-returning getter can hide absence. Registration defaults and actual persisted values also have different meanings.</p><p>Files work well for bounded serialized snapshots when you define schema versioning, atomic replacement, error behavior, and backup policy. Cache directories can be purged by the system; do not store irreplaceable drafts there. Application Support and Documents serve different purposes. A sandbox limits access by other apps, but does not remove the need to choose data protection and backup exclusions according to sensitivity.</p><p>For richer relationships and queries, Core Data manages object graphs and persistence; SwiftData offers a newer model API on supported platforms, including iOS 17+. Neither is a line-for-line Room replacement. Core Data managed object contexts have queue confinement rules, and SwiftData model contexts require appropriate isolation. Do not pass live managed objects across arbitrary tasks; pass stable IDs or immutable snapshots and refetch in the destination context.</p><p>A repository actor can own a store adapter, but that actor does not automatically override the underlying framework's context or queue rules. Preserve both layers' constraints. Model migration, transaction boundaries, and recovery from corruption deserve fixture-backed decisions before shipping an updated schema.</p>"
+        },
+        {
+          "id": "keychain",
+          "title": "Keychain protects secrets under a specific access policy",
+          "html": "<p>The Keychain is the iOS mechanism for small secrets such as tokens. It is not simply an encrypted UserDefaults. Item class, service, account, access group, accessibility, and synchronization settings influence identity and behavior. Handle OSStatus explicitly: missing item, duplicate item, denied access, and temporarily unavailable protected data have different meanings. A storage read error is not proof that the user has no credential.</p><p><code>WhenUnlocked</code> limits access to unlocked-device periods. <code>AfterFirstUnlock</code> may fit some background work but offers a different access window. A <code>ThisDeviceOnly</code> variant prevents migration of the item to another device through backup restore; it does not by itself define iCloud synchronization or every lifetime property. Accessibility is also different from requiring user authentication for each access.</p><p>The active credential storage sets <code>kSecAttrAccessibleWhenUnlocked</code>, which can migrate with encrypted backups. Teach that observed policy accurately; do not silently describe it as ThisDeviceOnly. A product's background-refresh and account-security needs determine whether a different policy is appropriate.</p><p>Do not depend on app uninstall reliably clearing Keychain items or on universal reinstall persistence. Define account reset and credential deletion deliberately and verify supported device behavior. Disk cleanup and Keychain cleanup are separate operations. Never print the token while diagnosing a failed delete, and test errors using fakes rather than real account secrets.</p>"
+        },
+        {
+          "id": "protocols",
+          "title": "A protocol is a behavioral and isolation contract",
+          "html": "<p>A Swift protocol lists required capabilities; an implementation can be a struct, class, or actor if its isolation fits the requirements. A synchronous nonisolated requirement cannot casually be satisfied by an actor method accessing actor state. An async requirement can provide the suspension point needed to access an actor implementation. For UI capabilities, a MainActor protocol can make the intended calling domain explicit.</p><pre><code class=\"language-swift\">struct StoredCard: Codable, Sendable, Equatable {\n    let id: String\n    let title: String\n}\nprotocol CardStore: Sendable {\n    func read(for accountID: String) async throws -&gt; [StoredCard]\n    func replace(_ cards: [StoredCard], for accountID: String) async throws\n    func clear(for accountID: String) async throws\n}</code></pre><p>The first parameter of <code>replace</code> has no external label because of <code>_</code>; the account uses the explicit label <code>for:</code>. The protocol requires Sendable because consumers may hold it across isolation domains. It does not promise a particular database or silently require UI isolation.</p><p><code>any CardStore</code> is an existential value holding some implementation. A generic <code>T: CardStore</code> preserves the concrete type and can express additional constraints. Choose based on the module boundary and testability; do not introduce protocols for every small helper merely to imitate an Android architecture template. A useful protocol separates an actual ownership or replacement boundary.</p>"
+        },
+        {
+          "id": "composition",
+          "title": "DI chooses lifetime; it does not make lifetime safe",
+          "html": "<p>Constructor injection makes required dependencies visible and supports focused tests. A composition root chooses real implementations and scopes: application, account, feature, or request. On Android a DI component may encode these scopes. In Swift, manual construction or a container can achieve them, but you must still decide retention and teardown explicitly.</p><p>The active <code>DIContainer</code> aliases Swinject's Container. Its <code>set(value:for:)</code> helper registers container-scoped instances. Its child-container helper explicitly says the caller must retain the child. Those are concrete retention choices. A singleton registration does not make a mutable service Sendable, and a DI container is not an isolation domain just because many dependencies pass through it.</p><p>Resolve the correct protocol type at composition, then pass it to the feature. Registering a concrete type when consumers resolve a protocol can produce missing dependencies or unintended fallback instances. The helper's generic default type is convenient, so inspect call sites that explicitly use <code>for:</code>. Silent fallback creation can also accidentally bypass account-scoped configuration.</p><p>Prefer tests that inject an in-memory actor store over tests that share a global container. The fake should preserve cancellation, account scope, and error semantics relevant to the test. A fake that always returns success cannot establish that a persistence failure is handled correctly.</p>"
+        },
+        {
+          "id": "module-contracts",
+          "title": "Read ZDModules as the checkout's actual seam",
+          "html": "<p><code>ZDModules</code> holds cross-feature contracts and associated models. Its SearchServiceModule is MainActor-isolated and offers an async throwing search capability. Its AuthModule includes navigation-facing types and UIKit imports. Therefore this module is not a universally platform-free domain package. Do not describe a desired clean architecture as if every current boundary already meets it.</p><p>A shared contract should avoid forcing one feature to import another feature's concrete implementation. It can still intentionally expose platform capabilities where coordination requires them. Review the Package.swift dependencies and public signatures together: an interface-only intention can be weakened by adding heavyweight shared types or feature-specific implementation details.</p><p>When adding a hypothetical store boundary, decide whether it belongs in a feature, infrastructure, or a shared contract module based on real consumers. Do not place everything in ZDModules to make it discoverable. Avoid circular dependencies, unnecessary public surface, and protocols carrying raw decoder or database-context types into UI code.</p><p>Migration should preserve current callers while a new adapter is introduced. Document store schema, account scope, and fallback behavior alongside the protocol. A renamed interface is not an architecture improvement if it still hides a global, returns unsafe live objects, or loses cancellation. The next lab composes these decisions with a request pipeline.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A Keychain read returns a protected-data availability error. What should the store infer?",
+          "options": [
+            "The credential is definitely absent.",
+            "The read failed under current conditions; absence requires its own status.",
+            "The token must be copied into UserDefaults."
+          ],
+          "answer": 1,
+          "explanation": "Availability and missing-item outcomes are different. Treating all errors as absence can cause incorrect login or overwrite behavior and hides the real storage condition."
+        },
+        {
+          "question": "Does registering one instance in Swinject's container make its mutable state safe across tasks?",
+          "options": [
+            "Yes, singleton scope supplies a lock.",
+            "No, retention scope and concurrency isolation are separate contracts.",
+            "Yes, if the service has a protocol."
+          ],
+          "answer": 1,
+          "explanation": "The container decides which instance callers receive. The instance still needs actor isolation, immutable values, or another correct synchronization design."
+        },
+        {
+          "question": "Why should a data protocol return snapshots rather than arbitrary live Core Data objects?",
+          "options": [
+            "Snapshots remove all storage errors.",
+            "Live objects have context and queue constraints; snapshots can be designed for safe transfer.",
+            "Core Data can never be used in async code."
+          ],
+          "answer": 1,
+          "explanation": "Context confinement remains relevant under concurrency. Pass stable IDs or Sendable value snapshots and use the appropriate context to access managed state."
+        }
+      ],
+      "exercise": {
+        "brief": "Implement an account-scoped in-memory CardStore and compose a synthetic feature with it. Document what a disk-backed adapter must add before claiming durability.",
+        "steps": [
+          "Use the StoredCard and CardStore declarations from the lesson.",
+          "Implement actor-owned dictionaries keyed by synthetic account ID.",
+          "Construct a feature dependency value with an explicit any CardStore rather than resolving globals inside methods.",
+          "Verify account A and B remain independent, clearing A leaves B, and replacement is one actor-isolated transition.",
+          "Write a durability note covering schema, protected data, transactions, backup, and failures."
+        ],
+        "acceptance": [
+          "Account identity is required for every storage operation.",
+          "The fake safely crosses task boundaries without unchecked Sendable.",
+          "The dependency lifetime is visible at composition.",
+          "In-memory success is never claimed as durable disk persistence or Keychain behavior."
+        ],
+        "solution": "<p>The following declarations extend the earlier protocol example in a scratch target. The actor satisfies async protocol requirements with synchronous isolated operations; an external caller's await provides the actor entry. No method suspends halfway through dictionary replacement.</p><pre><code class=\"language-swift\">actor MemoryCardStore: CardStore {\n    private var cardsByAccount: [String: [StoredCard]] = [:]\n\n    func read(for accountID: String) throws -&gt; [StoredCard] {\n        try Task.checkCancellation()\n        return cardsByAccount[accountID] ?? []\n    }\n\n    func replace(_ cards: [StoredCard], for accountID: String) throws {\n        try Task.checkCancellation()\n        cardsByAccount[accountID] = cards\n    }\n\n    func clear(for accountID: String) throws {\n        try Task.checkCancellation()\n        cardsByAccount[accountID] = nil\n    }\n}\n\nstruct CardFeatureDependencies: Sendable {\n    let accountID: String\n    let store: any CardStore\n}\n\nfunc syntheticDependencies() -&gt; CardFeatureDependencies {\n    CardFeatureDependencies(\n        accountID: \"synthetic-account-a\",\n        store: MemoryCardStore()\n    )\n}</code></pre><p>Use <code>try await store.replace(..., for: \"synthetic-account-a\")</code>, then read A and B through the same protocol. Store a different card for B, clear A, and verify B survives. The protocol declares throws even though this fake has only cancellation-related failure; a durable implementation can report disk or schema errors without changing all consumers.</p><p>The memory fake equates an absent account entry with an empty collection. That is acceptable for this exercise's contract, but a cache requiring “never loaded” versus “loaded empty” needs a separate optional or freshness record. Replacing a collection is atomic with respect to this actor's in-memory state; it does not establish transaction durability on disk.</p><p>A disk-backed worked design would encode a schema-versioned envelope, write to an appropriate account-scoped path with an atomic replacement policy, select protection and backup behavior, and preserve distinct read/write failures. A credential adapter instead uses Keychain identities and OSStatus handling. Keep those adapters separate. Finally, pair logout clearing with invalidation of pending repository work so an old request cannot refill A after this store clears it.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: UserDefaults",
+          "url": "https://developer.apple.com/documentation/foundation/userdefaults"
+        },
+        {
+          "label": "Apple: Restricting Keychain accessibility",
+          "url": "https://developer.apple.com/documentation/security/restricting-keychain-item-accessibility"
+        },
+        {
+          "label": "Apple: Core Data concurrency",
+          "url": "https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/CoreData/Concurrency.html"
+        },
+        {
+          "label": "Swift: Protocols",
+          "url": "https://docs.swift.org/swift-book/LanguageGuide/Protocols.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Swinject registration and child lifetime",
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDCoreBase/DI/DIContainer.swift",
+          "line": 24,
+          "why": "The helper registers container-scoped instances and documents retention of child containers."
+        },
+        {
+          "label": "Credential persistence accessibility",
+          "path": "ios-client/Projects/Infra/ZDNetworking/Sources/ZDApiClient/Credential+Storage.swift",
+          "line": 78,
+          "why": "The checkout explicitly stores credentials with WhenUnlocked accessibility and handles Keychain identity through service/account."
+        },
+        {
+          "label": "Shared search module contract",
+          "path": "ios-client/Projects/Infra/ZDModules/Sources/ZDModules/SearchServiceModule.swift",
+          "line": 13,
+          "why": "A verified cross-feature async protocol with explicit MainActor isolation."
+        },
+        {
+          "label": "Actual shared module dependencies",
+          "path": "ios-client/Projects/Infra/ZDModules/Package.swift",
+          "line": 44,
+          "why": "Read the target dependencies before describing ZDModules as a platform-free domain layer."
+        }
+      ],
+      "checklist": [
+        "I can assign a source of truth and account owner to each stored value.",
+        "I can explain preference, cache, durable data, and credential tradeoffs.",
+        "I can preserve storage errors instead of pretending every failure means absence.",
+        "I can separate DI scope from actor isolation.",
+        "I can place a shared protocol based on real consumers and module dependencies."
+      ]
+    },
+    {
+      "id": "020",
+      "title": "Data layer lab: a repository with observable correctness",
+      "summary": "Compose a fakeable remote boundary, account-scoped cache, cancellation, and latest-request commit rules in a synthetic lab.",
+      "duration": 120,
+      "level": "Lab",
+      "prerequisites": [
+        "015",
+        "016",
+        "017",
+        "018",
+        "019"
+      ],
+      "objectives": [
+        "Write a caller-visible repository contract before implementation.",
+        "Separate transport DTOs from Sendable domain snapshots.",
+        "Prevent old requests from committing after account changes or newer requests.",
+        "Verify failure ordering with deterministic gated fakes and honest cache semantics."
+      ],
+      "sections": [
+        {
+          "id": "contract",
+          "title": "Port a behavior, not an architecture diagram",
+          "html": "<p>Picture an Android repository combining Retrofit responses with a memory cache while a ViewModel renders the latest account's cards. Port the caller-visible behavior first. The iOS lab should load synthetic cards, cache a successful snapshot, force refresh on demand, preserve cancellation, and reject responses belonging to a superseded request or previous account. Naming a type Repository does not establish any of those guarantees.</p><p>Write the contract in ordinary language: the cache is memory-only and account-scoped; cached reads return the current successful snapshot; forced requests bypass that cache; a refresh failure preserves the previous snapshot but throws to the caller; only the latest started network request for the current account may commit. A superseded result is a distinct error, not an empty success. Changing account clears the cache and invalidates outstanding results.</p><p>This latest-started policy has a consequence: if a newer request fails, an older request still cannot install its later success. Another product might prefer newest successful response or explicit coalescing. Those are different policies, so choose and test one. Do not let task scheduling accidentally choose your product behavior.</p><p>The lab uses no real account, endpoint, database, or token. Build it in a scratch target. The course presents a worked design for comparison, while leaving you to create and run the practice implementation.</p>"
+        },
+        {
+          "id": "boundaries",
+          "title": "Give each layer one decision to own",
+          "html": "<p>The remote adapter owns request construction, approved transport usage, status validation, decoding, and DTO-to-domain conversion. The repository owns cache and request generations. Presentation owns UI identity, loading state, and whether cancellation or supersession should be silent. Credentials remain with the established account networking boundary. Keeping these decisions separate makes it possible to test them independently.</p><p>Define a small <code>LabRemote: Sendable</code> protocol with an async throwing fetch method, and use immutable <code>LabCard</code> values. Do not pass a dictionary of <code>Any</code> or a live database object across actors. A fake implementing the same protocol can pause a response until the test releases it. A production adapter would use session 018's pipeline rather than constructing an unconfigured session in the repository.</p><p>The returned snapshot includes account identity, not just cards. That helps presentation verify that it still belongs to the screen's current account. It does not authorize logging that identity or any real user data. In the lab all identifiers are synthetic.</p><p>Do not add DI resolution inside fetch or load. Supply the remote implementation once during construction. The composition root then makes lifetime and substitution reviewable. A protocol does not need a container to be useful; a direct initializer is sufficient for this experiment.</p>"
+        },
+        {
+          "id": "suspension",
+          "title": "Mark the two ownership checks around network waiting",
+          "html": "<p>The repository is an actor, so cache lookup and the initial generation captures are protected. The remote fetch then suspends. During that interval, another request may start or the account may change. Record both an account generation and a request number before the await, then compare after it. Account generation answers “does this response belong to the same account ownership period?” Request number answers “is this still the latest requested network operation?”</p><p>Use separate counters because cache invalidation and request replacement have different meanings. Increment the account generation when account ownership resets, even if the textual account ID later becomes the same again. An A-to-B-to-A sequence must not allow an original A response to appear current merely because the string matches.</p><p>After fetching, first preserve cancellation, then reject stale ownership, then reject supersession, then commit the immutable snapshot. Keep that final commit synchronous on the same actor. If you add an awaited disk write between validation and commit, actor reentrancy creates another interval to reason about. A separate store may need its own compare-and-commit generation contract.</p><p>Cancellation is still useful for resource efficiency. The guards remain necessary when the fake, transport, or server completes despite cancellation. Never present a successful cancellation test as proof that stale ownership cannot occur.</p>"
+        },
+        {
+          "id": "cache-policy",
+          "title": "A cache must tell callers what it knows",
+          "html": "<p>An empty card array and an absent cached snapshot are different. Empty means a request successfully returned no cards; absence means the repository has no successful snapshot. Represent the cache as an optional snapshot so a successful empty response can be reused. Avoid using <code>isEmpty</code> as the only cache-validity signal.</p><p>The lab has no TTL: cached values stay usable until explicit refresh or account change. That limitation is acceptable because it is stated. A production freshness contract should record fetched time or server validation metadata and inject a clock for testing expiry. Use monotonic time for elapsed durations; use wall-clock time when persisted timestamps or server dates require it. Those clocks are not interchangeable.</p><p>If a refresh fails, the previous snapshot remains stored, but the call throws. Presentation may show previous content plus a retry state. Returning old data as if it were freshly fetched would hide the failure. A richer return type could explicitly identify cached or stale content, but should not be introduced until the consumer needs it.</p><p>The active AsyncCache documentation separates eviction from invalidation. Eviction removes values while permitting pending work to refill them; invalidation prevents pre-existing work from repopulating the new generation. Our account change must use the stronger idea. Follow its tests to see how a real helper expresses that distinction.</p>"
+        },
+        {
+          "id": "test-matrix",
+          "title": "Control ordering instead of guessing it",
+          "html": "<p>Create a fake remote actor that records requests and exposes per-request gates. A test starts request A, waits until the fake reports A has begun, starts request B, waits for B, completes B, then completes A. Assert that B is cached and A throws supersession. The test is about this ordering; sleeping a few milliseconds does not guarantee it.</p><p>For account switching, start A's request, change to B, then release A. Assert the account-change error and an absent cache. Add A-to-B-to-A to prove identity equality cannot defeat generation checking. For cancellation, cancel the caller while its fake is paused, release it, and assert cancellation with no new commit. A fake should also be able to fail with an ordinary synthetic transport error.</p><p>Check cache hits by counting remote calls: the second non-forced read should reuse a successful snapshot, including an empty one. Check force by verifying another remote call starts. Check failed force refresh by verifying the old cache remains and the failure is observable.</p><p>Finally verify the remote adapter separately with session 018's HTTP fixtures. Repository tests should not become URLSession tests, and URLSession fixture tests should not need a view hierarchy. These boundaries make failures easier to localize and preserve realistic contracts.</p>"
+        },
+        {
+          "id": "integration",
+          "title": "Presentation remains a second commit boundary",
+          "html": "<p>A repository returning the correct snapshot does not automatically make a UI commit current. The screen can change query or account while awaiting the repository. MainActor protects presentation memory, but its async method can also reenter. Record a presentation request identity before loading and validate it before assigning visible state. Also compare the returned account context to the screen's current context.</p><p>If a synchronous button launches <code>Task</code>, retain and cancel its handle at the feature's defined stopping event. Alternatively let a framework-managed task call an async presentation method. Do not bury an independent Task inside every repository method; the caller already supplies an asynchronous lifetime and should see its errors.</p><p>For repository grounding, inspect the credential actor's logout-during-refresh test and AsyncCache's invalidation test. They demonstrate the same broad invariant with different business rules. Our lab rejects an old caller's result, whereas the generalized cache can return an old result while refusing to store it. Copying a helper without understanding that difference changes the feature contract.</p><p>Your lab handoff should include a short behavior table, the gated tests you ran, and the limits: memory-only persistence, no shared in-flight coalescing, no retry policy, and no real transport. Those limits identify the next design decisions without pretending this exercise is a completed production data layer.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why track account generation as well as the account ID string?",
+          "options": [
+            "Strings cannot be Sendable.",
+            "An A-to-B-to-A transition must still invalidate the original A request.",
+            "Generation encrypts account data."
+          ],
+          "answer": 1,
+          "explanation": "The same textual account identity can represent a later ownership period. A monotonically changed generation rejects work started before an intervening reset."
+        },
+        {
+          "question": "A forced refresh fails while an older snapshot is cached. What does this lab promise?",
+          "options": [
+            "It clears the old cache and returns empty success.",
+            "It retains the prior snapshot but throws the refresh failure.",
+            "It reports the old snapshot as freshly fetched."
+          ],
+          "answer": 1,
+          "explanation": "Retaining usable content and reporting a failed refresh are compatible. The caller can show old content with a recovery state without hiding the failure."
+        },
+        {
+          "question": "Is an actor-protected repository enough to prevent stale UI updates?",
+          "options": [
+            "Yes, all actors share one transaction.",
+            "No, presentation must validate its own request and account context before committing.",
+            "Yes, if the cards are Codable."
+          ],
+          "answer": 1,
+          "explanation": "Repository and presentation have separate ownership boundaries. A screen can change while awaiting the repository even when the repository's internal commit is correct."
+        }
+      ],
+      "exercise": {
+        "brief": "Build and test the synthetic card repository described above. Use a gated fake, document the chosen latest-started policy, and draw where cancellation and ownership are checked.",
+        "steps": [
+          "Create LabCard, LabSnapshot, LabRemote, and LabRepository in a scratch Swift target.",
+          "Inject a fake remote; do not launch a new unstructured task inside load.",
+          "Implement cached and forced reads with separate account and request generations.",
+          "Run controlled scenarios for out-of-order success, failure after cached success, canceled waiting, and A-to-B-to-A account changes.",
+          "Write a presentation integration sketch that validates its own request identity without editing the client."
+        ],
+        "acceptance": [
+          "Only the latest started request in the current account generation commits.",
+          "Successful empty results are cached; failed refresh preserves an existing snapshot and throws.",
+          "Cancellation, account change, and supersession remain distinct outcomes.",
+          "No production endpoint, token, source file, or persisted account data is used.",
+          "The lab accurately declares memory-only storage and lack of coalescing."
+        ],
+        "solution": "<p>This complete standalone implementation puts cache validation and cache commit in one actor. There is no await after the final guards, so another repository operation cannot interleave between those guards and the in-memory write.</p><pre><code class=\"language-swift\">struct LabCard: Sendable, Equatable {\n    let id: String\n    let title: String\n}\nstruct LabSnapshot: Sendable, Equatable {\n    let accountID: String\n    let cards: [LabCard]\n}\nprotocol LabRemote: Sendable {\n    func fetch(accountID: String) async throws -&gt; [LabCard]\n}\nenum LabLoadError: Error {\n    case accountChanged\n    case superseded\n}\nactor LabRepository {\n    private let remote: any LabRemote\n    private var accountID: String\n    private var accountGeneration = 0\n    private var requestNumber = 0\n    private var cached: LabSnapshot?\n\n    init(accountID: String, remote: any LabRemote) {\n        self.accountID = accountID\n        self.remote = remote\n    }\n\n    func load(force: Bool = false) async throws -&gt; LabSnapshot {\n        try Task.checkCancellation()\n        if !force, let cached { return cached }\n\n        requestNumber += 1\n        let startedRequest = requestNumber\n        let startedGeneration = accountGeneration\n        let startedAccount = accountID\n        let cards = try await remote.fetch(accountID: startedAccount)\n        try Task.checkCancellation()\n\n        guard accountGeneration == startedGeneration,\n              accountID == startedAccount else {\n            throw LabLoadError.accountChanged\n        }\n        guard requestNumber == startedRequest else {\n            throw LabLoadError.superseded\n        }\n        let snapshot = LabSnapshot(accountID: startedAccount, cards: cards)\n        cached = snapshot\n        return snapshot\n    }\n\n    func changeAccount(to newAccountID: String) {\n        accountGeneration += 1\n        requestNumber += 1\n        accountID = newAccountID\n        cached = nil\n    }\n\n    func currentSnapshot() -&gt; LabSnapshot? { cached }\n}</code></pre><p>The error precedence is intentional. A canceled caller gets cancellation; otherwise an old account generation gets accountChanged; otherwise an older request gets superseded. Ordinary remote errors propagate before any new snapshot is created. The prior snapshot therefore survives a failed forced refresh. A cache hit does not start a new network request or supersede an existing refresh.</p><p>A deterministic worked scenario starts request one for synthetic account A, starts request two, releases two with card B, and then releases one with card A. The second call succeeds and cache inspection returns B; the first throws superseded. For an account-switch scenario, change to synthetic B before releasing A; the old result throws accountChanged and currentSnapshot remains nil.</p><p>To extend this toward durable storage, do not simply await <code>store.replace</code> after the guards. Define a store command carrying ownership generation, or centralize durable commit in an owner that validates that generation. To add coalescing, specify whether caller cancellation affects shared work and how each waiter stops. These are follow-on contracts, not missing annotations.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Concurrency",
+          "url": "https://docs.swift.org/swift-book/LanguageGuide/Concurrency.html"
+        },
+        {
+          "label": "Apple: XCTest asynchronous tests",
+          "url": "https://developer.apple.com/documentation/xctest/asynchronous-tests-and-expectations"
+        },
+        {
+          "label": "Swift: Testing asynchronous code",
+          "url": "https://developer.apple.com/documentation/testing/testing-asynchronous-code"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Cache invalidation contract test",
+          "path": "ios-client/Projects/Infra/ZDCore/Tests/ZDCoreTests/Async/AsyncCacheTests.swift",
+          "line": 99,
+          "why": "A verified active test checks that outstanding requests do not repopulate invalidated cache state."
+        },
+        {
+          "label": "Logout during in-flight refresh",
+          "path": "ios-client/Projects/Infra/ZDNetworking/Tests/ZDNetworkingTests/CredentialManagerActorTests.swift",
+          "line": 151,
+          "why": "A controlled refresh/logout scenario demonstrates stale credential completion protection."
+        },
+        {
+          "label": "Cache generation and post-await guard",
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDCore/Multithreading/AsyncCache.swift",
+          "line": 141,
+          "why": "The generalized cache validates generation before storage; compare its old-caller behavior to this lab."
+        }
+      ],
+      "checklist": [
+        "I can describe the repository's cache and commit policy in plain language.",
+        "I can prove stale account work cannot commit after a reset.",
+        "I can use a gated fake to establish ordering deterministically.",
+        "I can distinguish cache absence, cached emptiness, and failed refresh.",
+        "I can explain why UI and disk writes need their own commit boundaries."
+      ]
+    },
+    {
+      "id": "021",
+      "title": "Architecture boundaries and a migration review",
+      "summary": "Trace a real data path, compare behavior at each seam, and design a reversible migration with evidence and limits.",
+      "duration": 100,
+      "level": "Review",
+      "prerequisites": [
+        "014",
+        "015",
+        "016",
+        "017",
+        "018",
+        "019",
+        "020"
+      ],
+      "objectives": [
+        "Trace a feature through contract, implementation, client, credentials, and composition.",
+        "Separate architecture observations from recommendations and unsupported assumptions.",
+        "Review a reactive-to-async or transport migration for semantic equivalence.",
+        "Define validation, rollout, and rollback criteria without claiming an unexecuted migration."
+      ],
+      "sections": [
+        {
+          "id": "review-frame",
+          "title": "Use your Android experience as a set of questions",
+          "html": "<p>An experienced Android engineer can recognize a feature calling a use case, a repository, and an HTTP client. Use that experience to ask good questions, not to demand that every iOS type match an Android layer name. UIKit coordination, value models, actor isolation, reactive adapters, and Swift package targets can divide responsibilities differently. Architecture quality depends on understandable ownership and contracts, not the number of boxes in a diagram.</p><p>Start a review with a concrete behavior: a synthetic query becomes search parameters, a service executes the request, and a caller receives results. Trace a method in the active checkout rather than guessing from a similarly named older file. This repository contains duplicate-looking legacy paths; use the verified Projects sources and inspect imports, package targets, and callers to establish relevance.</p><p>For every boundary, record input, output, errors, isolation, lifetime, account context, and resource ownership. This is a compact contract inventory. A change from PromiseKit or a publisher to async/await can simplify control flow while still changing cancellation, timing, replay, or error delivery. A transport replacement can change cookies, interception, redirects, and tracing even if it returns identical bytes in one test.</p><p>The goal of this review is a defensible migration plan and a tested synthetic seam. It is not permission to edit production modules or claim a complete application migration.</p>"
+        },
+        {
+          "id": "trace",
+          "title": "Follow declarations through composition",
+          "html": "<p>Begin with <code>SearchServiceModule</code> in ZDModules. Its declaration establishes MainActor isolation, argument labels, async execution, and throwing failure. Those facts constrain consumers. Then inspect the feature converter's <code>async let</code> lookups and optional fallbacks. That converter resolves domain inputs; it is not, just from its name, the transport or the complete search orchestration path.</p><p>Follow networking into the request processor and dispatcher. The async processor prepares a request, participates in hooks and tracing, performs auth-aware request handling, and processes the response. The URLSession dispatcher receives an injected provider. Credential adaptation belongs to the credential provider, not the view model. These are observable responsibilities in named files; avoid claiming every operation follows precisely the same path without tracing its concrete dispatch mode.</p><p>Finally inspect app composition. It creates a configured session, wraps it in the interception provider, and supplies it as an alternate dispatcher. Application startup checks a flag and can enable that alternative. This establishes coexistence and a selection point; it does not tell you the production flag value for every user or prove that legacy dependencies are removed.</p><p>At each step distinguish compile-time dependency from runtime selection. A Package.swift dependency proves a target can import something, not that every running request uses that implementation. A comment is useful intent; a call site and test provide stronger behavioral evidence.</p>"
+        },
+        {
+          "id": "boundary-quality",
+          "title": "Choose where knowledge should live",
+          "html": "<p>UI code should understand presentation state, navigation, and user recovery. It usually should not construct bearer headers or decode arbitrary JSON. A domain contract should expose meaningful inputs and snapshots, not force every consumer to understand transport status codes or storage contexts. An infrastructure adapter can retain those implementation details while mapping errors into an agreed boundary model.</p><p>That is a direction for design, not a claim that the checkout is a textbook clean architecture. ZDModules includes UIKit-facing contracts and dependencies. Some services are MainActor-isolated. Existing reactive and promise helpers carry legacy semantics. A good review identifies the actual seam that can improve without rewriting every consumer at once.</p><p>Ask whether each protocol has multiple meaningful consumers or an actual replacement boundary. An interface wrapping a single trivial pure function may add ceremony. Conversely, a concrete network client passed everywhere may expose too much configuration and ownership. Constructor injection and a narrow protocol can help when they isolate real variability or resource scope.</p><p>Check dependency direction at the package level. Shared contracts should not import concrete feature implementations merely to reuse a helper. Public model types increase the cost of future change. Avoid pushing request IDs, decoder strategies, and global DI containers into every API unless the consumer truly needs to control them.</p>"
+        },
+        {
+          "id": "migration-semantics",
+          "title": "Define equivalence before replacing syntax",
+          "html": "<p>For a one-shot operation, compare success, failure, cancellation, completion count, and when work starts. An async function returning one value is not a drop-in replacement for a publisher that may emit cached data then refreshed data. A publisher that never fails is not equivalent to an async throwing function unless the error behavior is intentionally redesigned. A bridge can contain the change while callers migrate, but needs its own tested lifetime contract.</p><p>For streams, compare cold or eager creation, subscriber count, replay, buffering, drop policy, and stop behavior. A Task feeding a subject may lose values before subscription. A callback wrapped in a checked continuation may continue after cancellation unless the adapter stops the underlying operation. A continuation must resume exactly once even when cancellation and completion race; solve that with a synchronized state machine rather than an unsafely shared Boolean.</p><p>For transport, compare request configuration, cookies, headers, redirects, TLS and trust handling, interception, payload size, cancellation mapping, and trace propagation. The repository's configured alternate dispatcher is a better migration seam than introducing <code>URLSession.shared</code> in each feature. Preserve the established credential owner and its stale-completion checks.</p><p>Use synthetic fixture parity tests for observable contract behavior. Do not mirror private implementation steps in tests, and do not send real write operations through both implementations merely to compare them. Shadowing a side-effecting request can itself duplicate the operation.</p>"
+        },
+        {
+          "id": "rollout",
+          "title": "A switch needs per-request consistency and rollback",
+          "html": "<p>A reversible migration selects implementations at a defined boundary. Snapshot the selected route for each request so an in-flight operation does not start in one implementation and continue in another. That policy differs from drain-then-promote, which waits for active requests to drain before using a new dispatcher. Choose the policy needed by shared session state and resource lifetime.</p><p>The checkout explicitly documents a drain-then-promote alternate-dispatcher strategy at startup and in request tracking. Read its state implementation and tests before promising the same behavior elsewhere. The worked gateway below only snapshots the route; it does not implement draining. Precise labels prevent a small experiment from being mistaken for the full production mechanism.</p><p>Define rollback at the composition boundary, not as a catch-all automatic fallback on every error. Retrying a failed write through another transport can repeat a server side effect. Even for reads, a fallback can hide genuine failures and distort metrics. A route switch for future requests is easier to reason about than replaying current operations without an idempotency contract.</p><p>Measure failure and cancellation separately, request duration, refresh count, active request count, and stream drop behavior. Use aggregate metadata without payloads, tokens, or sensitive identifiers. Define rollout stop conditions and an accountable owner before enabling a production flag; this lesson does not perform that enablement.</p>"
+        },
+        {
+          "id": "evidence",
+          "title": "Write a review that another engineer can verify",
+          "html": "<p>Separate three categories in your prose: observed behavior with a source anchor, inferred risk with its assumptions, and a proposed change with validation. For example, “the adapter finishes normally on publisher failure” is directly visible. “a consumer may hide network errors if it depends on thrown failure” is a conditional implication. “replace this boundary with a throwing stream” is a proposal requiring caller review.</p><p>Do not describe annotations such as <code>@unchecked Sendable</code> as proof of safety. Identify the actual state protection, or record that it still needs inspection. Likewise, a Swift 6 compiler installed locally does not establish every target's language mode or isolation defaults. Effective build settings and package target configuration are part of migration evidence.</p><p>A useful handoff names the smallest seam, the behaviors preserved, intentional differences, fixtures checked, unverified areas, rollout mechanism, and rollback criteria. Avoid an unbounded “migrate the data layer” project when a single shared transport or stream adapter provides a concrete first step.</p><p>Finish by explaining one tradeoff you chose. A snapshot-per-request gateway is simpler than draining but leaves old requests active. Latest-state buffering limits memory but loses intermediate values. Account invalidation improves correctness but can turn an old caller into a canceled or stale outcome. Staff-level architecture judgment makes these consequences visible.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "The app constructs an alternate URLSession dispatcher. What can you conclude?",
+          "options": [
+            "All production traffic already uses URLSession.",
+            "There is a configured alternative and selection boundary; runtime usage still depends on routing.",
+            "The existing dispatcher can be deleted immediately."
+          ],
+          "answer": 1,
+          "explanation": "Construction proves availability. The startup flag and state determine runtime selection, and coexistence does not establish complete migration or safe dependency removal."
+        },
+        {
+          "question": "A publisher emits cached data followed by fresh data. Is async throws -> Value an equivalent replacement?",
+          "options": [
+            "Yes, both use asynchronous syntax.",
+            "No, the number and timing of values differ unless the contract is intentionally changed.",
+            "Yes, if Value is Sendable."
+          ],
+          "answer": 1,
+          "explanation": "A one-shot function cannot preserve two separate deliveries without a new return model or stream. Equivalence includes timing, cardinality, failure, and cancellation."
+        },
+        {
+          "question": "Why avoid automatic fallback to the old transport after a write times out?",
+          "options": [
+            "The old transport is always slower.",
+            "The server may already have committed the write, so replay can duplicate it.",
+            "Swift cannot express fallback."
+          ],
+          "answer": 1,
+          "explanation": "A timeout creates uncertainty, not proof of no side effect. Fallback replay requires the same idempotency and retry reasoning as any repeated write."
+        }
+      ],
+      "exercise": {
+        "brief": "Produce a read-only migration review of the checkout's request boundary and implement a synthetic route gateway in a scratch target. Propose one bounded change with validation and rollback.",
+        "steps": [
+          "Trace SearchServiceModule, the async processor, credential provider, alternate dispatcher construction, and startup selection.",
+          "For each seam record isolation, lifetime, failure, account ownership, and whether the claim is directly observed.",
+          "Implement a gateway that snapshots the selected implementation before awaiting a synthetic read.",
+          "Use gated fakes to switch the route during an active read and verify only future reads use the new route.",
+          "Write a concise review explaining fixture coverage, intentional differences, stop conditions, and unverified production rollout state."
+        ],
+        "acceptance": [
+          "Every claim about the checkout has a verified active file anchor.",
+          "The gateway preserves an in-flight request's chosen implementation.",
+          "The review distinguishes route snapshotting from draining and rollback from replay.",
+          "No existing client source, flag, credential, or live request is modified.",
+          "The proposal has a concrete scope and caller-visible acceptance criteria."
+        ],
+        "solution": "<p>The following standalone gateway demonstrates per-request route consistency for synthetic reads. Its actor owns selection, while both implementations satisfy one Sendable contract. Because the selected dependency is captured before awaiting it, another call to select cannot change this request's implementation midway.</p><pre><code class=\"language-swift\">struct MigrationCard: Sendable, Equatable {\n    let id: String\n    let title: String\n}\nprotocol MigrationReading: Sendable {\n    func read(id: String) async throws -&gt; MigrationCard\n}\nenum MigrationRoute: Sendable { case existing, alternate }\n\nactor MigrationGateway {\n    private var route: MigrationRoute = .existing\n    private let existing: any MigrationReading\n    private let alternate: any MigrationReading\n\n    init(\n        existing: any MigrationReading,\n        alternate: any MigrationReading\n    ) {\n        self.existing = existing\n        self.alternate = alternate\n    }\n\n    func select(_ newRoute: MigrationRoute) {\n        route = newRoute\n    }\n\n    func read(id: String) async throws -&gt; MigrationCard {\n        try Task.checkCancellation()\n        let selected: any MigrationReading\n        switch route {\n        case .existing: selected = existing\n        case .alternate: selected = alternate\n        }\n        let result = try await selected.read(id: id)\n        try Task.checkCancellation()\n        return result\n    }\n}</code></pre><p>A worked review would state: “Observed: app composition creates an alternate configured URLSession dispatcher, and startup can enable it. Proposed scope: test one read operation through both injectable providers with the same synthetic fixtures. Preserve status validation, cancellation, credential adaptation, interception configuration, and tracing. Do not change account ownership or replay failed writes. Rollback selects the existing implementation for future operations. Runtime flag exposure and device performance remain unverified.”</p><p>For the route test, start a read against an existing fake and hold it, select alternate, then release the existing fake. Its result must still come from existing. Start a second read and verify alternate receives it. If draining is required, add explicit active-operation tracking and tests for when promotion happens rather than renaming this gateway.</p><p>The learning gateway does not reproduce the real client's interception, retries, draining, or tracing. It isolates one correctness property so you can reason about it. A production proposal should attach the exact operation's fixture parity results and identify the composition owner before a rollout. This is a review artifact and synthetic experiment, not a completed migration.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Concurrency migration guide",
+          "url": "https://www.swift.org/migration/documentation/migrationguide/"
+        },
+        {
+          "label": "Apple: URLSessionConfiguration",
+          "url": "https://developer.apple.com/documentation/foundation/urlsessionconfiguration"
+        },
+        {
+          "label": "Swift Evolution SE-0304: Task ownership",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0304-structured-concurrency.md"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Search contract entry point",
+          "path": "ios-client/Projects/Infra/ZDModules/Sources/ZDModules/SearchServiceModule.swift",
+          "line": 14,
+          "why": "Verified public capability and isolation seam for tracing feature inputs."
+        },
+        {
+          "label": "Async request processor and auth-aware pipeline",
+          "path": "ios-client/Projects/Infra/ZDNetworking/Sources/ZDApiClient/ApiClient+AsyncRequestProcessor.swift",
+          "line": 133,
+          "why": "The active processor delegates auth-aware requests before response processing; trace the concrete operation rather than guessing from type names."
+        },
+        {
+          "label": "Alternate dispatcher composition",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Controllers/API/ApiClient+Extensions.swift",
+          "line": 193,
+          "why": "The app supplies existing and alternate dispatchers plus a streaming dispatcher in one composition site."
+        },
+        {
+          "label": "Runtime dispatcher selection",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Application/Application.swift",
+          "line": 456,
+          "why": "Startup checks a flag and enables the alternate dispatcher with the documented drain-then-promote strategy."
+        },
+        {
+          "label": "Observed adapter failure mapping",
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDCoreBase/Extensions/Publisher+AsyncStream.swift",
+          "line": 14,
+          "why": "The failure branch finishes plain AsyncStream normally; caller impact requires tracing its use."
+        }
+      ],
+      "checklist": [
+        "I can trace a real request from feature contract to composition.",
+        "I can distinguish observed behavior, inference, and proposal.",
+        "I can compare cardinality, timing, failure, cancellation, and ownership across APIs.",
+        "I can describe a reversible rollout without replaying unsafe writes.",
+        "I can report verification limits without claiming an unexecuted production migration."
+      ]
+    }
+  ]
+}

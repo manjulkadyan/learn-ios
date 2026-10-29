@@ -1,0 +1,1128 @@
+{
+  "unit": {
+    "id": "foundations",
+    "title": "Swift foundations",
+    "summary": "Seven mentor-led sessions connect Kotlin experience to Swift values, states, service contracts, ownership, build tools, deterministic tests, and evidence-based repository reading.",
+    "order": 1
+  },
+  "lessons": [
+    {
+      "id": "001",
+      "title": "Swift bindings, optionals, and value semantics",
+      "summary": "Translate familiar Kotlin models while predicting ownership, mutation, absence, and Swift call syntax.",
+      "duration": 60,
+      "level": "Foundation",
+      "prerequisites": [],
+      "objectives": [
+        "Distinguish let/var bindings from object mutability and reference identity.",
+        "Unwrap optionals deliberately with if let, guard let, optional chaining, and nil coalescing.",
+        "Predict assignment behavior for structs, classes, arrays, and nested references.",
+        "Read argument labels, computed properties, integer widths, and access control in a real model."
+      ],
+      "sections": [
+        {
+          "id": "why-values",
+          "title": "Why the first model translation changes your assumptions",
+          "html": "<p>Imagine an Android form that edits a draft while the original remains visible behind it. You probably reach for a Kotlin data class and <code>copy()</code>. The same-looking Swift model changes the assignment story. Our goal is to predict what the user sees after an edit, before introducing screens or frameworks. Every example in this session is synthetic and can run in a standalone Swift file; UIKit and an app target are unnecessary.</p><p>Begin with three separate questions: can the variable be reassigned, can the value be mutated, and do two variables identify one shared object? Experienced developers often collapse these questions because ordinary Kotlin objects are references. Swift makes the distinction unavoidable. Prefer <code>let</code> when the binding should stay fixed, then introduce <code>var</code> only at an intentional mutation point. Neither spelling by itself means thread safety, deep immutability, or persistence.</p><pre><code class=\"language-kotlin\">data class Draft(var providerName: String)\nval original = Draft(\"Dr. Ada\")\nval edited = original\nedited.providerName = \"Dr. Lin\"\nprintln(original.providerName) // Dr. Lin</code></pre><p>The Kotlin example aliases one object. A generated data-class <code>copy()</code> creates a different outer instance but can preserve references to nested mutable objects. Keep that boundary in mind when reading the Swift version.</p>"
+        },
+        {
+          "id": "syntax-bindings",
+          "title": "Read declarations and calls without guessing",
+          "html": "<p>Swift writes a type after a colon: <code>let count: Int = 2</code>. It can infer the same type from <code>let count = 2</code>. <code>let</code> corresponds approximately to Kotlin <code>val</code>, and <code>var</code> to <code>var</code>. Braces delimit declarations and control flow; statement-ending semicolons are usually unnecessary. <code>[String]</code> means an array whose elements are strings, rather than an unspecified collection interface.</p><pre><code class=\"language-swift\">struct Draft {\n    var providerName: String\n    var patientName: String?\n}\n\nvar original = Draft(providerName: \"Dr. Ada\", patientName: nil)\nvar edited = original\nedited.providerName = \"Dr. Lin\"\nprint(original.providerName) // Dr. Ada\nprint(edited.providerName)   // Dr. Lin</code></pre><p><code>struct</code> declares a value type. The compiler supplies this simple struct with a memberwise initializer, so <code>providerName:</code> and <code>patientName:</code> are argument labels at the call site. They are part of how you call the initializer, not map keys. An explicit initializer can change the available memberwise initializer. Swift provides no automatic Kotlin-style <code>copy()</code> method.</p><p>Read <code>func title(for draft: Draft) -&gt; String</code> as a function called <code>title(for:)</code>, with external label <code>for</code>, local parameter name <code>draft</code>, and a string return value. A leading underscore removes an external label: <code>func inspect(_ draft: Draft)</code> is called <code>inspect(original)</code>. These small labels make large APIs readable.</p>"
+        },
+        {
+          "id": "values-references",
+          "title": "Predict mutation, including the nested-reference trap",
+          "html": "<p>Assigning a struct gives the destination its own value semantics. Mutating <code>edited.providerName</code> cannot change the original draft's string. This describes observable behavior, rather than promising an immediate byte-for-byte copy. Swift arrays and dictionaries also behave as values; storage can be shared internally until a mutation requires separation. Array assignment therefore differs from assigning a Kotlin mutable-list reference.</p><pre><code class=\"language-swift\">final class Notes {\n    var text = \"Initial\"\n}\n\nstruct SharedDraft {\n    var providerName: String\n    let notes: Notes\n}\n\nlet first = SharedDraft(providerName: \"Dr. Ada\", notes: Notes())\nlet second = first\nsecond.notes.text = \"Shared change\"\nprint(first.notes.text) // Shared change</code></pre><p><code>final class</code> declares a reference type that cannot be subclassed. The default property initializer makes <code>Notes()</code> available here. Both struct values contain a reference to the same Notes object; copying the containing struct does not clone that object. Even the <code>let</code> struct binding allows this nested object's property to change because the stored reference itself is unchanged.</p><p>Conversely, <code>first.providerName = \"New\"</code> would fail because it changes a stored part of a struct bound with <code>let</code>. A class bound with <code>let</code> can still expose mutable <code>var</code> properties. Use <code>===</code> to ask whether two class references identify one instance. <code>==</code> asks about equality and needs suitable conformance; it is not an identity operator.</p>"
+        },
+        {
+          "id": "optional-meaning",
+          "title": "Absence is a type, not an empty placeholder",
+          "html": "<p><code>String?</code> is an optional string: either a contained String or <code>nil</code>. A missing name, an empty string, and a displayed fallback are three different values with different product meanings. Kotlin's nullable type is a helpful analogy, but Swift exposes explicit optional binding syntax. An optional's stored value must be unwrapped before an API requiring a nonoptional String can consume it.</p><pre><code class=\"language-swift\">let patientName: String? = nil\nlet visibleName = patientName ?? \"Unknown\"\nprint(visibleName)\n\nif let name = patientName {\n    print(\"Present: \\(name)\")\n} else {\n    print(\"Name was absent\")\n}\n\nlet length: Int? = patientName?.count\nprint(length ?? 0)</code></pre><p><code>??</code> supplies a fallback only for <code>nil</code>; an empty present string stays empty. <code>if let name = patientName</code> creates a nonoptional local constant inside the success branch, while leaving the original optional unchanged. Optional chaining with <code>?.</code> skips the access when the receiver is absent and returns an optional result. It does not validate the contents of a present value.</p><p>A postfix <code>!</code> forces unwrapping and traps if the value is absent. A fixture being nonnil today is not a lifetime invariant for a production field. Avoid force unwraps in these exercises: express what absence should do instead. An implicit optional check in Kotlin should never be translated by sprinkling force unwraps through Swift code.</p>"
+        },
+        {
+          "id": "guard-and-width",
+          "title": "Guard clauses, widths, and tiny distinctions that matter",
+          "html": "<p>Choose <code>guard</code> when the rest of a function depends on a prerequisite. Its failure branch must leave the current scope, usually through <code>return</code> or <code>throw</code>. Unlike an <code>if let</code> success binding, the unwrapped guard binding remains usable after the guard. The shorthand <code>guard let value else</code> unwraps an optional already named value; the longer spelling works well while learning.</p><pre><code class=\"language-swift\">func greeting(for patientName: String?) -&gt; String {\n    guard let name = patientName else {\n        return \"Hello\"\n    }\n    return \"Hello, \\(name)\"\n}\nprint(greeting(for: \"Sam\"))\nprint(greeting(for: nil))</code></pre><p>Swift's <code>Int</code> has platform-dependent width and is 64 bits on the relevant modern Apple platforms. Kotlin <code>Long</code> is always a signed 64-bit integer, so <code>Int64?</code> is a clearer translation when the width is part of a data contract. Numeric conversions are explicit; optional conversion also requires handling absence. A sensible local count can remain Int.</p><p>Do not mechanically translate Kotlin <code>String.length</code> into Swift <code>String.count</code> for wire lengths. Kotlin counts UTF-16 code units; Swift String counts extended grapheme clusters. A visible accented character or emoji can expose the difference. Choose the representation your API actually needs. Finally, <code>Hashable</code> supports hashing and implies Equatable; it does not turn a struct into a reference or guarantee a persistent identifier.</p>"
+        },
+        {
+          "id": "read-repository",
+          "title": "Read the live cancellation model as evidence",
+          "html": "<p>Open the repository anchor for CancelAppointmentQuestionData. At line 8, <code>public struct</code> identifies the exported type, while its stored fields use <code>let</code>. The nullable <code>subtitle: String?</code> at line 11 describes possible absence. The <code>options</code> field is an array of another named type. Resist inventing a default subtitle: look at the consuming UI before deciding whether missing and blank should be rendered alike.</p><p>The <code>asNavigationState</code> block at line 15 is a computed property. It returns a value when accessed; it is not an additional stored field. <code>.question(self)</code> constructs an enum case carrying the current model, which we will unpack next. Being computed does not automatically mean cached, expensive, or safe to repeat with arbitrary side effects.</p><p>Notice a visibility boundary: the type is public, but fields without access modifiers are internal to its module. A public struct does not automatically export all its members or its synthesized memberwise initializer. That matters when you later move models across targets. The cancellation source directory is explicitly included by its co-located Project.swift and matches the target in Package.swift. This is an active source anchor, not a similarly named file in the older tree.</p><p>Before the exercise, say aloud what assigning this model preserves, what cannot be directly mutated, and which nested types you would inspect before claiming deep immutability. That last question is a professional habit, not a trick.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A let-bound Swift struct contains a let property pointing to a class with a var text property. What can still change?",
+          "options": [
+            "Nothing; let recursively freezes the entire graph.",
+            "The class object's text, while the struct's stored reference stays fixed.",
+            "The struct's stored reference can be replaced freely."
+          ],
+          "answer": 1,
+          "explanation": "let prevents mutation of the bound struct value. Mutating a class reached through its stored reference does not replace that reference, so both struct copies can observe the same class mutation."
+        },
+        {
+          "question": "For a present empty string, what does name ?? \"Unknown\" produce?",
+          "options": [
+            "Unknown",
+            "nil",
+            "The empty string"
+          ],
+          "answer": 2,
+          "explanation": "Nil coalescing tests absence, not emptiness. Treating empty as missing requires a separate product rule and an explicit content check."
+        },
+        {
+          "question": "Why use Int64? for a direct translation of a Kotlin Long? identifier?",
+          "options": [
+            "It preserves the explicitly signed 64-bit contract.",
+            "Swift Int is always 32 bits.",
+            "Optional identifiers must use Int64."
+          ],
+          "answer": 0,
+          "explanation": "Int64 states the width independent of platform. Int is convenient and 64 bits on this Apple environment, but its definition is platform-dependent; optionality imposes no special integer width."
+        },
+        {
+          "question": "What is the call syntax for func title(for draft: Draft) -> String?",
+          "options": [
+            "title(draft: original)",
+            "title(for: original)",
+            "title(original)"
+          ],
+          "answer": 1,
+          "explanation": "for is the external argument label. draft is the parameter's local name inside the body. Only an underscore would remove the external label."
+        }
+      ],
+      "exercise": {
+        "brief": "Translate a synthetic specialty/procedure draft into a Swift value model, then demonstrate independent edits and deliberate absence handling in an isolated Swift file.",
+        "steps": [
+          "Declare Selection with var specialtyID: Int64? and var procedureID: Int64?, both defaulting to nil. Explain each token.",
+          "Create an original containing specialty 10, assign it to edited, and change only edited to 20.",
+          "Print both specialties using ??; use if let to consume a present ID and guard let in a function that requires a procedure.",
+          "Predict the result of attempting to mutate a let Selection. Write the equivalent Kotlin aliasing explanation.",
+          "Add one nested mutable class in a separate experiment and explain why its state can remain shared."
+        ],
+        "acceptance": [
+          "Original retains 10 and edited contains 20.",
+          "Missing procedure follows an explicit return path without force unwrapping.",
+          "You distinguish a mutable binding, a value mutation, and shared reference identity.",
+          "The experiment is separate from production files; attempting the work, not reading this answer, establishes completion."
+        ],
+        "solution": "<p>Attempt the predictions first. This worked answer is a standalone Swift program with no client imports. Default values allow the omitted procedure argument; assignment creates independent outer values.</p><pre><code class=\"language-swift\">struct Selection {\n    var specialtyID: Int64? = nil\n    var procedureID: Int64? = nil\n}\n\nlet original = Selection(specialtyID: 10)\nvar edited = original\nedited.specialtyID = 20\nprint(original.specialtyID ?? -1) // 10\nprint(edited.specialtyID ?? -1)   // 20\n\nif let specialty = edited.specialtyID {\n    print(\"Present specialty: \\(specialty)\")\n}\n\nfunc procedureText(for selection: Selection) -&gt; String {\n    guard let procedure = selection.procedureID else {\n        return \"No procedure selected\"\n    }\n    return \"Procedure \\(procedure)\"\n}\nprint(procedureText(for: edited))</code></pre><p>The <code>-1</code> is an output-only teaching fallback, not a stored sentinel or valid identifier. Keeping nil in the model preserves the domain fact that no procedure was selected. The local specialty binding is nonoptional only within its branch; the procedure binding remains usable after the guard.</p><p>Changing <code>original.specialtyID</code> fails because original is a let-bound struct. Kotlin assignment of a mutable data-class instance instead aliases the same object. For the nested-reference extension, reuse Notes from the lesson: assign the containing struct and mutate <code>edited.notes.text</code>. Explain the shared Notes instance explicitly rather than claiming that all struct assignments recursively clone everything. The preserved instructor example remains a reference; your own translation and explanation still need to be attempted.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift language guide — The Basics",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/thebasics/"
+        },
+        {
+          "label": "Swift language guide — Structures and Classes",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/classesandstructures/"
+        },
+        {
+          "label": "Kotlin — Data classes and shallow copying",
+          "url": "https://kotlinlang.org/docs/data-classes.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Immutable question fields and optional subtitle",
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentQuestionData.swift",
+          "line": 8,
+          "why": "Active cancellation target model; inspect value semantics, visibility, Hashable, and the computed navigation property."
+        },
+        {
+          "label": "Cancellation source membership",
+          "path": "ios-client/Projects/Features/ZDAppointments/Project.swift",
+          "line": 49,
+          "why": "The generated target explicitly includes Sources/ZDAppointmentsCancellation/**/*.swift."
+        }
+      ],
+      "checklist": [
+        "I can predict struct assignment and Kotlin data-class aliasing.",
+        "I can explain why let is not deep immutability.",
+        "I can choose if let, guard let, ?. or ?? based on intended behavior.",
+        "I can read argument labels and optional integer widths.",
+        "I can distinguish equality, identity, and hashing.",
+        "I have attempted the exercise and recorded predictions or actual output."
+      ]
+    },
+    {
+      "id": "002",
+      "title": "Swift enums and Kotlin sealed states",
+      "summary": "Represent mutually exclusive states, attach the right payloads, and let exhaustive matching expose missing behavior.",
+      "duration": 60,
+      "level": "Foundation",
+      "prerequisites": [
+        "001"
+      ],
+      "objectives": [
+        "Translate a Kotlin sealed hierarchy into an enum with associated values.",
+        "Read case constructors, type inference, pattern bindings, and exhaustive switches.",
+        "Distinguish per-instance associated values from fixed raw values.",
+        "Keep successful empty data, missing data, and failures distinct."
+      ],
+      "sections": [
+        {
+          "id": "why-state",
+          "title": "Make contradictory states impossible to construct",
+          "html": "<p>Picture an Android search screen with <code>isLoading</code>, nullable results, and nullable error text. It is possible to accidentally set all three at once. You can prevent that with a Kotlin sealed hierarchy; Swift's enum with associated values solves the same modeling problem with different syntax and assignment behavior. Start by naming the valid situations rather than translating every old flag.</p><p>A state is a description of what is true now; an action is an event asking something to happen. Both can use enums, but they answer different questions. <code>.loading</code> describes a current state, while <code>.retry</code> describes an intent. Keeping the distinction helps when you later reason about navigation and UI updates. Today we use pure Swift descriptions without starting requests or rendering a screen.</p><pre><code class=\"language-kotlin\">sealed interface SearchState {\n    data object Idle : SearchState\n    data object Loading : SearchState\n    data class Loaded(val providers: List&lt;String&gt;) : SearchState\n    data class Failed(val message: String) : SearchState\n}</code></pre><p>This Kotlin example is a conceptual counterpart, not code shared between the clients. Swift enum cases are variants of one type rather than subclasses. Swift enums have value semantics, although a class stored in a payload can still be shared, just as in session 001.</p>"
+        },
+        {
+          "id": "associated-syntax",
+          "title": "Construct variants and read their payload labels",
+          "html": "<p>An associated value is data supplied each time a particular case is constructed. The loaded case needs a list; the failed case needs a message; idle and loading need neither. Because payload types are part of the declaration, the compiler prevents a loaded case with no array or a failure carrying an unrelated integer.</p><pre><code class=\"language-swift\">enum SearchState: Equatable {\n    case idle\n    case loading\n    case loaded(providers: [String])\n    case failed(message: String)\n}\n\nlet start: SearchState = .idle\nlet result = SearchState.loaded(providers: [\"Dr. Ada\"])\nlet empty: SearchState = .loaded(providers: [])\nlet failure: SearchState = .failed(message: \"Retry when connected\")</code></pre><p><code>case</code> introduces a variant. <code>providers:</code> is an argument label at construction; <code>[String]</code> is its array type. A leading dot means Swift can infer the enclosing enum type from context. The explicit <code>SearchState.loaded</code> spelling provides that context itself. You will encounter both forms in production code.</p><p><code>: Equatable</code> requests equality behavior. Synthesis works here because arrays of strings and strings are equatable. If you replace a payload with a custom type lacking Equatable, the compiler needs that conformance or an explicit equality implementation. A derived <code>Hashable</code> conformance has analogous requirements and includes Equatable. Neither one creates object identity. Adding protocols deliberately keeps your state model's capabilities visible to readers.</p>"
+        },
+        {
+          "id": "patterns",
+          "title": "A switch extracts data; it does not cast subclasses",
+          "html": "<p>Match the enum to decide which data exists. Kotlin's <code>when</code> often smart-casts a sealed subtype. Swift's <code>switch</code> matches a case pattern and binds its associated values into local names. Pattern names need not repeat the declaration labels: what matters is the matched case and its payload shape.</p><pre><code class=\"language-swift\">func title(for state: SearchState) -&gt; String {\n    switch state {\n    case .idle:\n        return \"Start a search\"\n    case .loading:\n        return \"Loading\"\n    case let .loaded(names):\n        return names.isEmpty ? \"No matches\" : \"\\(names.count) providers\"\n    case let .failed(message):\n        return \"Error: \\(message)\"\n    }\n}\n\nif case let .loaded(names) = result {\n    print(names.joined(separator: \", \"))\n}</code></pre><p><code>case let .loaded(names)</code> makes names an immutable array binding in that branch. <code>case .loaded(let names)</code> is an equivalent spelling. <code>if case</code> asks whether one pattern matches without requiring every other case to have a branch. It is useful for optional behavior; a renderer deciding all states generally benefits from a full switch.</p><p>The conditional expression <code>condition ? first : second</code> chooses one result, similar to a Kotlin expression-form if. Swift switch branches do not fall through automatically, so no break is necessary after each return. Avoid importing Java switch habits. An enum's payload is not a mutable field common to every case: to change state, assign a new case or construct a new payload.</p>"
+        },
+        {
+          "id": "exhaustiveness",
+          "title": "Let a new case expose every decision you owe",
+          "html": "<p>For this locally declared enum, the switch must cover every case or include a catch-all. Add <code>case offline</code> temporarily and the compiler will require a branch in title. That diagnostic is useful: a product decision now has a list of affected consumers. A default branch can make the code compile while silently giving the new state an inappropriate existing presentation.</p><p>Use an explicit branch when the new case deserves its own behavior. Use a catch-all only when grouping unknown situations is intentional and documented. For nonfrozen enums imported from libraries built with library evolution, future cases require special consideration. <code>@unknown default</code> allows future cases while warning about currently known cases you omitted. It is not a reason to suppress exhaustive handling of your own local model.</p><p>Exhaustiveness checks possible values, not valid transitions. The enum still permits a direct change from idle to failed, or one loaded list being replaced by another. A transition function or feature owner must define when such changes are allowed. This separation will matter in later architecture sessions: good state representation reduces invalid combinations, but it does not by itself orchestrate asynchronous work.</p><p>Likewise, avoid claiming that an enum eliminates every invalid payload. A failed message can be blank unless you validate it. Loaded strings can contain duplicates. Use the type system for structural constraints, then test the remaining domain rules explicitly.</p>"
+        },
+        {
+          "id": "raw-values",
+          "title": "Raw values are stable identifiers, not instance payloads",
+          "html": "<p>A raw-value enum associates a fixed identifier with each case. This is useful for a small closed set of known API codes or persistence keys. Every instance of scheduleConflict has the same raw string. An associated-value case instead carries information that can vary for each constructed instance, such as the message for this particular failed request.</p><pre><code class=\"language-swift\">enum ReasonCode: String {\n    case scheduleConflict = \"schedule_conflict\"\n    case other = \"other\"\n}\n\nlet known = ReasonCode(rawValue: \"schedule_conflict\")\nlet unknown = ReasonCode(rawValue: \"server_added_reason\")\nprint(known == .scheduleConflict) // true\nprint(unknown == nil)            // true\nprint(ReasonCode.other.rawValue) // other</code></pre><p><code>ReasonCode(rawValue:)</code> is a failable initializer returning an optional because a supplied string may not match a known case. Decide explicitly what unknown input means: reject it, show a generic fallback, or preserve the original value elsewhere for forward compatibility. Force unwrapping turns a server adding a new reason into a crash.</p><p>Raw values and associated payloads cannot be combined in the same raw-value enum. If you need both a fixed code and changing detail, use a struct containing a code plus detail, or an associated-value enum with a computed code property. Also, raw values do not automatically make a type Codable; that is a separate protocol. <code>CaseIterable</code> can enumerate suitable cases, but Swift cannot synthesize every possible associated-value instance.</p>"
+        },
+        {
+          "id": "product-boundaries",
+          "title": "Empty, idle, and absent are different product facts",
+          "html": "<p><code>.loaded(providers: [])</code> says a search finished successfully with zero matches. <code>.idle</code> says no result is currently being presented because the operation has not begun. <code>.failed(message:)</code> says completion failed. A spinner, a no-matches message, and a retry affordance express different next actions. Do not reduce them to the same empty array for convenience.</p><p>An optional <code>SearchState?</code> introduces another state: no SearchState value at all. Add it only if the owner genuinely has no state yet. When idle already expresses the initial situation, optionality may add needless branches and ambiguity. Ask what the user would see for nil versus idle before introducing both.</p><p>Open the active cancellation coordinator. Its NavigationState at line 177 contains question with CancelAppointmentQuestionData and bookingPrompt without payload. The switch at line 53 extracts questionData only in the question branch. The separate CancellationReason at line 8 uses String raw values for API identifiers. These files demonstrate the two enum forms in one feature, not two interchangeable implementation styles.</p><p>Trace the model's computed <code>asNavigationState</code> from the previous session: it wraps the model in question rather than converting it into a string. That preserves typed information until the consumer needs it. Inspecting this small chain is enough today; the UIKit superclass and navigation architecture will be introduced later.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What distinguishes an associated value from a raw value?",
+          "options": [
+            "Both are supplied dynamically at every construction.",
+            "Associated values vary per instance; raw values are fixed per case.",
+            "Raw values are class references while associated values are always integers."
+          ],
+          "answer": 1,
+          "explanation": "loaded(providers:) can hold a different array on every construction. ReasonCode.other always maps to its declared raw string. The two models solve different data needs."
+        },
+        {
+          "question": "A new local SearchState.offline case is added to an enum consumed by an exhaustive switch. What happens?",
+          "options": [
+            "The switch automatically uses failed.",
+            "The compiler requires handling the added case.",
+            "Existing branches run in declaration order until one succeeds."
+          ],
+          "answer": 1,
+          "explanation": "An exhaustive local switch must account for every case. Adding default earlier would have hidden this decision; Swift does not invent an offline presentation."
+        },
+        {
+          "question": "Why preserve loaded([]) separately from idle?",
+          "options": [
+            "An empty Swift array cannot be constructed.",
+            "It distinguishes completed success with no matches from a search that has not begun.",
+            "Enums require every case to hold a unique nonempty payload."
+          ],
+          "answer": 1,
+          "explanation": "The distinction supports different user guidance and analytics. Payload shape and product state are separate; an empty list is a valid successful result."
+        },
+        {
+          "question": "What does ReasonCode(rawValue: \"new_server_code\") return if the code is unknown?",
+          "options": [
+            "A new case created at runtime.",
+            "The first declared case.",
+            "nil"
+          ],
+          "answer": 2,
+          "explanation": "The raw-value initializer is failable. Unknown external identifiers need an explicit compatibility decision; an enum's cases are not extended dynamically."
+        }
+      ],
+      "exercise": {
+        "brief": "Design a four-state search renderer and prove the difference between empty success, initial state, and failure.",
+        "steps": [
+          "Write SearchState with idle, loading, loaded(providers:), and failed(message:), then implement title(for:) without default.",
+          "Print titles for all four variants and an additional loaded empty array.",
+          "Use if case to extract names from one result; explain the pattern's local binding.",
+          "Add offline temporarily and record the diagnostic or missing branch you predict.",
+          "Choose whether offline deserves a distinct case in your product; justify the retry, content, and accessibility behavior."
+        ],
+        "acceptance": [
+          "Every declared state has explicit rendering behavior.",
+          "An empty loaded array produces no matches rather than start search or retry.",
+          "The new offline case exposes a required switch update.",
+          "Unknown raw strings are handled without force unwrapping.",
+          "Your explanation distinguishes representation from transition rules."
+        ],
+        "solution": "<p>The lesson's title function is one worked renderer. Call it with these values in the same standalone file, after declaring SearchState and title. Compare your output before reading the reasoning.</p><pre><code class=\"language-swift\">let samples: [SearchState] = [\n    .idle,\n    .loading,\n    .loaded(providers: [\"Dr. Ada\"]),\n    .loaded(providers: []),\n    .failed(message: \"Retry when connected\")\n]\nfor sample in samples {\n    print(title(for: sample))\n}</code></pre><p>The expected lines are Start a search, Loading, 1 providers, No matches, and Error: Retry when connected. The teaching string intentionally leaves pluralization simple; real localized UI would address that separately. Empty success never takes the failure branch.</p><p>After adding offline, extend the switch with <code>case .offline: return \"Offline: retry later\"</code>. A separate case is justified if it drives a distinct affordance, such as retaining stale content or displaying a connection explanation. If all failures share the same behavior, a typed failure payload can be enough instead. Neither decision is universally correct; make the user-facing rule explicit.</p><p>The compiler protects coverage, but it cannot decide whether a retry should be enabled or whether cached names should remain visible. Those are transition and presentation requirements. For a raw code, preserve nil from unknown input until the boundary deliberately maps it to a fallback. Record the added branch and product rationale as your exercise evidence rather than treating this solution as completion.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift language guide — Enumerations",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/enumerations/"
+        },
+        {
+          "label": "Swift language guide — Control Flow",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/controlflow/"
+        },
+        {
+          "label": "Kotlin — Sealed classes and interfaces",
+          "url": "https://kotlinlang.org/docs/sealed-classes.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Navigation variants with associated question data",
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentNavigationCoordinator.swift",
+          "line": 177,
+          "why": "Active local NavigationState declares question payload and payload-free bookingPrompt."
+        },
+        {
+          "label": "Exhaustive navigation consumption",
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentNavigationCoordinator.swift",
+          "line": 53,
+          "why": "Switch binds question data before constructing the controller."
+        },
+        {
+          "label": "Fixed raw-value API reason identifiers",
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancellationReason.swift",
+          "line": 8,
+          "why": "Contrasts String raw values with the coordinator's per-instance associated data."
+        }
+      ],
+      "checklist": [
+        "I can construct associated-value cases and explain their argument labels.",
+        "I can extract payloads with case let and if case.",
+        "I can explain why adding a local case should expose missing handling.",
+        "I can distinguish raw values from associated data.",
+        "I can explain empty success, idle, nil, and failure independently.",
+        "I have attempted the renderer and recorded its product decisions."
+      ]
+    },
+    {
+      "id": "003",
+      "title": "Protocols, extensions, closures, and errors",
+      "summary": "Build a replaceable service contract, understand dispatch and callback lifetime, and preserve useful failure information.",
+      "duration": 75,
+      "level": "Foundation",
+      "prerequisites": [
+        "001",
+        "002"
+      ],
+      "objectives": [
+        "Define a protocol and substitute a deterministic fake for a real service.",
+        "Explain protocol requirements, default implementations, and extension-only helper dispatch.",
+        "Read function types, trailing closures, any existentials, and @escaping.",
+        "Handle success, empty success, and failure without collapsing domain meaning."
+      ],
+      "sections": [
+        {
+          "id": "why-contract",
+          "title": "Use your Android testing instincts with Swift contracts",
+          "html": "<p>On Android, an interface lets a ViewModel depend on a service contract rather than a Retrofit implementation. A fake can then return a small fixture or fail deterministically. Swift protocols provide a similar substitution boundary for structs, classes, and enums. That analogy is useful, but do not assume every protocol feature or dispatch rule matches a Kotlin interface.</p><p>Our synthetic service returns provider display names synchronously. Keeping it synchronous makes dependency substitution and error handling visible without introducing concurrency. <code>throws</code> permits failure; it creates no background execution. Later an <code>async throws</code> requirement can also suspend, but suspension, ownership, and thread choice are separate concerns. Do not add async simply because a type is called a service.</p><pre><code class=\"language-swift\">protocol ProviderServing {\n    func providers() throws -&gt; [String]\n}\n\nenum ProviderError: Error {\n    case offline\n}\n\nstruct FakeProviderService: ProviderServing {\n    let isOffline: Bool\n\n    func providers() throws -&gt; [String] {\n        if isOffline {\n            throw ProviderError.offline\n        }\n        return [\"Dr. Ada\", \"Dr. Lin\"]\n    }\n}</code></pre><p>The colon after the struct name declares conformance, and the colon after ProviderError makes the enum usable as an Error. Every conforming service must satisfy the required callable shape. This entire declaration block is standalone Swift and needs no networking package.</p>"
+        },
+        {
+          "id": "contract-shape",
+          "title": "Read the complete API promise, including labels",
+          "html": "<p>Read <code>func providers() throws -&gt; [String]</code> as a zero-argument operation that returns strings or exits by throwing. The required name, parameter labels, return type, and effects matter. A fake whose method is named <code>fetchProviders</code> does not satisfy this requirement merely because it returns the same array. Likewise, an <code>async</code> implementation cannot stand in for a synchronous requirement.</p><p>Kotlin generally lets exceptions propagate without a throws declaration; Java has checked exception declarations for specified exception classes. Swift's ordinary untyped throws is a checked effect at the call site, but it does not enumerate a Java-style list of exception classes. Newer Swift supports typed throws in appropriate APIs; today's examples and the inspected repository requirement use ordinary throws. Treat that as a conscious scope choice rather than a universal limitation of Swift.</p><p>A property requirement such as <code>var name: String { get }</code> promises readable access, not a specific storage strategy. A stored let property or computed property can satisfy it. A get/set requirement needs writable behavior. For a value-type requirement that mutates its own stored state, <code>mutating</code> must be part of the contract; that does not arise in our read-only service.</p><p><code>any ProviderServing</code> is an existential: a value accessed through the protocol while its concrete conforming type is hidden. It enables substitution here. A generic parameter constrained to ProviderServing preserves the concrete type for the generic implementation. Neither choice proves reference semantics; the wrapped service may still be a struct.</p>"
+        },
+        {
+          "id": "extensions-dispatch",
+          "title": "Reuse behavior without hiding dispatch rules",
+          "html": "<p>An extension adds behavior to an existing type or protocol. It can add methods, computed properties, and conformance, but cannot introduce stored instance properties. Our helper transforms the required service output and deliberately preserves throwing behavior.</p><pre><code class=\"language-swift\">extension ProviderServing {\n    func displayNames() throws -&gt; [String] {\n        try providers().map { name in name.uppercased() }\n    }\n}</code></pre><p><code>map</code> calls the closure once for each element and constructs an output array. <code>name in</code> separates the parameter declaration from the body. With a single expression, an explicit return is unnecessary. The initial try accounts for the potentially throwing providers call; uppercasing itself is not a network operation.</p><p>A protocol requirement with a default implementation participates in protocol dispatch. A method declared only in an extension is an added helper, not an overridable requirement. A same-named concrete method can be selected through the concrete type while the extension helper is selected through the protocol-typed value. This standalone example makes the distinction visible:</p><pre><code class=\"language-swift\">protocol BadgeNaming {}\nextension BadgeNaming {\n    func badge() -&gt; String { \"default\" }\n}\nstruct FeaturedBadge: BadgeNaming {\n    func badge() -&gt; String { \"featured\" }\n}\nlet concreteBadge = FeaturedBadge()\nlet abstractBadge: any BadgeNaming = concreteBadge\nprint(concreteBadge.badge()) // featured\nprint(abstractBadge.badge()) // default</code></pre><p>If badge must vary polymorphically, declare it as a requirement in BadgeNaming and optionally supply its default in the extension. Kotlin extension functions are also selected statically, but Kotlin extensions cannot retroactively make a class implement an interface. Use the analogy to ask questions, not to skip checking Swift's contract.</p>"
+        },
+        {
+          "id": "closures",
+          "title": "Function values have a signature and a lifetime",
+          "html": "<p><code>([String]) -&gt; Void</code> describes a closure accepting one string array and returning no useful result. Void is Swift's empty tuple type, serving a role similar to Kotlin Unit. Parentheses group input types; the arrow introduces the return type. A closure's type tells you what can be passed, not which queue it runs on.</p><pre><code class=\"language-swift\">func showProviders(\n    service: any ProviderServing,\n    onNames: ([String]) -&gt; Void\n) {\n    do {\n        let names = try service.displayNames()\n        onNames(names)\n    } catch ProviderError.offline {\n        print(\"Offline: retry when connected\")\n    } catch {\n        print(\"Unexpected failure\")\n    }\n}\n\nshowProviders(service: FakeProviderService(isOffline: false)) { names in\n    print(names.joined(separator: \", \"))\n}</code></pre><p>The closure after the closing parenthesis is trailing-closure syntax for the final onNames argument. <code>names</code> receives the array; it is not fetched from an outer variable. Shorthand <code>$0</code> can replace the first parameter, but explicit names teach intent more clearly.</p><p>A plain closure parameter is nonescaping by default: this function invokes it during the call. Storing it on an object, returning it, or arranging for later invocation requires an escaping parameter. <code>@escaping</code> belongs on the parameter declaration, not on the stored property's function type. It states that the callback may outlive the call; it does not mean background execution, weak capture, or guaranteed invocation. Optional closure parameters have different type behavior, so apply this rule to the plain closure form shown here.</p>"
+        },
+        {
+          "id": "errors-meaning",
+          "title": "Try marks failure; it does not recover from it",
+          "html": "<p>At a throwing call, choose propagation, handling, or deliberate loss of error detail. <code>try</code> marks the call and allows the error to travel outward. A do/catch block handles it locally. A surrounding function declared throws can propagate it instead. A catch pattern for ProviderError.offline handles that case; the final catch binds any other thrown error as <code>error</code> if you need it.</p><p><code>try?</code> turns failure into nil and discards the error. That is reasonable when failure truly means optional absence and no later decision needs its cause. <code>try? service.providers() ?? []</code> is usually wrong for this screen: offline becomes indistinguishable from successful zero results. Session 002 gave these situations different states so that retry behavior remains possible.</p><p><code>try!</code> traps when the operation throws. It is not a faster catch or a user-facing recovery strategy. Swift error handling also does not catch every crash: force-unwrapping nil and triggering precondition failures are not ordinary thrown errors. Define failure semantics before selecting an operator.</p><p><code>defer</code> schedules cleanup as a scope is left, including after return or throw. It is useful for paired resource operations, but it cannot transform an error into success. In our simple synchronous service there is no resource requiring deferred cleanup. Avoid decorative language features; each one should solve a visible requirement.</p>"
+        },
+        {
+          "id": "repo-reading",
+          "title": "Decode a production contract without borrowing its infrastructure",
+          "html": "<p>Open GooglePlaceDetailsServing at line 12. Its public protocol inherits Sendable, and fetchDetails is <code>async throws</code>. You can already identify the placeId argument label, suspension permission, failure permission, and concrete return type. Sendable is a concurrency contract for later study, not a synonym for immutable or a guarantee that every operation is thread-safe.</p><p>The DIResolver extension at line 18 adds a lookup helper to an existing type. It calls a required resolver operation rather than storing a service itself. <code>#file</code> and <code>#line</code> provide diagnostic defaults; callers normally do not supply them. The return is spelled with a bare protocol name in this source. Our teaching code uses explicit any; do not infer a repository-wide migration from that stylistic difference.</p><p>In the cancellation coordinator, the onSubmitResponse property at line 19 stores an async throwing closure. Its initializer marks that parameter escaping at line 28 and assigns it at line 36. The later invocation uses <code>try await</code>. Read the callback lifetime first; execution and cancellation will have their own sessions.</p><p>The standalone fake proves replacement and error semantics, not integration with the real dependency resolver, UIKit, or the app. When reading the repository, follow the active Sources directory and its manifest. When practicing, keep the program small enough that each language effect has an obvious reason.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why does storing a callback parameter on an object require @escaping?",
+          "options": [
+            "Because it always executes on a background queue.",
+            "Because its lifetime can extend beyond the initializing function call.",
+            "Because only escaping closures can throw."
+          ],
+          "answer": 1,
+          "explanation": "Escaping is a lifetime annotation. Thread choice, capture strength, throwing behavior, and whether the callback is eventually invoked are separate properties."
+        },
+        {
+          "question": "A helper exists only in a protocol extension, and a conformer declares the same method. Which is selected through an any-protocol value?",
+          "options": [
+            "The conformer's same-named method in every situation.",
+            "The extension-only helper based on the protocol-typed access.",
+            "The compiler dynamically adds the method to the protocol."
+          ],
+          "answer": 1,
+          "explanation": "Only declared requirements establish the polymorphic contract. Make the method a protocol requirement when calls through the protocol must dispatch to conformer-specific implementations."
+        },
+        {
+          "question": "What behavior is lost by try? service.providers() ?? []?",
+          "options": [
+            "The ability to distinguish failed retrieval from successful empty data.",
+            "The ability to make arrays immutable.",
+            "The ability to use trailing closures."
+          ],
+          "answer": 0,
+          "explanation": "Both outcomes become the same empty array, discarding the offline error needed for retry or a failure presentation."
+        },
+        {
+          "question": "What does any ProviderServing imply about the underlying service?",
+          "options": [
+            "It must be a class.",
+            "Its concrete conforming type is hidden behind the protocol contract.",
+            "It is automatically safe to share across actors."
+          ],
+          "answer": 1,
+          "explanation": "An existential can hold a conforming struct or class. It does not change value/reference semantics or add a concurrency safety guarantee."
+        }
+      ],
+      "exercise": {
+        "brief": "Create a synthetic appointment service with nonempty success, empty success, and offline failure; consume it through a protocol with separate success and failure callbacks.",
+        "steps": [
+          "Declare AppointmentServing with appointments() throws -> [String] and an AppointmentFailure.offline error.",
+          "Implement a fake configured with Result<[String], AppointmentFailure>, explaining the generic angle-bracket syntax.",
+          "Add a count helper in a protocol extension while preserving throws.",
+          "Write a consumer accepting any AppointmentServing plus onSuccess and onFailure callbacks.",
+          "Demonstrate all three outcomes and justify whether either callback must escape."
+        ],
+        "acceptance": [
+          "Nonempty and empty arrays both invoke success exactly once.",
+          "Offline invokes failure and never masquerades as a zero-count success.",
+          "The extension helper preserves errors.",
+          "Callbacks run during the synchronous consumer call and need no @escaping.",
+          "No real appointments, requests, or production file edits are used."
+        ],
+        "solution": "<p>Result is a generic enum: the first type parameter is successful data and the second is an Error-conforming failure. Its get operation returns success or throws failure. This is a complete standalone answer; keep it separate from earlier declarations.</p><pre><code class=\"language-swift\">protocol AppointmentServing {\n    func appointments() throws -&gt; [String]\n}\nenum AppointmentFailure: Error { case offline }\n\nstruct FakeAppointments: AppointmentServing {\n    let result: Result&lt;[String], AppointmentFailure&gt;\n    func appointments() throws -&gt; [String] { try result.get() }\n}\nextension AppointmentServing {\n    func count() throws -&gt; Int { try appointments().count }\n}\nfunc loadAppointments(\n    using service: any AppointmentServing,\n    onSuccess: ([String]) -&gt; Void,\n    onFailure: (any Error) -&gt; Void\n) {\n    do {\n        onSuccess(try service.appointments())\n    } catch {\n        onFailure(error)\n    }\n}\nlet outcomes: [Result&lt;[String], AppointmentFailure&gt;] = [\n    .success([\"Synthetic visit\"]),\n    .success([]),\n    .failure(.offline)\n]\nfor outcome in outcomes {\n    loadAppointments(\n        using: FakeAppointments(result: outcome),\n        onSuccess: { print(\"Success count:\", $0.count) },\n        onFailure: { print(\"Failure:\", $0) }\n    )\n}</code></pre><p>The two success lines contain counts 1 and 0. The failure line reports offline. The helper and consumer do not silently substitute defaults. Both callbacks are ordinary nonescaping parameters because no code stores or returns them. If you later put onSuccess in a retained handler, change the parameter annotation and review what it captures; adding escaping alone does not establish correct ownership.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift language guide — Protocols",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/protocols/"
+        },
+        {
+          "label": "Swift language guide — Extensions",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/extensions/"
+        },
+        {
+          "label": "Swift language guide — Closures",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/closures/"
+        },
+        {
+          "label": "Swift language guide — Error Handling",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/errorhandling/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Async throwing service contract",
+          "path": "ios-client/Projects/Infra/ZDModules/Sources/ZDModules/GooglePlaceDetailsServing.swift",
+          "line": 12,
+          "why": "Active ZDModules protocol and resolver extension expose requirement syntax, Sendable, and dependency lookup."
+        },
+        {
+          "label": "Stored escaping callback",
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentNavigationCoordinator.swift",
+          "line": 28,
+          "why": "Initializer annotation and line 36 assignment connect callback lifetime to real feature ownership."
+        },
+        {
+          "label": "Active module source inclusion",
+          "path": "ios-client/Projects/Infra/ZDModules/Project.swift",
+          "line": 20,
+          "why": "Source glob includes the service contract in the generated module."
+        }
+      ],
+      "checklist": [
+        "I can replace a concrete service with a protocol-conforming fake.",
+        "I can distinguish protocol requirements from extension-only helpers.",
+        "I can read a closure type and trailing-closure call.",
+        "I can explain @escaping without assuming threading or weak ownership.",
+        "I can choose propagation, do/catch, or deliberate optional failure.",
+        "I have demonstrated success, empty success, and offline failure separately."
+      ]
+    },
+    {
+      "id": "004",
+      "title": "ARC, capture lists, and ownership graphs",
+      "summary": "Reason about screen lifetime, break closure cycles deliberately, and distinguish leaks from temporary retention.",
+      "duration": 75,
+      "level": "Foundation",
+      "prerequisites": [
+        "001",
+        "003"
+      ],
+      "objectives": [
+        "Explain why an unreachable strong cycle differs under ARC and JVM garbage collection.",
+        "Draw strong and weak ownership edges for stored callbacks.",
+        "Use weak capture and optional binding while understanding temporary strong ownership.",
+        "Evaluate capture snapshots, nested closures, and the lifetime promise behind unowned."
+      ],
+      "sections": [
+        {
+          "id": "why-memory",
+          "title": "A dismissed screen can still have owners",
+          "html": "<p>An Android Activity retained by a singleton listener survives because it remains reachable from a GC root. You already know to inspect listeners and callbacks. Swift asks an additional question: do the surviving objects strongly retain each other? Automatic Reference Counting manages class-instance lifetime through owning references rather than periodically tracing the graph from roots.</p><p>Under JVM garbage collection, a cycle that is unreachable from roots can be collected. Android ART also uses garbage collection, though it is not the same collector implementation as desktop HotSpot. Under Swift ARC, an isolated cycle of strong references can keep its participants alive. Removing the screen's external variable does not remove the internal owning edges.</p><p>ARC is automatic, but ownership design remains your responsibility. Values such as structs do not have class identity; nevertheless a struct can contain references whose lifetime ARC manages. Closures can retain captured class objects. These facts connect directly to sessions 001 and 003: a value wrapper is not a deep-copy boundary, and an escaping callback may outlive the function that created it.</p><p>We will use synchronous toy screens in standalone Swift. There are no UIKit views, threads, or delayed timers, so the evidence will concern ownership only. The same reasoning is later applied to a production view controller, with its lifecycle and task behavior inspected separately.</p>"
+        },
+        {
+          "id": "strong-cycle",
+          "title": "Draw the cycle before adding weak",
+          "html": "<p>Read the following complete standalone demonstration as a graph. The external screen variable initially owns the instance. The instance owns its tapCallback closure property. That closure uses self.name, so it strongly captures the same screen. After screen becomes nil, the two internal strong edges remain.</p><pre><code class=\"language-swift\">final class CyclicScreen {\n    let name = \"Synthetic screen\"\n    var tapCallback: (() -&gt; Void)?\n    func install() {\n        tapCallback = { print(self.name) }\n    }\n    deinit { print(\"CyclicScreen released\") }\n}\n\nfunc inspectCycle() {\n    var screen: CyclicScreen? = CyclicScreen()\n    screen?.install()\n    weak var probe = screen\n    screen = nil\n    print(probe != nil) // true: stored closure still owns screen\n    probe?.tapCallback = nil  // explicitly clean up the intentional cycle\n    print(probe == nil) // true\n}\ninspectCycle()</code></pre><p><code>(() -&gt; Void)?</code> is an optional zero-argument closure. The outer question mark applies to the function value, allowing tapCallback to be absent. <code>deinit</code> runs when the class instance is deallocated; it cannot rescue a cycle that prevents deallocation. Placing <code>tapCallback = nil</code> only inside deinit would therefore be ineffective.</p><p>The weak probe observes without owning. Its staying nonnil after external ownership disappears demonstrates a remaining owner. Clearing tapCallback removes the screen-to-closure edge, which releases the closure and its capture. The demonstration deliberately cleans up; a lesson should not leave a leak running merely to prove that leaks exist.</p>"
+        },
+        {
+          "id": "weak-binding",
+          "title": "Weak capture changes ownership, then guard restores a local owner",
+          "html": "<p>Use weak when the callback can outlive the object it references and the callback should tolerate that object's disappearance. Weak references do not keep a class instance alive and are set to nil after it is released. They are optional variables because their target may disappear; they apply to class instances or class-bound protocol references.</p><pre><code class=\"language-swift\">final class WeakScreen {\n    let name = \"Synthetic screen\"\n    var tapCallback: (() -&gt; Void)?\n    func install() {\n        tapCallback = { [weak self] in\n            guard let self else {\n                print(\"Skipped: screen is gone\")\n                return\n            }\n            print(self.name)\n        }\n    }\n    deinit { print(\"WeakScreen released\") }\n}\n\nfunc inspectWeakCapture() {\n    var screen: WeakScreen? = WeakScreen()\n    screen?.install()\n    let savedCallback = screen?.tapCallback\n    weak var probe = screen\n    savedCallback?()\n    screen = nil\n    print(probe == nil) // true\n    savedCallback?()   // safely prints Skipped\n}\ninspectWeakCapture()</code></pre><p>The square-bracket list belongs to the closure definition. <code>[weak self]</code> requests a nonowning capture; <code>in</code> begins the body. <code>guard let self</code> unwraps the captured optional into a strong local binding. That keeps the object available while this body uses it. It does not make weak magically strong forever.</p><p>SavedCallback owns the closure, but its weak capture does not own the screen. Optional invocation, <code>savedCallback?()</code>, skips the call only if the closure itself is missing. The guard separately handles the closure existing while its screen is gone. These are two different optional checks.</p>"
+        },
+        {
+          "id": "ownership-choices",
+          "title": "Strong, weak, and unowned encode different promises",
+          "html": "<p>A strong reference is appropriate for ownership: a coordinator owning its current child, or an operation retaining a dependency until completion. Weak is appropriate for observing something owned elsewhere when disappearance is acceptable. The common nonoptional unowned form also avoids retention, but accessing it after the target's lifetime ends traps. Choosing unowned requires a lifetime guarantee, not a hope that the callback will finish quickly.</p><table><thead><tr><th>Reference</th><th>Retains target</th><th>Target ends first</th></tr></thead><tbody><tr><td>Strong</td><td>Yes</td><td>Its ownership must end before deallocation</td></tr><tr><td>Weak</td><td>No</td><td>Reference becomes nil</td></tr><tr><td>Unowned, ordinary form</td><td>No</td><td>Later access traps</td></tr></tbody></table><p>Unowned optional references also exist, but they do not gain weak's automatic nil behavior. For this beginner sequence, use weak for externally retained callbacks unless you can prove the target outlives every use. Do not execute a crashing unowned demonstration in the exercise.</p><p>Making every capture weak can silently drop required work. If a save operation must complete independently of a screen, a service or operation owner may need to retain the necessary dependency. If screen updates should be discarded after dismissal, a weak screen capture may be exactly right. Write the desired lifetime first, then select the reference.</p><p>Likewise, a temporary strong reference is not automatically a leak. A retained operation can release everything after completion. Ask what owns the operation, whether completion is guaranteed, and whether cancellation or clearing a callback breaks the path. A graph with a bounded release path deserves different analysis from a permanent cycle.</p>"
+        },
+        {
+          "id": "capture-snapshots",
+          "title": "Capture lists also decide which value you remember",
+          "html": "<p>Capture strength is only one role of a capture list. An ordinary closure capturing a local mutable variable can observe its later value. An explicit capture initialized from that variable takes a value at closure creation. This small standalone example makes the difference observable without using class ownership at all.</p><pre><code class=\"language-swift\">var label = \"Before\"\nlet live = { print(label) }\nlet snapshot = { [label] in print(label) }\nlabel = \"After\"\nlive()     // After\nsnapshot() // Before</code></pre><p><code>[label]</code> captures the current string value under the same local name. You can give the captured value another name, such as <code>[initialLabel = label]</code>. If the captured value is a class reference, capturing it strongly keeps that object; it does not freeze the object's properties or clone it. A snapshot of a reference is still a reference.</p><p>Nested closures require fresh analysis. After a weak capture is unwrapped, an inner stored closure using the newly bound self can capture it strongly. The outer weak edge does not propagate a weak policy into all inner work. The same principle applies when a Task closure uses that binding across suspension.</p><p>A compiler may shorten a local's lifetime after its last meaningful use; avoid treating deinit prints as a universal statement about exact source-line timing under all optimization levels. Weak probes and controlled removal of known owners give stronger evidence. Exact retention behavior around asynchronous work additionally depends on the task and the surrounding storage.</p>"
+        },
+        {
+          "id": "repo-ownership",
+          "title": "Trace active callbacks and separate the unanswered questions",
+          "html": "<p>Open CancelAppointmentViewController at line 85. The controller installs a callback on subview.on. In the view file, line 21 owns an Actions container, whose tappedContinue property is a stored closure near line 229. Draw controller to view to Actions to callback. The callback's weak self capture avoids adding a strong edge back to the controller.</p><p>The longer <code>guard let self = self</code> in this source and the shorter <code>guard let self</code> in our example both unwrap the optional into a local binding. Their spelling differs; the ownership purpose is the same. The current project also contains modern and legacy idioms, so learning one concise form does not require rewriting every older form.</p><p>In the coordinator at line 64, the outer callback captures self weakly, unwraps it, then creates a Task at line 77 that uses self. That inner closure retains the unwrapped coordinator for its use. This snippet shows retention; it does not, by itself, prove a permanent cycle or establish a cancellation policy. Inspect task storage, completion, and the awaited service before making that diagnosis.</p><p>Explicitly list what you can conclude and what remains unknown. You can identify the weak outer edge and strong inner use. You cannot conclude that every request terminates promptly, that dismissal cancels work, or that memory is released immediately afterward. Ownership analysis improves when claims stay tied to inspected evidence.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why can a cycle that JVM GC collects remain alive under Swift ARC?",
+          "options": [
+            "ARC never releases class instances.",
+            "The cycle's strong ownership edges remain even after external ownership is removed.",
+            "Swift closures always live until app termination."
+          ],
+          "answer": 1,
+          "explanation": "A tracing collector can recognize a root-unreachable cycle. ARC needs the remaining owning references to be broken; screen and stored closure can retain one another."
+        },
+        {
+          "question": "Inside a [weak self] closure, what does guard let self establish?",
+          "options": [
+            "A strong local reference for the subsequent work.",
+            "A new weak reference that can disappear during each property access.",
+            "Automatic cancellation of nested tasks."
+          ],
+          "answer": 0,
+          "explanation": "Successful optional binding retains the instance through the local use. A nested closure can capture this new binding strongly, so its lifetime needs another review."
+        },
+        {
+          "question": "A saved weak-capturing callback is invoked after the screen is released. What should happen?",
+          "options": [
+            "A forced unwrap is required.",
+            "Its optional self is nil, so it follows the chosen absent-owner path.",
+            "The saved closure automatically recreates the screen."
+          ],
+          "answer": 1,
+          "explanation": "The callback may still exist independently of its owner. Weak capture allows safe disappearance; its body must deliberately handle that case."
+        },
+        {
+          "question": "What justifies unowned rather than weak for an escaping callback?",
+          "options": [
+            "The target is usually fast.",
+            "A proven lifetime relationship ensuring the target outlives every callback use.",
+            "The class has a deinit method."
+          ],
+          "answer": 1,
+          "explanation": "Ordinary unowned access traps after the target is gone. Speed and deinit presence do not establish the required lifetime invariant."
+        }
+      ],
+      "exercise": {
+        "brief": "Reproduce a closure cycle, clean it up, then repair it with weak capture and prove that a saved callback tolerates a missing owner.",
+        "steps": [
+          "Run or reconstruct inspectCycle and draw every strong edge before and after screen = nil.",
+          "Explain why the weak probe remains nonnil, then explicitly clear onTap and verify cleanup.",
+          "Implement the weak version without looking at its answer; save its callback separately.",
+          "Call the saved callback before release and after release; record the different output.",
+          "Predict unowned behavior without running a crashing variant. Explain one case where deliberate strong retention is appropriate."
+        ],
+        "acceptance": [
+          "The cyclic demonstration cleans up after itself.",
+          "The weak probe becomes nil when strong owners are removed in the repaired version.",
+          "The saved callback safely handles missing self.",
+          "Both diagrams label ownership, and the explanation separates callback storage from its captured object.",
+          "No claim of a production memory fix or app build is made."
+        ],
+        "solution": "<p>The cycle graph is <code>screen → instance → tapCallback closure → instance</code>, with strong arrows throughout. Assigning nil to screen removes only the first arrow. Clearing the stored closure removes the loop and permits deallocation. Do not place that cleanup solely in deinit: the cycle prevents reaching it.</p><p>The repaired graph is <code>screen → instance → tapCallback closure ⇢ instance</code>, where the last arrow is weak. A saved callback adds an independent strong owner of the closure, not of its weakly referenced screen. With the external screen variable cleared, the weak probe becomes nil; invocation follows the guard's absent-owner branch.</p><p>The complete code above provides the worked implementations. Expected observations are true for remaining retention in inspectCycle, true for cleanup afterward, true for release in inspectWeakCapture, and Skipped after invoking the saved callback post-release. Treat deinit output as supporting evidence in this controlled program rather than a timing contract for every optimization level.</p><p>For the final ownership choice, consider queued work that must finish even after a view disappears. A dedicated queue may strongly own that operation and its service until completion, then clear its stored work. That is bounded retention if the release path is guaranteed. If the owner also permanently owns the queue and its operation captures the owner, inspect the new cycle. Each added closure deserves its own graph.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift language guide — Automatic Reference Counting",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/"
+        },
+        {
+          "label": "Swift language guide — Closures and capturing values",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/closures/"
+        },
+        {
+          "label": "Android — Memory management overview",
+          "url": "https://developer.android.com/topic/performance/memory-overview"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Weak controller callback",
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentViewController.swift",
+          "line": 85,
+          "why": "Trace the view callback back to its owner and compare long-form optional binding."
+        },
+        {
+          "label": "View owns its Actions container",
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/Views/CancelAppointmentViewController.View.swift",
+          "line": 21,
+          "why": "Actions and its stored callbacks explain the controller-view-callback ownership path."
+        },
+        {
+          "label": "Nested Task after weak-self unwrapping",
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentNavigationCoordinator.swift",
+          "line": 64,
+          "why": "The outer weak capture becomes a strong local binding used by inner asynchronous work; retention is not by itself proof of a permanent leak."
+        }
+      ],
+      "checklist": [
+        "I can draw a screen/closure cycle and name each owner.",
+        "I can explain ARC versus tracing garbage collection without conflating them.",
+        "I can use weak capture with a deliberate missing-owner path.",
+        "I can explain strong local binding after guard and fresh nested capture decisions.",
+        "I can justify or reject unowned from a lifetime invariant.",
+        "I have reproduced and cleaned up the demonstration without treating reading as completion."
+      ]
+    },
+    {
+      "id": "005",
+      "title": "Xcode, SwiftPM, and Tuist through a Gradle lens",
+      "summary": "Separate targets, schemes, products, toolchains, language modes, and deployment versions while reading this checkout's real build graph.",
+      "duration": 75,
+      "level": "Foundation",
+      "prerequisites": [
+        "001",
+        "002",
+        "003",
+        "004"
+      ],
+      "objectives": [
+        "Map familiar Gradle concepts to Xcode targets, schemes, configurations, and Swift packages without assuming exact equivalents.",
+        "Distinguish compiler version, tools version, language mode, SDK, and deployment target.",
+        "Trace source membership and dependencies through active Tuist manifests.",
+        "Choose standalone Swift, swift test, or an Xcode destination according to what the code imports."
+      ],
+      "sections": [
+        {
+          "id": "why-build-graph",
+          "title": "Find the compiler's view of the feature",
+          "html": "<p>You know how an Android build can fail because a source belongs to the wrong module, a variant has different dependencies, or the selected JDK does not match the plugin. iOS has the same categories of problem, distributed across Xcode targets, schemes, configurations, package manifests, and project generators. Learning the graph prevents hours of debugging a source file that is not even compiled by the chosen target.</p><p>Xcode is the IDE and its toolchain includes Apple SDKs, compiler drivers, simulators, and build tools. Swift Package Manager, often shortened to SwiftPM or SPM, declares packages, targets, dependencies, and products. Tuist describes and generates Xcode projects using Swift manifests. These tools cooperate; they are not three interchangeable ways to run the same command.</p><p>Start with one question: what artifact and destination am I asking the tools to build? A pure Swift model can run as a standalone program or a host-compatible package. A file importing UIKit needs an Apple platform target with the relevant SDK. A unit test bundle needs its test target and runner. Successfully running a model snippet does not imply that an iOS app, signing, or integration was validated.</p>"
+        },
+        {
+          "id": "mapping",
+          "title": "Use analogies, then name the limits",
+          "html": "<table><thead><tr><th>Android idea</th><th>Closest iOS concept</th><th>Boundary</th></tr></thead><tbody><tr><td>Gradle module</td><td>Target or package target</td><td>A package may contain several targets and products</td></tr><tr><td>Build type/flavor combination</td><td>Configuration plus target and scheme choices</td><td>A scheme is an action plan, not a flavor</td></tr><tr><td>AAR/JAR or APK artifact</td><td>Library product, framework, app, or test bundle</td><td>Artifact type and linking rules differ</td></tr><tr><td>settings.gradle project graph</td><td>Workspace and dependency graph</td><td>A workspace groups projects rather than compiling one module</td></tr><tr><td>Gradle tasks</td><td>Build, run, test, archive actions</td><td>Actions select targets, configuration, and destination</td></tr></tbody></table><p>An Xcode target defines a buildable component, its sources, dependencies, build settings, and output type. A scheme specifies how build, run, test, profile, analyze, and archive actions use targets. A configuration such as Debug or Release supplies a set of build settings. The run destination selects a simulator, device, or supported host environment. These axes explain why the same source can behave differently across builds.</p><p>A workspace can contain multiple projects and their dependencies. A project can contain an app, frameworks, unit tests, UI tests, and extensions. A SwiftPM product exposes one or more package targets as a library or executable to downstream clients. Import usually names a module, not necessarily a package or product. Do not assume a directory's name is the import name without checking its target.</p><p>An app's bundle identifier distinguishes its installed identity; it is not the same concept as a Swift module name. An app extension is its own target with separate capabilities and packaging, rather than a source set inside the app. We will revisit signing later; here the purpose is to locate the correct graph node.</p>"
+        },
+        {
+          "id": "version-axes",
+          "title": "Five version numbers can describe one build",
+          "html": "<p>The selected compiler is the installed Swift implementation, reported by <code>xcrun swift --version</code>. The Xcode version identifies the IDE/toolchain distribution, reported by <code>xcodebuild -version</code>. On this authoring machine the inspected commands report Apple Swift 6.4 and Xcode 27.1. Those are observations of this environment, not minimum course requirements or evidence that all client targets use Swift 6 language mode.</p><p>A package's first <code>// swift-tools-version:</code> line chooses its minimum tools version and the PackageDescription API available to the manifest. It also influences default language settings, but it is not the installed compiler's version and not the iOS deployment target. Explicit language settings or target settings must be considered when determining how sources are checked.</p><p>The Swift language mode controls compatibility and language checking, including the stronger concurrency rules associated with Swift 6 mode. A newer compiler can compile older language modes. The SDK supplies compile-time platform APIs; the deployment target states the oldest OS supported by the built component. Having an API in the SDK does not mean it is available on every supported runtime.</p><p>In this checkout, ZDAppointments Package.swift declares tools 5.9 and iOS 17. ZDHome declares tools 6.1 and iOS 17, and its Project.swift explicitly sets <code>SWIFT_VERSION</code> to 6. The production app settings helper carries 5.0. This is a mixed graph. Never diagnose a Swift 6 concurrency error by reading only the tools line of an unrelated package.</p>"
+        },
+        {
+          "id": "manifest-reading",
+          "title": "Read a small package before the full workspace",
+          "html": "<p>This synthetic manifest is for an isolated, host-compatible model library. It contains no UIKit dependency, remote packages, app identity, or signing requirement. It is an example to place in your own scratch directory, not a patch to the client.</p><pre><code class=\"language-swift\">// swift-tools-version: 5.9\nimport PackageDescription\n\nlet package = Package(\n    name: \"FoundationLab\",\n    products: [\n        .library(name: \"FoundationLab\", targets: [\"FoundationLab\"])\n    ],\n    targets: [\n        .target(name: \"FoundationLab\"),\n        .testTarget(\n            name: \"FoundationLabTests\",\n            dependencies: [\"FoundationLab\"]\n        )\n    ]\n)</code></pre><p>The library product exports FoundationLab's target. The test target depends on that target; putting a test file beside production sources would not automatically make it a discovered test. By convention, source lives under <code>Sources/FoundationLab</code> and tests under <code>Tests/FoundationLabTests</code>. A custom target path can override those conventions, so inspect before assuming.</p><p><code>import PackageDescription</code> makes manifest APIs available; it is not an import your model needs at runtime. For an iOS package, platforms can declare a minimum iOS version, but that does not make UIKit buildable through a default macOS <code>swift test</code> invocation. The selected build environment still matters.</p><p>Dependencies can name local packages, version ranges, exact versions, or revisions. A resolved dependency file records selected versions; it serves a role related to lockfiles, not to source membership. Keep manifest intent and resolved selections conceptually separate. Credentials or network failure during resolution should not be mistaken for a syntax failure in your new model.</p>"
+        },
+        {
+          "id": "tuist-checkout",
+          "title": "Follow this checkout's generated graph",
+          "html": "<p>Open ZDAppointments Project.swift. The cancellation target at line 44 is an iOS static framework, declares deployment 17.0, and includes <code>Sources/ZDAppointmentsCancellation/**/*.swift</code> at line 49. Its tests are a separate unit-test target at line 101 with their own glob and dependency on the cancellation target. This confirms why our earlier anchors are active in the generated build.</p><p>The co-located Package.swift describes corresponding targets for the retained SwiftPM route. Workspace.swift identifies the generated workspace as Zocdoc-Tuist and lists app entry projects; dependencies bring other projects into the graph. Current manifests and internal tooling notes show local projects declared through Project.swift while Tuist/Package.swift retains remote dependencies and specialized settings. Do not conclude that all local features are still remote package entries because an older comment mentions migration.</p><p>Tuist configuration and project generation are different from compiling app code. The repository pins Tuist 4.203.4 in mise.toml. Use the pinned workflow rather than globally installing a different version for this exercise. Generated project files can be regenerated from the manifests; a hand edit may disappear at the next generation. Check ownership before changing a build setting.</p><p>Sources also need target dependencies for their imports. If a file exists but its module cannot be imported, inspect target membership, product exposure, dependency edges, and destination before clearing caches. Cache deletion is not a substitute for explaining the graph.</p>"
+        },
+        {
+          "id": "diagnostic-order",
+          "title": "Choose the smallest meaningful verification",
+          "html": "<p>For a language-only experiment, a standalone file is enough. For a pure model library with tests, use swift test in that scratch package. For UIKit, simulator integration, or app-hosted tests, choose the correct Xcode workspace, scheme, and destination. A test target importing UIKit cannot be validated simply by running it as a macOS script.</p><pre><code class=\"language-shell\">xcrun swift --version\nxcodebuild -version\n# From your own host-compatible FoundationLab package:\nswift test\n# Replace the placeholder with an existing inspected workspace:\nxcodebuild -list -workspace /path/to/Existing.xcworkspace</code></pre><p>The first two commands inspect tool selection. The final command lists workspace structure; it does not build or prove dependencies can resolve. The placeholder is intentionally not a discovered path in this workspace. Read the available schemes and match them to manifests before selecting one for a build.</p><p>When a build fails, classify the first actionable diagnostic: parsing/type checking, module resolution, linking, destination/SDK, signing, or test discovery. Search upward from the failing target rather than treating every failure as an Xcode problem. Record the chosen workspace, target, scheme, configuration, destination, and compiler as evidence.</p><p>There is no need to regenerate the shared app or modify its setup to learn today's model. The next session uses an isolated FoundationLab package. That scope gives fast feedback on value semantics and contracts while keeping full app dependencies out of the language exercise.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A package declares swift-tools-version: 5.9. Which conclusion is justified?",
+          "options": [
+            "It must run on iOS 5.9.",
+            "It declares its required tools/manifest API version; other settings determine platform and language details.",
+            "The installed compiler must be exactly Swift 5.9."
+          ],
+          "answer": 1,
+          "explanation": "Tools version, installed compiler, source language mode, and deployment target are different axes. A compatible newer compiler can build a 5.9 manifest."
+        },
+        {
+          "question": "How does an Xcode scheme differ from a target?",
+          "options": [
+            "A scheme plans actions using targets, configurations, tests, and destinations.",
+            "A scheme is simply another spelling of module.",
+            "Targets exist only for test code."
+          ],
+          "answer": 0,
+          "explanation": "The target defines a component's build inputs and product. A scheme selects how components participate in build/run/test/archive actions."
+        },
+        {
+          "question": "Why might swift test fail for a package that imports UIKit even on a Mac?",
+          "options": [
+            "SwiftPM cannot run any tests.",
+            "The default host build is macOS, while UIKit requires an appropriate Apple platform target/destination.",
+            "Every test requires App Store signing."
+          ],
+          "answer": 1,
+          "explanation": "Tool availability does not change platform availability. A pure package can run on the host; UIKit tests need a supported platform route such as an iOS simulator target."
+        },
+        {
+          "question": "Where should a durable change to a generated target's source glob be made?",
+          "options": [
+            "Only in the generated project, since manifests are comments.",
+            "In the owning manifest, followed by the established generation workflow.",
+            "In whichever same-named source file appears first in search."
+          ],
+          "answer": 1,
+          "explanation": "Generated files reflect manifest intent and may be replaced. First verify which Project.swift or Package.swift owns the chosen graph route."
+        }
+      ],
+      "exercise": {
+        "brief": "Produce a small build-map note for the active cancellation feature and design a separate pure-model lab target without changing shared build files.",
+        "steps": [
+          "Locate cancellation source and test target declarations in Project.swift and Package.swift.",
+          "Record target name, output type, source glob, minimum iOS version, and one dependency.",
+          "Compare the observed Swift compiler with ZDHome's tools line and explicit SWIFT_VERSION; explain why the numbers differ.",
+          "Sketch FoundationLab's Sources and Tests folders and explain what the library product exports.",
+          "Classify a hypothetical missing module, unavailable UIKit host import, and test-not-discovered failure. Choose the next evidence to inspect."
+        ],
+        "acceptance": [
+          "The note uses verified active manifest locations rather than guessed Xcode UI names.",
+          "It distinguishes target, scheme, configuration, destination, and product.",
+          "It states that tools version, language mode, and deployment target are separate.",
+          "The pure lab has no UIKit or remote dependency.",
+          "No shared project, generated artifact, signing setting, or learner progress is changed."
+        ],
+        "solution": "<p>The cancellation generated target is ZDAppointmentsCancellation, a static framework for iOS with deployment 17.0. Its source glob selects the active cancellation Sources directory. The test target is ZDAppointmentsCancellationTests, a unit-test bundle with a dependency on the cancellation target. The retained package declares matching target names and tools 5.9.</p><p>The lab layout is <code>Package.swift</code>, <code>Sources/FoundationLab/Selection.swift</code>, and <code>Tests/FoundationLabTests/SelectionTests.swift</code>. The product exposes the library target; tests depend on it and import its module. The synthetic manifest above is the worked configuration. In the next session we will deliberately use a modern tools declaration for Swift Testing, while keeping the same source/test structure.</p><p>A missing module suggests checking the consuming target's dependency and exported product before editing imports. A UIKit host import failure suggests checking platform/destination. A test that compiles but is not discovered suggests checking source glob, test target, framework conventions, and scheme's test action. These are hypotheses with targeted checks, not guaranteed diagnoses. A successful standalone run validates only the isolated program; it does not validate the entire app graph.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple — Configuring a new Xcode target",
+          "url": "https://developer.apple.com/documentation/xcode/configuring-a-new-target-in-your-project"
+        },
+        {
+          "label": "Apple — Customizing build schemes",
+          "url": "https://developer.apple.com/documentation/xcode/customizing-the-build-schemes-for-a-project"
+        },
+        {
+          "label": "SwiftPM — PackageDescription and tools version",
+          "url": "https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html"
+        },
+        {
+          "label": "Tuist — Generated Xcode project workflow",
+          "url": "https://tuist.dev/en/docs/guides/get-started/generated-xcode-project"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Cancellation target, sources, and test bundle",
+          "path": "ios-client/Projects/Features/ZDAppointments/Project.swift",
+          "line": 44,
+          "why": "Read actual output type, deployment target, source membership, and dependencies."
+        },
+        {
+          "label": "Retained package tools and platform declarations",
+          "path": "ios-client/Projects/Features/ZDAppointments/Package.swift",
+          "line": 1,
+          "why": "Tools 5.9 and iOS 17 are separate settings."
+        },
+        {
+          "label": "Explicit Swift 6 target mode",
+          "path": "ios-client/Projects/Features/ZDHome/Project.swift",
+          "line": 38,
+          "why": "Provides concrete evidence of Swift 6 mode alongside older settings in this graph."
+        },
+        {
+          "label": "Production app's compatibility setting",
+          "path": "ios-client/Tuist/ProjectDescriptionHelpers/DemoAppDefaults.swift",
+          "line": 46,
+          "why": "Production helper sets SWIFT_VERSION 5.0, demonstrating that the installed Swift compiler is not the entire graph's language mode."
+        },
+        {
+          "label": "Generated workspace entry projects",
+          "path": "ios-client/Workspace.swift",
+          "line": 3,
+          "why": "Workspace name and dependency resolution context are visible in the current manifest."
+        },
+        {
+          "label": "Pinned Tuist tool",
+          "path": "ios-client/mise.toml",
+          "line": 10,
+          "why": "Current checkout pins Tuist 4.203.4; avoid inventing a global version requirement."
+        }
+      ],
+      "checklist": [
+        "I can locate the compiler's active source and test target graph.",
+        "I can distinguish package, target, product, project, workspace, and scheme.",
+        "I can report tools version and language mode separately.",
+        "I can explain SDK versus deployment target and runtime availability.",
+        "I can choose standalone Swift, host package tests, or an iOS destination.",
+        "I have written a build-map note without changing shared manifests."
+      ]
+    },
+    {
+      "id": "006",
+      "title": "Model and testing lab: a tiny search core",
+      "summary": "Build a pure Swift package that preserves value semantics and meaningful failure states, then prove its behavior with deterministic tests.",
+      "duration": 100,
+      "level": "Lab",
+      "prerequisites": [
+        "001",
+        "002",
+        "003",
+        "004",
+        "005"
+      ],
+      "objectives": [
+        "Implement a small value model, state enum, protocol, and synchronous boundary.",
+        "Write tests for behavior that matters rather than merely mirroring code structure.",
+        "Use Swift Testing syntax and recognize the XCTest counterpart.",
+        "Document what a host-only model test verifies and what it leaves untested."
+      ],
+      "sections": [
+        {
+          "id": "lab-scope",
+          "title": "Build a core small enough to reason about",
+          "html": "<p>You have probably tested a Kotlin reducer or ViewModel by replacing its repository with a fake. Today we recreate the smallest useful version of that workflow in Swift: a search draft, a finite state model, a service contract, and a pure synchronous load function. There is no screen, network, persistence, actor, or dependency container. Each extra concern would make it harder to tell whether a failure belongs to syntax, state semantics, or infrastructure.</p><p>The product rules are concrete. A draft edit must not mutate the original. An absent procedure remains absent rather than becoming a sentinel ID. A missing specialty requires a choice. A successful query with no results remains successful. An offline service failure produces a retry state. A successful nonempty response preserves its names.</p><p>Use synthetic names and identifiers throughout. The production cancellation feature supplies examples of model and test organization; we are not importing its data or claiming to reproduce its business rules. Reading the worked solution is useful reference material, but it does not pre-complete your exercise. Save predictions first and compare them with the tests you run.</p><p>Plan about twenty minutes for modeling, twenty for test construction, twenty for implementation, and the remaining time for explaining failures and documenting limits. The lab can also be completed on paper with predicted test outcomes if a compatible toolchain is unavailable.</p>"
+        },
+        {
+          "id": "package-setup",
+          "title": "Set up one module and one test target",
+          "html": "<p>In your own scratch directory, use the Sources/FoundationLab and Tests/FoundationLabTests layout from session 005. For this modern Swift Testing example, use the following manifest with a Swift 6.0-or-newer toolchain. The authoring machine has Swift 6.4. This deliberately selects a modern lab baseline without changing the client graph's mixed settings.</p><pre><code class=\"language-swift\">// swift-tools-version: 6.0\nimport PackageDescription\n\nlet package = Package(\n    name: \"FoundationLab\",\n    products: [\n        .library(name: \"FoundationLab\", targets: [\"FoundationLab\"])\n    ],\n    targets: [\n        .target(name: \"FoundationLab\"),\n        .testTarget(\n            name: \"FoundationLabTests\",\n            dependencies: [\"FoundationLab\"]\n        )\n    ]\n)</code></pre><p>The manifest has no remote dependency. Its library can compile on the host because we use only ordinary Swift types. Put the model and load function under the library target, and put test imports and fakes under the test target. <code>swift test</code> is run from this scratch package, not from the full client root.</p><p>The test framework is named Testing, while your application module is FoundationLab. <code>@testable import FoundationLab</code> allows the test target to access internal declarations when the module is built with testing enabled. It does not expose private implementation everywhere or turn internal types into public API. A test target dependency and a module import are both needed; one does not replace the other.</p>"
+        },
+        {
+          "id": "design-first",
+          "title": "Write invariants before choosing implementations",
+          "html": "<p>Declare SearchDraft as a struct with optional Int64 identifiers and a query string. Its computed displayQuery returns All providers only for an empty query. This is a presentation rule, not a mutation of the underlying string. State the behavior for nil identifiers separately: the absence of a procedure is allowed, while the absence of a specialty blocks a search.</p><p>Declare LabSearchState with idle, loading, loaded(providers:), and failed(message:). The state vocabulary includes situations a future UI may use, even though this synchronous function returns only a terminal loaded or failed state. Do not insert a transient loading state into a return value just to exercise all enum cases. A later asynchronous owner would publish transitions.</p><p>The protocol has one operation: <code>search(for draft: SearchDraft) throws -&gt; [String]</code>. The external label for reads naturally at the call; draft is the local parameter name. Passing the draft by value makes the service boundary explicit. It does not stop a conforming class from managing its own internal state.</p><p>Make the fake configurable with Result. A successful empty array and an offline error then require different fixture constructors. This is more honest than a fake with one Boolean whose meaning changes between tests. Keep the fake in the test target unless it serves a real runtime purpose. Avoid designing a reusable mocking framework before the first behavior is proven.</p>"
+        },
+        {
+          "id": "implementation",
+          "title": "A worked core, with explicit failure mapping",
+          "html": "<p>Try your implementation first, then compare it with this complete library source. All declarations are internal by default, which is sufficient for this package's tests. No Foundation or UI import is needed.</p><pre><code class=\"language-swift\">struct SearchDraft: Equatable {\n    var specialtyID: Int64?\n    var procedureID: Int64?\n    var query: String\n\n    var displayQuery: String {\n        query.isEmpty ? \"All providers\" : query\n    }\n}\n\nenum LabSearchState: Equatable {\n    case idle\n    case loading\n    case loaded(providers: [String])\n    case failed(message: String)\n}\n\nenum LabSearchError: Error { case offline }\n\nprotocol LabProviderServing {\n    func search(for draft: SearchDraft) throws -&gt; [String]\n}\n\nfunc load(\n    draft: SearchDraft,\n    service: any LabProviderServing\n) -&gt; LabSearchState {\n    guard draft.specialtyID != nil else {\n        return .failed(message: \"Choose a specialty\")\n    }\n    do {\n        return .loaded(providers: try service.search(for: draft))\n    } catch LabSearchError.offline {\n        return .failed(message: \"Offline: retry\")\n    } catch {\n        return .failed(message: \"Unable to search\")\n    }\n}</code></pre><p>The guard checks the specialty requirement before calling the service. It checks absence rather than rejecting a numeric sentinel. The do block produces loaded even when the returned array is empty. The first catch maps the known offline case to retry guidance; the final catch supplies a generic unexpected-failure message.</p><p>This small boundary intentionally turns service errors into presentation states. In production you might retain a typed failure, expose a retry policy, or report an error through an observability boundary. A generic message should not be your only diagnostic evidence in a real app. Here, synchronous deterministic mapping isolates the distinction we want to learn.</p><p>Neither this function nor the protocol implements thread safety, request cancellation, input trimming, localization, caching, or result ordering. Those are future requirements. A model test is most useful when it makes its scope explicit instead of implying that a passing assertion covers unimplemented concerns.</p>"
+        },
+        {
+          "id": "testing-frameworks",
+          "title": "Read Swift Testing and recognize XCTest",
+          "html": "<p>Swift Testing discovers functions annotated with <code>@Test</code>. <code>#expect</code> records a condition and useful diagnostics when it is false. These are macros provided by the Testing module, not comments or preprocessor directives. A suite can group tests, and parameterized tests can run one behavior over several fixtures. The active cancellation tests already use this framework.</p><p>XCTest is also widely used, including for UI automation and older tests. An XCTest unit test conventionally subclasses XCTestCase and defines methods beginning with test; assertions such as <code>XCTAssertEqual</code> express expectations. This optional alternative belongs in a test target that has the lab module available:</p><pre><code class=\"language-swift\">import XCTest\n@testable import FoundationLab\n\nfinal class SearchDraftXCTests: XCTestCase {\n    func testDisplayQueryForEmptyInput() {\n        let draft = SearchDraft(\n            specialtyID: 10, procedureID: nil, query: \"\"\n        )\n        XCTAssertEqual(draft.displayQuery, \"All providers\")\n    }\n}</code></pre><p>Choose the framework already used by the target and the behavior you need. Do not mix XCTest assertion APIs inside a Swift Testing test and assume identical failure reporting. The two frameworks can coexist in a test target, but that is not a reason to duplicate every assertion.</p><p>Keep each test's fixtures local. Swift Testing can execute tests in parallel, so shared mutable globals turn a simple value-model test into an order-dependent exercise. Avoid sleeps: the core is synchronous and needs none. A fake gives controlled results directly.</p>"
+        },
+        {
+          "id": "test-design",
+          "title": "Prove the product distinctions and learn from a red test",
+          "html": "<p>The worked tests below belong to Tests/FoundationLabTests. They assert behavior at the boundary: original value preservation, correct fallback, empty success versus offline failure, missing-specialty validation, and preservation of a nonempty response. They do not assert that your implementation uses a particular number of branches.</p><pre><code class=\"language-swift\">import Testing\n@testable import FoundationLab\n\nstruct FakeLabService: LabProviderServing {\n    let result: Result&lt;[String], LabSearchError&gt;\n    func search(for draft: SearchDraft) throws -&gt; [String] {\n        try result.get()\n    }\n}\n\n@Test func editingPreservesOriginal() {\n    let original = SearchDraft(\n        specialtyID: 10, procedureID: nil, query: \"\"\n    )\n    var edited = original\n    edited.specialtyID = 20\n    #expect(original.specialtyID == 10)\n    #expect(edited.specialtyID == 20)\n    #expect(original.procedureID == nil)\n    #expect(original.displayQuery == \"All providers\")\n}\n\n@Test func successfulEmptyAndFailureRemainDistinct() {\n    let draft = SearchDraft(\n        specialtyID: 10, procedureID: nil, query: \"Ada\"\n    )\n    let empty = load(\n        draft: draft, service: FakeLabService(result: .success([]))\n    )\n    let offline = load(\n        draft: draft, service: FakeLabService(result: .failure(.offline))\n    )\n    #expect(empty == .loaded(providers: []))\n    #expect(offline == .failed(message: \"Offline: retry\"))\n    #expect(empty != offline)\n}\n\n@Test func missingSpecialtyRequiresAChoice() {\n    let draft = SearchDraft(\n        specialtyID: nil, procedureID: nil, query: \"\"\n    )\n    let state = load(\n        draft: draft,\n        service: FakeLabService(result: .success([\"Dr. Ada\"]))\n    )\n    #expect(state == .failed(message: \"Choose a specialty\"))\n}\n\n@Test func nonemptySuccessKeepsNames() {\n    let draft = SearchDraft(\n        specialtyID: 10, procedureID: nil, query: \"Ada\"\n    )\n    let state = load(\n        draft: draft,\n        service: FakeLabService(result: .success([\"Dr. Ada\"]))\n    )\n    #expect(state == .loaded(providers: [\"Dr. Ada\"]))\n}</code></pre><p>The first test would catch accidental reference semantics in a mutable model. The second would catch replacing errors with empty arrays. The third would catch omission of the validation rule, and the fourth protects nonempty success. A failure should lead to an explanation of which product fact was violated, not simply a change to the expected string until everything turns green.</p><p>As a diagnostic exercise, temporarily replace the do/catch implementation with <code>.loaded(providers: (try? service.search(for: draft)) ?? [])</code>. Predict which assertion fails before running. Restore the explicit error mapping afterward. This controlled mutation shows that the failure-distinction test protects something real.</p><p>Open the active booking-prompt tests at their repository anchor. They use descriptive Test labels, locally constructed responses, and parameterized inputs for business variants. Copy the discipline of controlled fixtures and named behavior, not the domain-specific cancellation codes. Their inclusion is confirmed by the cancellation test source glob.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which test most directly detects treating offline as successful empty results?",
+          "options": [
+            "A test that imports the module.",
+            "A test asserting empty success and offline yield distinct expected states.",
+            "A test counting lines in the implementation."
+          ],
+          "answer": 1,
+          "explanation": "The test protects a product distinction at the boundary. Importing or measuring code cannot show that retry information survived."
+        },
+        {
+          "question": "What does @testable import FoundationLab provide?",
+          "options": [
+            "Access to internal declarations when built for testing, without making all private details public.",
+            "Automatic production dependency injection.",
+            "A guarantee that UIKit works on a host-only target."
+          ],
+          "answer": 0,
+          "explanation": "Testable import changes test access to internal module declarations with testing enabled. It does not change platform APIs or install dependencies."
+        },
+        {
+          "question": "Why keep fake configuration and fixtures local to each Swift Testing test?",
+          "options": [
+            "Because structs cannot be global.",
+            "Because parallel tests should not interfere through shared mutable state.",
+            "Because Swift Testing prohibits all reusable helpers."
+          ],
+          "answer": 1,
+          "explanation": "Parallel execution can expose shared mutable fixture races and order dependence. Reusable pure helpers are fine; local ownership keeps each case deterministic."
+        },
+        {
+          "question": "What does a passing swift test for this lab establish?",
+          "options": [
+            "The iOS app is signed, accessible, and ready to release.",
+            "The tested pure model behaviors work in this host-compatible package.",
+            "All production service implementations conform correctly at runtime."
+          ],
+          "answer": 1,
+          "explanation": "Scope matters. The lab checks its own core and fixtures; app integration, platforms, UI, and networking still require their respective verification."
+        }
+      ],
+      "exercise": {
+        "brief": "Implement FoundationLab independently, then submit its model, tests, observed or predicted results, and a short explanation of the guarantees.",
+        "steps": [
+          "Create only your own scratch package with the modern manifest, source folder, and test folder.",
+          "Before implementation, write expected cases for original/edit independence, empty query, absent specialty, absent procedure, empty success, offline, and nonempty success.",
+          "Implement the draft, enum, protocol, and load boundary, preserving ordinary throwing semantics.",
+          "Write at least the four meaningful tests above in your own words and run swift test if your toolchain supports it.",
+          "Introduce the deliberate try?-to-empty bug, predict its failure, then restore correct mapping.",
+          "Explain one remaining requirement the tests do not cover and one ownership issue that would arise if callbacks were later stored."
+        ],
+        "acceptance": [
+          "Original and edited drafts are independent values, and absence remains optional.",
+          "Empty success is loaded([]), offline is failed, and nonempty names are preserved.",
+          "Missing specialty fails before a useful search result is produced.",
+          "Tests use synthetic local fixtures and no sleeps or real network calls.",
+          "Evidence states toolchain and package scope; no full-app verification is inferred.",
+          "The learner's attempt and output remain separate from the worked answer."
+        ],
+        "solution": "<p>The complete model and Swift Testing blocks above form the worked answer. In the intended scratch layout, run <code>swift test</code> from the directory containing Package.swift. Expect the four named Swift Testing tests to pass; if you also add the optional XCTest example, expect that additional test as well. Compiler success alone is not test execution, so keep those pieces of evidence separate.</p><p>With the deliberately incorrect try? fallback, offline becomes loaded with an empty array. The expected offline state and inequality assertions fail, exposing the lost retry information. Restoring the explicit catch repairs the behavior. That exercise demonstrates why the test matters independently of the particular implementation.</p><p>A useful remaining requirement is whitespace-only query normalization: our rule checks empty strings, not trimmed content. Another is localization of the display messages. A stored callback would need an escaping parameter and an ownership graph; this package currently stores no callbacks. Present these as limits, not as bugs secretly fixed by a passing test run. The course author's verification of snippets is separate from your own lab completion.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple — Swift Testing",
+          "url": "https://developer.apple.com/documentation/testing"
+        },
+        {
+          "label": "Apple — XCTest",
+          "url": "https://developer.apple.com/documentation/xctest"
+        },
+        {
+          "label": "SwiftPM — Package and test target configuration",
+          "url": "https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html"
+        },
+        {
+          "label": "Swift language guide — Error Handling",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/errorhandling/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Active Swift Testing business-rule tests",
+          "path": "ios-client/Projects/Features/ZDAppointments/Tests/ZDAppointmentsCancellationTests/CancelAppointmentBookingPromptManagerTests.swift",
+          "line": 8,
+          "why": "Inspect import Testing, descriptive @Test functions, parameterized fixtures, and #expect."
+        },
+        {
+          "label": "Cancellation test source membership",
+          "path": "ios-client/Projects/Features/ZDAppointments/Project.swift",
+          "line": 101,
+          "why": "The unit-test target selects this Tests directory and depends on the active cancellation source target."
+        }
+      ],
+      "checklist": [
+        "I can create a pure package with separate source and test targets.",
+        "I can implement a value model, typed state, and protocol seam.",
+        "I can use @Test and #expect while recognizing XCTest equivalents.",
+        "I can explain which behavior each assertion protects.",
+        "I can demonstrate that offline and empty success differ.",
+        "I have recorded actual or predicted test evidence and honest scope limits."
+      ]
+    },
+    {
+      "id": "007",
+      "title": "Foundations retrieval review and repository walkthrough",
+      "summary": "Retrieve the first six sessions from memory, diagnose plausible mistakes, and explain one feature's model, callbacks, and build membership end to end.",
+      "duration": 90,
+      "level": "Review",
+      "prerequisites": [
+        "001",
+        "002",
+        "003",
+        "004",
+        "005",
+        "006"
+      ],
+      "objectives": [
+        "Predict values, optional paths, dispatch, errors, and retention before executing code.",
+        "Explain a connected production source trace using verified anchors.",
+        "Classify language, ownership, and build failures from evidence.",
+        "Produce a small independent implementation and a focused personal review plan."
+      ],
+      "sections": [
+        {
+          "id": "retrieval-method",
+          "title": "Recall first, check second, explain the mismatch",
+          "html": "<p>An experienced Android engineer can understand a Swift explanation quickly while still reaching for Kotlin semantics under pressure. Retrieval practice catches that gap. Today you will predict small programs, explain mistakes, and walk one real feature from model to callback to target. The goal is transferable reasoning, not memorizing spellings or declaring the whole platform mastered.</p><p>Close the earlier lesson text for the first pass. Write answers with confidence marks: certain, tentative, or guessing. Then check the worked explanations and run the isolated snippets if you have the toolchain. When a prediction changes, write the assumption that misled you. For example, replacing val with let is easy; remembering that a struct bound to let cannot mutate a stored field is a different skill.</p><p>Use three columns in your notes: observation, language rule, and product consequence. An array is empty is an observation; successful data is not an error is a domain distinction; show no matches rather than retry is a product consequence. This format prevents correct-looking syntax from substituting for a correct explanation.</p><p>Keep unfinished exercises pending. Instructor examples and your own practice remain separate evidence.</p>"
+        },
+        {
+          "id": "values-recall",
+          "title": "Predict binding, aliasing, and absence",
+          "html": "<p>Before running the following standalone program, predict the three printed values. Explain which assignment creates independent value state, which property still shares a class instance, and why the fallback is not used for the empty query. Then say whether changing first.query would compile.</p><pre><code class=\"language-swift\">final class ReviewNotes { var text = \"Initial\" }\nstruct ReviewDraft {\n    var query: String\n    var specialtyID: Int64?\n    let notes: ReviewNotes\n}\n\nlet first = ReviewDraft(\n    query: \"\", specialtyID: nil, notes: ReviewNotes()\n)\nvar edited = first\nedited.query = \"Ada\"\nedited.notes.text = \"Shared\"\nprint(first.query.isEmpty)\nprint(first.notes.text)\nlet optionalQuery: String? = first.query\nprint(optionalQuery ?? \"Fallback\")</code></pre><details><summary>Worked prediction — open after answering</summary><p>The outputs are true, Shared, and a blank line. The outer struct values have independent query fields, but both contain the same Notes reference. A present empty string is not nil, so nil coalescing preserves it. Changing first.query fails because first is a let-bound struct; editing the nested class does not replace the struct's stored reference.</p></details><p>Now retrieve the syntax distinctions without checking session 001. What external label is used for <code>func subtitle(for draft: ReviewDraft)</code>? Why might a wire identifier use Int64 rather than Int? What extra contract does Hashable provide beyond Equatable? Does String.count mean the same thing as Kotlin String.length for every Unicode input?</p><p>Explain each answer with a concrete consequence. Argument labels affect call sites; integer width affects data contracts; hashing affects collections rather than identity; text representation affects length limits. Facts become useful when you can name the bug they prevent.</p>"
+        },
+        {
+          "id": "state-recall",
+          "title": "Recover the state model instead of patching booleans",
+          "html": "<p>On a blank page, declare a state with idle, loading, loaded names, and failed message. Write a title function without default. Give one output for successful empty results and one for offline failure. Then add a hypothetical offline case and identify every consumer you would expect the compiler to revisit.</p><details><summary>Worked reasoning — open after drafting</summary><p>An associated-value enum stores names only in loaded and an error description only in failed. An exhaustive switch exposes missing handling when a new local case is introduced. Empty loaded results should express no matches; idle should express a search not yet begun; failure should retain enough meaning to offer recovery. The enum controls representable combinations, while a separate owner still controls valid transitions.</p></details><p>For a second retrieval task, compare <code>case failed(message: String)</code> with <code>enum Reason: String</code>. Which data varies per instance? What happens when a raw-value initializer receives a newly introduced server string? Do not answer by saying both are enums; describe the different boundary behavior.</p><p>A good answer notes that associated data varies for each construction and a raw value is fixed for each case. Unknown raw input yields nil, requiring a compatibility decision. Neither form automatically validates message contents or becomes Codable just because it has strings.</p><p>Finally, consider a requirement to preserve old results while loading new ones. Our simple four-state model cannot express that directly. You could add a loading payload, nest a request status inside a content model, or define another appropriate state. Identify the product rule first. Retrieval includes knowing when a previously useful model has reached its limit.</p>"
+        },
+        {
+          "id": "contract-recall",
+          "title": "Audit service substitution, dispatch, and lost errors",
+          "html": "<p>Explain a consumer taking <code>any ProviderServing</code> without saying every conformer is a class. What makes a synchronous fake replaceable? Which parts of the protocol signature must align? What would need to change if the contract becomes async? Answer these before opening the source anchors.</p><p>Next, audit the expression <code>(try? service.providers()) ?? []</code>. It is valid Swift, so a compiler will not reject the product mistake. Name two originally distinct outcomes and the UI affordance lost after the transformation. Then rewrite the boundary with do/catch or a typed result so that empty success and failure remain distinct.</p><details><summary>Worked contract and failure explanation</summary><p>A conformer satisfies the required operation's name, labels, types, and effects. The existential hides the concrete type, which can be a value or reference. Ordinary throws requires explicit try at the call. Async adds suspension to the contract rather than merely decorating an implementation. The optional fallback erases the error and makes offline look like zero matches, losing retry meaning.</p></details><p>Now retrieve extension dispatch: a method is supplied only in a protocol extension, and the conformer declares a same-named method. Through a protocol-typed value, the helper is selected from the extension. If conformer-specific behavior is part of the contract, declare it as a requirement and optionally provide a default implementation. Being able to say this precisely prevents a fake passing while production silently takes a different helper.</p><p>Finally, define escaping without mentioning threads. A stored plain closure parameter must be marked escaping because it can outlive the call. That annotation does not make it weak, Sendable, asynchronous, or guaranteed to run. Those are separate reviews.</p>"
+        },
+        {
+          "id": "ownership-recall",
+          "title": "Draw the stored callback and nested-work graphs",
+          "html": "<p>Draw an owner holding a callback that strongly captures the owner. Remove the external variable and mark which edges remain. Predict whether deinit can break the loop by clearing the callback. Then redraw the graph with weak capture and explain what a separately saved callback can do after the owner disappears.</p><details><summary>Worked ownership explanation</summary><p>The owner-to-callback and callback-to-owner strong edges keep the cycle alive. Deinit cannot remove a loop that prevents deallocation. Weak capture removes the callback's owning edge; a saved callback can remain alive while its captured owner becomes nil. Its body needs a deliberate absent-owner path. Optional callback invocation and optional owner unwrapping solve different absence cases.</p></details><p>For a harder question, the weak callback performs guard let self and creates another stored closure using self. Label the inner capture. Explain why the outer capture policy does not automatically apply to the nested closure. If the stored work is cleared after execution, what distinguishes temporary retention from an unbounded leak?</p><p>The guard introduces a strong local owner. The inner closure can retain that binding until its own lifetime ends. You must inspect who stores the inner work and when it releases it. A guaranteed release path can make retention appropriate; a new cycle or a never-completing operation can keep resources alive unexpectedly.</p><p>Choose unowned only from a proven lifetime relationship. Do not propose it merely because a callback is normally fast. Also separate memory lifetime from lifecycle policy: a callback that safely finds a screen alive may still be semantically wrong to update after dismissal. Ownership safety does not decide cancellation or UI validity.</p>"
+        },
+        {
+          "id": "tools-recall",
+          "title": "Classify the failure before touching the build",
+          "html": "<p>You are told that the machine has Swift 6.4, ZDAppointments starts with tools 5.9, its minimum iOS version is 17, and another target explicitly sets SWIFT_VERSION to 6. Explain why none of these facts contradicts the others. Then name the evidence needed to know the failing target's effective language mode rather than borrowing a neighboring target's setting.</p><p>The installed compiler, manifest tools requirement, source language mode, and deployment target are separate. Effective build settings for the chosen target and route settle the mode; the newest compiler version alone does not. An SDK can contain APIs unavailable on the minimum supported runtime, so availability also requires explicit reasoning.</p><p>Classify three failures: a type does not conform to a protocol; a module cannot be imported; and a test compiles but never runs. The first suggests signature or requirement checking. The second suggests dependency, product exposure, platform, or source membership. The third suggests discovery conventions, test target inclusion, or the scheme's test action. These categories tell you what to inspect next.</p><p>Retrieve the Xcode vocabulary: target is a component; configuration is a build-setting set; scheme plans actions using components; destination chooses a runtime or platform; workspace groups the project graph. A generated Project.swift is not app runtime code just because both use Swift.</p><p>For the pure model lab, host swift test is appropriate. For a UIKit test, a suitable iOS destination is needed. A source-only type check, a passing package test, and a successful simulator app build are different evidence. Write the exact verification scope beside each claim.</p>"
+        },
+        {
+          "id": "repository-recall",
+          "title": "Walk one active feature in six observations",
+          "html": "<p>Follow the repository anchors without editing source. Start at the question model and its optional subtitle. Follow its computed wrapper to NavigationState and the switch extracting question data. Locate the stored submission closure and escaping initializer. Trace the weak controller callback and coordinator's nested Task. Finish at the source and test globs in Project.swift.</p><p>Record an observed line and a justified conclusion at each stop. A source glob proves membership, not successful compilation. Weak capture proves a nonowning edge, not cancellation. The booking-prompt tests connect Testing macros and locally constructed fixtures to business variants; your host-only lab does not replace their platform integration.</p><p>Readiness means explaining this chain and implementing a changed example independently. Choose focused practice from your weak spots: three assignment predictions, an added enum case, two error fixtures, or one ownership graph. Revisit it in two days and a week with changed inputs so that you retrieve the rule rather than memorize output.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A copied struct contains a mutable class reference. Which prediction is correct?",
+          "options": [
+            "All nested state is automatically cloned.",
+            "The struct's direct fields have value semantics, but the contained class may remain shared.",
+            "All fields must be immutable because structs are values."
+          ],
+          "answer": 1,
+          "explanation": "Value assignment preserves the outer value model. It copies a class reference as a reference, not as a recursively cloned object."
+        },
+        {
+          "question": "A weak callback unwraps self before creating an inner Task that uses self. What can you conclude?",
+          "options": [
+            "The Task must also capture weakly.",
+            "The inner work can retain the strong local binding; storage and completion need separate inspection.",
+            "A permanent leak is proven without more context."
+          ],
+          "answer": 1,
+          "explanation": "Each closure has its own captures. Strong inner retention is evidence of lifetime, not by itself evidence of an unbreakable cycle or cancellation behavior."
+        },
+        {
+          "question": "The installed compiler is Swift 6.4. Does every client target necessarily use Swift 6 language mode?",
+          "options": [
+            "Yes, compiler and language mode are identical.",
+            "No; inspect effective settings and manifests for the selected target.",
+            "Only if its deployment target is iOS 17."
+          ],
+          "answer": 1,
+          "explanation": "The compiler can support compatibility modes. Tools requirements and OS deployment values do not settle a target's source mode by themselves."
+        },
+        {
+          "question": "A renderer uses default for a local state enum. What review question matters when a case is added?",
+          "options": [
+            "Whether the new product behavior is being silently grouped instead of explicitly considered.",
+            "Whether Swift switches need a Java-style break.",
+            "Whether the case name should be converted to a raw string."
+          ],
+          "answer": 0,
+          "explanation": "A default can conceal omitted behavior. For locally owned finite states, explicit handling makes added product decisions visible."
+        },
+        {
+          "question": "Which evidence best supports readiness for the next unit?",
+          "options": [
+            "Opening every lesson and copying its checklist.",
+            "An independent implementation, justified predictions, and a source trace with honest limits.",
+            "A successful toolchain version command alone."
+          ],
+          "answer": 1,
+          "explanation": "Understanding is demonstrated by transfer to changed examples and evidence-backed explanation, while remaining UI and platform topics are acknowledged."
+        }
+      ],
+      "exercise": {
+        "brief": "Create a miniature review owner that stores a refresh callback, keeps empty success distinct from failure, and permits safe callback invocation after owner release. Add an independent draft-copy prediction and a short build-map note.",
+        "steps": [
+          "Without the answer, declare an outcome enum, throwing service protocol, and deterministic fake.",
+          "Implement a final class with a stored optional refresh callback and state. Choose capture ownership deliberately.",
+          "Write an exhaustive summary function that differentiates initial state, no matches, names, and retry.",
+          "Save the callback, release its owner, observe through a weak probe, and invoke the saved callback safely.",
+          "Demonstrate offline separately; write predicted output before running.",
+          "For the earlier ReviewDraft snippet, explain direct field independence and nested sharing. Finish with the active feature's source/test target map."
+        ],
+        "acceptance": [
+          "Empty success renders no matches and offline renders retry.",
+          "The stored callback does not form an owner cycle, and post-release invocation is safe.",
+          "No force unwrap, try!, deliberate crash, live network, or production edit is required.",
+          "All outcome cases are covered and the build note distinguishes tools, mode, and platform.",
+          "You submit predictions and actual or paper-traced output, plus two concepts to revisit.",
+          "Prior lessons and learner progress are not automatically marked complete."
+        ],
+        "solution": "<p>This complete standalone implementation uses a weak callback because refresh may be retained after the owner is gone. The fake is a struct; the owner is a class because the exercise intentionally needs reference lifetime. Read it only after drafting your version.</p><pre><code class=\"language-swift\">enum ReviewOutcome: Equatable {\n    case idle\n    case loaded([String])\n    case failed(String)\n}\nenum ReviewFailure: Error { case offline }\nprotocol ReviewServing {\n    func names() throws -&gt; [String]\n}\nstruct ReviewFake: ReviewServing {\n    let result: Result&lt;[String], ReviewFailure&gt;\n    func names() throws -&gt; [String] { try result.get() }\n}\nfinal class ReviewOwner {\n    var state: ReviewOutcome = .idle\n    var refreshCallback: (() -&gt; Void)?\n    let service: any ReviewServing\n\n    init(service: any ReviewServing) {\n        self.service = service\n        refreshCallback = { [weak self] in\n            guard let self else { return }\n            do {\n                self.state = .loaded(try self.service.names())\n            } catch {\n                self.state = .failed(\"Retry\")\n            }\n        }\n    }\n}\nfunc summary(of state: ReviewOutcome) -&gt; String {\n    switch state {\n    case .idle: return \"Start\"\n    case let .loaded(names):\n        return names.isEmpty ? \"No matches\" : \"\\(names.count) providers\"\n    case let .failed(message): return message\n    }\n}\nfunc inspectReviewOwner() {\n    var owner: ReviewOwner? = ReviewOwner(\n        service: ReviewFake(result: .success([]))\n    )\n    let saved = owner?.refreshCallback\n    weak var probe = owner\n    saved?()\n    if let state = owner?.state {\n        print(summary(of: state)) // No matches\n    }\n    owner = nil\n    print(probe == nil) // true\n    saved?()            // missing owner: safely returns\n}\ninspectReviewOwner()\nlet offlineOwner = ReviewOwner(\n    service: ReviewFake(result: .failure(.offline))\n)\nofflineOwner.refreshCallback?()\nprint(summary(of: offlineOwner.state)) // Retry</code></pre><p>The controlled output is No matches, true, and Retry. The saved callback survives but its weak owner becomes nil, so the guard returns. The outcome enum preserves successful empty results and failure as different cases. Catching all errors as Retry is a scoped simplification; a production boundary may preserve typed causes.</p><p>The initializer stores a newly constructed closure rather than accepting a closure parameter, so there is no parameter to mark escaping. The property's function type does not take an escaping attribute. If a future initializer accepts the stored callback from a caller, that plain closure parameter needs escaping and a fresh ownership review.</p><p>Complete your written audit by contrasting this pure program with the active UIKit coordinator. Source and test membership are verified through its Project.swift; the program itself does not verify navigation, task cancellation, localization, signing, or simulator behavior. Choose your next two retrieval tasks from the explanations you had to change, not from the ones that already felt comfortable.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift language guide — Structures and Classes",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/classesandstructures/"
+        },
+        {
+          "label": "Swift language guide — Protocols",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/protocols/"
+        },
+        {
+          "label": "Swift language guide — Automatic Reference Counting",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/"
+        },
+        {
+          "label": "SwiftPM — PackageDescription",
+          "url": "https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html"
+        },
+        {
+          "label": "Apple — Swift Testing",
+          "url": "https://developer.apple.com/documentation/testing"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Begin the trace at the question value",
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentQuestionData.swift",
+          "line": 8,
+          "why": "Recover immutable fields, optional subtitle, and computed navigation wrapper."
+        },
+        {
+          "label": "Stored service submission callback",
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentNavigationCoordinator.swift",
+          "line": 19,
+          "why": "Connect contract effects, escaping initialization, later invocation, and ownership."
+        },
+        {
+          "label": "Weak view-controller callback",
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentViewController.swift",
+          "line": 85,
+          "why": "Recover the owner-to-view-to-actions-to-callback graph from source."
+        },
+        {
+          "label": "Active source and test graph",
+          "path": "ios-client/Projects/Features/ZDAppointments/Project.swift",
+          "line": 49,
+          "why": "Verify source inclusion and follow down to the dedicated cancellation test target."
+        },
+        {
+          "label": "Real feature retrieval through parameterized tests",
+          "path": "ios-client/Projects/Features/ZDAppointments/Tests/ZDAppointmentsCancellationTests/CancelAppointmentBookingPromptManagerTests.swift",
+          "line": 23,
+          "why": "Connect business variants to explicit fixtures and Swift Testing macros."
+        }
+      ],
+      "checklist": [
+        "I can make predictions before consulting worked answers.",
+        "I can explain value, optional, enum, protocol, error, and ownership distinctions together.",
+        "I can trace active source to callback and manifest using inspected evidence.",
+        "I can classify a failure and choose the next useful check.",
+        "I can state what my verification does and does not cover.",
+        "I have attempted the review program and selected two focused retrieval tasks."
+      ]
+    }
+  ]
+}

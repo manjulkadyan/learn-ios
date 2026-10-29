@@ -1,0 +1,1155 @@
+{
+  "unit": {
+    "id": "interface",
+    "title": "UI and feature delivery",
+    "summary": "Understand UIKit and SwiftUI ownership, build safe navigation and asynchronous UI, test at the right boundary, and trace active features end to end.",
+    "order": 2
+  },
+  "lessons": [
+    {
+      "id": "008",
+      "title": "UIKit: lifecycle, layout, and who owns a screen",
+      "summary": "Build a precise model of UIViewController appearance, UIKit containment, layout, and ARC ownership without assuming Android lifecycle equivalence.",
+      "duration": 80,
+      "level": "Interface",
+      "prerequisites": [
+        "004",
+        "005",
+        "007"
+      ],
+      "objectives": [
+        "Distinguish controller lifetime, view loading, appearance, and scene activity.",
+        "Build a small UIKit screen using actions and Auto Layout.",
+        "Draw strong and weak ownership edges for a controller, model, and delegate.",
+        "Embed a hosted screen using the full child-controller containment sequence."
+      ],
+      "sections": [
+        {
+          "id": "android-to-uikit",
+          "title": "A familiar screen, a different ownership system",
+          "html": "<p>Imagine an Android Fragment containing a title, a form, and a Continue button. You already separate rendering, navigation, and business state; the new work is understanding the objects that carry those responsibilities. UIKit is Apple's imperative interface framework. A <code>UIView</code> is a reference-type object that participates in a view hierarchy and renders or receives input. A <code>UIViewController</code> manages a root view and coordinates its presentation, interactions, and child controllers. Neither is an Activity. A controller has useful similarities to a Fragment, but the callback contracts and restoration rules differ.</p><p>A <code>UIWindow</code> displays a hierarchy within a window scene. A navigation controller is a container that manages a stack of controllers. A view controller owns its root view; a view owns its subviews. A navigation controller retains the controllers on its stack. These ownership relationships explain why a screen can remain alive after it stops being visible. UIKit does not install an Android <code>ViewModelStore</code> for every controller or automatically cancel its asynchronous jobs.</p><p>Start every investigation with four questions: who constructs the controller, who retains it, who supplies its model, and which event makes the flow finish? In this checkout, a small SwiftUI demo can construct a UIKit controller through a representable wrapper, while the real feature retains its model elsewhere. The same visual screen can therefore have different ownership boundaries in a demo and in production.</p>"
+        },
+        {
+          "id": "lifecycle",
+          "title": "Loading, appearing, disappearing, and deallocation",
+          "html": "<p>Controller initialization creates the object and establishes dependencies. Accessing <code>view</code> can load its root view even when no pixels are visible; <code>loadViewIfNeeded()</code> makes that intent explicit. <code>loadView()</code> creates the root hierarchy. Override it for a fully custom root view, or use the default implementation and configure subviews in <code>viewDidLoad()</code>. Do not call <code>super.loadView()</code> when your override supplies its own root view. <code>viewDidLoad()</code> is a setup event for the loaded hierarchy, not a guarantee that navigation or window geometry is ready.</p><p><code>viewWillAppear(_:)</code> occurs around an appearance transition, and <code>viewDidAppear(_:)</code> after appearance completes. They can run repeatedly: push a detail, pop back, and the original controller appears again. <code>viewIsAppearing(_:)</code> is a newer callback useful when updated traits and geometry are available during appearance; check the target's SDK and deployment support before adopting it. Layout callbacks, including <code>viewDidLayoutSubviews()</code>, can run many times independently of creation or fetching.</p><p><code>viewDidDisappear(_:)</code> says the view disappeared; it does not prove that the flow was cancelled, the controller was popped, or ARC deallocated it. A presented screen may cover it, and navigation transitions may be interactive. Read the container's removal or dismissal evidence before reporting a terminal result. <code>deinit</code> means an instance is being deallocated; relying on it for timely cancellation is dangerous when a task retains the owner. Scene activation and backgrounding are separate from controller appearance. Choose setup, refresh, and cleanup events according to the product behavior, not by matching callback names to <code>onResume</code>.</p>"
+        },
+        {
+          "id": "construct",
+          "title": "Read a UIKit implementation line by line",
+          "html": "<p>The following synthetic example belongs in an iOS UIKit target. <code>import UIKit</code> makes framework types available. <code>@MainActor</code> marks UI access as isolated to the main actor. <code>final</code> prevents subclassing; <code>: UIViewController</code> names the superclass. <code>override</code> replaces inherited behavior, and calling <code>super</code> preserves framework behavior. An instance property survives repeated appearances because the controller remains the same object.</p><pre><code class=\"language-swift\">import UIKit\n\n@MainActor\nfinal class CounterController: UIViewController {\n    private let titleLabel = UILabel()\n    private var tapCount = 0\n\n    override func viewDidLoad() {\n        super.viewDidLoad()\n        view.backgroundColor = .systemBackground\n        titleLabel.numberOfLines = 0\n\n        let button = UIButton(type: .system)\n        button.setTitle(\"Add one\", for: .normal)\n        button.addAction(UIAction { [weak self] _ in\n            guard let self else { return }\n            self.tapCount += 1\n            self.render()\n        }, for: .touchUpInside)\n\n        let stack = UIStackView(arrangedSubviews: [titleLabel, button])\n        stack.axis = .vertical\n        stack.spacing = 16\n        stack.translatesAutoresizingMaskIntoConstraints = false\n        view.addSubview(stack)\n        let safe = view.safeAreaLayoutGuide\n        NSLayoutConstraint.activate([\n            stack.topAnchor.constraint(equalTo: safe.topAnchor, constant: 24),\n            stack.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 16),\n            stack.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -16)\n        ])\n        render()\n    }\n\n    private func render() {\n        titleLabel.text = \"Count: \\(tapCount)\"\n    }\n}</code></pre><p><code>UIAction</code> wraps an event closure; <code>_</code> discards its action parameter. The capture list <code>[weak self]</code> makes the controller reference optional and non-owning. <code>guard let self else</code> unwraps it for the closure's remaining scope. <code>.touchUpInside</code>, <code>.vertical</code>, and <code>.systemBackground</code> omit type names because the surrounding APIs establish their types. String interpolation, <code>\\(tapCount)</code>, inserts a value. The action mutates state and then renders explicitly, unlike a declarative state observation system.</p>"
+        },
+        {
+          "id": "arc",
+          "title": "Ownership diagrams explain more than callback logs",
+          "html": "<p>ARC counts strong references rather than tracing an arbitrary object graph like the Java garbage collector. A class property is strong unless declared otherwise. Suppose controller A strongly holds model B, while B strongly holds an event closure that captures A. A → B → closure → A is a cycle; removing A from a navigation stack does not break it. A weak capture can remove that last ownership edge, but it must preserve the intended lifetime of the operation. Ask whether the callback should still occur if the screen owner has disappeared.</p><p>Delegation is common in this repository. A delegate protocol constrained with <code>: AnyObject</code> allows only class conformers, which makes a <code>weak var delegate: SomeDelegate?</code> possible. <code>?</code> permits the reference to become <code>nil</code> after deallocation. The caller must retain the delegate somewhere else. Assigning a newly created delegate directly into a weak property can make it vanish immediately. The address-form demo retains its coordinator in state, then assigns it as the model's weak delegate.</p><p>Weak is an ownership decision, not an optimization you apply to every property. The parent normally retains children, and a flow owner normally retains a coordinator until a result arrives. A task closure can retain a controller across an <code>await</code>. Unwrapping a weak capture into a strong local before suspension deliberately extends that lifetime until the operation finishes. This may be correct; it is not proof of a permanent leak. Document the lifetime you want, and give long-running tasks an explicit stop or finish path. Unit 3 develops the concurrency details.</p>"
+        },
+        {
+          "id": "layout",
+          "title": "Constraints, safe areas, and repeatable rendering",
+          "html": "<p>Auto Layout is a system of constraints between attributes such as leading edges, heights, and baselines. Turning <code>translatesAutoresizingMaskIntoConstraints</code> off tells UIKit not to derive competing constraints from the legacy resizing mask. <code>NSLayoutConstraint.activate</code> enables the array of constraints. Negative trailing constants inset the trailing edge. The safe-area guide avoids areas obscured by system or container UI; it is not equivalent to applying the same padding to every device.</p><p>A vertical <code>UIStackView</code> arranges its arranged subviews and uses their intrinsic sizes. The label and button in the example provide intrinsic height, so top and horizontal constraints are enough for that small demonstration. Larger forms need scroll behavior and a complete sizing strategy. Hard-coded frame dimensions inside <code>viewDidLoad()</code> are fragile because the eventual container size may differ. Do geometry-dependent work in layout callbacks or constraints, and avoid adding the same subviews or constraints repeatedly there.</p><p>Rendering should be repeatable: applying the same state twice should yield the same visible result without starting another request or registering another action. That principle is familiar from Android rendering functions. In UIKit it must be enforced explicitly. For keyboard and first-responder problems, inspect unnecessary rebuilding as well as layout. The production address form guards identical error writes because redundant observed changes can disturb its hosted input UI. Treat that as a concrete example of why identity and no-op updates matter.</p>"
+        },
+        {
+          "id": "containment",
+          "title": "A child controller is more than its root view",
+          "html": "<p>When UIKit contains another controller, establish both the controller relationship and the view relationship. Merely calling <code>addSubview(child.view)</code> does not establish controller containment. Apple uses the controller tree to route appearance, traits, and other system behavior. <code>UIHostingController</code> is a UIKit controller whose content is SwiftUI; it obeys the same containment rule.</p><pre><code class=\"language-swift\">import SwiftUI\nimport UIKit\n\n@MainActor\nfunc embedMessage(in parent: UIViewController) -&gt; UIViewController {\n    let child = UIHostingController(rootView: Text(\"Synthetic demo\"))\n    parent.addChild(child)\n    child.view.translatesAutoresizingMaskIntoConstraints = false\n    parent.view.addSubview(child.view)\n    NSLayoutConstraint.activate([\n        child.view.topAnchor.constraint(equalTo: parent.view.safeAreaLayoutGuide.topAnchor),\n        child.view.leadingAnchor.constraint(equalTo: parent.view.leadingAnchor),\n        child.view.trailingAnchor.constraint(equalTo: parent.view.trailingAnchor),\n        child.view.bottomAnchor.constraint(equalTo: parent.view.safeAreaLayoutGuide.bottomAnchor)\n    ])\n    child.didMove(toParent: parent)\n    return child\n}</code></pre><p><code>in</code> is an external argument label here: call <code>embedMessage(in: controller)</code>, while the function body uses <code>parent</code>. <code>addChild</code> performs the incoming <code>willMove</code> notification. After installing the view and constraints, call <code>didMove(toParent:)</code>. Removal reverses the relationship: call <code>willMove(toParent: nil)</code>, remove the root view and any separately managed constraints, then <code>removeFromParent()</code>, which sends the outgoing completion. The booking address form's <code>bind()</code> factory returns a hosted controller and explicitly leaves containment to its caller.</p>"
+        },
+        {
+          "id": "trace",
+          "title": "Trace the demo without inventing production behavior",
+          "html": "<p>Open <code>ContentView</code> and follow the Member ID entry into <code>MemberIdDemo</code>. Its UIKit destination uses <code>MemberIdUIKitDemo</code>, a SwiftUI wrapper that constructs a plain controller with three member-ID states. The state array is synthetic presentation data; constructing this controller does not fetch an insurance record. Notice the project uses SnapKit's <code>snp.makeConstraints</code> and local fluent helpers such as <code>with(axis:)</code>. Those are dependency or repository APIs, not Swift or UIKit language features.</p><p>Compare that static controller with the visit-reason host. It waits for <code>viewDidAppear</code>, checks that a navigation controller exists, retains the flow coordinator, and then starts it. This is evidence for its integration strategy, not a universal rule that every network request belongs in <code>viewDidAppear</code>. Its retained-coordinator guard prevents repeated starts as appearance callbacks recur.</p><p>For a useful debugging notebook, record object identities, appearance events, parent/container changes, and task start/finish separately. Ask what a push, pop, modal presentation, and cancelled interactive gesture should do. A refresh on every appearance might be desirable for a volatile list and destructive for an unsaved form. Once you can explain those choices, UIKit stops feeling like a renamed Android lifecycle and becomes a system with explicit, testable ownership decisions.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A controller's view disappears when a detail screen is pushed. What can you conclude?",
+          "options": [
+            "The controller has been deallocated.",
+            "Its view disappeared; its owner may still retain the controller.",
+            "All tasks owned by the controller were cancelled."
+          ],
+          "answer": 1,
+          "explanation": "Appearance describes visibility transitions. The navigation stack may retain the controller, and UIKit does not automatically cancel tasks stored by it."
+        },
+        {
+          "question": "A model has a weak delegate. What must the caller arrange?",
+          "options": [
+            "Retain the delegate elsewhere for the intended callback lifetime.",
+            "Use unowned for every reference back to the controller.",
+            "Create a new delegate before every render."
+          ],
+          "answer": 0,
+          "explanation": "Weak references do not keep objects alive. A controller or another explicit owner must strongly retain the delegate; unowned risks accessing a deallocated object."
+        },
+        {
+          "question": "Which operation is required after installing a child controller's view and constraints?",
+          "options": [
+            "Call the child's viewDidLoad() manually.",
+            "Only retain child.view.",
+            "Call child.didMove(toParent: parent) after parent.addChild(child)."
+          ],
+          "answer": 2,
+          "explanation": "The complete containment sequence installs the parent-child controller relationship and sends its completion. UIKit owns lifecycle dispatch; calling viewDidLoad yourself bypasses that contract."
+        }
+      ],
+      "exercise": {
+        "brief": "In a separate learner scratch iOS target, build the synthetic counter and explain its lifetime through push, cover, pop, and release. Do not edit the client checkout.",
+        "steps": [
+          "Create CounterController using the example and present it from a UINavigationController.",
+          "Add diagnostic breakpoint actions to viewDidLoad, viewDidAppear, viewDidDisappear, and deinit; record events separately from state changes.",
+          "Increment twice, push a blank detail, then pop back. Explain why the count remains two.",
+          "Draw ownership arrows for navigation controller → counter → view hierarchy → button → action. Mark the weak closure edge.",
+          "Embed a small hosting controller using the full containment sequence, then remove it correctly."
+        ],
+        "acceptance": [
+          "The counter remains two after returning from detail.",
+          "Constraints adapt to the container's safe area without duplicate installation.",
+          "The ownership drawing explains why disappearing does not imply deallocation.",
+          "The child controller receives containment completion and is removable without orphaning its view."
+        ],
+        "solution": "<p>The count lives on the controller, and the navigation stack retains that same controller while the detail is visible. Therefore the return path should not rerun one-time hierarchy construction or reset the count. A diagnostic log may show multiple appearance events with one initial load. After popping the counter itself, release any scratch variables that also retained it before expecting <code>deinit</code>.</p><p>The action has a weak reference to the counter; the button and action therefore do not keep the controller alive through a strong reference cycle. A temporarily promoted <code>self</code> remains alive during the synchronous event, which is what the render requires. The parent retains its hosted child through containment. To remove that child, use the following sequence in a main-actor UI context:</p><pre><code class=\"language-swift\">child.willMove(toParent: nil)\nchild.view.removeFromSuperview()\nchild.removeFromParent()</code></pre><p>Here <code>child</code> is the hosted controller retained by your scratch owner. If you retain it in a separate property, clear that property as part of the owner's removal policy. Do not force a deallocation conclusion from a visibility log: first audit every remaining strong reference. The worked answer is a design and inspection guide; this course author has not built or run your scratch app.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: UIViewController",
+          "url": "https://developer.apple.com/documentation/uikit/uiviewcontroller"
+        },
+        {
+          "label": "Apple: Creating a custom container view controller",
+          "url": "https://developer.apple.com/documentation/uikit/creating-a-custom-container-view-controller"
+        },
+        {
+          "label": "Swift: Automatic Reference Counting",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Static UIKit demo construction",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/MemberIdUIKitDemo.swift",
+          "line": 22,
+          "why": "Builds the controller, view hierarchy, constraints, and synthetic presentation states."
+        },
+        {
+          "label": "Appearance-gated flow ownership",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/VisitReasonPickerDemo.swift",
+          "line": 90,
+          "why": "Waits for navigation containment and retains its coordinator before starting."
+        },
+        {
+          "label": "Hosted address form contract",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/AddressForm/BookingAddressFormViewModel+UIKit.swift",
+          "line": 11,
+          "why": "Explicitly assigns child-controller containment responsibility to the caller."
+        }
+      ],
+      "checklist": [
+        "I can separate controller lifetime from appearance and scene activity.",
+        "I can explain every constraint and action in the counter example.",
+        "I can find a strong reference cycle and justify a weak delegate.",
+        "I can add and remove a hosted child with complete containment.",
+        "I can explain which demo paths use synthetic states and which start a flow."
+      ]
+    },
+    {
+      "id": "009",
+      "title": "SwiftUI: state, bindings, identity, and Observation",
+      "summary": "Choose the owner of each value, understand SwiftUI's descriptive View values, and distinguish Observation from persistence and lifecycle management.",
+      "duration": 85,
+      "level": "Interface",
+      "prerequisites": [
+        "001",
+        "005",
+        "008"
+      ],
+      "objectives": [
+        "Explain why a SwiftUI View value is not an Android View object.",
+        "Choose among plain properties, State, Binding, Bindable, and legacy object wrappers.",
+        "Explain how view identity governs state storage and why Observation does not persist data.",
+        "Read the address-form demo's modern state flow alongside the member-ID demo's legacy observation."
+      ],
+      "sections": [
+        {
+          "id": "description",
+          "title": "Use your Compose experience, then check the boundary",
+          "html": "<p>In Compose, a composable describes UI from state and can run many times. That experience is useful when reading SwiftUI. A SwiftUI <code>View</code> commonly is a small <code>struct</code> value that describes an interface; it is not a mutable Android <code>View</code>, and it is not the long-lived UIKit view object that eventually displays it. SwiftUI evaluates descriptions, tracks dependencies and identity, and reconciles the rendered hierarchy. Creating a new description does not necessarily create a new screen or lose its state.</p><p>The declaration <code>struct Editor: View</code> means the value type conforms to the <code>View</code> protocol. Its <code>var body: some View</code> is a computed property returning a particular view type that the caller need not spell out. <code>some</code> is an opaque return type: the compiler still knows the concrete type, so it differs from unrestricted dynamic interface boxing. Containers use result-builder syntax to combine expressions such as <code>Text</code> and <code>Button</code> without manually constructing a list of children.</p><p>Keep <code>body</code> focused on describing current state. A request inside it can run again when a dependency changes; a model initialized there can be recreated. Rendering callbacks and value initializers are not a durable screen-creation signal. Organize work around an explicit owner and events such as an action or a view-associated task, which session 011 will explain.</p>"
+        },
+        {
+          "id": "state",
+          "title": "State is storage associated with identity",
+          "html": "<p><code>@State</code> is a property wrapper used to connect a declaration to storage managed by SwiftUI. The wrapper's value syntax looks like an ordinary variable, but SwiftUI maintains the state for that view identity across repeated description creation. Keep local state private so the implementation remains its clear owner. This resembles Compose's remembered state at a composition location, while its exact storage and identity rules are SwiftUI's.</p><pre><code class=\"language-swift\">import SwiftUI\n\nstruct LocalToggle: View {\n    @State private var expanded = false\n\n    var body: some View {\n        VStack {\n            Button(expanded ? \"Collapse\" : \"Expand\") {\n                expanded.toggle()\n            }\n            if expanded {\n                Text(\"Synthetic appointment details\")\n            }\n        }\n    }\n}</code></pre><p>The conditional operator <code>condition ? a : b</code> selects the button title. A trailing closure after <code>Button</code> supplies its action. <code>toggle()</code> mutates the Boolean. <code>if</code> within the builder conditionally describes a child; it does not imperatively hide a retained Android view. A change to <code>expanded</code> allows SwiftUI to update the relevant description.</p><p>Identity comes from the hierarchy and can be augmented explicitly. Moving between conditional branches or changing <code>.id(value)</code> can replace an identity and reset state. A random ID generated on every render creates accidental resets. An intentional new ID is appropriate when the product requests a fresh flow, as the picker demo does when showing the picker again. State is not process-death restoration or disk storage. It does not turn a draft into persistent data and may be destroyed when its owning identity leaves the hierarchy.</p>"
+        },
+        {
+          "id": "binding",
+          "title": "A Binding is access to somebody else's source of truth",
+          "html": "<p>Passing a <code>String</code> gives a child a value to display. Passing a <code>Binding&lt;String&gt;</code> gives it read and write access to a source owned elsewhere. Angle brackets provide the generic type argument. A <code>@Binding</code> child property uses that access without creating a new independent state store. The projected value syntax <code>$name</code> produces a binding from a state wrapper; the dollar sign is wrapper projection, not string interpolation.</p><pre><code class=\"language-swift\">import SwiftUI\n\nstruct NameField: View {\n    @Binding var name: String\n\n    var body: some View {\n        TextField(\"Demo name\", text: $name)\n    }\n}\n\nstruct NameScreen: View {\n    @State private var name = \"\"\n\n    var body: some View {\n        VStack {\n            NameField(name: $name)\n            Text(name.isEmpty ? \"No name yet\" : name)\n        }\n        .padding()\n    }\n}</code></pre><p><code>TextField</code>'s <code>text:</code> argument expects a binding because typing changes the value. <code>NameField(name: $name)</code> connects the child's generated initializer to the parent's storage. In Compose, the familiar counterpart is passing <code>value = name</code> plus <code>onValueChange = { name = it }</code>. SwiftUI packages those read/write operations into a binding. It does not imply a network write or domain validation.</p><p>A constant binding can preview a control but cannot accept edits into a changing source. A custom binding can transform input in its setter, but transformation can affect cursor position and should be intentional. Avoid duplicating the same draft into parent state and child state and synchronizing them with multiple change callbacks. That creates two sources of truth and difficult ordering rules; choose a single owner and derive the presentation.</p>"
+        },
+        {
+          "id": "observation",
+          "title": "Observable models and Bindable editors",
+          "html": "<p>Observation supports reference models whose property accesses SwiftUI can track. <code>@Observable</code> is a macro that generates observation support at compile time. It is different from the <code>@State</code> property wrapper. With SwiftUI's Observation integration, a view depends on the observable properties it reads while computing its body, including reads reached through computed properties. Reading a model is enough to establish those dependencies; the model does not have to be locally owned by that view.</p><p>Observation-based SwiftUI APIs in this example require iOS 17 or later and a toolchain supporting the macro. The demo target declares iOS 18.2, so that deployment setting can use them. A deployment target answers which OS versions can run the target; a Swift language mode answers how the compiler interprets language rules. They are different settings. Applying <code>@MainActor</code> separately declares the model's isolation; observation itself does not make arbitrary concurrent mutation safe.</p><pre><code class=\"language-swift\">import Foundation\nimport Observation\nimport SwiftUI\n\n@MainActor\n@Observable\nfinal class DemoDraft {\n    var name = \"\"\n    var acceptsReminder = false\n\n    var canContinue: Bool {\n        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty\n    }\n}\n\n@MainActor\nstruct DraftEditor: View {\n    @Bindable var draft: DemoDraft\n\n    var body: some View {\n        Form {\n            TextField(\"Demo name\", text: $draft.name)\n            Toggle(\"Reminder\", isOn: $draft.acceptsReminder)\n            Text(draft.canContinue ? \"Ready\" : \"Enter a name\")\n        }\n    }\n}\n\n@MainActor\nstruct DraftScreen: View {\n    @State private var draft = DemoDraft()\n\n    var body: some View {\n        DraftEditor(draft: draft)\n    }\n}</code></pre><p><code>@Bindable</code> provides projections such as <code>$draft.name</code> for an observable object passed into an editor. It is not a request for persistence or a new ownership scope. The screen uses <code>@State</code> to maintain the locally created model reference across its identity. The computed <code>canContinue</code> reads <code>name</code>, so its display responds to name edits without storing an additional validity Boolean.</p>"
+        },
+        {
+          "id": "ownership",
+          "title": "Observation, ownership, and persistence answer different questions",
+          "html": "<p>Ask three separate questions. Observation asks which property changes should update the UI. Ownership asks which component keeps the model instance alive and decides when to replace it. Persistence asks how data survives destruction of the process or its in-memory owner. <code>@Observable</code> answers the first question. It does not automatically retain a delegate, cancel a task, save a draft, restore navigation, or survive logout. <code>@State</code> supplies identity-associated local storage; that still does not answer persistence.</p><p>A parent can create one observable model and pass it as a plain property to a read-only child. Use <code>@Bindable</code> when that child needs bindings for controls. The environment can distribute a dependency through a hierarchy, but distribution does not automatically define its business lifetime. An app-owned model may intentionally outlive individual screens; a form-owned model may be discarded when its flow finishes. Make those choices explicit instead of choosing wrappers by matching the word ViewModel from Android.</p><p>One subtle trap is initializing state from an input and expecting subsequent input changes to overwrite it. An initializer seeds the state for a new identity. If the parent later supplies a different record while the identity remains, existing draft state may remain. That may protect unsaved edits, or it may display the wrong record. Decide whether to reset identity, implement an explicit replace operation, or make the parent own the draft. Avoid side effects in model initialization because candidate instances can be created during description construction even when SwiftUI retains existing state storage.</p>"
+        },
+        {
+          "id": "legacy",
+          "title": "Legacy ObservableObject remains part of this codebase",
+          "html": "<p>The member-ID model conforms to <code>ObservableObject</code> and marks its changing state <code>@Published</code>. These belong to the older Combine-backed observation style. A view that creates and maintains such a model commonly uses <code>@StateObject</code>; a view receiving it commonly uses <code>@ObservedObject</code>. Both wrappers retain a reference, but <code>@ObservedObject</code> does not establish a stable owner-created instance across description reconstruction in the way <code>@StateObject</code> does.</p><p>Do not mechanically put <code>@StateObject</code> around an arbitrary class or <code>@ObservedObject</code> around a model using only Observation. The wrappers have protocol requirements. With an Observation-only model, use <code>@State</code> for local ownership and a plain reference or <code>@Bindable</code> for consumers. Incremental coexistence is normal: read the declared model type and the actual boundary before choosing a wrapper. Migrating a wrapper while leaving the model's protocol and notifications unchanged is not a complete migration.</p><p>The demo's <code>MemberIdViewModelDemo</code> receives its model and uses <code>@ObservedObject</code>; <code>AddressFormDemo</code> creates an observable address model in <code>@State</code>. These are concrete, current patterns, not evidence that every feature already uses one system. When reviewing a proposed migration, examine tests, publishers, delegate behavior, platform availability, and the owner of the instance. A smaller observation mechanism does not justify silently changing any of those contracts.</p>"
+        },
+        {
+          "id": "repo-practice",
+          "title": "Follow an edit through the active address form",
+          "html": "<p>Begin at the address demo's <code>@State</code> declaration, then inspect <code>BookingAddressFormView</code>'s <code>@Bindable</code> model. A text field binds to a property such as <code>street</code>. The model's <code>didSet</code> property observer compares against <code>oldValue</code>, applies its constraints, and notifies a weak delegate. The computed <code>currentAddress</code> creates a value for consumers. That value is a projection of the current draft, not an automatic persisted record.</p><p>Notice <code>display(address:)</code> temporarily suppresses delegate notifications while populating fields. Programmatic prefill and user typing therefore have distinct event semantics even though both assign properties. <code>setError</code> skips identical assignments, which is useful when a controller evaluates form validity repeatedly. Read these decisions as part of the feature's public contract; an isolated SwiftUI tutorial that binds text directly to a plain String would not cover them.</p><p>Lastly, the demo retains its delegate coordinator in state because the model's delegate is weak. The coordinator also uses an observation annotation, but retention is supplied by the screen's state storage, not by the macro. This is the distinction to carry into future reviews: a screen that updates correctly can still lose callbacks or drafts if ownership is wrong.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does @Observable guarantee for a model?",
+          "options": [
+            "Its values are saved after process termination.",
+            "Its task lifetime matches an Android ViewModel.",
+            "Its property accesses and mutations can participate in observation."
+          ],
+          "answer": 2,
+          "explanation": "The macro provides observation support. Owners still choose the model lifetime, synchronization, cancellation, and persistence strategy."
+        },
+        {
+          "question": "A child edits a parent's @State String. Which declaration expresses that relationship?",
+          "options": [
+            "@Binding var name: String",
+            "@State private var name copied from the parent",
+            "let name: String"
+          ],
+          "answer": 0,
+          "explanation": "Binding supplies read/write access to the parent's source. A new State copy creates independent storage, while a plain immutable value cannot edit the original."
+        },
+        {
+          "question": "Why can changing .id(...) reset a form draft?",
+          "options": [
+            "An ID writes an empty draft to disk.",
+            "It changes view identity, so SwiftUI can create fresh associated state.",
+            "IDs are only visual accessibility labels."
+          ],
+          "answer": 1,
+          "explanation": "State is associated with identity. Explicit identity replacement can discard old storage. Accessibility identifiers are a different API and serve a different purpose."
+        }
+      ],
+      "exercise": {
+        "brief": "Create an observable synthetic draft owned by one scratch SwiftUI screen. Add an editable child and a read-only summary, then demonstrate deliberate identity reset.",
+        "steps": [
+          "In a separate iOS 17+ learning target, implement DemoDraft, DraftScreen, and DraftEditor from the example.",
+          "Add a summary child with a plain DemoDraft property and read name and canContinue in its body.",
+          "Type a name, toggle the reminder, and force an unrelated parent state update. Explain why the draft stays.",
+          "Wrap the whole DraftScreen in a parent with @State resetKey = 0; apply .id(resetKey) and increment it through a Reset button.",
+          "Compare the address demo's wrappers with the member-ID demo; write the ownership and persistence answer for each."
+        ],
+        "acceptance": [
+          "The editor and summary share one model reference and respond to name edits.",
+          "Unrelated parent updates preserve the draft while identity is stable.",
+          "A deliberate identity change creates fresh draft state.",
+          "The explanation explicitly separates observation, model ownership, and persistence."
+        ],
+        "solution": "<p>A read-only child needs no binding wrapper when its body reads observable properties. It receives the same reference and observes those reads. The owner-created instance remains in the screen's state storage while its identity remains stable.</p><pre><code class=\"language-swift\">@MainActor\nstruct DraftSummary: View {\n    let draft: DemoDraft\n    var body: some View {\n        Text(draft.canContinue ? draft.name : \"Incomplete\")\n    }\n}\n\n@MainActor\nstruct ResettableDraft: View {\n    @State private var resetKey = 0\n    var body: some View {\n        VStack {\n            DraftScreen().id(resetKey)\n            Button(\"Reset draft\") { resetKey += 1 }\n        }\n    }\n}</code></pre><p>Add <code>DraftSummary(draft: draft)</code> beside the editor in <code>DraftScreen</code>. The parent key is an <code>Int</code> inferred from zero; changing it deliberately replaces the child identity. You should observe a new empty name and false reminder after Reset. This behavior is a product choice, so a production app should consider unsaved-edit confirmation separately. Both demo models here are in-memory; no wrapper promises disk restoration. The address model uses Observation plus State ownership, while the member-ID consumer observes an externally supplied ObservableObject. The latter boundary must be traced to its supplying owner rather than inferred from the word Observed.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Managing model data in your app",
+          "url": "https://developer.apple.com/documentation/swiftui/managing-model-data-in-your-app"
+        },
+        {
+          "label": "Apple: Migrating from ObservableObject to Observable",
+          "url": "https://developer.apple.com/documentation/swiftui/migrating-from-the-observable-object-protocol-to-the-observable-macro"
+        },
+        {
+          "label": "Apple: Discover Observation in SwiftUI",
+          "url": "https://developer.apple.com/videos/play/wwdc2023/10149/"
+        },
+        {
+          "label": "Apple: State",
+          "url": "https://developer.apple.com/documentation/swiftui/state"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Modern local model ownership",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/AddressFormDemo.swift",
+          "line": 12,
+          "why": "Creates an observable model and retains the weak delegate's coordinator in State."
+        },
+        {
+          "label": "Production bindings and focus",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/AddressForm/BookingAddressFormView.swift",
+          "line": 12,
+          "why": "Uses Bindable to expose text-field bindings from an observable model."
+        },
+        {
+          "label": "Observable model and weak delegate",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/AddressForm/BookingAddressFormViewModel.swift",
+          "line": 20,
+          "why": "Separates actor isolation, observation, normalization, and delegate ownership."
+        },
+        {
+          "label": "Legacy observation consumer",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/MemberIdViewModelDemo.swift",
+          "line": 12,
+          "why": "Receives an ObservableObject model using ObservedObject."
+        }
+      ],
+      "checklist": [
+        "I can explain View descriptions versus rendered UIKit objects.",
+        "I can choose a single source of truth and pass a Binding.",
+        "I can distinguish State ownership from Bindable editing.",
+        "I can predict when identity changes discard local state.",
+        "I can explain why Observable adds neither persistence nor task ownership.",
+        "I can read modern and legacy observation without inventing a migration."
+      ]
+    },
+    {
+      "id": "010",
+      "title": "Navigation and UIKit–SwiftUI interoperability",
+      "summary": "Model route state and terminal results, bridge UI frameworks in both directions, and reason about coordinator lifetime and dismissal.",
+      "duration": 85,
+      "level": "Interface",
+      "prerequisites": [
+        "008",
+        "009"
+      ],
+      "objectives": [
+        "Represent navigation as routes or explicit UIKit flow operations.",
+        "Implement the make/update responsibilities of a representable bridge.",
+        "Host SwiftUI in UIKit without breaking controller containment.",
+        "Trace selection, back navigation, interactive dismissal, and flow completion in the picker."
+      ],
+      "sections": [
+        {
+          "id": "flow",
+          "title": "Navigation is a feature boundary, not just an animation",
+          "html": "<p>An Android feature often opens a destination and returns a selection or cancellation to its caller. Preserve that product-level thinking on iOS. A push changes a navigation stack; a modal presents a separate flow; dismissing a presentation and returning a result are related but distinct operations. The owning feature must decide which outcome completes the business interaction. A cancelled interactive transition must not accidentally report a completed selection.</p><p><code>UINavigationController</code> manages UIKit controllers through operations such as <code>pushViewController(_:animated:)</code> and <code>popViewController(animated:)</code>. SwiftUI's <code>NavigationStack</code> describes a root and destinations, optionally controlled by a bound path. Its analogy to Android's navigation back stack is useful, but it is not an interchangeable runtime. A UIKit coordinator can own navigation for SwiftUI content hosted inside a controller, so the existence of a SwiftUI view does not prove that a SwiftUI stack owns its flow.</p><p>Keep the outcome independent of visual details. A synthetic picker can return <code>selected(id:)</code> or <code>cancelled</code> while its owner chooses push versus modal presentation. The active visit-reason feature follows that separation. Its public coordinator exposes a result; the view and model remain internal. This gives callers a smaller integration contract than importing and manipulating every screen component.</p>"
+        },
+        {
+          "id": "routes",
+          "title": "Typed routes and explicit path state",
+          "html": "<p>For a small SwiftUI flow, use a homogeneous route array. <code>Hashable</code> provides stable hashing and equality for route values, and Swift synthesizes conformance when associated data supports it. <code>[Route]</code> means an array of Route. <code>Route.self</code> is the type value passed to destination registration, not an instance of a route. <code>case .detail(let id)</code> extracts an enum's associated value.</p><pre><code class=\"language-swift\">import SwiftUI\n\nenum DemoRoute: Hashable {\n    case detail(id: String)\n}\n\nstruct RouteDemo: View {\n    @State private var path: [DemoRoute] = []\n\n    var body: some View {\n        NavigationStack(path: $path) {\n            List {\n                NavigationLink(\"Open synthetic detail\",\n                               value: DemoRoute.detail(id: \"demo-1\"))\n            }\n            .navigationTitle(\"Demo\")\n            .navigationDestination(for: DemoRoute.self) { route in\n                switch route {\n                case .detail(let id):\n                    VStack {\n                        Text(\"Detail: \\(id)\")\n                        Button(\"Return to root\") { path.removeAll() }\n                    }\n                }\n            }\n        }\n    }\n}</code></pre><p>The link appends a route value; the destination registration maps that type to a description. Clearing the array returns to root. The binding makes path changes visible to the owner, including back navigation. Prefer stable identifiers over entire mutable record objects so routes do not silently change identity as the record changes. A route path is not automatic persistence; restoring it requires a deliberate encoding and validation policy. Heterogeneous <code>NavigationPath</code> is available, but a typed array is simpler when a feature has one route enum. These NavigationStack APIs require iOS 16 or later.</p>"
+        },
+        {
+          "id": "presentation",
+          "title": "Modal state and a precisely scoped dismiss action",
+          "html": "<p>SwiftUI's <code>.sheet(isPresented:)</code> associates a modal with a Boolean binding. <code>.sheet(item:)</code> associates it with an optional identifiable value. The item form makes the selected content and the presentation decision share one source. <code>Identifiable</code> requires an <code>id</code> representing stable identity; using the title as identity is unsafe when titles can change or collide.</p><p><code>@Environment(\\.dismiss)</code> reads a dismissal action from the current environment. The backslash-dot syntax is a key path identifying the environment value. Read it inside the sheet or destination that should dismiss. Reading the root's dismiss action and passing it into a sheet can target the wrong presentation context. Calling the action requests dismissal; it is not an automatic domain result or guarantee that a previous animation has completed.</p><p>Use explicit callbacks or a result type to report what happened. If a sheet supports swipe-to-dismiss, reconcile that path with the Cancel button. Decide whether unsaved edits should be preserved, discarded, or require confirmation. Programmatic selection and interactive dismissal can converge on an idempotent finish operation: the first terminal outcome wins, later duplicate callbacks do nothing. Idempotence prevents duplicate result delivery but does not excuse missing cleanup.</p><p>In UIKit, check which controller presents the modal and which one is dismissed. A modal navigation controller creates a distinct navigation hierarchy; its dismiss action is different from popping a pushed child. Also distinguish result timing from animation timing: a caller that immediately presents another screen may need to await or coordinate the transition. The active picker documents why its current modal caller can accept an immediate result.</p>"
+        },
+        {
+          "id": "representable",
+          "title": "UIKit inside SwiftUI: creation and updates are different jobs",
+          "html": "<p><code>UIViewControllerRepresentable</code> adapts a UIKit controller into a SwiftUI description. <code>makeUIViewController(context:)</code> creates the controller for a represented identity. <code>updateUIViewController(_:context:)</code> applies changing inputs to that existing controller. <code>Context</code> is a framework-provided type containing integration information, including the optional coordinator. SwiftUI calls these methods; they are not methods you call from <code>body</code> to force an update.</p><pre><code class=\"language-swift\">import SwiftUI\nimport UIKit\n\n@MainActor\nfinal class MessageController: UIViewController {\n    private let label = UILabel()\n\n    override func viewDidLoad() {\n        super.viewDidLoad()\n        view.backgroundColor = .systemBackground\n        label.numberOfLines = 0\n        label.translatesAutoresizingMaskIntoConstraints = false\n        view.addSubview(label)\n        NSLayoutConstraint.activate([\n            label.centerYAnchor.constraint(equalTo: view.centerYAnchor),\n            label.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),\n            label.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16)\n        ])\n    }\n\n    func display(_ message: String) {\n        loadViewIfNeeded()\n        label.text = message\n    }\n}\n\n@MainActor\nstruct UIKitMessage: UIViewControllerRepresentable {\n    let message: String\n\n    func makeUIViewController(context: Context) -&gt; MessageController {\n        MessageController()\n    }\n\n    func updateUIViewController(_ controller: MessageController, context: Context) {\n        controller.display(message)\n    }\n}</code></pre><p>The underscore before <code>message</code> removes its external label; call <code>display(message)</code>. Loading the hierarchy before touching its label makes the update safe even if SwiftUI has not displayed it yet. The wrapper can be used as <code>UIKitMessage(message: currentText)</code> inside a SwiftUI container. It does not create a new controller for every text update. Empty update methods are suitable for static construction inputs, as in the demo's static UIKit screens, but will ignore later input changes if reused as dynamic components.</p>"
+        },
+        {
+          "id": "coordinator",
+          "title": "Bridge callbacks with a stable coordinator",
+          "html": "<p>A representable's <code>Coordinator</code> is a class used to carry callback and delegate integration across ephemeral wrapper descriptions. <code>makeCoordinator()</code> creates it, and <code>context.coordinator</code> exposes it in make and update methods. It is an interoperability object, not automatically the same architectural abstraction as the feature's navigation coordinator. The identical name covers two different jobs.</p><p>For a text-field bridge, the coordinator commonly receives UIKit delegate changes and writes into a binding. Update the coordinator's current inputs in the update method rather than permanently capturing the first wrapper value. Otherwise a callback can call an obsolete closure or write to an obsolete binding. Before assigning text in an update, compare the existing value to avoid unnecessary selection or first-responder disruption. Do not emit a user-edit event merely because SwiftUI applied the same state again.</p><p>Subscriptions and callback lifetimes need equally explicit handling. The member-ID <code>UIViewRepresentable</code> stores Combine cancellables on its bridge coordinator. This keeps subscriptions alive for the integration's lifetime. A teardown hook such as <code>dismantleUIViewController(_:coordinator:)</code> can detach delegates or cancel work owned specifically by the wrapper, but it must not cancel a shared operation owned by another feature. Document ownership instead of using teardown as a blanket cleanup function.</p><p>A wrapper can also retain a feature coordinator through its UIKit host, as the picker demo does. That coordinator starts an asynchronous result flow. Avoid adding another nested navigation controller simply because the content is UIKit: first establish whether the surrounding destination already has a suitable navigation container.</p>"
+        },
+        {
+          "id": "hosting",
+          "title": "SwiftUI inside UIKit: hosting preserves ownership decisions",
+          "html": "<p><code>UIHostingController(rootView:)</code> creates a UIKit controller from a SwiftUI description. UIKit can push it, present it, or contain it as a child. This lets a UIKit flow render a new SwiftUI component without rewriting navigation. If UIKit already owns the stack, a hosted child usually does not need another NavigationStack just to draw a title; navigation configuration belongs to the actual owning container.</p><p>Containment still requires <code>addChild</code>, installing and constraining the root view, and <code>didMove(toParent:)</code>, as session 008 demonstrated. Keeping only the hosting controller's view while discarding its controller breaks that contract. For a table or collection cell, <code>UIHostingConfiguration</code> is a separate integration option with its own deployment requirements, not a substitute for every child-controller boundary.</p><p>The repository provides <code>HostingController</code> and <code>HostingController_iOS16</code> helpers in its infrastructure. Those are project APIs, not Apple type names. Read their implementations when their extra behavior matters. The booking address model's <code>bind()</code> returns a hosting controller and configures safe-area treatment for its particular scroll-view integration. Do not copy <code>safeAreaRegions = []</code> into every hosted screen: removing safe-area participation everywhere can put content beneath system UI. The containment and layout contract should describe the actual parent.</p>"
+        },
+        {
+          "id": "trace",
+          "title": "Follow every picker exit, including the user's gesture",
+          "html": "<p>Read the demo host's <code>viewDidAppear</code> guard: it needs an existing navigation controller and starts only once per retained coordinator. Follow <code>didStart()</code> in the active coordinator. It validates nonempty input, constructs and retains its model, assigns itself as weak delegate, hosts the SwiftUI picker, and chooses pushed or modal presentation. The host's retained coordinator keeps the flow alive; Observation on the model does not.</p><p>Selection reaches the model's delegate and then the coordinator's result path. A pushed flow pops; a modal flow dismisses. The pushed host observes removal from its parent, while a retained <code>UIAdaptivePresentationControllerDelegate</code> adapter observes interactive modal dismissal. The adapter must be retained because the presentation controller's delegate reference does not supply its lifetime. Both explicit cancellation and selection also cancel optional fetch work.</p><p>The empty-input demo is a deliberately invalid invocation, not the ordinary search-no-results state. The coordinator reports a runtime bug, presents a generic alert, and completes with cancellation after the alert is dismissed. Search-no-results instead remains an active picker with input the user can change. Keeping those cases distinct avoids shipping a dead-end feature disguised as an empty list.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A hosted SwiftUI picker is pushed by UINavigationController. Who owns that navigation stack?",
+          "options": [
+            "The picker automatically owns a NavigationStack.",
+            "The UINavigationController and the flow owner that operates it.",
+            "The model's Observable macro."
+          ],
+          "answer": 1,
+          "explanation": "SwiftUI rendering does not change the stack's owner. UIKit still retains and transitions its controller stack; the coordinator controls the feature's operations."
+        },
+        {
+          "question": "Why update the bridge coordinator's callback in updateUIViewController?",
+          "options": [
+            "To keep it aligned with the latest representable inputs.",
+            "To recreate the entire UIKit controller after each edit.",
+            "To make callbacks persist after process death."
+          ],
+          "answer": 0,
+          "explanation": "Wrapper values can be recreated while the bridge coordinator remains stable. An old callback capture can target stale inputs unless the current integration state is refreshed."
+        },
+        {
+          "question": "What is the distinction between an empty initial procedure array and an unsuccessful search?",
+          "options": [
+            "Both always finish the flow as cancelled.",
+            "Only an unsuccessful search can produce a runtime error.",
+            "Invalid initial input makes selection impossible; search-no-results is a reversible UI state."
+          ],
+          "answer": 2,
+          "explanation": "The active coordinator guards invalid empty initialization. Search remains within a valid flow, and the user can edit the query to find supported choices."
+        }
+      ],
+      "exercise": {
+        "brief": "Create a scratch flow that displays a synthetic detail route and a UIKit message bridge. Then audit the active picker for all terminal outcomes.",
+        "steps": [
+          "Build RouteDemo in a separate iOS 16+ learning target and add UIKitMessage(message: id) to its detail content.",
+          "Change a local message state while staying on the detail and verify that the controller updates without losing identity.",
+          "Write an outcome table for selection, Cancel button, back gesture, modal swipe dismissal, invalid initial input, and search-no-results.",
+          "Trace each terminal picker outcome to its production finish call and mark who owns any outstanding fetch task.",
+          "Explain why the address bind() factory cannot be embedded using addSubview alone."
+        ],
+        "acceptance": [
+          "The UIKit bridge applies changing input through its update method.",
+          "Route removal returns to the root with one stack owner.",
+          "The outcome table identifies the search-no-results case as nonterminal.",
+          "Every terminal flow path names a result and a cleanup responsibility.",
+          "Containment includes both controller and view relationships."
+        ],
+        "solution": "<p>Inside the detail's VStack, use a local stateful child rather than attaching independent state to the destination closure:</p><pre><code class=\"language-swift\">struct DetailMessage: View {\n    let id: String\n    @State private var suffix = \"\"\n\n    var body: some View {\n        VStack {\n            UIKitMessage(message: id + suffix)\n            Button(\"Update message\") { suffix = \" — updated\" }\n        }\n    }\n}</code></pre><p>Use <code>DetailMessage(id: id)</code> from the route destination. The update calls <code>display</code> on the existing represented controller. The audited outcome table should say selection → selected value; explicit cancel/back/modal swipe → cancelled; invalid initial input → reported bug then cancelled after alert dismissal; search-no-results → stay active. In the current code, optional common-procedure work is cancelled by explicit result paths and interactive modal dismissal. The pushed removal callback finishes cancellation; the base finish stores and delivers its result without cancelling subclass task handles. This source-observed cleanup difference is a review question, not a demonstrated runtime defect. The address host must receive full child containment so UIKit can route controller events.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: NavigationStack",
+          "url": "https://developer.apple.com/documentation/swiftui/navigationstack"
+        },
+        {
+          "label": "Apple: UIViewControllerRepresentable",
+          "url": "https://developer.apple.com/documentation/swiftui/uiviewcontrollerrepresentable"
+        },
+        {
+          "label": "Apple: UIHostingController",
+          "url": "https://developer.apple.com/documentation/swiftui/uihostingcontroller"
+        },
+        {
+          "label": "Apple: Use SwiftUI with UIKit",
+          "url": "https://developer.apple.com/videos/play/wwdc2022/10072/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Demo navigation root",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/ContentView.swift",
+          "line": 12,
+          "why": "Uses SwiftUI NavigationStack to expose actual demo destinations."
+        },
+        {
+          "label": "SwiftUI-to-UIKit flow wrapper",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/VisitReasonPickerDemo.swift",
+          "line": 69,
+          "why": "Bridges a UIKit host and retains the public feature coordinator."
+        },
+        {
+          "label": "UIKit-owned hosted flow",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/VisitReasonPicker/VisitReasonPickerCoordinatorImpl.swift",
+          "line": 65,
+          "why": "Validates input, hosts SwiftUI content, and chooses pushed or modal presentation."
+        },
+        {
+          "label": "Interactive dismissal adapter",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/VisitReasonPicker/VisitReasonPickerCoordinatorImpl.swift",
+          "line": 127,
+          "why": "Explicitly retains the presentation-delegate adapter and reports cancellation."
+        }
+      ],
+      "checklist": [
+        "I can choose one owner for a navigation stack.",
+        "I can explain route values, destination registration, and path bindings.",
+        "I can separate dismissing UI from returning a feature result.",
+        "I can distinguish bridge coordinators from feature coordinators.",
+        "I can trace all picker exits and identify nonterminal empty search results.",
+        "I can explain make, update, and child-controller containment."
+      ]
+    },
+    {
+      "id": "011",
+      "title": "Async first steps: suspension, cancellation, and UI state",
+      "summary": "Call asynchronous Swift APIs safely from a screen, make cancellation cooperative, and prevent obsolete responses from winning a UI race.",
+      "duration": 90,
+      "level": "Interface",
+      "prerequisites": [
+        "003",
+        "005",
+        "009",
+        "010"
+      ],
+      "objectives": [
+        "Read async, throws, try await, Task, and cancellation checks accurately.",
+        "Distinguish view-associated tasks from manually created unstructured tasks.",
+        "Keep UI state on the main actor while treating await as a possible interleaving point.",
+        "Represent loading outcomes and reject stale responses with an explicit request policy."
+      ],
+      "sections": [
+        {
+          "id": "suspension",
+          "title": "From suspend functions to Swift async functions",
+          "html": "<p>Consider an Android search screen: typing launches a coroutine, an HTTP operation suspends, and a newer query can make the earlier result obsolete. Swift has the same engineering problem. A function marked <code>async</code> may suspend while it waits; a caller uses <code>await</code> at a possible suspension point. <code>throws</code> permits failure, and <code>try await</code> handles both effects. This is conceptually similar to calling a Kotlin suspend function inside a coroutine, but the exact task hierarchy, isolation, and lifecycle integration need separate investigation.</p><p><code>await</code> does not mean create a background thread. It does not promise a suspension every time, and it does not automatically parallelize two calls. Calling one async function and then another still expresses a sequence. Thread or executor behavior depends on actor isolation, the function's declaration, and toolchain settings. A heavy synchronous calculation in main-actor code can block the UI even if its enclosing function is async.</p><p>This lesson deliberately uses a main-actor synthetic service whose only waiting operation suspends. That avoids claiming a universal background execution rule. Later sessions cover structured child tasks, actors, Sendable, and executor behavior. For now, learn to mark each suspension point, identify the owner of the task, and decide whether the result still belongs to the current screen state when execution resumes.</p>"
+        },
+        {
+          "id": "syntax",
+          "title": "Read a small asynchronous operation",
+          "html": "<p>The following code is suitable for an iOS learning target or an async Swift harness with the relevant standard library and Foundation support. It performs no network request and uses only synthetic strings. <code>enum DemoLoadError: Error</code> defines an error value; <code>throw</code> exits with it. <code>200_000_000</code> is a numeric literal with readability separators, representing 200 million nanoseconds.</p><pre><code class=\"language-swift\">import Foundation\n\nenum DemoLoadError: Error {\n    case unavailable\n}\n\n@MainActor\nstruct DemoLoader {\n    func load(for id: String) async throws -&gt; String {\n        try await Task.sleep(nanoseconds: 200_000_000)\n        try Task.checkCancellation()\n        if id == \"fail\" {\n            throw DemoLoadError.unavailable\n        }\n        return \"Synthetic result for \\(id)\"\n    }\n}</code></pre><p><code>for</code> is the external label, and <code>id</code> is the parameter's local name; call <code>load(for: \"demo-1\")</code>. The arrow specifies the successful return type. <code>Task.sleep</code> suspends the task rather than blocking a thread. It throws if cancellation interrupts the sleep. The additional cancellation check demonstrates checking the task's flag before publishing subsequent work, even though this particular sleep already responds to cancellation.</p><p>Modern toolchains also provide duration-based sleep overloads such as <code>Task.sleep(for: .milliseconds(200))</code>. Check their platform availability before replacing a project's existing abstraction. In this checkout, the member-ID feature injects an <code>AsyncSleep</code> dependency, allowing tests to control timeout behavior. That repository protocol is an integration choice, not a new Swift keyword. Never replace suspension with a blocking <code>Thread.sleep</code> just to make an async example appear predictable.</p>"
+        },
+        {
+          "id": "launch",
+          "title": "A task needs a lifetime owner",
+          "html": "<p>An async function can call another async function directly with <code>await</code>; that call remains part of the same task. A synchronous button callback cannot suspend, so <code>Task { ... }</code> creates an asynchronous task from that event. This task is unstructured: it does not become a lifecycle-managed child merely because the source line is inside a view. Its returned handle lets an owner await its result or request cancellation.</p><p><code>Task&lt;Void, Never&gt;</code> describes a task returning no useful value and exposing no thrown error. <code>Void</code> is the empty tuple type; <code>Never</code> represents an impossible value, here indicating that the task closure handles its failures. Dropping the handle does not cancel the task. The task can retain objects captured by its closure, so deallocation is not a reliable stop mechanism.</p><p>SwiftUI's <code>.task { ... }</code> modifier supplies view-associated asynchronous work. <code>.task(id: value)</code> also requests cancellation and restarts when its Equatable ID changes. This is a useful conceptual neighbor of Compose's <code>LaunchedEffect(key)</code>, but not a claim of identical implementation. SwiftUI can cancel work when the view disappears before it completes; the operation must still cooperate. Do not wrap the awaited operation in a nested <code>Task</code> inside the modifier: that creates a separate unstructured task and can lose the cancellation relationship you expected.</p><p>A UIKit coordinator instead may store a task property and cancel it on the flow's explicit finish path. Choose the owner according to whether work belongs to a visible screen, an entire feature flow, or a shared service.</p>"
+        },
+        {
+          "id": "cancellation",
+          "title": "Cancellation is a request with a contract",
+          "html": "<p><code>handle.cancel()</code> sets cancellation state and notifies cancellation handlers. It does not forcibly kill a thread or guarantee that arbitrary code stops immediately. Cooperative APIs may throw <code>CancellationError</code>; your own code can call <code>Task.checkCancellation()</code> to throw when cancelled, or inspect <code>Task.isCancelled</code> to take a nonthrowing branch. Checking only before a long operation is insufficient if the user leaves while the operation is suspended.</p><p>Cancellation usually is not a user-facing service failure. A screen disappearing, a newer search replacing an older one, or a user choosing manual entry are normal reasons to stop. However, an API can use its own error type for cancellation: networking may report a cancelled URL error rather than Swift's CancellationError. Use the task flag plus the service's documented error behavior when classifying failures. Do not assume one catch clause recognizes every cancellation source.</p><p>Cancellation also is not freshness. A service might ignore cancellation or finish just before it receives the request. If an old response can race with a newer one, check a request token or revision before changing shared UI state. That check is necessary even when all model properties are main-actor isolated. Actor isolation prevents concurrent unsynchronized access; it does not preserve a pre-await assumption across suspension.</p><p>Avoid swallowing errors with <code>try?</code> and then continuing as if work succeeded. That converts both failure and cancellation into an optional and can publish misleading defaults. Prefer an explicit do/catch whose branches express the intended UI outcomes.</p>"
+        },
+        {
+          "id": "model",
+          "title": "An explicit loading state with a freshness guard",
+          "html": "<p>Use one enum instead of unrelated loading, error, and result flags that can contradict each other. In this iOS 17+ example, <code>@Observable</code> enables view updates, <code>@MainActor</code> isolates the model, and <code>private(set)</code> allows public reading within the model's visibility while restricting assignment to its implementation. A revision increments for each load, so every suspended operation knows which request it belongs to.</p><pre><code class=\"language-swift\">import Observation\n\n@MainActor\n@Observable\nfinal class DemoLoadingModel {\n    enum Phase: Equatable {\n        case idle\n        case loading\n        case loaded(String)\n        case failed(String)\n    }\n\n    private(set) var phase: Phase = .idle\n    private var revision = 0\n\n    func load(id: String) async {\n        revision += 1\n        let requestRevision = revision\n        phase = .loading\n        do {\n            let message = try await DemoLoader().load(for: id)\n            try Task.checkCancellation()\n            guard requestRevision == revision else { return }\n            phase = .loaded(message)\n        } catch {\n            guard requestRevision == revision else { return }\n            if Task.isCancelled || error is CancellationError {\n                phase = .idle\n            } else {\n                phase = .failed(\"Unable to load the synthetic result\")\n            }\n        }\n    }\n}</code></pre><p><code>do</code> groups throwing operations. A general <code>catch</code> exposes its error as <code>error</code>. <code>is</code> tests an error's runtime type; <code>||</code> is logical OR. The freshness guard runs in both success and failure paths, so an old cancellation cannot clear a newer result. This small model treats cancellation of the latest request as idle. Another product might retain previously loaded data; choose and test that policy rather than deriving it from the async keyword.</p>"
+        },
+        {
+          "id": "view",
+          "title": "Call the model in the view's task",
+          "html": "<p>This view belongs in an iOS 17+ SwiftUI target alongside the preceding model and service. The owner stores the observable model in State. The input <code>id</code> is a plain value supplied by a parent; changing it restarts the modifier's work for the current identity. The switch is exhaustive, so each representable phase has a rendering.</p><pre><code class=\"language-swift\">import SwiftUI\n\n@MainActor\nstruct DemoLoadingScreen: View {\n    let id: String\n    @State private var model = DemoLoadingModel()\n\n    var body: some View {\n        Group {\n            switch model.phase {\n            case .idle:\n                Text(\"Ready\")\n            case .loading:\n                ProgressView(\"Loading\")\n            case .loaded(let message):\n                Text(message)\n            case .failed(let message):\n                Text(message)\n            }\n        }\n        .task(id: id) {\n            await model.load(id: id)\n        }\n    }\n}</code></pre><p><code>Group</code> combines descriptions without choosing a stack layout. <code>ProgressView</code> is a framework control for progress feedback. The associated-value <code>let message</code> binds the payload for its case. The task directly awaits the model method and therefore observes cancellation in that task. The revision policy protects against overlapping requests during rapid input changes.</p><p>For a retry button, either change a retry token included in the task ID or retain a deliberately managed Task handle. A button whose only action creates an untracked Task may still be fine for short, intentional flow work, but its ownership policy should be explicit. A retry key that changes every render is a bug: it turns updates into a perpetual restart loop.</p>"
+        },
+        {
+          "id": "repo",
+          "title": "Read current cancellation behavior without promising more",
+          "html": "<p>In <code>PrefillMemberIdViewModel</code>, starting a load creates separate fetching and timeout tasks. Choosing manual entry calls a reset method that cancels pending tasks and changes the state. After fetching, the implementation checks cancellation before publishing its result and confirms it is still loading. That explains how the user's explicit choice can win over a delayed response. Its timeout and sleep dependency make deterministic testing possible.</p><p>The visit-reason coordinator owns an optional fetch task for common suggestions. A failed fetch degrades to an empty optional section while the full supported procedure list remains usable. Before changing the model after suspension, it checks <code>Task.isCancelled</code>. That policy differs from the primary member-ID retrieval, whose failure changes a central form state. Error handling must reflect the role of the data.</p><p>Do not infer that every callback-launched Task in the demos has full cancellation handling; the age-warning demo uses a task to await an alert result without storing a handle. Demos can illustrate integration with narrower lifetime assumptions. A production review should identify its owner, stopping event, result relevance, and tests before adopting the pattern elsewhere.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does await guarantee about execution?",
+          "options": [
+            "The caller runs on a new background thread.",
+            "The operation can suspend; actor and executor rules still determine execution context.",
+            "The awaited operation runs in parallel with every following line."
+          ],
+          "answer": 1,
+          "explanation": "Await marks a possible suspension point. It neither creates a thread nor parallelizes a sequence, and main-actor synchronous work can still block rendering."
+        },
+        {
+          "question": "Why use a revision check after await even when a previous task was cancelled?",
+          "options": [
+            "Cancellation cannot be requested from the main actor.",
+            "The service may finish despite cancellation, and the response can be obsolete.",
+            "Observable models cannot store enums."
+          ],
+          "answer": 1,
+          "explanation": "Cancellation is cooperative, and an older result may race with replacement. A revision check implements freshness independently of the service's cancellation behavior."
+        },
+        {
+          "question": "Which call preserves a SwiftUI task modifier's cancellation context?",
+          "options": [
+            ".task { await model.load(id: id) }",
+            ".task { Task { await model.load(id: id) } }",
+            "Button action with an unretained Task always cancels on disappearance."
+          ],
+          "answer": 0,
+          "explanation": "Directly awaiting the operation keeps it in the modifier's task. A nested Task creates unstructured work whose lifetime is not automatically the same."
+        }
+      ],
+      "exercise": {
+        "brief": "Use the synthetic loading model to demonstrate success, failure, replacement, and cancellation. Explain the user-visible state policy before implementation.",
+        "steps": [
+          "Create the service, model, and screen in a separate iOS 17+ scratch target.",
+          "Supply demo-1 for success and fail for the synthetic unavailable error.",
+          "Add parent buttons that rapidly switch the ID between two demo values; record which result is allowed to publish.",
+          "Navigate away during the delay and return; describe whether the new screen should start a new load.",
+          "Write a request-event sequence for two overlapping calls and classify an old success and an old failure.",
+          "Inspect the member-ID reset and post-fetch cancellation check, and compare its manual-entry behavior with this lesson's idle policy."
+        ],
+        "acceptance": [
+          "Success and failure have explicit, mutually exclusive rendering states.",
+          "Cancelled latest work does not become a user-facing unavailable error.",
+          "An older request cannot overwrite or clear a newer request's phase.",
+          "The learner can identify which Task is associated with the view and which is manually owned.",
+          "No real network or patient data is used."
+        ],
+        "solution": "<p>Suppose A starts with revision 1 and B starts with revision 2 while A is suspended. If A succeeds later, its revision comparison fails, so it returns without publishing. If A fails or is cancelled, the catch-path comparison also fails, so it cannot reset B's state. B alone may publish loaded, failed, or idle according to its own outcome.</p><p>For deterministic model reasoning, replace the delay with a controlled fake in your own scratch target so you can complete B before A. A direct service dependency makes this easy: inject a main-actor async throwing closure or protocol rather than depending on wall-clock timing. Do not claim the rapid-tap manual experiment proves all schedules; it only demonstrates one observed run.</p><p>When the current screen's task is cancelled, the model checks the task flag or CancellationError and uses its chosen idle policy. A production form could preserve prior data instead. The member-ID feature specifically resets to manual entry because that is the user's action, and its post-fetch cancellation check protects that decision. The important result is a documented transition policy plus a freshness guard, not a particular spinner or timeout duration.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Concurrency",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"
+        },
+        {
+          "label": "Apple: Task",
+          "url": "https://developer.apple.com/documentation/swift/task"
+        },
+        {
+          "label": "Apple: Task.cancel()",
+          "url": "https://developer.apple.com/documentation/swift/task/cancel()"
+        },
+        {
+          "label": "Apple: Explore structured concurrency in Swift",
+          "url": "https://developer.apple.com/videos/play/wwdc2021/10134/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Manual entry cancels owned work",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/PrefillMemberId/ViewModels/PrefillMemberIdViewModel.swift",
+          "line": 112,
+          "why": "Cancels fetch, timeout, and delayed cleanup tasks before updating state."
+        },
+        {
+          "label": "Post-suspension cancellation check",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/PrefillMemberId/ViewModels/PrefillMemberIdViewModel.swift",
+          "line": 167,
+          "why": "Checks cancellation and current loading state before publishing data."
+        },
+        {
+          "label": "Optional lookup cancellation policy",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/VisitReasonPicker/VisitReasonPickerCoordinatorImpl.swift",
+          "line": 169,
+          "why": "Owns a task, degrades optional lookup failure, and rejects updates after cancellation."
+        },
+        {
+          "label": "Task from a synchronous UIKit action",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/AgeMatchingDemo.swift",
+          "line": 56,
+          "why": "Demonstrates launching asynchronous alert work from a button event."
+        }
+      ],
+      "checklist": [
+        "I can read async throws and try await without assuming background execution.",
+        "I can name the task owner and stopping event.",
+        "I can explain cooperative cancellation and error classification.",
+        "I can reject stale success and stale failure after suspension.",
+        "I can distinguish view-associated tasks from unstructured Task creation.",
+        "I can explain the actual reset policy in the member-ID feature."
+      ]
+    },
+    {
+      "id": "012",
+      "title": "XCTest, Swift Testing, UI automation, and snapshots",
+      "summary": "Choose a test boundary, write expressive assertions, control async behavior, and review visual baselines without confusing snapshots with correctness.",
+      "duration": 95,
+      "level": "Interface",
+      "prerequisites": [
+        "003",
+        "007",
+        "009",
+        "011"
+      ],
+      "objectives": [
+        "Write equivalent behavior tests using XCTest and Swift Testing.",
+        "Explain test discovery, optional assertions, actor isolation, and parallel-test hazards.",
+        "Test cancellation with controlled completion rather than arbitrary sleeps.",
+        "Distinguish unit, integration, snapshot, and UI-automation evidence in the active demo."
+      ],
+      "sections": [
+        {
+          "id": "boundaries",
+          "title": "Start with the behavior you want evidence for",
+          "html": "<p>Your Android testing instincts transfer well: isolate decisions, fake external dependencies, and reserve expensive device automation for integration paths that require it. On iOS, XCTest supports unit tests, performance tests, and UI automation through XCUIAutomation. Swift Testing is a newer Swift-native unit-testing framework included with Xcode 16 and later. They can coexist in a project or target; use the assertion and lifecycle APIs appropriate to the framework of each test rather than mixing them inside one test.</p><p>A pure query-normalization test proves how a function handles strings. A model test proves state transitions and delegate decisions. A coordinator integration test can verify a controller is pushed and a selection produces a result. A snapshot detects a visual change under configured rendering conditions. A UI test launches an app and interacts with its accessibility-exposed elements. None subsumes all the others.</p><p>Write the evidence you need before choosing a framework. For the picker, whitespace trimming belongs in a fast model test; search-no-results presentation belongs in a snapshot or UI assertion; swipe-back cancellation belongs near the coordinator or actual navigation integration. A screenshot of a list cannot prove that its selection reaches the caller exactly once. Conversely, a correct selected-ID assertion cannot prove that a long localized label is readable.</p>"
+        },
+        {
+          "id": "xctest",
+          "title": "XCTest discovery and precise assertions",
+          "html": "<p><code>import XCTest</code> exposes the framework. A test class subclasses <code>XCTestCase</code>, and test methods conventionally start with <code>test</code>. <code>final</code> prevents subclassing but is not the discovery mechanism. <code>XCTAssertEqual</code> compares values and records a test failure rather than throwing a Swift error. The helper below is synthetic, and both it and the test belong in a learner's testable module and test target.</p><pre><code class=\"language-swift\">import Foundation\n\nfunc demoFilteredNames(_ names: [String], query: String) -&gt; [String] {\n    let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)\n    guard !normalized.isEmpty else { return names }\n    return names.filter { $0.localizedCaseInsensitiveContains(normalized) }\n}</code></pre><pre><code class=\"language-swift\">import XCTest\n\nfinal class DemoFilterTests: XCTestCase {\n    func testTrailingWhitespaceStillMatches() {\n        let names = [\"Demo Dental\", \"Demo Eye\"]\n        let result = demoFilteredNames(names, query: \"dental \")\n        XCTAssertEqual(result, [\"Demo Dental\"])\n    }\n\n    func testWhitespaceOnlyReturnsOriginalChoices() {\n        let names = [\"Demo Dental\", \"Demo Eye\"]\n        XCTAssertEqual(demoFilteredNames(names, query: \"   \"), names)\n    }\n}</code></pre><p><code>$0</code> is the first implicit closure parameter, here a candidate string. The <code>query:</code> argument label makes the call's purpose clear. An array equality assertion checks both membership and order, which is stronger than checking only the count. <code>@testable import ModuleName</code> grants a test target access to internal declarations of a module built with testability enabled; it does not expose private implementation or magically import app resources.</p><p>When a result is optional, prefer <code>try XCTUnwrap(value)</code> in a throwing test method. It records a failure and stops that path if the value is nil. Force unwraps can crash the test host and obscure the intended assertion. Avoid reproducing the entire production algorithm in the test's expected-value calculation; use a small, independently understood fixture.</p>"
+        },
+        {
+          "id": "swift-testing",
+          "title": "Swift Testing attributes, macros, and parameters",
+          "html": "<p>Swift Testing discovers <code>@Test</code>-annotated functions; a function does not need a test-name prefix. <code>@Suite</code> optionally names or configures a suite. A struct can group tests without subclassing XCTestCase. The hash-prefixed <code>#expect</code> and <code>#require</code> are macros that expand assertions with useful expression diagnostics. An expectation records a failed check and continues; a requirement throws if the required condition or optional unwrap fails.</p><pre><code class=\"language-swift\">import Testing\n\n@Suite(\"Synthetic query matching\")\nstruct DemoQueryTests {\n    @Test(\"Case and surrounding whitespace are ignored\",\n          arguments: [\"dental\", \"DENTAL\", \" dental \"])\n    func findsDental(query: String) {\n        let result = demoFilteredNames([\"Demo Dental\", \"Demo Eye\"], query: query)\n        #expect(result == [\"Demo Dental\"])\n    }\n\n    @Test(\"Missing matches produce an empty array\")\n    func hasNoResults() {\n        #expect(demoFilteredNames([\"Demo Dental\"], query: \"zzz\").isEmpty)\n    }\n\n    @Test(\"First match has a readable name\")\n    func unwrapsFirstMatch() throws {\n        let result = demoFilteredNames([\"Demo Dental\"], query: \"dental\")\n        let first = try #require(result.first)\n        #expect(first == \"Demo Dental\")\n    }\n}</code></pre><p><code>arguments:</code> runs the same behavior check for each supplied value, passing it to the function parameter. <code>result.first</code> is optional because an array may be empty; the requirement establishes the precondition for the next check. This is a useful conceptual counterpart to parameterized JUnit tests, with framework-specific discovery and failure semantics.</p><p>Swift Testing commonly runs tests in parallel. New suite instances isolate instance properties, but globals, singleton dependencies, UserDefaults domains, font registration, and shared files can still collide. A serialized suite trait can be appropriate for a narrowly justified shared resource, but it is not a replacement for isolated test fixtures. Main-actor annotations control UI access, not the isolation of all business state shared between tests.</p>"
+        },
+        {
+          "id": "async-tests",
+          "title": "Async tests should await evidence, not elapsed time",
+          "html": "<p>Both frameworks support async test functions. Add <code>@MainActor</code> when constructing or calling a main-actor model or UIKit object; do not assume all test methods execute there. When an async operation directly returns the result, await it and assert that result. For callback APIs, XCTest expectations and asynchronous fulfillment provide bounded waiting. Avoid a blocking wait on the main actor when fulfillment requires that same actor.</p><p>A meaningful cancellation test first arranges the operation, then requests cancellation, awaits task completion, and checks the defined outcome. The next Swift Testing example uses the model and service from session 011 in the same scratch module. It tests pre-cancelled work rather than a transport race:</p><pre><code class=\"language-swift\">import Testing\n\n@Test(\"Cancelled load returns to idle\")\n@MainActor\nfunc cancelledLoadIsIdle() async {\n    let model = DemoLoadingModel()\n    let operation = Task { await model.load(id: \"demo-1\") }\n    operation.cancel()\n    await operation.value\n    #expect(model.phase == .idle)\n}</code></pre><p><code>operation.value</code> awaits completion; because this task handles errors internally, the await does not need try. To test cancellation after an operation begins, inject a fake service with a start signal and controlled completion. Await the start signal, cancel, then release or complete the fake. A <code>Task.yield()</code> or a short sleep does not prove the fake reached a particular stage.</p><p>For stale-response behavior, start A, wait until the fake records A, start B, complete B, then complete A. Assert B's result stays. Also test an old failure. The checkout's member-ID configuration injects AsyncSleep for timeout control. That seam is more reliable than increasing a timeout until a flaky test happens to pass on one machine.</p>"
+        },
+        {
+          "id": "snapshots",
+          "title": "Snapshots are reviewed visual contracts",
+          "html": "<p>SnapshotTesting is a third-party library used by this repository. It is not Apple's XCTest assertion API. The local <code>assertStandardSnapshot(of:)</code> helper wraps it with fixed dimensions, safe-area insets, light appearance, display scale, font registration, and configured comparison precision. The exact environment still matters: OS font rendering, SDK changes, layout timing, and animation can cause diffs even when those local traits are fixed.</p><p>A snapshot must render a deterministic state. Use a synthetic fixture and explicitly set loading, loaded, failure, or no-results before capture. Wait for the intended layout or disable nonessential animation through the project's established mechanism. Do not snapshot a live network request or the wall-clock phase of a shimmer and then pretend that image is stable. The demo's picker snapshots construct default, filtered, and no-results states through demo hooks.</p><p>Recording is a review operation, not a way to make assertions pass. When a diff appears, inspect the previous baseline, the new image, and the reason for the change. Confirm that fonts registered correctly, the expected state was loaded, and the rendering environment matches. Re-record only an understood intended change. The helper reads a recording environment variable, but enabling it blindly can overwrite accepted visual evidence.</p><p>One standard phone-size baseline does not establish accessibility, large-text, dark-mode, localization, or tablet correctness. Add targeted evidence for changes that affect those behaviors. A tolerance can absorb small rendering noise; it can also hide a small regression. Choose its meaning deliberately instead of raising precision thresholds until review disappears.</p>"
+        },
+        {
+          "id": "ui-tests",
+          "title": "UI automation operates across the app boundary",
+          "html": "<p>XCTest UI tests use <code>XCUIApplication</code> to launch and query the app under test. The test runner and app are separate execution contexts, so a plain test variable is not an app dependency injection seam. Configure deterministic app behavior through an explicit test launch contract or existing demo fixtures. Query by stable accessibility identifiers when possible; a visible label can change through localization or copy editing.</p><pre><code class=\"language-swift\">import XCTest\n\nfinal class ScratchDemoUITests: XCTestCase {\n    func testSyntheticDetailCanOpen() {\n        let app = XCUIApplication()\n        app.launch()\n        let open = app.buttons[\"Open synthetic detail\"]\n        XCTAssertTrue(open.waitForExistence(timeout: 3))\n        open.tap()\n        XCTAssertTrue(app.staticTexts[\"Detail: demo-1\"].waitForExistence(timeout: 3))\n    }\n}</code></pre><p>This example requires a UI-test target attached to the session 010 scratch app, with the RouteDemo detail showing that text. It is not a runnable standalone Swift program. <code>waitForExistence(timeout:)</code> returns a Bool, which the assertion checks; ignoring that return can let a test continue without evidence. Query types must match what accessibility exposes: an apparent text block might be a text view rather than a static text.</p><p>The active empty-picker UI test demonstrates this distinction by querying the alert's description as a text view and checking the cancelled result after dismissal. That path proves integration the pure filtering tests cannot. Keep UI tests few and purposeful because app launch, animations, keyboard interaction, and simulator conditions make them slower and more variable than model checks.</p>"
+        },
+        {
+          "id": "review",
+          "title": "Use the checkout's test layers as a coverage map",
+          "html": "<p>Read a member-ID demo snapshot to identify its presentation fixture, then read the feature model tests to identify state and delegate assertions. Read the picker coordinator tests for selected and cancelled results and the Swift Testing tests in InsuranceHome for an actual modern suite. The codebase already contains both frameworks; teaching one as the only current convention would be misleading.</p><p>The demo Project.swift declares an app target, a unit-test target, and a UI-test target. Those declarations establish available integration boundaries, not evidence that tests were executed successfully. This course author inspected source and contracts; it did not run the client suite or regenerate any baselines. When you run your own checks, record the scheme, simulator runtime, fixture state, and result. Distinguish a compiler failure, an assertion failure, and a baseline-environment mismatch before making a change.</p><p>A useful review asks which requirement each test proves and what would fail if the requirement broke. If removing the normalization still passes your query test, your fixture is too forgiving. If disconnecting the selection callback still passes every screenshot, add result-level evidence. Strong tests expose behavior boundaries instead of mirroring implementation line by line.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A snapshot shows the selected row correctly. What remains unproven?",
+          "options": [
+            "Whether the visual fixture changed under the configured renderer.",
+            "Whether the selection result reaches its caller exactly once.",
+            "Whether an image baseline exists."
+          ],
+          "answer": 1,
+          "explanation": "A visual comparison observes rendering. Result delivery, lifetime, and duplicate completion need model or coordinator integration assertions."
+        },
+        {
+          "question": "In Swift Testing, when should you use try #require(optional)?",
+          "options": [
+            "When later assertions require a non-nil value and the test should stop if it is missing.",
+            "Whenever you want to silently ignore a failed check.",
+            "To import private app properties into a UI test process."
+          ],
+          "answer": 0,
+          "explanation": "Require records the failed requirement and throws when its optional cannot be unwrapped. Expect is suitable for independent checks that can continue."
+        },
+        {
+          "question": "Which strategy tests an A/B response race most reliably?",
+          "options": [
+            "Sleep for one second after starting A and assume it began.",
+            "Raise the test timeout until CI passes.",
+            "Use a fake that signals start and lets the test complete B before A."
+          ],
+          "answer": 2,
+          "explanation": "Controlled scheduling establishes the exact race under test. Timing guesses depend on machine load and do not prove the prerequisite stages occurred."
+        }
+      ],
+      "exercise": {
+        "brief": "Build a small test plan for the synthetic filter and loading screen, then map it to the demo repository's test layers. Keep all implementation in your learner scratch project.",
+        "steps": [
+          "Write the two XCTest normalization tests and the parameterized Swift Testing test in their proper targets.",
+          "Add no-match and whitespace-only cases and assert full arrays, not just counts.",
+          "Add the pre-cancelled async test from this session; explain the different test required for cancellation after service start.",
+          "Plan a controlled A/B completion test including an old error path, describing the fake's start and completion signals.",
+          "Choose two deterministic visual states to snapshot in the scratch app if SnapshotTesting is installed; otherwise document the capture contract without inventing an Apple API.",
+          "Read the demo's empty-picker UI test and identify its terminal result assertion."
+        ],
+        "acceptance": [
+          "The query tests fail if trimming or case-insensitive matching is removed.",
+          "Each individual test uses one framework's assertions and lifecycle rules.",
+          "Async tests await completion or explicit signals rather than relying on elapsed sleep.",
+          "The proposed snapshots name their fixtures and environment.",
+          "The coverage map distinguishes rendering evidence from returned-result evidence."
+        ],
+        "solution": "<p>The expected query arrays are <code>[\"Demo Dental\"]</code> for dental, DENTAL, and surrounding-space variants; the original array for whitespace-only input; and an empty array for zzz. Those fixtures independently encode behavior. The pre-cancelled loading test should end at idle and await its operation, so no outstanding task can mutate state after the assertion.</p><p>For A/B completion, have the fake store one pending operation per synthetic request ID and notify the test when each has started. Complete B with its synthetic result and observe loaded B. Complete A with either a different result or an error and observe that loaded B remains. The test should fail if the model removes its success or catch freshness guard. Explicitly finish and clean up every pending fake operation so the test cannot hang.</p><p>A loaded and failed snapshot pair checks distinct visible contracts under a fixed environment, while a coordinator assertion checks the terminal selection payload. The demo's empty-input UI test checks the generic alert, dismisses it, and waits for Cancelled. That is evidence for invalid invocation recovery, not the same requirement as search-no-results rendering. Source inspection here is complete; test execution belongs to the scratch or client environment you deliberately choose.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Testing in Xcode",
+          "url": "https://developer.apple.com/documentation/xcode/testing"
+        },
+        {
+          "label": "Apple: XCTest",
+          "url": "https://developer.apple.com/documentation/xctest"
+        },
+        {
+          "label": "Apple: Swift Testing",
+          "url": "https://developer.apple.com/documentation/testing"
+        },
+        {
+          "label": "Swift: Migrating a test from XCTest",
+          "url": "https://docs.swift.org/latest/documentation/testing/migratingfromxctest/"
+        },
+        {
+          "label": "Apple: Running tests serially or in parallel",
+          "url": "https://developer.apple.com/documentation/testing/parallelization"
+        },
+        {
+          "label": "SnapshotTesting maintainer documentation (third-party)",
+          "url": "https://github.com/pointfreeco/swift-snapshot-testing"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Demo snapshot assertion",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Tests/MemberIdSnapshotTests.swift",
+          "line": 12,
+          "why": "Provides a current XCTest snapshot example using the project's wrapper."
+        },
+        {
+          "label": "Swift Testing in an active feature",
+          "path": "ios-client/Projects/Features/ZDInsuranceHome/Tests/ZDInsuranceHomeTests/PlanProgressViewModelTests.swift",
+          "line": 8,
+          "why": "Shows Suite, Test, expect, and main-actor model access."
+        },
+        {
+          "label": "Deterministic rendering configuration",
+          "path": "ios-client/Projects/Infra/ZDTestUtilities/Sources/ZDTestUtilities/SnapshotTestHelpers.swift",
+          "line": 13,
+          "why": "Defines fixed snapshot dimensions, traits, fonts, precision, and recording mode."
+        },
+        {
+          "label": "Whitespace behavior tests",
+          "path": "ios-client/Projects/Features/ZDBooking/Tests/ZDBookingTests/VisitReasonPicker/VisitReasonPickerViewModelTests.swift",
+          "line": 54,
+          "why": "Tests real normalization requirements independently of pixels."
+        },
+        {
+          "label": "Invalid-input UI integration",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/UITests/VisitReasonPickerUITest.swift",
+          "line": 13,
+          "why": "Verifies an alert followed by flow cancellation through actual UI queries."
+        }
+      ],
+      "checklist": [
+        "I can choose a test boundary from a requirement.",
+        "I can read XCTest discovery and Swift Testing macros.",
+        "I can unwrap an optional without crashing the test host.",
+        "I can design a deterministic cancellation and stale-result test.",
+        "I can explain what a visual baseline proves and how to review a diff.",
+        "I can identify app-process versus test-runner boundaries."
+      ]
+    },
+    {
+      "id": "013",
+      "title": "UI lab: build a synthetic booking draft end to end",
+      "summary": "Practice state ownership, editing, modal results, navigation, a UIKit bridge, async rendering, and behavior-based verification in an isolated learner app.",
+      "duration": 150,
+      "level": "Lab",
+      "prerequisites": [
+        "008",
+        "009",
+        "010",
+        "011",
+        "012"
+      ],
+      "objectives": [
+        "Build a small UI from a written behavior contract rather than copying a production feature.",
+        "Own one observable draft and share it with editing and summary screens.",
+        "Combine modal selection, push navigation, a UIKit bridge, and view-associated async work.",
+        "Produce explicit acceptance evidence and relate the scratch design to active demo boundaries."
+      ],
+      "sections": [
+        {
+          "id": "brief",
+          "title": "The lab contract: a draft, a picker, and a review",
+          "html": "<p>An experienced Android engineer usually learns a new platform fastest by finishing one narrow feature. Build a synthetic visit-draft app in a separate learning target. It has a demo display name, a selected demo reason, a Review destination, and Reset. The picker opens modally, choosing a reason updates the draft, and cancelling preserves the previous selection. Review displays the shared draft plus a UIKit-hosted message. A synthetic asynchronous result on Review exercises session 011 without accessing a backend.</p><p>This is a UI and ownership lab, not an appointment-booking implementation. Use labels such as Demo chat and Demo check-in, and do not enter patient details. No code in the client checkout needs to change. The worked solution is supplied as reference material to inspect after your attempt; the course author has not created or run your app for you.</p><p>Write the acceptance contract first. Review is disabled when the trimmed display name is empty or no reason is selected. A modal cancel never clears a valid prior selection. Returning from Review preserves edits while the root identity remains. Reset clears the model's draft fields explicitly. Unrelated rendering must not start a second picker or recreate the model. These statements give you stronger checkpoints than merely asking whether the UI looks familiar.</p>"
+        },
+        {
+          "id": "prepare",
+          "title": "Choose a target and make its boundaries visible",
+          "html": "<p>Create a scratch SwiftUI iOS target with iOS 17 or later support for Observation. Choose the toolchain available to you, then check the deployment setting separately from the Swift language mode. If you use the existing demo app for reading or running current fixtures, inspect its scheme and dependencies; do not assume the Tuist project and checked-in Xcode project are interchangeable. Both are present, and the manifest names its generated project with a migration suffix.</p><p>Your scratch files need target membership in the app; behavior tests need membership in a unit-test target, and UI automation belongs in a UI-test target. A Swift source file visible in the project navigator is not proof that it belongs to the right module. Imports describe module dependencies, not directories. Keep the lab's types internal to the scratch module unless a separate target has a deliberate reason to expose them.</p><p>Set one SwiftUI root from your app entry point. The <code>@main</code> attribute identifies the executable entry type, and an <code>App</code> body supplies scenes such as a <code>WindowGroup</code>. Do not add a second @main type to the same app target. A preview is a development rendering context, not proof that scene setup, navigation, lifecycle, and test-host behavior all work when the app launches.</p>"
+        },
+        {
+          "id": "ownership",
+          "title": "Design the owner before the fields",
+          "html": "<p>Use an <code>@Observable</code>, <code>@MainActor</code> reference model for the draft and own it in the root's <code>@State</code>. The editor and picker receive that same object. Use <code>@Bindable</code> when a receiving control needs projected bindings; a picker button can assign a property through a plain reference without that wrapper. The review receives a plain reference and reads its properties. There is one draft source of truth rather than a separate name and selection copied into every screen.</p><p>Represent the finite synthetic reasons with an enum that has String raw values. <code>CaseIterable</code> synthesizes <code>allCases</code>, a collection of its cases. <code>Identifiable</code> provides each row a stable ID. In the worked solution, <code>var id: Self { self }</code> returns the enum value as its identity; <code>Self</code> refers to the current type. This keeps identity independent of later display-label changes.</p><p>The optional <code>selectedReason</code> models absence honestly. Optional chaining such as <code>selectedReason?.rawValue</code> reads a label only when a selection exists; <code>??</code> supplies a fallback. A computed <code>canReview</code> derives eligibility from the current fields. Do not maintain a separate validity flag with callbacks from multiple controls. Your Android counterpart would be one immutable UI-state stream or one shared state holder with derived validity; the exact Observation mechanics remain different.</p>"
+        },
+        {
+          "id": "assemble",
+          "title": "Build in checkpoints you can explain",
+          "html": "<p>Checkpoint one is a text field bound to the draft and a derived eligibility label. Type only spaces and verify that eligibility remains false. Checkpoint two is a modal picker. The root owns the presentation Boolean, while the picker reads its dismissal action from inside its own modal context. The modal contains its own NavigationStack for its title and Cancel toolbar; this is a separate presentation scope, not a redundant stack inside an already pushed detail.</p><p>Checkpoint three adds Review as a destination in the root stack. Use a destination-based NavigationLink for this tiny lab; the typed path pattern from session 010 becomes valuable when the owner needs programmatic routing or restoration. Disable the link when the draft is incomplete. Remember that a disabled control is user-facing affordance, not security or server validation. Any production action boundary must validate its own inputs.</p><p>Checkpoint four inserts <code>UIKitMessage</code> from session 010. Give it a changing String from the draft and confirm that its update method applies current input to the existing controller. Set a suitable frame for this small message in a Form row so its intended height is explicit. Avoid making the controller report selection or validation merely because its displayed message updated.</p><p>Checkpoint five adds <code>DemoLoadingScreen</code> from session 011 using a synthetic reason label as its ID. It directly awaits its model load in a task modifier. This demonstrates that a screen-associated task belongs to the Review presentation, while the draft belongs to the root.</p>"
+        },
+        {
+          "id": "verify",
+          "title": "Test both the values and the actual interaction",
+          "html": "<p>Model tests should check empty, whitespace-only, and valid names, absent and present reasons, and Reset. These tests do not require a simulator interaction loop. For the picker, exercise Cancel with no previous selection and with an existing selection. Both must preserve the draft's selected reason. Verify that choosing the same reason again remains a legitimate selection event without creating duplicate screens.</p><p>Run the app and record a short sequence: enter Demo Ada, choose Demo chat, open Review, return, reopen the picker, cancel, then Reset. The review and picker should use the same model reference while the root identity is stable. Try an unrelated state change in the root and check that it does not erase the draft. Separately use a deliberate identity-reset wrapper if you want to demonstrate state lifetime; do not conflate that mechanism with the explicit Reset operation.</p><p>For the async section, choose success and the fail fixture separately and leave Review during its delay. Explain which task should receive cancellation and why the root's draft remains. The worked lab displays a synthetic result; it does not assert a real request was cancelled at the transport layer. Use controlled service completion in a model test for stale-response evidence.</p><p>For visual evidence, inspect longer names, a narrow screen, keyboard visibility, and larger text. A quick fixed-size screenshot is a starting artifact, not a full accessibility review. If snapshot dependencies are absent in the scratch app, do not pretend the repository helper is a standard SwiftUI function you can import anywhere.</p>"
+        },
+        {
+          "id": "debug",
+          "title": "Debug the boundary that failed",
+          "html": "<p>If the field changes but the summary does not, check that both hold the same model and that the summary reads the observable property during body evaluation. If typing resets, look for accidental identity changes or model creation inside body. If the picker reopens after dismissal, inspect the presentation binding and callbacks for a second source of truth. If Cancel changes the selection, determine whether a temporary row highlight has been written into the committed draft too early.</p><p>If the UIKit message remains old, inspect updateUIViewController before blaming Observation. If it has zero height, inspect the represented controller's layout and the parent row's sizing contract. If navigation presents twice, look for work triggered by repeated appearance rather than a guarded flow start. If an old async result appears, inspect freshness checks in both success and failure paths rather than assuming cancel forcibly terminates work.</p><p>Use an event notebook with separate columns for model changes, presentation changes, task events, and bridge updates. Print only synthetic information in the scratch app. A screen-level symptom often spans two ownership boundaries; naming those boundaries narrows your search more effectively than adding broad delays or random IDs. A fix should explain the causal chain, not just make the symptom disappear once.</p>"
+        },
+        {
+          "id": "repo-map",
+          "title": "Compare your lab with the demo's actual contracts",
+          "html": "<p>The demo's address form owns an observable model in State and supplies a retained delegate coordinator, while the feature view uses Bindable. Compare that ownership with your root and picker. The production address form includes field normalization, focus movement, analytics, and a public UIKit binding factory that your scratch app deliberately does not reproduce.</p><p>The visit-reason demo enters through a public coordinator instead of constructing the internal feature view. Its invalid empty-input fixture exercises recovery; your small enum-backed picker always has known synthetic choices. The member-ID demo shows both static visual states and a model-driven asynchronous path. Use those examples to understand boundaries, not as a reason to bypass public APIs or put debugging hooks into production flows.</p><p>Finish with an engineering note: state the owner of the draft, the modal presentation, the UIKit controller, and the async task; list what survives a push, a return, a Reset, and a process restart. Your draft survives return while the owner identity remains, Reset clears its fields, and a process restart has no persistence contract. This note is the bridge from a working UI to a feature design you can review confidently.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "The modal picker should preserve a prior selection when Cancel is tapped. What should its Cancel action do?",
+          "options": [
+            "Always set selectedReason to nil.",
+            "Create a new root draft.",
+            "Dismiss without changing the committed selection."
+          ],
+          "answer": 2,
+          "explanation": "The lab contract says cancellation preserves current committed state. A temporary tentative selection, if added, should be owned separately and discarded on cancellation."
+        },
+        {
+          "question": "Why does Review receive the root's model reference instead of copying its fields into State?",
+          "options": [
+            "To share one source of truth and avoid divergent draft copies.",
+            "Because every class must be global.",
+            "Because State automatically saves models to disk."
+          ],
+          "answer": 0,
+          "explanation": "A shared reference lets all consumers observe the same draft. Local State copies create independent storage and additional synchronization rules; none implies persistence."
+        },
+        {
+          "question": "The UIKit message does not change after a field edit. Which boundary should you inspect first?",
+          "options": [
+            "The simulator's Wi-Fi configuration.",
+            "The representable's update method and its current input.",
+            "The enum's CaseIterable implementation."
+          ],
+          "answer": 1,
+          "explanation": "SwiftUI passes updated inputs through the representable update phase. A static or missing update method can leave UIKit rendering old data even when the model is correctly observed."
+        }
+      ],
+      "exercise": {
+        "brief": "Implement the five-checkpoint synthetic draft lab in a separate learner iOS app, then produce a behavior log and ownership note. The existing client remains a read-only reference.",
+        "steps": [
+          "Write acceptance criteria before reading the worked solution and choose an iOS 17+ learning target.",
+          "Create one observable draft with demo displayName, optional reason, derived canReview, and explicit reset().",
+          "Build root editing, a modal reason picker with Cancel, and a pushed Review screen using the same model.",
+          "Reuse the UIKitMessage and DemoLoadingScreen examples from sessions 010 and 011, with synthetic input and explicit row sizing.",
+          "Add model tests for whitespace, absent selection, valid draft, and Reset; manually exercise modal cancellation and returning from Review.",
+          "Record the fixture sequence, any actual tests run, and the ownership/persistence note. Do not claim unrun checks passed."
+        ],
+        "acceptance": [
+          "A whitespace-only name cannot open Review.",
+          "Selection updates the shared draft; Cancel preserves an existing choice.",
+          "Returning from Review preserves the root draft.",
+          "Reset clears name and reason without implicitly replacing navigation.",
+          "The UIKit bridge updates its existing controller from current input.",
+          "Review's asynchronous work has a view-associated lifetime and a synthetic failure fixture.",
+          "The verification note distinguishes executed checks from planned checks."
+        ],
+        "solution": "<p>Use the following as a worked reference after implementing your version. These types belong in one scratch iOS 17+ module; include the previously explained UIKitMessage, DemoLoader, DemoLoadingModel, and DemoLoadingScreen declarations from sessions 010–011. Foundation supplies trimming, Observation supplies the macro, and SwiftUI supplies the controls.</p><pre><code class=\"language-swift\">import Foundation\nimport Observation\nimport SwiftUI\n\nenum PracticeReason: String, CaseIterable, Identifiable {\n    case chat = \"Demo chat\"\n    case checkIn = \"Demo check-in\"\n    var id: Self { self }\n}\n\n@MainActor\n@Observable\nfinal class PracticeDraft {\n    var displayName = \"\"\n    var selectedReason: PracticeReason?\n\n    var canReview: Bool {\n        !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty\n            &amp;&amp; selectedReason != nil\n    }\n\n    func reset() {\n        displayName = \"\"\n        selectedReason = nil\n    }\n}\n\n@MainActor\nstruct PracticeRoot: View {\n    @State private var draft = PracticeDraft()\n    @State private var showsPicker = false\n\n    var body: some View {\n        NavigationStack {\n            Form {\n                Section(\"Synthetic input\") {\n                    TextField(\"Demo display name\", text: $draft.displayName)\n                    Button(draft.selectedReason?.rawValue ?? \"Choose demo reason\") {\n                        showsPicker = true\n                    }\n                }\n                Section {\n                    NavigationLink(\"Review\") {\n                        PracticeReview(draft: draft)\n                    }\n                    .disabled(!draft.canReview)\n                    Button(\"Reset\") { draft.reset() }\n                }\n            }\n            .navigationTitle(\"Practice draft\")\n            .sheet(isPresented: $showsPicker) {\n                PracticePicker(draft: draft)\n            }\n        }\n    }\n}\n\n@MainActor\nstruct PracticePicker: View {\n    @Environment(\\.dismiss) private var dismiss\n    let draft: PracticeDraft\n\n    var body: some View {\n        NavigationStack {\n            List(PracticeReason.allCases) { reason in\n                Button(reason.rawValue) {\n                    draft.selectedReason = reason\n                    dismiss()\n                }\n            }\n            .navigationTitle(\"Demo reason\")\n            .toolbar {\n                Button(\"Cancel\") { dismiss() }\n            }\n        }\n    }\n}\n\n@MainActor\nstruct PracticeReview: View {\n    let draft: PracticeDraft\n    var body: some View {\n        Form {\n            Text(draft.selectedReason?.rawValue ?? \"No selection\")\n            UIKitMessage(message: \"Demo name: \\(draft.displayName)\")\n                .frame(height: 100)\n            DemoLoadingScreen(id: draft.selectedReason?.rawValue ?? \"demo-1\")\n        }\n        .navigationTitle(\"Review\")\n    }\n}</code></pre><p>The Boolean conjunction <code>&amp;&amp;</code> requires both validity conditions. Root State retains the draft; the picker writes that same object through its plain reference. Bindable is unnecessary here because its buttons assign a property directly rather than requiring a Binding projection. Its Cancel action only dismisses, so an existing choice remains. Review uses ordinary observable reads and a dynamic UIKit message. The modal's separate stack supplies its own toolbar scope. Reset mutates the draft explicitly; it does not use a random ID or replace the stack.</p><p>For the failure checkpoint, temporarily pass the literal <code>\"fail\"</code> to DemoLoadingScreen in your own scratch version, then restore the reason-based input. A model test should assign a whitespace name and a reason and expect false, assign Demo Ada and expect true, call reset and expect empty name, nil reason, and false. The worked code is a reference design inspected for consistency; it is not a claim that an app binary or screenshot was produced.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Creating and combining views",
+          "url": "https://developer.apple.com/tutorials/swiftui/creating-and-combining-views"
+        },
+        {
+          "label": "Apple: Handling user input",
+          "url": "https://developer.apple.com/tutorials/swiftui/handling-user-input"
+        },
+        {
+          "label": "Apple: Managing model data in your app",
+          "url": "https://developer.apple.com/documentation/swiftui/managing-model-data-in-your-app"
+        },
+        {
+          "label": "Apple: Demystify SwiftUI",
+          "url": "https://developer.apple.com/videos/play/wwdc2021/10022/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "App entry and scene setup",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/ZDBookingDemoAppApp.swift",
+          "line": 11,
+          "why": "Shows the real SwiftUI app entry, WindowGroup, and font registration."
+        },
+        {
+          "label": "Demo ownership and action checkpoints",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/AddressFormDemo.swift",
+          "line": 19,
+          "why": "Exposes synthetic prefill, error, and clearing controls around a real feature model."
+        },
+        {
+          "label": "Public picker integration boundary",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/VisitReasonPickerDemo.swift",
+          "line": 66,
+          "why": "Documents public coordinator use rather than direct construction of internal views."
+        },
+        {
+          "label": "Behavior tests for prefill and editing",
+          "path": "ios-client/Projects/Features/ZDBooking/Tests/ZDBookingTests/AddressForm/BookingAddressFormViewModelTests.swift",
+          "line": 30,
+          "why": "Separates populated values from delegate-notification behavior."
+        },
+        {
+          "label": "Demo target and test target declarations",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Project.swift",
+          "line": 13,
+          "why": "Shows deployment settings and separate app, unit-test, and UI-test boundaries."
+        }
+      ],
+      "checklist": [
+        "I have built the scratch UI myself from written acceptance criteria.",
+        "I can identify the single draft owner and its editing consumers.",
+        "I can distinguish Cancel from Reset and push from modal scope.",
+        "I can prove the UIKit bridge receives current input.",
+        "I can describe the Review task's lifetime separately from the draft.",
+        "I have recorded actual verification and its limits.",
+        "I can map the lab to public demo and active feature boundaries."
+      ]
+    },
+    {
+      "id": "014",
+      "title": "Feature tracing and review: prove how a screen works",
+      "summary": "Trace a real demo into active feature code, explain state and ownership contracts, and write an evidence-based review covering every result and verification gap.",
+      "duration": 100,
+      "level": "Review",
+      "prerequisites": [
+        "008",
+        "009",
+        "010",
+        "011",
+        "012",
+        "013"
+      ],
+      "objectives": [
+        "Trace a feature from entry point through model, rendering, navigation, async work, and result delivery.",
+        "Separate public contracts, project helpers, platform behavior, and demo-only hooks.",
+        "Audit strong and weak ownership, suspension points, and terminal cleanup paths.",
+        "Write a concrete review and test proposal without claiming execution evidence from source inspection."
+      ],
+      "sections": [
+        {
+          "id": "start",
+          "title": "Use one user action as the spine of your investigation",
+          "html": "<p>On Android, you might start from a click listener, trace the ViewModel intent, follow a repository call, and inspect a navigation result. Do the equivalent for one iOS action before reading every file in a module. Choose Open Visit Reason Picker → type a query → select a reason → return a result. Also trace Cancel and invalid input. A feature investigation should produce a causal account of those behaviors, not an inventory of class names.</p><p>Start at the demo's ContentView destination, then the wrapper, then the UIKit host, then the public feature coordinator. Mark each boundary: a SwiftUI description becomes a UIKit controller; the host retains a flow owner; the flow owner constructs an internal observable model; a hosted SwiftUI view reads and edits that model; a selection reaches a weak delegate; the owner returns a terminal result. The search action and the selection action take different paths, even though they occur on the same screen.</p><p>Record observed implementation separately from inference. Seeing a <code>Task</code> property proves a handle is stored; it does not prove every exit cancels it. Seeing a cancellation test proves that behavior is asserted in source; it does not prove the test passed today. This discipline is especially valuable when entering an unfamiliar platform, because familiar architecture names can create false confidence.</p>"
+        },
+        {
+          "id": "contracts",
+          "title": "Read the public contract before internal rendering",
+          "html": "<p>The picker result is an enum with selected Procedure and cancelled cases. It is public, Equatable, and Sendable. Equatable supports value comparison; Sendable describes concurrency transfer safety under Swift's rules, which unit 3 examines in detail. Neither annotation performs persistence, navigation, or business validation. The coordinator's public protocol exposes analytics context and presentation configuration to set before starting.</p><p>The base type is <code>Coordinator&lt;VisitReasonPickerResult, Never&gt;</code>. Its generic arguments state the successful result and failure type. Its <code>start()</code> declaration uses typed throws, <code>throws(Failure)</code>. For this specialization, Never means no thrown failure result can be produced through that declared channel, so a caller awaits start without try. The result may still be cancelled, and the implementation may still report diagnostic errors. Those are separate from the function's thrown-error channel.</p><p><code>public</code> permits use outside a module. <code>open</code> additionally permits external subclassing or overriding where applicable. Internal view and model declarations remain hidden from callers. Demo hooks behind <code>#if DEBUG</code> are conditional compilation APIs and are not a general production integration contract. When a proposed change exposes an internal model just to simplify a demo, ask whether the public coordinator or a bounded debug fixture would satisfy that need instead.</p>"
+        },
+        {
+          "id": "map",
+          "title": "Build a responsibility and ownership map",
+          "html": "<p>A small map makes responsibilities easier to compare. Add strong and weak arrows separately; a data dependency is not always an ownership edge. The current picker has the following roles:</p><table><thead><tr><th>Component</th><th>Responsibility</th><th>Lifetime evidence</th></tr></thead><tbody><tr><td>Demo SwiftUI root</td><td>Expose entry and display outcome</td><td>Local State stores result and explicit reset identity</td></tr><tr><td>UIKit demo host</td><td>Wait for navigation context and start the flow</td><td>Retains the feature coordinator</td></tr><tr><td>Feature coordinator</td><td>Construct model, choose presentation, return outcome</td><td>Retains model, navigation controller, fetch handle, and dismissal adapter</td></tr><tr><td>Observable model</td><td>Query text, filtering, optional common-section state</td><td>Weak delegate points back to the coordinator</td></tr><tr><td>SwiftUI feature view</td><td>Bind search input and describe rows</td><td>Uses Bindable on the supplied model</td></tr><tr><td>Hosting controller</td><td>Integrate SwiftUI with UIKit navigation</td><td>Retained by the containing navigation hierarchy</td></tr></tbody></table><p>The coordinator's weak hosting-controller reference is not evidence that its screen immediately disappears: the navigation hierarchy retains the hosted controller. Similarly, the model's weak delegate works because the flow has another strong coordinator owner. The modal dismissal adapter must be retained explicitly because assigning a delegate alone is insufficient for its lifetime.</p><p>Compare the address feature: a controller can own an observable form model, obtain a hosted controller from bind(), and retain itself or a coordinator as the weak delegate's owner. The Observation macro provides updates; the owner and containment contracts provide lifetime. A review that only checks property wrappers misses half the design.</p>"
+        },
+        {
+          "id": "data",
+          "title": "Follow query text into derived rows",
+          "html": "<p>The picker view binds its search bar to <code>$viewModel.searchText</code>. The model derives filtered procedures by trimming query whitespace, forming a deduplicated union of supported and common procedures when searching, matching names case-insensitively, and sorting results. The expression <code>seen.insert($0.id).inserted</code> uses Set insertion's returned flag to keep the first occurrence of each identity. It is not a dictionary assignment or a UI identity annotation.</p><p>Trace a whitespace-only query separately from an unmatched nonempty query. Whitespace-only input becomes an empty normalized query and preserves the normal list. An unmatched query produces a reversible no-results view. Initializing the whole feature with no supported procedures is different: selection is impossible, so the coordinator reports the invalid invocation and completes cancellation after an alert.</p><p>The optional lookup for common suggestions demonstrates another compact syntax. <code>any SomeProtocol</code> denotes an existential value holding a conforming instance. Parentheses around <code>(any SomeProtocol)?</code> make the entire existential optional. <code>try await lookup?.method(...) ?? []</code> calls only when lookup exists, awaits its result, and supplies an empty array when it does not. An absent dependency and a failed fetch can intentionally degrade to the same UI, but a reviewer should verify that this fallback is appropriate for optional suggestions. It would be a poor silent default for a required booking submission.</p>"
+        },
+        {
+          "id": "results",
+          "title": "Audit each terminal path and the work it leaves behind",
+          "html": "<p>Selection calls the model delegate, which chooses pop-and-finish or dismiss-and-finish based on presentation. Explicit result helpers cancel the common-suggestion task. Interactive modal dismissal also requests cancellation and finishes. Pushed removal is detected by the hosting helper when disappearance accompanies <code>isMovingFromParent</code>; disappearance alone is not used as terminal evidence.</p><p>Read the removal callback carefully: in the current coordinator it calls <code>finish(.cancelled)</code>, while the explicit pop helper calls <code>fetchTask?.cancel()</code> first. Read the base finish implementation too: it stores the first result, resumes waiting continuations, and clears them; it does not cancel arbitrary subclass task properties. Therefore source inspection supports a concrete difference between the cleanup paths. It does not by itself prove a user-visible bug, because lookup timing, remaining ownership, and the relevance of an orphaned model also matter.</p><p>A useful review question is whether the feature wants all terminal paths to request cancellation of optional lookup work. Propose a controlled test that starts the lookup, simulates actual pushed removal, then completes the lookup and observes cancellation or the intended no-update policy. This is more precise than a broad instruction to add weak self everywhere.</p><p>Finally, result storage defensively accepts only the first finish. The base's documented caller contract still says to finish once. First-result protection prevents duplicate delivery; it does not make repeated result-producing paths a good design. Explicit selection disables its removal callback before popping so the two outcomes do not compete.</p>"
+        },
+        {
+          "id": "tests",
+          "title": "Assess the strength and limits of existing evidence",
+          "html": "<p>The picker model tests cover trailing whitespace, whitespace-only input, case-insensitive filtering, no match, and selection delegation. The coordinator tests cover push, selected result, back cancellation, optional lookup behavior, modal presentation, interactive-dismiss callback handling, and invalid initial input. Demo snapshots cover default, filtered, and no-results rendering. The UI test covers the invalid-input alert and cancelled outcome.</p><p>Read how each test stimulates the behavior. The modal interaction test invokes the presentation delegate callback directly. That verifies callback integration and returned result, but does not itself perform a real swipe gesture through UIKit animation. The invalid-input unit test uses a special presenter because a scene-less test host may not deliver transition completion like a running app. The UI test supplies separate end-to-end evidence for that alert path.</p><p>For a proposed change, name the failing requirement and the test boundary that would detect it. Query normalization should need a model assertion, not a new app-launch test. Shared error styling might need a snapshot. Gesture and container integration may need both a helper test and a focused UI path. Report planned checks as planned until executed, and preserve accepted baselines until an understood rendering change merits review.</p>"
+        },
+        {
+          "id": "review",
+          "title": "Write findings a teammate can act on",
+          "html": "<p>A good review connects a concrete trigger to a consequence and a verification proposal. For example: when the user leaves through the pushed-removal callback while the optional lookup is suspended, that callback finishes without using the explicit cancellation helper; verify whether the request should stop and add a controlled pending-lookup test. This identifies the observed path and the unresolved policy instead of announcing a speculative defect.</p><p>For ownership findings, name the cycle or missing retained owner. For state findings, name both conflicting sources. For concurrency findings, name the suspension point and the assumption that may become stale. For API findings, identify which caller's contract changes. Avoid turning familiar Android advice into a universal iOS rule: a received ObservableObject, an owner-created Observable model, and a UIKit flow coordinator all have different integration requirements.</p><p>Keep platform availability accurate. SwiftUI Observation integration begins with iOS 17-era APIs; this demo's target minimum is iOS 18.2. That does not imply every module or production app has the same minimum. The member-ID model still follows ObservableObject conventions in this checkout, while the address and picker models use Observation. A review should honor those actual declarations and describe a migration explicitly if one is proposed.</p>"
+        },
+        {
+          "id": "retrieval",
+          "title": "Close the unit with retrieval rather than rereading",
+          "html": "<p>Without opening the prior lessons, explain why an appearing controller can be the same instance, why a SwiftUI struct can be reconstructed without resetting State, why Bindable is not ownership, and why await does not imply background execution. Then explain how a flow can return a cancelled result even when its declared failure type is Never. These answers expose whether the concepts are connected or only memorized as names.</p><p>Next, predict what happens if the picker demo generates a new ID on every body evaluation, if its host does not retain the coordinator, if the weak model delegate has no other owner, or if a cancelled lookup still publishes a result. For each prediction, name the boundary and the smallest useful observation or test. Do not repair every issue with another wrapper or another Task; choose a change that restores the violated contract.</p><p>Your final artifact should be a one-page feature trace with an outcome table, an ownership map, current test coverage, one evidence-backed review question, and verification limits. You are ready for the data and concurrency unit when you can defend that trace using source and API semantics without assuming that familiar architecture vocabulary guarantees identical platform behavior.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A coordinator specializes Failure as Never. Which statement is correct?",
+          "options": [
+            "Its flow cannot return cancelled or show an error alert.",
+            "Its declared thrown-error channel cannot produce a Failure, but cancelled can still be a normal result.",
+            "The process can never terminate."
+          ],
+          "answer": 1,
+          "explanation": "Never concerns the specialized failure channel. The selected/cancelled result enum and diagnostic reporting are separate from thrown errors."
+        },
+        {
+          "question": "The pushed-removal callback calls finish(.cancelled). Why inspect the base finish implementation?",
+          "options": [
+            "To determine whether finish also cancels subclass-owned tasks before claiming uniform cleanup.",
+            "Because finish always deallocates its caller immediately.",
+            "Because weak references trigger finish automatically."
+          ],
+          "answer": 0,
+          "explanation": "The base stores and delivers a result; it does not automatically know about the subclass's fetch handle. Cleanup claims require tracing the actual implementation."
+        },
+        {
+          "question": "A test directly invokes presentationControllerDidDismiss. What does it establish?",
+          "options": [
+            "A real swipe gesture and every animation path passed.",
+            "Every navigation controller is safe to dismiss.",
+            "The delegate callback path returns the expected result under that test fixture."
+          ],
+          "answer": 2,
+          "explanation": "Direct callback stimulation gives focused integration evidence. It does not replace a real-gesture or container-animation check when that behavior is material."
+        }
+      ],
+      "exercise": {
+        "brief": "Write a source-backed review of the active visit-reason picker and a shorter comparison with the address form. Do not implement a client change.",
+        "steps": [
+          "Trace ContentView → demo wrapper → UIKit host → public coordinator → internal view/model → returned result.",
+          "Create an outcome table for select, explicit back, pushed removal, modal swipe, invalid initial input, and search-no-results.",
+          "Annotate strong owners and weak delegate/controller references; identify who keeps each callback target alive.",
+          "Read optional-fetch code and base finish behavior; write one precise cleanup-policy question with source evidence.",
+          "Map query, coordinator, snapshot, and UI tests to the requirements they cover and identify what direct callback tests do not execute.",
+          "Compare Observation availability, target deployment minimum, and actual member-ID/address/picker conventions.",
+          "Submit a compact review with facts, inference, proposed verification, and explicit unrun checks."
+        ],
+        "acceptance": [
+          "The trace uses verified active files and public integration boundaries.",
+          "Every terminal outcome names its result and cleanup evidence.",
+          "The ownership map explains the coordinator and delegate lifetimes.",
+          "The review distinguishes a source-observed asymmetry from a proven runtime failure.",
+          "Test coverage claims distinguish test source from executed results.",
+          "The availability discussion does not equate iOS 17 Observation support with the demo's iOS 18.2 minimum."
+        ],
+        "solution": "<p>A worked trace is: demo destination creates wrapper; wrapper makes a host; host waits for navigation containment, retains coordinator, and awaits start; coordinator validates input and retains model; hosted view binds search; selection calls the model delegate; coordinator transitions its controller and finishes the selected result; demo renders that result. Search-no-results remains in the flow, whereas invalid initial input reports a diagnostic and returns cancellation after the alert.</p><p>The outcome table must show explicit pop/dismiss helpers requesting fetch cancellation, interactive modal dismissal requesting cancellation, and the pushed-removal callback delivering cancellation directly. The base finish stores the first result and resumes waiters; cancellation of subclass tasks is not part of that implementation. The defensively protected first result does not weaken the documented finish-once contract.</p><p>A review question can read: should pushed gesture removal also request cancellation of common-suggestion lookup work? The source shows different cleanup paths; add a fake lookup that signals start, trigger removal, then complete the lookup to verify the intended policy. Report this as a policy and verification question unless you have demonstrated harmful behavior. Contrast the direct-delegate modal test with an actual gesture run.</p><p>The address comparison should name State ownership, Bindable field access, weak delegate retention, batch prefill suppression, and caller-owned hosted containment. The platform note should name iOS 17 Observation integration, this demo's iOS 18.2 target, and the legacy ObservableObject member-ID model. No client modifications or test execution are implied by completing this reading exercise.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: UIViewController",
+          "url": "https://developer.apple.com/documentation/uikit/uiviewcontroller"
+        },
+        {
+          "label": "Apple: Demystify SwiftUI",
+          "url": "https://developer.apple.com/videos/play/wwdc2021/10022/"
+        },
+        {
+          "label": "Apple: Migrating from ObservableObject to Observable",
+          "url": "https://developer.apple.com/documentation/swiftui/migrating-from-the-observable-object-protocol-to-the-observable-macro"
+        },
+        {
+          "label": "Swift: Concurrency",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Entry-to-host trace",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/VisitReasonPickerDemo.swift",
+          "line": 85,
+          "why": "Shows containment gating, coordinator retention, await, and result callback."
+        },
+        {
+          "label": "Public result and contract",
+          "path": "ios-client/Projects/Infra/ZDModules/Sources/ZDModules/BookingModule.swift",
+          "line": 33,
+          "why": "Defines selected/cancelled outcomes and the public coordinator configuration nearby."
+        },
+        {
+          "label": "Active query derivation",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/VisitReasonPicker/VisitReasonPickerViewModel.swift",
+          "line": 42,
+          "why": "Contains normalization, deduplication, matching, and sorting behavior."
+        },
+        {
+          "label": "Terminal path comparison",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/VisitReasonPicker/VisitReasonPickerCoordinatorImpl.swift",
+          "line": 87,
+          "why": "Separates pushed removal, explicit result helpers, and modal dismissal handling."
+        },
+        {
+          "label": "Base result delivery semantics",
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDCoreBase/Coordinator/Coordinator.swift",
+          "line": 96,
+          "why": "Stores the first result and resumes waiters without cancelling subclass fetch tasks."
+        },
+        {
+          "label": "Gesture-removal hosting integration",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDMezzanineLibrary/Framework/SwiftUI/Wrappers/HostingController/HostingController_iOS16.swift",
+          "line": 61,
+          "why": "Combines disappearance with isMovingFromParent to notify pushed removal."
+        },
+        {
+          "label": "Modal callback test boundary",
+          "path": "ios-client/Projects/Features/ZDBooking/Tests/ZDBookingTests/VisitReasonPicker/VisitReasonPickerCoordinatorTests.swift",
+          "line": 232,
+          "why": "Stimulates the dismissal delegate directly, clarifying what the test actually executes."
+        }
+      ],
+      "checklist": [
+        "I can trace one action across framework and module boundaries.",
+        "I can distinguish public APIs from internal views and DEBUG hooks.",
+        "I can name strong owners, weak callbacks, and outstanding tasks.",
+        "I can explain every terminal result and nonterminal empty state.",
+        "I can assess the evidence supplied by each test boundary.",
+        "I can write a concrete review question without claiming an unobserved failure.",
+        "I can distinguish API availability, target minimum, and current repository conventions."
+      ]
+    }
+  ]
+}
