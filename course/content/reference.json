@@ -1,5 +1,158 @@
 {
   "reference": [
+    {
+      "id": "advanced-runloop",
+      "category": "Runtime",
+      "android": "Looper, Handler and message delivery",
+      "ios": "RunLoop modes, sources and timers",
+      "explanation": "A RunLoop processes registered work on a thread; its current mode controls which sources and timers are eligible. Investigate why a timer pauses during tracking before changing scheduling.",
+      "boundary": "A DispatchQueue is a different abstraction; neither every queue nor every Swift task owns a RunLoop.",
+      "lesson": "085"
+    },
+    {
+      "id": "advanced-operation",
+      "category": "Runtime",
+      "android": "ExecutorService and Future",
+      "ios": "DispatchQueue and OperationQueue",
+      "explanation": "Compare submission, completion, dependency and cancellation ownership. An OperationQueue can coordinate dependent operations with a concurrency limit; a DispatchGroup only tracks outstanding work.",
+      "boundary": "A queue does not imply a private fixed thread pool, and canceling an Operation does not forcibly stop its implementation.",
+      "lesson": "086"
+    },
+    {
+      "id": "advanced-lock",
+      "category": "Concurrency",
+      "android": "synchronized, ReentrantLock and Kotlin Mutex",
+      "ios": "NSLock, Synchronization.Mutex and actors",
+      "explanation": "Use a short synchronous critical section when blocking is appropriate; use declared actor ownership for asynchronous state access. Define the entire invariant and lock ordering.",
+      "boundary": "Kotlin coroutine Mutex suspends waiters. Swift thread-blocking locks must not be held across await; an actor method can reenter at suspension. Check platform availability of each primitive.",
+      "lesson": "087"
+    },
+    {
+      "id": "advanced-worker",
+      "category": "Concurrency",
+      "android": "Dispatchers.Default and Dispatchers.IO",
+      "ios": "Swift cooperative executor and an explicit blocking-work boundary",
+      "explanation": "A suspending declaration does not move CPU parsing away from UI isolation. Identify where synchronous work executes and where legacy I/O can occupy a worker.",
+      "boundary": "Swift has no universal Dispatchers.IO equivalent. A detached task is not a blanket cure for blocking or a structured child of the screen.",
+      "lesson": "088"
+    },
+    {
+      "id": "advanced-java11-settings",
+      "category": "Tooling",
+      "android": "JDK toolchain, --release 11 and Android runtime/API level",
+      "ios": "Swift compiler, language mode, isolation settings, SDK and deployment target",
+      "explanation": "Record these independent settings before interpreting a diagnostic or choosing an API. A compiler can offer newer language features while the application supports an older OS through appropriate runtime checks.",
+      "boundary": "There is no exact Java 11 to Swift version pairing. JVM garbage collection and Swift ARC also impose different lifetime obligations.",
+      "lesson": "089"
+    },
+    {
+      "id": "advanced-task-context",
+      "category": "Concurrency",
+      "android": "ThreadLocal and coroutine context elements",
+      "ios": "TaskLocal values",
+      "explanation": "Attach a bounded diagnostic or request context to a task scope and reason about inheritance through child or unstructured tasks.",
+      "boundary": "Swift tasks can resume on another thread; thread-local storage is not task-local state. Detached work does not inherit the same task context automatically.",
+      "lesson": "091"
+    },
+    {
+      "id": "advanced-clock",
+      "category": "Foundation",
+      "android": "System.nanoTime, Instant and injected test clocks",
+      "ios": "ContinuousClock, Duration and injected timing dependencies",
+      "explanation": "Use monotonic clocks for in-process elapsed time and timeouts, and wall time for persisted or server-defined timestamps. Make time progression controllable in a test.",
+      "boundary": "A monotonic instant is not a portable persisted timestamp; timer delivery and cancellation still have their own scheduling contracts.",
+      "lesson": "091"
+    },
+    {
+      "id": "advanced-layers",
+      "category": "UI",
+      "android": "ViewPropertyAnimator and rendered animation state",
+      "ios": "CALayer model and presentation layers",
+      "explanation": "Separate the intended property value from the currently presented value during an animation. Reconcile state when an interactive animation is interrupted.",
+      "boundary": "Core Animation is not an exact mapping of Android RenderThread, and a layer animation does not automatically update the application model.",
+      "lesson": "094"
+    },
+    {
+      "id": "advanced-layout-cache",
+      "category": "UI",
+      "android": "Compose measure policies and layout caches",
+      "ios": "SwiftUI Layout cache and proposal-dependent measurement",
+      "explanation": "Cache only intermediate values whose inputs are identified, then invalidate for proposal, text, font, environment or child changes. Verify placement in RTL and baseline cases.",
+      "boundary": "A cached width is not valid for every parent proposal; measurement must not mutate observable screen state as a feedback channel.",
+      "lesson": "095"
+    },
+    {
+      "id": "advanced-lifetimes",
+      "category": "Platform",
+      "android": "Application, Activity and screen lifecycle",
+      "ios": "App process, UISceneSession, scene, window and view identity",
+      "explanation": "Assign services, drafts and task cancellation to the lifetime that actually owns them. AppDelegate and scene responsibilities coexist; a SwiftUI view disappearing is a separate event.",
+      "boundary": "Inactive is not necessarily background. Scene disconnection is not process termination, and termination callbacks cannot be a durability strategy.",
+      "lesson": "096"
+    },
+    {
+      "id": "advanced-store-upgrade",
+      "category": "Data",
+      "android": "Room schema fixtures and migration tests",
+      "ios": "Core Data model versions and SwiftData migration stages",
+      "explanation": "Retain an actual old store, upgrade through supported paths, and assert preserved domain records and explicit recovery behavior.",
+      "boundary": "A Codable JSON envelope migration does not prove SQLite/Core Data/SwiftData compatibility. Context ownership still applies inside an actor.",
+      "lesson": "097"
+    },
+    {
+      "id": "advanced-outbox",
+      "category": "Data",
+      "android": "Durable mutation queues and WorkManager",
+      "ios": "Persisted outbox and iOS replay eligibility",
+      "explanation": "Persist a command identity and account scope before sending, reconcile ambiguous completion, and retry without duplicating the server effect. Reload pending state after process restart.",
+      "boundary": "A task or background request does not guarantee an iOS wake-up. Idempotency must be honored by the server contract, not merely by a local UUID.",
+      "lesson": "098"
+    },
+    {
+      "id": "advanced-keychain",
+      "category": "Security",
+      "android": "Keystore-backed secret storage",
+      "ios": "Keychain identity and accessibility",
+      "explanation": "Treat missing, denied, protected-data unavailable and other OSStatus outcomes as distinct. Keep credentials and logout ownership separate from public caches.",
+      "boundary": "Keychain is not an encrypted preferences map. Persistence after app deletion and synchronization depend on item policy and should not be assumed from a successful write.",
+      "lesson": "099"
+    },
+    {
+      "id": "advanced-artifact",
+      "category": "Delivery",
+      "android": "Build variants, APK packaging and mapping files",
+      "ios": "Effective settings, signed app archive and matching dSYM",
+      "explanation": "Inspect the actual product identity, resources, entitlements and binary UUID. Retain the symbols matching the installed diagnostic rather than a similarly named local build.",
+      "boundary": "Debug versus Release is one axis; scheme, environment, test plan, SDK, architecture and signing are additional independent axes.",
+      "lesson": "105"
+    },
+    {
+      "id": "advanced-failure",
+      "category": "Reliability",
+      "android": "Crashes, ANRs and low-memory termination",
+      "ios": "Crashes, hangs, watchdog termination and jetsam",
+      "explanation": "Classify the user outcome before selecting symbolication, a responsiveness trace or memory evidence. Keep revision, cohort and symbol identity with the investigation.",
+      "boundary": "A jetsam event is not automatically an ordinary exception crash, and a high elapsed interval is not necessarily sampled CPU work.",
+      "lesson": "106"
+    },
+    {
+      "id": "advanced-commerce",
+      "category": "Specialists",
+      "android": "Play Billing purchase and entitlement handling",
+      "ios": "StoreKit transaction and entitlement lifecycle",
+      "explanation": "Model pending, verified, revoked, refunded and restored outcomes independently of the purchasing screen. Apply an explicit server/device trust policy.",
+      "boundary": "A UI success or local flag does not establish a verified entitlement; sandbox outcomes and current store policies need their own checks.",
+      "lesson": "109"
+    },
+    {
+      "id": "advanced-cloud-conflict",
+      "category": "Specialists",
+      "android": "Offline replicas and conflict reconciliation",
+      "ios": "CloudKit records and coordinated documents",
+      "explanation": "Use record identity/version information and a stated merge policy to reconcile local and remote edits. Define deletion, retry and account-change behavior.",
+      "boundary": "CloudKit is not an automatic correctness layer over an arbitrary cache; document coordination and database record conflict resolution are different contracts.",
+      "lesson": "110"
+    },
     {"id":"bindings","category":"Language","android":"val / var","ios":"let / var","explanation":"A let binding cannot be reassigned; var permits mutation. With a struct, mutating a stored property mutates the bound value. A let class reference can still refer to an object with mutable properties.","boundary":"Binding immutability is not deep immutability. Class references stored inside a value can remain shared.","lesson":"001"},
     {"id":"nullability","category":"Language","android":"T? and null","ios":"Optional<T>, T? and nil","explanation":"An optional represents either a value or its absence. Optional chaining uses ?. and fallback uses ??. if let or guard let binds the contained value safely.","boundary":"An absent value is different from an empty collection or a failure. Force unwrapping with ! traps when the value is nil.","lesson":"001"},
     {"id":"data-class","category":"Language","android":"Kotlin data class","ios":"Swift struct","explanation":"Both are useful for models, but a Kotlin data class remains a reference type. Swift structs have value semantics. Add Equatable or Hashable when equality or hashing is part of the model contract.","boundary":"Swift does not generate Kotlin copy() for structs, and value semantics do not imply deep-copying nested class instances.","lesson":"001"},

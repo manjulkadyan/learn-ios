@@ -1,0 +1,133 @@
+{
+  "workshops": [
+    {
+      "id": "runtime-scheduling-lab",
+      "title": "Runtime lab: prove ordering, terminal outcomes and scheduling boundaries",
+      "summary": "Execute finite host probes for modes, queues, operations, locks, bounded CPU work and a blocking-file bridge, then extend a result policy independently.",
+      "kind": "Host implementation",
+      "sessions": [
+        "085",
+        "086",
+        "087",
+        "088"
+      ],
+      "sections": [
+        {
+          "id": "host-contract",
+          "title": "Read the package and establish the evidence boundary",
+          "html": "<p>This workshop starts with a small command-line package, like a JVM console project rather than an Android activity. Package.swift declares one executable and no remote dependencies. Its tools header requires Swift 6.2 or later; swiftLanguageModes selects Swift 6 checking. The macOS 15 floor enables the Synchronization.Mutex example. Those numbers express distinct tools, language and OS requirements, not equivalent version numbers across Swift, Kotlin and Java. Author execution used Apple Swift 6.4 on arm64 macOS 26.6.2 with macOS SDK 27.0, so the oldest compiler and OS remain unexecuted.</p>\n<p>Open Sources/RuntimeLab/main.swift before running. The @main type provides an asynchronous throwing entry. Its initial finite synchronous probes execute before its first suspension, then async checksum and file examples run. A failed require throws LabError rather than printing an optimistic pass. The final PASS appears only after all assertions complete. These checks validate the instructor's synthetic examples. They neither mark learner completion nor prove company-client behavior, throughput, fairness or deadline performance.</p>\n<p>Use zsh run-checks.sh from the lab directory. It creates one unique /private/tmp directory, sends SwiftPM scratch/cache/config/security and compiler caches there, and passes that directory as RUNTIME_LAB_TMP for the fixture. Inspect the README for the exact author command and outcome. The target-required DisplayDriver file is excluded from the package; UIKit runtime interaction requires a separate scratch iOS app. Do not assume SwiftPM built it simply because a directory named Targets exists. Retain command, exit status and toolchain in your own evidence notes.</p>"
+        },
+        {
+          "id": "queue-operation",
+          "title": "Predict event contracts without a timing contest",
+          "html": "<p>checkQueues submits forty numbered blocks to one serial queue and checks the exact array zero through thirty-nine after a bounded group wait. That establishes this fixture's submission-order execution. The group coordinates completion but knows no domain failure policy. A separate custom concurrent queue receives a barrier write followed by a synchronous read. The read sees seventeen. The value also uses a small lock wrapper, so removing the barrier would not create a deliberate unsafe memory race; its ordering assertion remains the important scheduling check.</p>\n<p>The pre-cancelled DispatchWorkItem never executes its increment body. Cancellation occurs before submission, making the schedule explicit instead of racing a sleep. The user-data-add source receives a payload of three, activates once, checks the aggregate delivered value, then observes the cancellation handler before dismantling its handler capture. That models event aggregation and cleanup ordering rather than one-callback-per-event assumptions. Every semaphore wait is finite and belongs to a synchronous host probe; nothing waits for the main queue.</p>\n<p>checkOperations intentionally submits consumer before producer but adds a dependency first. The producer stores a synthetic failure Result and the consumer records recovery. The expected log is produce then recover. Dependency readiness requires finished state, not success. A separate operation is cancelled before submission and finishes without executing its side effect. These cases resemble Java work graphs only at the ordering level; CompletableFuture error propagation cannot be assumed. QoS stays a workload hint and never supplies the required dependency or a deadline. Predict each expected observation before seeing PASS.</p>"
+        },
+        {
+          "id": "locks-modes",
+          "title": "Check the protected state, and name what remains unproved",
+          "html": "<p>LockedValue hides a private value and NSLock. update acquires, uses defer to release, and exposes inout access only to its synchronous closure. The unchecked Sendable conformance is an audit promise that every access is covered, not compiler proof. A closure can throw, and the host explicitly throws then snapshots afterward to exercise cleanup. A callback that recursively calls update would deadlock; do not add that as an executable exercise. Draw the reentry graph and move callbacks outside the scope.</p>\n<p>The lock probe concurrently performs two thousand increments for the classic wrapper, Swift Mutex and OSAllocatedUnfairLock. Each final value must be two thousand. That checks no lost updates in these executed schedules. It is not a sanitizer run, a fairness experiment or a lock throughput benchmark. Mutex needs the available Synchronization module and supported OS. The allocated unfair wrapper supplies stable underlying lock storage, unlike a raw Swift os_unfair_lock value passed by ampersand. No thread-owned lock is held across await.</p>\n<p>The run-loop probe registers an already-due one-shot Timer in a synthetic custom mode. A bounded default-mode run must leave count zero; the custom-mode run must make count one. Its behavior says nothing about actual UIKit scrolling or variable refresh. Timers are special run-loop entities and need not make returnAfterSourceHandled end the call immediately, so an explicit timeout still matters. The UIKit companion demonstrates lifecycle-owned display-link registration and stop, but its animation and device timing require separate evidence. Keep event eligibility distinct from scheduling priority and callback cost.</p>"
+        },
+        {
+          "id": "admission-io",
+          "title": "Follow async ownership through cancellation and file outcomes",
+          "html": "<p>The checksum helper uses @concurrent to make its executor choice explicit and checks cancellation at chunk boundaries. Its local arithmetic uses tiny synthetic values. windowedChecksums seeds a bounded child window and admits one replacement per completion. Each child returns an index; only the parent writes the output. That preserves input order without simultaneous writes to one array. The full input array remains retained, so this is not a complete streaming byte-budget solution. The gated cancellation check requests cancellation before the checksum starts and always releases its gate; it avoids deliberate executor starvation.</p>\n<p>BlockingFileReader uses two maximum executing operations and a checked continuation around Data(contentsOf:). The async caller suspends while the synchronous read executes. Its fixture writes synthetic bytes into the unique temporary directory, verifies exact returned bytes, then requests a missing path and checks error propagation. A queue execution limit does not bound unbounded submissions; the supplied entry submits reads sequentially. An in-flight read is not interrupted. Cancellation is checked before enqueue and after return, so a cancelled result is rejected only when that call has finished.</p>\n<p>Read resource ownership as carefully as the await. Cancelling a BlockOperation before it runs without resuming an associated continuation could strand the waiting task. Resuming early and releasing resources a running operation still uses can be equally wrong. This simple bridge chooses wait-for-read completion, with exactly one success or failure resumption. Kotlin Dispatchers.IO suggests a resource distinction but is not implemented by Task.detached. A real adapter needs an admission owner, token registration and a documented stop API before promising immediate cancellation. The workshop's missing-file error is actual host evidence; disk performance, load behavior and physical-device energy remain unmeasured.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Run the baseline, then independently add a three-way operation-result fixture and one new bounded checksum input in a scratch copy.",
+        "steps": [
+          "Read README and run zsh run-checks.sh; save your actual version, command and exit status.",
+          "Predict the serial log, dependency failure log, lock totals and mode counts.",
+          "Add producer cases success(17), failure and cancellation-before-start with explicit no-result handling.",
+          "Keep consumer submitted first and addDependency before enqueueing.",
+          "Add batches [[7], [], [2, 3], [4]] and independently expect [7, 0, 5, 4].",
+          "Explain one overload policy and one noninterruptible-I/O cancellation policy without inventing load data."
+        ],
+        "acceptance": [
+          "The baseline exits successfully with all finite semantic checks.",
+          "Each producer case yields the documented consumer outcome without depending on enqueue order.",
+          "The checksum output remains indexed and parent-owned.",
+          "No unsafe race, deliberate hang or thread-owned lock across await is added.",
+          "Evidence distinguishes your extended fixture from instructor checks and unexecuted UIKit/device work."
+        ],
+        "solution": "<p>For the operation exercise, create a fresh queue, result box and event log per case. The producer stores .success(17) or .failure(.fixture); for the cancellation case call cancel before enqueue and leave output nil. The dependent consumer switches over the optional Result: apply seventeen, record recovery, or record stopped prerequisite. Put a bounded completion signal on the consumer and verify its final event after completion. Cancelled producer completion permits readiness but cannot conjure successful data. Avoid letting a previous case's stored result leak into the next case.</p><p>The new checksum fixture returns seven, zero, five and four. Width two constrains child admission, while returned indices let completion order vary harmlessly. Do not derive expected values by calling checksum again inside the assertion. The empty batch is intentional coverage of the loop's no-element path and final cancellation check. Changing width changes permitted overlap, not values or result order.</p><p>A reasonable overload design separates active operations, pending items and bytes. Replace obsolete prefetches and reserve the next slot for visible demand, with an aging rule if starvation matters. For an already started noninterruptible read, keep its resources alive and reject publication after completion when cancelled. This is a policy argument to test under load, not a measured performance improvement. The supplied baseline is ready to execute; your changed fixture, evidence record and separate UIKit follow-through remain learner work.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: DispatchQueue execution contracts",
+          "url": "https://developer.apple.com/documentation/dispatch/dispatchqueue"
+        },
+        {
+          "label": "Apple: Operation dependencies and cancellation",
+          "url": "https://developer.apple.com/documentation/foundation/operation"
+        },
+        {
+          "label": "Apple: Synchronization.Mutex",
+          "url": "https://developer.apple.com/documentation/synchronization/mutex"
+        },
+        {
+          "label": "Swift SE-0461: concurrent async functions",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0461-async-function-isolation.md"
+        }
+      ],
+      "files": [
+        {
+          "label": "Read-only assigned-content validation",
+          "path": "labs/RuntimeLab/Validation/check-content.py"
+        },
+        {
+          "label": "Package contract",
+          "path": "labs/RuntimeLab/Package.swift"
+        },
+        {
+          "label": "Finite executable semantic probes",
+          "path": "labs/RuntimeLab/Sources/RuntimeLab/main.swift"
+        },
+        {
+          "label": "Isolated host runner",
+          "path": "labs/RuntimeLab/run-checks.sh"
+        },
+        {
+          "label": "Commands, evidence and remaining gaps",
+          "path": "labs/RuntimeLab/README.md"
+        },
+        {
+          "label": "Target-required UIKit display-link driver",
+          "path": "labs/RuntimeLab/Targets/DisplayDriver.swift"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "The Operation consumer is enqueued first but depends on the producer. Which statement is correct?",
+          "options": [
+            "It must run first because OperationQueue is a FIFO queue.",
+            "It becomes ready after its prerequisite finishes, and must inspect the prerequisite outcome.",
+            "The dependency automatically converts failure into success."
+          ],
+          "answer": 1,
+          "explanation": "Dependencies establish readiness, not success. The reversed enqueue order helps reveal accidental ordering assumptions."
+        },
+        {
+          "question": "What do two thousand successful locked increments establish?",
+          "options": [
+            "The executed fixture retained all updates; fairness and universal race freedom remain unproved.",
+            "The fastest lock was measured.",
+            "The client has no data races."
+          ],
+          "answer": 0,
+          "explanation": "Exact counts are semantic evidence for the fixture. No timing, sanitizer or client runtime measurement occurred."
+        },
+        {
+          "question": "Does the blocking reader stop a read immediately on task cancellation?",
+          "options": [
+            "Yes, checked continuations interrupt Foundation file calls.",
+            "No; it waits for the legacy call, then checks cancellation before returning accepted data.",
+            "Only detached tasks can stop it."
+          ],
+          "answer": 1,
+          "explanation": "Continuation suspension does not interrupt the operation. Immediate stop would need a supported handle and an exactly-once race-safe cancellation protocol."
+        }
+      ]
+    }
+  ]
+}

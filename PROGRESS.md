@@ -3,7 +3,7 @@
 ## Current state
 
 - Learner: Android engineer with 7–8 years of experience; beginning iOS.
-- Updated: 27 October 2026, Asia/Calcutta (course-library expansion only; learner exercise status unchanged).
+- Updated: 29 October 2026, Asia/Kolkata (course-library expansion only; learner exercise status unchanged).
 - Current session: 004 — ARC and capture lists.
 - Status: session 004 plan delivered manually at the learner's request; exercises for sessions 001–004 awaiting learner response.
 - Completed sessions: none yet.
@@ -19,6 +19,8 @@
 - Keep a 45-minute daily habit; longer lessons and labs may span multiple days. No recurring automation was created by this work.
 - Library expanded 27 October 2026: 56 sessions, with unchanged core content/IDs and 28 additional deep dives. Coverage map includes 118 topics and explicit specialist study branches; Libraries & pins includes both checked-in remote dependency graphs. Availability is not delivery or completion, and all previously pending learner work stays pending.
 - Interview practice added 27 October 2026: two prompts per course lesson, model answers/rubrics, eight mock-round agendas and a separate answer/feedback/quiz ledger. Browser self-scores and manual review dates do not update this mentor log, accept exercises or activate scheduled delivery.
+- Beginner-to-staff/principal expansion, 29 October 2026: 84 available sessions, including explicit Swift 057–070 and SwiftUI 071–084 beginner tracks; six reading paths; eleven runnable-code/tool/design workbenches; 168 interview prompts; and setup/question/debrief budgets for the mock rounds. Higher new IDs preserve original saved-progress identities. The language-first path is recommended for a fresh start; current mentor delivery remains 004 and pending exercises remain unchanged.
+- Companion verification is instructor evidence only: host tests and synthetic regression tests are separate from the native simulator build, device interaction and independent learner review. The course does not award a staff/principal qualification, accept pending work or activate a scheduler.
 
 ## Session history
 

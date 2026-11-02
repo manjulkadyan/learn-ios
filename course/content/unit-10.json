@@ -1,0 +1,1038 @@
+{
+  "unit": {
+    "id": "swift-bootcamp-types",
+    "title": "Swift bootcamp: values, contracts and retrieval",
+    "summary": "Seven beginner sessions connect value edits, initialization, reference identity, failures, capture lifetime and generic abstraction to an integrated tested language core with explicit practice limits.",
+    "order": 10
+  },
+  "lessons": [
+    {
+      "id": "064",
+      "title": "Structs, mutating methods, inout and exclusivity",
+      "summary": "Give models value semantics, make caller-visible edits explicit, and understand why overlapping mutations are rejected.",
+      "duration": 75,
+      "level": "Foundation",
+      "prerequisites": [
+        "057",
+        "058",
+        "059",
+        "060",
+        "061",
+        "062",
+        "063"
+      ],
+      "objectives": [
+        "Define a struct and predict initializer/member access and value assignment.",
+        "Explain mutating methods and inout at both declaration and call sites.",
+        "Identify overlapping access and distinguish an outer value copy from nested reference sharing."
+      ],
+      "sections": [
+        {
+          "id": "why-values",
+          "title": "Make an edit draft a real value",
+          "html": "<p>An Android editor often copies a Kotlin data class before changing a form. Swift struct defines a value type whose assignment already has value semantics. You describe its stored properties and methods, then construct an instance through an initializer. Dot syntax reads a member of that instance. A struct declaration is a type definition, not a single global object. Each initialization creates a value with its own stored state. Our draft contains only integers and strings at first so an edit’s effect is easy to predict.</p><p>Kotlin data class generates conveniences such as copy and equality for specified primary-constructor properties. Swift struct is not exactly that bundle: assignment provides value semantics, a simple memberwise initializer can be synthesized, and equality/hash support requires appropriate protocol conformance. You do not call an automatically generated copy method just because Kotlin taught that pattern. Let/var still matters: a let-bound struct cannot change a stored part of its value, even if that property was declared var. A var-bound struct can mutate properties that permit it. Thread safety, validation and deep cloning remain separate design decisions.</p>"
+        },
+        {
+          "id": "struct-syntax",
+          "title": "A complete model with an explicit edit method",
+          "html": "<pre><code class=\"language-swift\">struct Draft {\n    var name: String\n    var count: Int\n\n    mutating func addOne() {\n        count += 1\n    }\n\n    func caption() -&gt; String {\n        return \"\\(name): \\(count)\"\n    }\n}\nlet original = Draft(name: \"Ada\", count: 1)\nvar edited = original\nedited.name = \"Rae\"\nedited.addOne()\nprint(original.caption())\nprint(edited.caption())</code></pre><p>The first line names a new struct type. Name and count are stored var properties; each instance holds its values. The simple declaration permits a memberwise initializer using their labels. AddOne is marked mutating because its method changes the enclosing value’s stored count. Caption is nonmutating and returns a String computed from the current fields. Original is a let binding, while edited is a var binding copied from it. Changing edited.name and calling its edit method do not alter original. Output is Ada: 1 and Rae: 2.</p><p>Self, spelled lowercase <code>self</code> for an instance, can disambiguate a property from a parameter with the same name. Mutating methods may also replace self with another value of the same type; that is still caller-visible value mutation. A method without mutating cannot directly assign stored properties of a struct. A class method has reference semantics and different mutation rules, introduced below and in lesson 066. Attempting original.addOne is rejected at compile time, because modifying a let-bound struct conflicts with the binding contract. Calling its read-only caption is fine. An initializer supplies state; it is not an arbitrary method named after the type.</p>"
+        },
+        {
+          "id": "inout",
+          "title": "Make caller-visible mutation visible twice",
+          "html": "<pre><code class=\"language-swift\">func add(_ amount: Int, to value: inout Int) {\n    value += amount\n}\nvar count = 2\nadd(3, to: &amp;count)\nprint(count)\n\nfunc renamed(_ draft: Draft, to name: String) -&gt; Draft {\n    var result = draft\n    result.name = name\n    return result\n}</code></pre><p>This block continues the Draft declaration above; its add/count part also runs independently. In the function signature, inout says value receives temporary mutable access to the caller’s variable. At the call site, the ampersand before count explicitly authorizes that access. Count becomes five. You must pass a writable var/storage location; a literal or a let-bound value is unsuitable. A normal Int parameter would be an immutable local binding and could not replace the caller’s integer.</p><p>The renamed helper shows the return-a-copy alternative. It takes a regular Draft value, creates a local mutable result, edits that copy and returns it. The caller decides whether to store the result. Inout is described semantically as copy-in/copy-out behavior, even when the compiler optimizes how storage is accessed. It is not a general C pointer, not a reference you can safely keep for later, and not Kotlin passing an ordinary object reference. An escaping closure cannot retain an inout parameter for later mutation because the temporary access must end with the call. Choose inout for a clear synchronous editing contract; choose a returned value when ownership and composition read more simply.</p>"
+        },
+        {
+          "id": "exclusivity",
+          "title": "One mutation needs exclusive access for its duration",
+          "html": "<p>Swift enforces memory-access exclusivity: a long-running modifying access must not overlap an incompatible read or modification of the same storage. An inout argument establishes modifying access during the call. A mutating value method similarly needs access to its receiver. Passing the same variable to two inout parameters asks for two overlapping modifications, even if a particular implementation seems harmless. The rule makes semantics stable instead of requiring the compiler to infer every alias-dependent operation. Some conflicts are caught statically; others require runtime enforcement.</p><p>Suppose <code>balance(_ left: inout Int, _ right: inout Int)</code> adjusts two balances. Calling <code>balance(&amp;count, &amp;count)</code> is invalid. Repair the intended algorithm: if two independent values are needed, make independent variables and write back deliberately. If swapping positions of one array is the goal, use <code>swapAt</code> instead of taking two overlapping subscripts as inout through the same container. Disjoint stored properties of some locally provable value storage can be permitted, but do not depend on that optimization without understanding the access rule. Exclusivity is about overlapping access, not a mutex or actor. Safe synchronous mutation does not automatically establish race-free use across threads.</p>"
+        },
+        {
+          "id": "nested-reference",
+          "title": "An outer value can still carry a shared object",
+          "html": "<pre><code class=\"language-swift\">final class Note {\n    var text = \"Initial\"\n}\nstruct Packet {\n    var title: String\n    let note: Note\n}\nlet first = Packet(title: \"One\", note: Note())\nvar second = first\nsecond.title = \"Two\"\nsecond.note.text = \"Shared\"\nprint(first.title)\nprint(first.note.text)\nprint(first.note === second.note)</code></pre><p>A class is a reference type with identity; final prohibits subclassing this class. The property default allows Note() here. Packet remains a struct, but its note property stores a class reference. Assignment makes independent title fields while copying the reference to the same Note instance. Changing second.note.text therefore changes what first observes through that shared object. Identity comparison <code>===</code> returns true. Output is One, Shared and true. Value assignment does not recursively clone an object graph.</p><p>Even a let-bound Packet can permit a reached class object’s var property to change, because that action does not replace Packet’s stored reference. Replacing its title or note field would be a different action. This resembles Kotlin data-class copy retaining nested object references, but the outer Swift value has assignment semantics without calling copy. If independent edits require independent nested state, use nested value types or a deliberate cloning/construction policy. Copy-on-write arrays likewise copy class references as references. Naming a wrapper struct does not make all reachable state immutable, Sendable, or thread-safe. Keep contained-reference ownership and concurrency analysis separate from today’s assignment prediction.</p>"
+        },
+        {
+          "id": "repo-and-failures",
+          "title": "Connect edits to inspected source",
+          "html": "<p>The active question model is a struct with let fields and a computed navigation wrapper. That outer model cannot directly mutate its stored fields. Its Hashable conformance supplies equality/hash capabilities, not an automatic deep-copy promise. The active core BeforeAfter utility declares mutating update methods, which signal that the container’s value changes. A ReportAnIssue helper accepts an inout BeforeAfter&lt;State&gt;, making caller-visible editing explicit. Key paths and the utility’s internal storage are later study; the inout boundary is already readable.</p><p>Misconceptions include assuming every var property can be changed through a let struct, assuming an ampersand is a reusable pointer, diagnosing an exclusivity error as a threading bug, and assuming a nested class was cloned. Classify the corresponding evidence: compiler rejection, temporary-access lifetime, overlapping synchronous storage access, and shared identity. Inout and mutating are related but not interchangeable spellings: one describes a parameter contract, the other a value method’s receiver mutation. We verified these anchors and target globs, not the entire utility implementation or company app. The exercise checks small deterministic edit boundaries with no unsafe overlap execution.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Can a let-bound Draft call its mutating addOne?",
+          "options": [
+            "Yes, because count is var",
+            "No, because it changes the bound struct value",
+            "Only if no other copy exists"
+          ],
+          "answer": 1,
+          "explanation": "The receiver binding must permit mutation. A var stored property does not override an immutable struct binding."
+        },
+        {
+          "question": "What does add(3, to: &count) authorize?",
+          "options": [
+            "Keeping a raw pointer forever",
+            "Temporary exclusive mutation of count during the call",
+            "Automatic background work"
+          ],
+          "answer": 1,
+          "explanation": "inout and ampersand describe caller-visible temporary access. They provide no retained pointer or scheduling contract."
+        },
+        {
+          "question": "What happens when Packet copies a Note reference?",
+          "options": [
+            "Note is deep-cloned",
+            "Both packets may observe the same Note object",
+            "The struct becomes a class"
+          ],
+          "answer": 1,
+          "explanation": "Outer value fields remain independent, but a stored class reference continues to identify its shared object."
+        }
+      ],
+      "exercise": {
+        "brief": "Implement a value counter with a mutating method and a separate inout adjustment, then predict one nested-reference boundary.",
+        "steps": [
+          "Declare Counter with var value and mutating increment().",
+          "Copy a let original into var edited and call the method only on edited.",
+          "Write add(_ amount: Int, to value: inout Int), call it with &edited.value.",
+          "Explain why passing the same variable to two inout parameters is invalid.",
+          "Use the Note/Packet experiment to separate outer-field independence from shared identity."
+        ],
+        "acceptance": [
+          "Original remains two while edited becomes six after increment and adding three.",
+          "Mutation is explicit at the method and inout call sites.",
+          "No overlapping inout operation or unsafe pointer is executed.",
+          "The explanation labels value fields and reference identity separately."
+        ],
+        "solution": "<p>This complete standalone counter answer needs no declarations from the sections. The original and edited bindings deliberately differ in mutability.</p><pre><code class=\"language-swift\">struct Counter {\n    var value: Int\n    mutating func increment() { value += 1 }\n}\nfunc add(_ amount: Int, to value: inout Int) {\n    value += amount\n}\nlet original = Counter(value: 2)\nvar edited = original\nedited.increment()\nadd(3, to: &amp;edited.value)\nprint(original.value)\nprint(edited.value)\nvar positions = [1, 2]\npositions.swapAt(0, 1)\nprint(positions)</code></pre><p>Output is two, six and [2, 1]. The method modifies only edited. The inout call temporarily mutates its writable property and ends before the subsequent print. SwapAt expresses one container operation without two overlapping inout subscript accesses. Explain the invalid same-variable call in notes rather than inserting it into the working program.</p><p>For changed-input retrieval, start at four, increment twice and add one. Predict the original and edited values before running. Then contrast this counter with Packet containing Note: the shared class state requires a separate policy even though the wrapper is a value. The result is evidence of small language behavior, not a completed client mutation, concurrency proof, or automatic mastery of value ownership.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Struct value semantics and class references",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/classesandstructures/"
+        },
+        {
+          "label": "Swift: Mutating value methods",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/methods/"
+        },
+        {
+          "label": "Swift: Inout access and exclusivity",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/memorysafety/"
+        }
+      ],
+      "repo": [
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentQuestionData.swift",
+          "line": 8,
+          "label": "Immutable-field value model",
+          "why": "Observe struct assignment capabilities separately from Hashable."
+        },
+        {
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDCoreBase/Medical Bag (Utilities)/BeforeAfter/BeforeAfter.swift",
+          "line": 84,
+          "label": "Mutating value update method",
+          "why": "Read receiver mutation without assuming the contained graph is deep-copied."
+        },
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointments/Appointment Guide/Report An Issue/ReportAnIssueViewController+InternalEventManager.swift",
+          "line": 267,
+          "label": "Explicit inout editing boundary",
+          "why": "The helper accepts temporary writable access to a BeforeAfter value."
+        }
+      ],
+      "checklist": [
+        "I can distinguish mutable property and mutable struct binding.",
+        "I can explain both ends of an inout call.",
+        "I can identify overlapping access and choose a valid algorithm.",
+        "I have demonstrated outer independence and nested sharing separately."
+      ]
+    },
+    {
+      "id": "065",
+      "title": "Properties, initialization and access contracts",
+      "summary": "Establish valid stored state, distinguish computed and lazy values, and expose only the construction and mutation API you intend.",
+      "duration": 75,
+      "level": "Foundation",
+      "prerequisites": [
+        "057",
+        "058",
+        "059",
+        "060",
+        "061",
+        "062",
+        "063",
+        "064"
+      ],
+      "objectives": [
+        "Explain stored, computed, observed and lazy properties.",
+        "Write explicit and failable initializers and predict synthesis boundaries.",
+        "Separate access levels, setter permission, mutation and synchronization."
+      ],
+      "sections": [
+        {
+          "id": "why-construction",
+          "title": "Protect a model when it is created",
+          "html": "<p>An Android primary constructor and custom property accessors often establish a model’s rules. Swift initialization and property contracts solve related problems with different syntax. A stored property holds state in an instance. An initializer, spelled init, gives every required stored property an initial value before a usable instance exists. A default value in the declaration can supply part of that work. An initializer does not return an ordinary value with a return expression; successful construction produces the initialized instance through the type call.</p><p>A simple struct can synthesize a memberwise initializer, but that convenience is sensitive to declaration and access choices. Defining a custom initializer in the struct’s primary declaration suppresses its automatic memberwise initializer. An initializer in an extension can preserve synthesis when appropriate. Do not assume a Kotlin primary-constructor/copy pattern exists just because the fields look similar. If construction must enforce a nonempty label, expose an initializer expressing that invariant. If later edits can violate the invariant, restrict the setter or provide a validated editing operation. Construction validity and lifetime validity are separate requirements.</p>"
+        },
+        {
+          "id": "explicit-init",
+          "title": "Define a small valid value with a failable initializer",
+          "html": "<pre><code class=\"language-swift\">struct PositiveQuantity {\n    let value: Int\n\n    init?(_ candidate: Int) {\n        guard candidate &gt; 0 else { return nil }\n        self.value = candidate\n    }\n\n    var doubled: Int {\n        return value * 2\n    }\n}\nif let quantity = PositiveQuantity(3) {\n    print(quantity.value)\n    print(quantity.doubled)\n}\nprint(PositiveQuantity(0) == nil)</code></pre><p>The stored let value must be initialized on a successful path. The question mark after init makes construction failable: failure returns nil instead of a partially usable value. The underscore removes the external argument label. Guard rejects zero and negative input. <code>self.value</code> means the instance’s stored property, while candidate is the parameter. Doubled is computed: accessing it runs its getter rather than reading separate stored doubled state. The valid fixture prints three and six; invalid construction prints true for nil.</p><p>The optional binding applies to the constructed value, just as it did to String? and dictionary lookup. A failable initializer can only convey failure as absence; a throwing initializer in lesson 067 can preserve an error reason. The name PositiveQuantity does not by itself guarantee doubling every possible positive Int avoids overflow. Domain bounds for arithmetic need their own policy; our small fixture stays within them. A custom primary initializer means callers cannot assume a synthesized <code>PositiveQuantity(value:)</code> call exists. Calling the declared API is part of maintaining the invariant, not an incidental syntax preference.</p>"
+        },
+        {
+          "id": "computed-and-observed",
+          "title": "A getter computes; an observer reacts to assignment",
+          "html": "<pre><code class=\"language-swift\">struct Meter {\n    var value = 0 {\n        willSet { print(\"Next \\(newValue)\") }\n        didSet { print(\"Previous \\(oldValue)\") }\n    }\n\n    var doubled: Int {\n        get { value * 2 }\n        set { value = newValue / 2 }\n    }\n}\nvar meter = Meter()\nmeter.value = 3\nprint(meter.doubled)\nmeter.doubled = 10\nprint(meter.value)</code></pre><p>Value stores an integer and has assignment observers. WillSet runs before an observed assignment and receives newValue. DidSet runs afterward and receives oldValue. They can run even when the assigned value equals the current value, so an observer is not automatically a change-detection filter. Ordinary direct initial assignments establishing a type’s own stored properties do not run these observers. Inherited or delegated setter paths require more careful interpretation. Meter() uses the default stored value; the later assignment to three triggers its observers.</p><p>Doubled declares get and set, so it stores no independent integer. The getter returns twice value. The setter receives a proposed doubled value as newValue and assigns half to value, triggering the stored property’s observers. The printed computed value is six, then the final stored value is five. Integer truncation means setting an odd doubled amount would not round-trip exactly; specify the desired contract rather than assuming property syntax guarantees inverse operations. Kotlin custom accessors are a useful analogy, but Swift newValue/oldValue and initialization rules must be read directly. Observers are not locks, transactions, or a general validation rollback mechanism.</p>"
+        },
+        {
+          "id": "lazy",
+          "title": "Lazy storage is a first-read snapshot",
+          "html": "<pre><code class=\"language-swift\">struct CaptionDraft {\n    var count = 1\n    var liveCaption: String { \"Count \\(count)\" }\n    lazy var firstCaption: String = \"First \\(count)\"\n}\nvar draft = CaptionDraft()\ndraft.count = 2\nprint(draft.firstCaption)\ndraft.count = 4\nprint(draft.firstCaption)\nprint(draft.liveCaption)</code></pre><p>LiveCaption is computed and reflects count at each access. FirstCaption is lazy stored state: its value is initialized on first access, here when count is two, then retained for later reads. It prints First 2 twice even after count becomes four. LiveCaption prints Count 4. Lazy must be var because establishing the stored value is deferred beyond initial construction. Accessing a lazy property on a struct may mutate its storage, so the draft binding must be mutable; a let binding cannot authorize that first-read mutation.</p><p>Kotlin lazy delegates provide a helpful deferred-initialization analogy, but Swift lazy does not carry the same synchronization policy. Concurrent first access is not a general exactly-once safe initialization guarantee. Choose isolation or another synchronization mechanism separately when concurrent use is possible. Also review captured owners when a lazy initializer is a closure; laziness does not imply weak capture. Decide whether you want a snapshot, a recalculated property, or an explicitly invalidated cache. Calling all three lazy hides a freshness requirement. Today’s fixture checks first-access semantics only and does not benchmark computation or exercise concurrent races.</p>"
+        },
+        {
+          "id": "access",
+          "title": "A public type does not export every member automatically",
+          "html": "<p>Internal is Swift’s default visibility: other files in the same module can use that declaration. Public exposes an API to importing modules. Private restricts access to the enclosing declaration and eligible same-file extensions; fileprivate grants source-file scope. Modern package access describes a package boundary, which can contain several modules. Kotlin internal and Java package access use different build/package concepts, so verify the actual target/module before translating those names. Visibility controls who may use an API, not whether it is safe across threads.</p><p>A public struct does not automatically receive a public memberwise initializer, even with public stored properties. Expose an explicit public init when another module must construct it. A restricted setter such as <code>public private(set) var count</code> permits public reads while confining writes. Let describes immutable storage/binding; private(set) describes who may write a var, so they are not equivalent. Class APIs additionally distinguish public from open for external subclassing/overriding; lesson 066 teaches that hierarchy. None of these modifiers creates actor isolation or locks. Tests using testable import can access internal APIs under testing-enabled builds but do not generally bypass private. Keep construction and mutation permissions explicit at the boundary.</p>"
+        },
+        {
+          "id": "repo-and-failure",
+          "title": "Read the source’s actual construction shape",
+          "html": "<p>The active question model is public, yet its stored fields and computed navigation property are internal by default. Its simple memberwise construction is usable within its module, not automatically exported to arbitrary importing clients. The active BeforeAfter utility writes explicit public initializers and keeps its implementation storage private, demonstrating a deliberate construction API. It also supplies computed before/after properties rather than duplicate public fields. We inspected those declarations and target membership; we did not establish every property’s runtime cost.</p><p>Misconceptions include treating a computed property as cached, expecting a lazy caption to stay current, assuming observers validate construction, and assuming public on a type exports all synthesis. A compiler diagnostic for accessing a lazy struct property through let needs a mutation explanation, not a blanket var conversion across the app. A stale lazy display needs a freshness policy, not repeated initializer calls. The optional initialization-access supplement covers class delegation, wider access and additional property cases after this core lesson. It is matching further detail; the standalone examples here contain the prerequisites needed for today’s exercise without requiring the old advanced core.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Does a read-only computed property store its result automatically?",
+          "options": [
+            "Yes",
+            "No, its getter runs on access",
+            "Only on a struct"
+          ],
+          "answer": 1,
+          "explanation": "Property syntax alone does not provide a cache. Separate stored/lazy/cache contracts must establish retained results."
+        },
+        {
+          "question": "Why must a lazy property be var?",
+          "options": [
+            "Because strings are reference types",
+            "Its stored value is established on first access after initialization",
+            "Because it always changes on each read"
+          ],
+          "answer": 1,
+          "explanation": "Deferred first initialization modifies storage. It does not imply repeated recalculation or synchronization."
+        },
+        {
+          "question": "Does public struct synthesize a public memberwise initializer?",
+          "options": [
+            "Always",
+            "Only if all fields are public",
+            "No, an explicit exported construction API is needed"
+          ],
+          "answer": 2,
+          "explanation": "The synthesized memberwise initializer is not automatically public. Defining a deliberate public init exposes the intended boundary."
+        }
+      ],
+      "exercise": {
+        "brief": "Create a nonempty label through a failable initializer, then compare a current computed caption with a first-read lazy snapshot.",
+        "steps": [
+          "Declare Label with let text and init? rejecting empty String.",
+          "Bind valid and invalid results without force unwrapping.",
+          "Declare a mutable draft with var count, computed current and lazy first caption.",
+          "Read lazy at count two, change count to four, and record both captions.",
+          "Explain what API another module would need if Label became public."
+        ],
+        "acceptance": [
+          "Empty construction yields nil and valid construction preserves the text.",
+          "The first-read caption remains based on count two.",
+          "The computed caption reflects count four.",
+          "The access explanation includes an explicit public initializer rather than inferred synthesis."
+        ],
+        "solution": "<p>This complete program separates validation from freshness. Neither type needs a UI framework or custom module to demonstrate local semantics.</p><pre><code class=\"language-swift\">struct Label {\n    let text: String\n    init?(_ text: String) {\n        guard !text.isEmpty else { return nil }\n        self.text = text\n    }\n}\nstruct Draft {\n    var count = 0\n    var current: String { \"Now \\(count)\" }\n    lazy var first: String = \"First \\(count)\"\n}\nprint(Label(\"\") == nil)\nif let label = Label(\"Ada\") { print(label.text) }\nvar draft = Draft()\ndraft.count = 2\nprint(draft.first)\ndraft.count = 4\nprint(draft.first)\nprint(draft.current)</code></pre><p>Expected output is true, Ada, First 2, First 2 and Now 4. The local parameter text shadows the stored property name, so self.text identifies the destination. The validation rejects exactly empty input, not whitespace; add a separately stated policy if the product needs trimming. A lazy value is not invalidated by changing count.</p><p>For an exported version, choose public on the type and intended readable member, then explicitly mark the initializer public. That is a language-contract explanation here, not a claim that a two-module build ran. Try a changed fixture and note which properties recompute versus retain state. The optional supplement broadens the topic, while independent practice and observed output remain the evidence of learning.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Stored, computed, observed and lazy properties",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/properties/"
+        },
+        {
+          "label": "Swift: Memberwise and failable initializers",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/initialization/"
+        },
+        {
+          "label": "Swift: Visibility and initializer access",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/accesscontrol/"
+        }
+      ],
+      "repo": [
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentQuestionData.swift",
+          "line": 8,
+          "label": "Public type with internal members",
+          "why": "Inspect actual access levels and computed navigation getter."
+        },
+        {
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDCoreBase/Medical Bag (Utilities)/BeforeAfter/BeforeAfter.swift",
+          "line": 21,
+          "label": "Explicit public construction API",
+          "why": "The utility exports selected initializers while private storage stays hidden."
+        },
+        {
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDCoreBase/Medical Bag (Utilities)/BeforeAfter/BeforeAfter.swift",
+          "line": 37,
+          "label": "Computed readable properties",
+          "why": "before and after delegate to underlying storage; property syntax does not prove caching or cost."
+        }
+      ],
+      "checklist": [
+        "I can explain initialization before mutation.",
+        "I can distinguish computation, observation and first-read storage.",
+        "I can expose a deliberate cross-module construction API.",
+        "I have recorded validation and freshness fixtures."
+      ],
+      "guides": [
+        "initialization-access"
+      ]
+    },
+    {
+      "id": "066",
+      "title": "Classes, inheritance, initialization and safe casting",
+      "summary": "Predict reference identity and dynamic behavior, then narrow an existing instance deliberately without relying on unsafe casts.",
+      "duration": 75,
+      "level": "Foundation",
+      "prerequisites": [
+        "057",
+        "058",
+        "059",
+        "060",
+        "061",
+        "062",
+        "063",
+        "064",
+        "065"
+      ],
+      "objectives": [
+        "Distinguish class reference assignment from struct value assignment.",
+        "Define a subclass override and explain designated/convenience/required construction.",
+        "Use is and as? while separating dynamic type, static view and object identity."
+      ],
+      "sections": [
+        {
+          "id": "why-reference",
+          "title": "Use identity only when the model needs it",
+          "html": "<p>An Android controller or mutable service is an object whose references can be shared. Swift class supplies reference semantics and identity for similar ownership needs. Assigning one class variable to another copies its reference, so both can observe mutations of the same instance. A let class binding prevents replacing its reference; it does not freeze the instance’s var properties. This differs from a let-bound struct’s direct stored-field mutation rule. The choice between struct and class is about the model’s semantics, not simply which declaration looks familiar.</p><p>Classes can inherit from one superclass and can conform to multiple protocols. Structs and enums do not inherit from classes. Inheritance lets a specialized instance reuse and override a superclass contract; it also creates construction and access obligations. Kotlin classes are final by default, whereas a Swift class can be subclassed within its permitted access boundary unless declared final. Swift public allows external use, while open grants relevant external subclassing/overriding permission. Do not introduce inheritance merely to reuse a formatter; composition or a protocol may express a capability more directly. Today’s hierarchy is a small learning fixture, not a recommendation for every domain model.</p>"
+        },
+        {
+          "id": "identity",
+          "title": "A complete shared-reference experiment",
+          "html": "<pre><code class=\"language-swift\">final class Counter {\n    var value = 0\n}\nlet first = Counter()\nlet second = first\nsecond.value = 3\nprint(first.value)\nprint(first === second)\nlet third = Counter()\nthird.value = 3\nprint(first === third)</code></pre><p>Final prevents subclassing Counter. Its stored default value makes the simple default initializer available. First and second are let bindings, but both reference the same mutable Counter instance. Changing second.value is permitted because it changes that instance, not either stored reference. First observes three. <code>===</code> compares class identity, printing true for the shared object and false for separately constructed third even though their values match. Swift <code>==</code> asks about value equality and requires suitable behavior/conformance; it is not interchangeable with identity.</p><p>Kotlin/Java object references provide a close assignment analogy, but equality spellings differ: Kotlin referential equality uses three equals, Java double equals checks reference identity, and Swift uses three equals for class identity. Do not mechanically port the same punctuation between languages. Reference semantics do not provide a lock or guarantee immutable service state. Two aliases can mutate one object, so later concurrency lessons must establish an owner/isolation contract. If independent edit state is the requirement, a value model may be simpler. If shared identity and lifetime are intentional, explicitly name who owns that object and who merely observes it.</p>"
+        },
+        {
+          "id": "hierarchy",
+          "title": "Construct a subclass and override one behavior",
+          "html": "<pre><code class=\"language-swift\">class Record {\n    let name: String\n\n    required init(name: String) {\n        self.name = name\n    }\n\n    func caption() -&gt; String {\n        return name\n    }\n}\nfinal class TaggedRecord: Record {\n    let tag: Int\n\n    init(name: String, tag: Int) {\n        self.tag = tag\n        super.init(name: name)\n    }\n\n    required convenience init(name: String) {\n        self.init(name: name, tag: 0)\n    }\n\n    override func caption() -&gt; String {\n        return \"\\(super.caption()) [\\(tag)]\"\n    }\n}\nlet record: Record = TaggedRecord(name: \"Ada\", tag: 7)\nprint(record.caption())</code></pre><p>Record is the base class; its initializer establishes name. Required says subclasses must provide that initializer shape through permitted inheritance or implementation. TaggedRecord introduces tag, initializes it before delegating to super.init, and defines a convenience path on the same class. Its required convenience initializer supplies tag zero and delegates through self.init. You do not add override when satisfying an initializer already marked required. Override on caption explicitly replaces inherited behavior, and super.caption calls the base implementation as part of the specialized result.</p><p>The final binding’s static type is Record, but its dynamic instance is TaggedRecord. Calling the overridable method selects the subclass implementation and prints Ada [7]. This is dynamic dispatch through a class hierarchy, not an enum switch or a forced cast. Final prevents further subclassing of TaggedRecord. The main initializer’s tag assignment precedes the superclass call because the introduced storage must be initialized first. This program is standalone Swift; it needs no NSObject or UI target. A superclass reference does not create a new base object or discard the instance’s tag.</p>"
+        },
+        {
+          "id": "initialization-rules",
+          "title": "Designated goes up; convenience goes across",
+          "html": "<p>A designated class initializer establishes its introduced stored properties and delegates to a designated initializer of its immediate superclass when one exists. A convenience initializer delegates to another initializer on the same class, eventually reaching a designated path. These paths support Swift’s two-phase initialization safety: stored state throughout the hierarchy is established before the instance can be fully used for customization. A subclass cannot freely read unfinished self or let it escape before the required initialization stage. Kotlin superclass-constructor intuition helps orient you, but Swift enforces its own definite-initialization and delegation rules.</p><p>Class initializer inheritance is conditional, unlike simply inheriting every ordinary method. Inspect the full initializer set before assuming a convenience overload is available on a subclass. Overriding a nonrequired superclass designated initializer uses override; implementing a required shape uses required. Failable init? can represent ordinary construction failure, while a deliberate fatalError in an unsupported coder initializer represents a programmer restriction and traps. It is not equivalent to validating user input and returning nil. The initialization-access supplement expands these contracts, but the complete hierarchy above supplies today’s needed construction rules. For a value type there is no superclass and no class convenience/designated hierarchy.</p>"
+        },
+        {
+          "id": "casting",
+          "title": "Ask a type question without converting identity",
+          "html": "<pre><code class=\"language-swift\">let records: [Record] = [\n    Record(name: \"Base\"),\n    TaggedRecord(name: \"Special\", tag: 9)\n]\nfor record in records {\n    if let tagged = record as? TaggedRecord {\n        print(\"Tag \\(tagged.tag)\")\n    } else {\n        print(\"Base only\")\n    }\n}\nprint(records[0] is TaggedRecord)\nprint(records[1] is TaggedRecord)</code></pre><p>This block continues the Record hierarchy above. The array stores references through a common base type. <code>as?</code> attempts a conditional downcast and returns an optional of the requested subtype. Binding it creates a narrower static view of the same instance; it does not construct or clone a TaggedRecord. The first element follows Base only; the second prints Tag 9. <code>is</code> asks whether an instance satisfies the type check and returns Bool, here false and true. An ordinary upcast to a superclass is compatible without a conditional result.</p><p>An unconditional <code>as!</code> downcast traps if the dynamic instance does not fit. It is not a recovery strategy for a heterogeneous list. The plain as spelling has other roles, including compatible upcasts and bridging where supported, and is not a universal numeric conversion operator. Prefer a declared polymorphic operation when the consumer only needs behavior; repeated subtype checks can reveal that the abstraction omits a real capability. Kotlin’s is/as? is a helpful analogy, but Swift class/reference, protocol existential and bridge rules must be considered separately. Any can store unrelated values; lesson 069 distinguishes it from protocol-constrained any.</p>"
+        },
+        {
+          "id": "repo-and-failure",
+          "title": "Read inheritance without making UI a prerequisite",
+          "html": "<p>The active cancellation controller declares a superclass and overrides viewDidLoad, calling super before installing callbacks. Its designated state initializer delegates to super, and the required coder initializer deliberately traps because that construction route is unsupported. These are actual class/init patterns, but running this UIKit controller needs an iOS target and client dependencies. Our pure hierarchy demonstrates the language rules without assuming those APIs. The cancellation helper uses a conditional as? cast before invoking a modal-specific hide operation; it narrows an existing reference instead of creating a new controller.</p><p>Misconceptions include expecting let to freeze a class, assuming upcasting slices off subclass state, using as! as input validation, and presuming all superclass initializers are inherited. The correct next check depends on the symptom: identify aliases for surprising mutation, dynamic method behavior for superclass access, optional downcast failure for an unexpected subtype, and declared initializer paths for unavailable calls. We verified source membership via the active cancellation target glob. We did not build UIKit code, verify controller lifecycle timing, or migrate the hierarchy. Choose composition or protocols when capabilities, rather than inherited identity, are the real requirement.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does let prevent for a class binding?",
+          "options": [
+            "Every property mutation",
+            "Replacing the binding’s reference",
+            "Subclass overrides"
+          ],
+          "answer": 1,
+          "explanation": "The reference binding is fixed, but the referenced object may still expose mutable var properties."
+        },
+        {
+          "question": "Does as? create a new subclass instance?",
+          "options": [
+            "Yes",
+            "No, it conditionally provides a narrower view of the same instance",
+            "Only for final classes"
+          ],
+          "answer": 1,
+          "explanation": "Conditional casting checks the dynamic type. Identity and object state are not cloned."
+        },
+        {
+          "question": "Where does a convenience initializer delegate?",
+          "options": [
+            "To an initializer on the same class",
+            "Directly to any superclass initializer",
+            "To a global factory automatically"
+          ],
+          "answer": 0,
+          "explanation": "It goes across the same class and must ultimately reach a designated initialization path."
+        }
+      ],
+      "exercise": {
+        "brief": "Build a base caption class and a tagged subclass, then predict dispatch and safe downcasting through base references.",
+        "steps": [
+          "Create Record with required init(name:) and caption().",
+          "Create TaggedRecord with tag, a full designated initializer and required convenience name initializer.",
+          "Override caption while reusing super.caption().",
+          "Store base and subclass instances in [Record], print captions and conditional tag access.",
+          "Explain the identity and initialization order without using as!."
+        ],
+        "acceptance": [
+          "Base caption is Base and tagged caption is Ada [7].",
+          "The required convenience path creates tag zero.",
+          "Conditional casting fails safely for the base and succeeds for the subclass.",
+          "No UIKit imports, forced casts or partially initialized self escape are required."
+        ],
+        "solution": "<p>The complete answer repeats its declarations so it can run as a separate file. It tests the construction and dynamic-use paths rather than only a concrete subclass call.</p><pre><code class=\"language-swift\">class Record {\n    let name: String\n    required init(name: String) { self.name = name }\n    func caption() -&gt; String { name }\n}\nfinal class TaggedRecord: Record {\n    let tag: Int\n    init(name: String, tag: Int) {\n        self.tag = tag\n        super.init(name: name)\n    }\n    required convenience init(name: String) {\n        self.init(name: name, tag: 0)\n    }\n    override func caption() -&gt; String { \"\\(super.caption()) [\\(tag)]\" }\n}\nlet base = Record(name: \"Base\")\nlet tagged = TaggedRecord(name: \"Ada\", tag: 7)\nlet records: [Record] = [base, tagged]\nfor record in records {\n    print(record.caption())\n    if let special = record as? TaggedRecord { print(special.tag) }\n}\nprint(TaggedRecord(name: \"Default\").tag)\nprint((records[1] as? TaggedRecord) === tagged)</code></pre><p>Output is Base, Ada [7], seven, zero and true. The first iteration has no tag line, because the cast returns nil. The last check confirms that the successful cast still refers to tagged’s original instance. The base-typed call uses the override, proving that changing the static view did not change the dynamic object.</p><p>For retrieval, add another subclass only if its behavior needs a real inherited contract, and predict which calls need override versus which construction shapes need required. State the separate access change needed for external subclassing: relevant declarations would need open rather than merely public. That statement is a language rule, not a two-module build result. Independent changed-input practice and recorded evidence remain pending for the learner.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Subclassing, overriding and final",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/inheritance/"
+        },
+        {
+          "label": "Swift: Class delegation, required and two-phase initialization",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/initialization/"
+        },
+        {
+          "label": "Swift: is and conditional casts",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/typecasting/"
+        }
+      ],
+      "repo": [
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentViewController.swift",
+          "line": 19,
+          "label": "Active controller superclass",
+          "why": "Read the class hierarchy without importing UIKit into the scratch program."
+        },
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentViewController.swift",
+          "line": 31,
+          "label": "Designated and required construction paths",
+          "why": "State construction delegates to super; coder construction is explicitly unsupported."
+        },
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/Helpers.swift",
+          "line": 44,
+          "label": "Conditional narrowing of an existing target",
+          "why": "as? guards a modal-specific operation."
+        }
+      ],
+      "checklist": [
+        "I can distinguish reference identity from value equality.",
+        "I can trace designated, convenience and required initialization.",
+        "I can predict overrides through a superclass view.",
+        "I have demonstrated safe cast failure and success."
+      ],
+      "guides": [
+        "initialization-access"
+      ]
+    },
+    {
+      "id": "067",
+      "title": "Enums, associated data, errors and defer",
+      "summary": "Represent distinct outcomes, preserve failure reasons, and pair synchronous cleanup with scope exits.",
+      "duration": 75,
+      "level": "Foundation",
+      "prerequisites": [
+        "057",
+        "058",
+        "059",
+        "060",
+        "061",
+        "062",
+        "063",
+        "064",
+        "065",
+        "066"
+      ],
+      "objectives": [
+        "Construct and match payload-bearing enums and distinguish fixed raw values.",
+        "Read throws/try/do/catch and choose deliberate optional loss of failure.",
+        "Predict defer registration, scope and reverse-order cleanup."
+      ],
+      "sections": [
+        {
+          "id": "why-states",
+          "title": "Replace contradictory flags with a finite vocabulary",
+          "html": "<p>On Android a sealed state can prevent a result list, loading flag and error flag from disagreeing. Swift enum gives one type several named variants, called cases. An associated value supplies typed data for one particular case instance. An enum value occupies one case at a time, so loaded data and failure are not independent flags you can accidentally turn on together. The declaration constrains representable structure; an owner or transition function still decides when moving from one state to another is allowed.</p><p>Kotlin sealed subclasses are a helpful modeling analogy, but Swift enum cases are variants of one value type rather than subclass instances. Associated payloads can themselves contain class references, so outer value semantics still do not imply deep cloning. Begin with synthetic idle, loaded names and failed reason. Successful empty names remain loaded with an empty array, not failed and not idle. Distinguishing these outcomes preserves the user’s next action. The standard Error protocol identifies values usable as thrown errors; an enum can conform to it while carrying precise failure data. No networking framework or old course prerequisite is necessary.</p>"
+        },
+        {
+          "id": "enum-syntax",
+          "title": "Construct and match an exhaustive outcome",
+          "html": "<pre><code class=\"language-swift\">enum Outcome: Equatable {\n    case idle\n    case loaded(names: [String])\n    case failed(message: String)\n}\nfunc caption(for outcome: Outcome) -&gt; String {\n    switch outcome {\n    case .idle:\n        return \"Start\"\n    case let .loaded(names):\n        return names.isEmpty ? \"No matches\" : names.joined(separator: \", \")\n    case let .failed(message):\n        return \"Retry: \\(message)\"\n    }\n}\nprint(caption(for: .loaded(names: [])))\nprint(caption(for: .failed(message: \"offline\")))</code></pre><p>Each case introduces a variant. Loaded’s names label is used during construction, and its payload type is [String]. Equatable requests equality behavior, which can be synthesized here because every payload supports it. Switch covers every declared case without default. <code>case let .loaded(names)</code> matches that variant and binds its payload into a local immutable array. It is pattern matching, not casting a sealed subclass. A leading dot at the call site is possible because the parameter type supplies Outcome context.</p><p>The output is No matches then Retry: offline. Adding a local offline case requires this exhaustive switch to account for it. Default can hide that new decision, so use it only for an intentional catch-all policy. <code>if case let</code> can extract one variant when ignoring the others is appropriate; rendering every state usually deserves a full switch. Equatable does not validate message content, enforce legal transitions, perform analytics or cancel requests. Updating an enum’s state means assigning a new case value; a failed payload is not a mutable property shared by every possible case.</p>"
+        },
+        {
+          "id": "raw-values",
+          "title": "A fixed code is not a per-instance payload",
+          "html": "<pre><code class=\"language-swift\">enum ReasonCode: String {\n    case offline = \"offline\"\n    case invalid = \"invalid\"\n}\nprint(ReasonCode.offline.rawValue)\nprint(ReasonCode(rawValue: \"new_code\") == nil)</code></pre><p>The colon String declares a raw-value enum. Each case maps to a fixed String, so every offline instance has the same raw value. The rawValue initializer is failable because an arbitrary external string may not match a known case. A newly added code therefore yields nil rather than creating a case dynamically. Decide whether to reject, preserve the unknown string, or use an explicit fallback. Force unwrapping a raw conversion turns a normal compatibility condition into a trap.</p><p>Associated data instead varies per constructed instance, such as a failure’s original invalid input. A raw-value enum cannot simultaneously declare arbitrary associated payloads. Combine a fixed code with other fields in a struct, or use an associated-value enum with a computed code if the domain requires both. Codable or CaseIterable are separate capabilities and should not be inferred from enum alone. Kotlin enums with constructor fields may look similar to raw codes, but Swift’s raw conversion contract and payload restrictions must be read directly. The exercise uses no real wire response; it demonstrates boundary policy using synthetic strings.</p>"
+        },
+        {
+          "id": "throwing",
+          "title": "Mark failure permission and preserve its reason",
+          "html": "<pre><code class=\"language-swift\">enum QuantityError: Error {\n    case notInteger(String)\n    case nonpositive(Int)\n}\nfunc quantity(from text: String) throws -&gt; Int {\n    guard let value = Int(text) else {\n        throw QuantityError.notInteger(text)\n    }\n    guard value &gt; 0 else {\n        throw QuantityError.nonpositive(value)\n    }\n    return value\n}\ndo {\n    print(try quantity(from: \"bad\"))\n} catch let QuantityError.notInteger(text) {\n    print(\"Invalid integer: \\(text)\")\n} catch {\n    print(\"Other error: \\(error)\")\n}</code></pre><p>This enum conforms to Error, a standard protocol allowing it to be thrown. Throws in the function signature grants a failure path; it does not run the operation asynchronously. Guard failures construct a precise error and throw it, exiting the current operation. The caller uses try to mark the throwing call. Do encloses the region handled by the following catches. The first catch matches and binds notInteger’s payload; the last catch handles remaining errors, accessible as error. The fixture prints Invalid integer: bad.</p><p>Ordinary untyped throws checks failure permission without listing Java-style checked exception classes. Modern typed throws exists but is unnecessary for this beginner contract. <code>try?</code> deliberately converts thrown failure into nil and loses the reason; <code>try!</code> traps on error. A postfix force unwrap and a failed precondition are also traps, not ordinary thrown errors that do/catch catches. If invalid input needs an explanation, use explicit handling or propagation instead of try? followed by a default success value. Result is a standard enum for storing success or failure as a value; it is not mandatory for every synchronous throwing operation.</p>"
+        },
+        {
+          "id": "defer",
+          "title": "Register cleanup at the point you acquire responsibility",
+          "html": "<pre><code class=\"language-swift\">func inspect(_ valid: Bool) throws {\n    print(\"Enter\")\n    defer { print(\"Outer cleanup\") }\n    do {\n        defer { print(\"Inner cleanup\") }\n        guard valid else { throw QuantityError.nonpositive(0) }\n        print(\"Work\")\n    }\n    print(\"After inner scope\")\n}\ndo {\n    try inspect(false)\n} catch {\n    print(\"Handled\")\n}</code></pre><p>This block continues QuantityError above. Defer registers a body to execute when its containing scope is left, including by return or throw. The inner do scope registers its own cleanup. For false, guard throws, so the inner cleanup runs first, then the function’s outer cleanup, then the caller’s catch prints Handled. Enter comes first and neither Work nor After inner scope is reached. Multiple defers in one scope run in reverse registration order. A defer declared on a path never reached is not registered.</p><p>This resembles Kotlin try/finally cleanup intent, but registration location and scope are essential Swift details. Defer does not catch the error, resume a task, undo every mutation automatically, or guarantee handling process termination. Pair it with a concrete synchronous responsibility such as releasing an acquired resource. Do not place an acquisition’s cleanup after an early exit that can occur first. For asynchronous resource operations and task cancellation, define a separate lifecycle contract in later lessons. Today’s print trace proves normal language-scope behavior only; it is not evidence of a file being closed or a production callback being removed.</p>"
+        },
+        {
+          "id": "repo-and-failures",
+          "title": "Read a typed outcome and its cleanup separately",
+          "html": "<p>The active cancellation coordinator’s NavigationState carries question data in one case and no payload in bookingPrompt. CancellationReason uses fixed String raw values instead. Its callback error path performs response removal explicitly; Swift throwing did not automatically roll back that array append. The helper’s defer performs modal cleanup after finishing its inner callback scope. These anchors show payload shape, error handling and scope cleanup as different contracts. Async continuations and UIKit are surrounding infrastructure for later study, not prerequisites for the pure examples.</p><p>Misconceptions include collapsing failed retrieval to loaded([]), confusing a raw code with arbitrary payload, believing try catches, and expecting defer to run only on success. Define expected observations for valid, invalid, empty and unknown-code fixtures. A default catch that prints one message may be an intentional simplification but loses classification unless a separate boundary preserves it. The question is what the caller needs to decide, not which punctuation produces fewer lines. We verified actual source locations and target inclusion without running these company flows. The exercise keeps invalid-input identity visible and checks cleanup on both normal and thrown exits.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What makes associated values different from raw values?",
+          "options": [
+            "Associated payloads vary per instance; raw values are fixed per case",
+            "Both are arbitrary runtime payloads",
+            "Raw values require class identity"
+          ],
+          "answer": 0,
+          "explanation": "Each loaded instance can carry different names. A raw enum case maps to its declared fixed code."
+        },
+        {
+          "question": "Does try handle a thrown error?",
+          "options": [
+            "Yes, by itself",
+            "No, it marks a throwing call; handling or propagation is still needed",
+            "Only for enums"
+          ],
+          "answer": 1,
+          "explanation": "A do/catch or an enclosing throws function determines the handling/propagation path. try alone is not recovery."
+        },
+        {
+          "question": "When does a reached defer run?",
+          "options": [
+            "Only on successful fall-through",
+            "When its enclosing scope exits, including return or throw",
+            "Immediately when declared"
+          ],
+          "answer": 1,
+          "explanation": "Defer registers cleanup for scope exit. Multiple registrations in the same scope execute in reverse order."
+        }
+      ],
+      "exercise": {
+        "brief": "Parse positive integer text, preserve distinct parse and domain failures, and observe cleanup on success and error.",
+        "steps": [
+          "Define ParseFailure cases invalid(String) and nonpositive(Int), conforming to Error.",
+          "Write parse(_:) throws -> Int with explicit guards.",
+          "Add a defer recording a cleanup line within each parse call.",
+          "Run fixtures 3, bad and 0 with separate catch patterns.",
+          "Explain why try? with a zero fallback would erase meaningful failure."
+        ],
+        "acceptance": [
+          "Three succeeds; bad retains the original text; zero reports a domain failure.",
+          "Every reached parse scope emits one cleanup line.",
+          "Failure is not rendered as successful empty data.",
+          "No forced try, unwrap or live network is required."
+        ],
+        "solution": "<p>This complete standalone answer makes each error cause observable at the caller. Cleanup is a print trace, so do not describe it as production resource verification.</p><pre><code class=\"language-swift\">enum ParseFailure: Error {\n    case invalid(String)\n    case nonpositive(Int)\n}\nfunc parse(_ text: String) throws -&gt; Int {\n    defer { print(\"Cleanup \\(text)\") }\n    guard let value = Int(text) else { throw ParseFailure.invalid(text) }\n    guard value &gt; 0 else { throw ParseFailure.nonpositive(value) }\n    return value\n}\nfor text in [\"3\", \"bad\", \"0\"] {\n    do {\n        let value = try parse(text)\n        print(\"Accepted \\(value)\")\n    } catch let ParseFailure.invalid(original) {\n        print(\"Invalid \\(original)\")\n    } catch let ParseFailure.nonpositive(value) {\n        print(\"Nonpositive \\(value)\")\n    } catch {\n        print(\"Unexpected\")\n    }\n}</code></pre><p>Each cleanup line appears before its caller’s Accepted, Invalid or Nonpositive line because parse exits before the caller resumes that path. The reason remains available to the matching catch. An optional fallback to zero would conflate parse failure, nonpositive rejection and an invented success sentinel, violating the contract.</p><p>For retrieval, add a negative fixture and predict the nonpositive payload. Then add a locally declared enum variant and identify which switches or catch classifications need an intentional decision. Exhaustiveness and error effects constrain structure, while business transitions and recovery policy remain your responsibility. Your independent parser and trace provide learning evidence; this worked code does not complete practice or establish app error reporting.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Associated and raw-value cases",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/enumerations/"
+        },
+        {
+          "label": "Swift: Throwing, handling and defer",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/errorhandling/"
+        }
+      ],
+      "repo": [
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentNavigationCoordinator.swift",
+          "line": 177,
+          "label": "Payload-bearing navigation enum",
+          "why": "Question data is associated per instance; bookingPrompt has no payload."
+        },
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancellationReason.swift",
+          "line": 8,
+          "label": "Fixed String raw codes",
+          "why": "Contrast a raw conversion boundary with arbitrary associated data."
+        },
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/Helpers.swift",
+          "line": 43,
+          "label": "Scope cleanup with defer",
+          "why": "Inspect cleanup separately from continuation completion and surrounding UIKit behavior."
+        }
+      ],
+      "checklist": [
+        "I can distinguish raw codes from associated payloads.",
+        "I can preserve parse, domain and empty-success outcomes.",
+        "I can explain try, handling and propagation separately.",
+        "I have traced cleanup on valid and thrown exits."
+      ]
+    },
+    {
+      "id": "068",
+      "title": "Closures, escaping callbacks and capture lifetime",
+      "summary": "Read stored function values, distinguish live captures from snapshots, and prove when a callback retains or releases its owner.",
+      "duration": 75,
+      "level": "Foundation",
+      "prerequisites": [
+        "057",
+        "058",
+        "059",
+        "060",
+        "061",
+        "062",
+        "063",
+        "064",
+        "065",
+        "066",
+        "067"
+      ],
+      "objectives": [
+        "Read closure types, explicit parameters and trailing calls.",
+        "Distinguish nonescaping and escaping callback contracts without assuming scheduling.",
+        "Draw strong/weak ownership and test safe invocation after owner release."
+      ],
+      "sections": [
+        {
+          "id": "why-callbacks",
+          "title": "A listener has an owner and a lifetime",
+          "html": "<p>An Android listener can outlive the screen that installed it. You already look for who registers it, who stores it, and who removes it. Swift closures add a precise ownership question: what does the function value retain? A closure can use values from its surrounding scope, called captures. Its function type specifies inputs and output, while capture and storage describe lifetime. None of those facts alone determines a queue, thread, actor, invocation count or cancellation policy. Today’s examples are synchronous so we can study ownership without timing uncertainty.</p><p>Swift classes are managed by Automatic Reference Counting, ARC: strong owning references keep class instances alive. An unreachable strong cycle can survive even after outside references disappear. JVM/Android garbage collection can collect a cycle that is unreachable from roots, though listeners reachable from a singleton still leak under either system. That comparison is useful precisely at the boundary: ARC is not a tracing collector that automatically discards isolated cycles. Closures can be part of those cycles because they are stored values that strongly capture an owner. Start by drawing owner to stored closure to owner before choosing weak capture.</p>"
+        },
+        {
+          "id": "closure-signature",
+          "title": "Read the function value before shortening its syntax",
+          "html": "<pre><code class=\"language-swift\">func inspect(_ value: Int, using operation: (Int) -&gt; String) {\n    print(operation(value))\n}\nlet caption: (Int) -&gt; String = { value in\n    return \"Count \\(value)\"\n}\ninspect(3, using: caption)\ninspect(4) { value in\n    \"Next \\(value)\"\n}</code></pre><p>Inspect receives an Int and a function value that accepts Int and returns String. It calls that operation during inspect’s own execution and prints the returned String. Caption is a closure assigned to a binding with an explicit function type. Braces surround the function body; value is its local parameter; in begins the body; return supplies its result. The first call passes the function value by name. The second uses a trailing closure for the final closure argument and omits return because its body is a single expression. Output is Count 3 and Next 4.</p><p>There is no asynchronous scheduling here. <code>Void</code> would describe no useful result, for example <code>() -&gt; Void</code> for a zero-argument action. A property <code>(() -&gt; Void)?</code> is an optional function value; <code>action?()</code> invokes it only if present. That optional check says nothing about whether its captured object still exists. Parameters can be named explicitly or inferred with $0; multiple nested shorthand closures can obscure which parameter belongs to which scope. Kotlin lambdas and trailing syntax provide an algorithm analogy, but Swift’s function types, external labels and ownership remain distinct rules.</p>"
+        },
+        {
+          "id": "escaping",
+          "title": "Escaping means outliving the call, not running elsewhere",
+          "html": "<pre><code class=\"language-swift\">final class Button {\n    var action: (() -&gt; Void)?\n\n    func install(_ action: @escaping () -&gt; Void) {\n        self.action = action\n    }\n\n    func tap() {\n        action?()\n    }\n}\nlet button = Button()\nbutton.install { print(\"Tapped\") }\nbutton.tap()\nbutton.action = nil\nbutton.tap()</code></pre><p>Button stores an optional action. Install accepts a plain closure parameter and assigns it to that property. Because the property can retain the closure after install returns, the parameter is marked @escaping. The attribute belongs on the parameter declaration, not on the property’s function type. Tap simply invokes an existing action synchronously. Clearing the property releases Button’s ownership of the closure. The program prints Tapped once; the second tap has no action.</p><p>Ordinary closure parameters are nonescaping by default when used only during the call. An optional closure parameter has different type behavior and should not receive the same plain-parameter rule mechanically. Escaping permits a longer lifetime; it does not require storage, guarantee delivery, make the closure weak, or mean background execution. A named completion may still never be called unless the producer’s contract and implementation ensure it. Kotlin noinline/crossinline and callbacks address related concerns, but they are not exact equivalents to Swift’s escaping lifetime annotation. When bridging later APIs, analyze registration, execution context and cancellation separately instead of treating one keyword as all three.</p>"
+        },
+        {
+          "id": "ownership",
+          "title": "Remove the owning edge that closes the cycle",
+          "html": "<pre><code class=\"language-swift\">final class Owner {\n    let name = \"Synthetic\"\n    var action: (() -&gt; Void)?\n\n    func install() {\n        action = { [weak self] in\n            guard let self else { return }\n            print(self.name)\n        }\n    }\n}\nfunc checkLifetime() {\n    var owner: Owner? = Owner()\n    owner?.install()\n    let saved = owner?.action\n    weak var probe = owner\n    saved?()\n    owner = nil\n    print(probe == nil)\n    saved?()\n}\ncheckLifetime()</code></pre><p>The owner stores action. A closure written as <code>{ print(self.name) }</code> would strongly capture that owner, creating owner-to-closure-to-owner retention. The working example instead uses [weak self], a capture list before in. Weak references observe class instances without owning them and become nil after release. The guard unwraps the captured optional into a strong local binding for this body’s use. Saved retains the closure, not its weakly captured owner. The program prints Synthetic then true, and the final invocation returns without printing because the owner is gone.</p><p>A deinit cleanup alone cannot break a cycle that prevents deinit from being reached. Remove or weaken an owning edge before expecting deallocation. Weak is appropriate when disappearance is acceptable; deliberate strong retention can be appropriate for work that must finish under another owner. Ordinary unowned also avoids retention but traps if accessed after its target dies, so choose it only from a proven lifetime relation. Do not execute a crashing unowned demonstration. Weak capture is not cancellation: a producer may continue work after its receiver vanishes, and a still-alive screen may already be semantically inactive.</p>"
+        },
+        {
+          "id": "capture-snapshots",
+          "title": "Each nested function value has its own captures",
+          "html": "<pre><code class=\"language-swift\">func compareCaptures() {\n    var label = \"Before\"\n    let live = { print(label) }\n    let snapshot = { [label] in print(label) }\n    label = \"After\"\n    live()\n    snapshot()\n}\ncompareCaptures()</code></pre><p>The ordinary capture refers to the mutable local binding and reads its later value when invoked. The explicit [label] capture records the current String value at closure creation. Output is After then Before. A named capture such as [initial = label] can make the snapshot intent clearer. Capturing a class reference this way preserves a reference to the same object, not a frozen or deep-cloned object. Strings here keep the distinction simple. Kotlin captured vars and local vals offer a related mental model, but the explicit Swift capture list specifies the chosen value and ownership.</p><p>After [weak self] succeeds at guard, the local self is strong for the following work. An inner stored closure that captures that binding can retain it strongly unless it specifies its own policy. The outer weak annotation does not propagate automatically into all nested closures or tasks. Analyze storage and release at every layer. Temporary strong retention with a guaranteed end is different from an unbounded cycle. Exact destruction line timing may vary with optimization and last use; a weak probe plus controlled removal of known owners gives more useful evidence than assuming a particular deinit print always occurs on a specific source line.</p>"
+        },
+        {
+          "id": "repo-and-failure",
+          "title": "Connect the source graph to honest conclusions",
+          "html": "<p>The cancellation coordinator stores an async throwing callback in a property and marks the accepted initializer parameter escaping. Its controller callback weakly captures self, unwraps it, then starts a Task that uses the strong binding. The source proves those capture/lifetime shapes, but not that every request finishes promptly or that dismissal cancels work. The view controller similarly installs a weak callback on an Actions owner. These are verified active anchors; the pure lesson programs do not import UIKit or exercise their execution contexts.</p><p>Misconceptions include reading escaping as background, weak as cancellation, a capture list as recursive cloning, and an outer weak capture as a nested policy. Draw the actual owning arrows and ask where each stored function value is released. An intentional strong-cycle experiment should explicitly clear the closure afterward through a weak probe, so it does not leave its own leak behind. The optional callback-ownership supplement expands notification tokens, delegates and queues after these prerequisites. It is matching further reading rather than a required advanced lesson. Today’s deterministic lifetime test has no sleeps, real events or networking and leaves learner completion unchanged.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does @escaping mean for a plain closure parameter?",
+          "options": [
+            "The closure may outlive this call",
+            "The closure always runs on a worker thread",
+            "The closure captures self weakly"
+          ],
+          "answer": 0,
+          "explanation": "Escaping is a lifetime permission. Scheduling, capture ownership and whether delivery occurs need separate contracts."
+        },
+        {
+          "question": "Does [weak self] apply automatically to nested closures?",
+          "options": [
+            "Always",
+            "No, each closure has its own captures",
+            "Only when guard unwraps self"
+          ],
+          "answer": 1,
+          "explanation": "A successful guard introduces a strong local binding that inner stored work may retain. Inspect each nested closure separately."
+        },
+        {
+          "question": "What survives when saved holds a weak-capturing callback after owner release?",
+          "options": [
+            "The owner must survive",
+            "The closure can survive while self becomes nil",
+            "The closure recreates its owner"
+          ],
+          "answer": 1,
+          "explanation": "Saved owns the function value. Its weak capture observes disappearance without retaining or reconstructing the owner."
+        }
+      ],
+      "exercise": {
+        "brief": "Store a weak owner callback, save it independently, and prove safe invocation before and after owner release; contrast a snapshot with a live capture.",
+        "steps": [
+          "Declare an owner with an optional () -> Void action and an installation method.",
+          "Choose [weak self] and a guard with an explicit absent-owner exit.",
+          "Save the action and observe owner through a weak probe inside a local function.",
+          "Invoke before release, remove the strong owner and invoke again.",
+          "Predict a strong-cycle variant and its explicit cleanup without leaving it retained."
+        ],
+        "acceptance": [
+          "The first invocation sees the owner; the weak probe becomes nil after release.",
+          "A saved callback safely tolerates the missing owner.",
+          "The explanation separates optional closure absence from optional captured-owner absence.",
+          "No scheduling, cancellation or production leak fix is inferred."
+        ],
+        "solution": "<p>This complete standalone check reports a count while the owner exists and proves release after its known strong owner is removed.</p><pre><code class=\"language-swift\">final class Recorder {\n    var count = 0\n    var action: (() -&gt; Void)?\n    func install() {\n        action = { [weak self] in\n            guard let self else { return }\n            self.count += 1\n            print(self.count)\n        }\n    }\n}\nfunc check() {\n    var recorder: Recorder? = Recorder()\n    recorder?.install()\n    let saved = recorder?.action\n    weak var probe = recorder\n    saved?()\n    recorder = nil\n    print(probe == nil)\n    saved?()\n}\ncheck()</code></pre><p>Output is one then true. The second invocation of saved finds a nil weak owner and returns. The optional invocation only checks that saved itself exists; the guard handles the separate owner question. The initializer accepts no closure parameter, so @escaping is unnecessary here even though the property stores a constructed closure.</p><p>For an intentional cycle variant, replace the weak capture with a strong self capture, predict probe staying nonnil after recorder is cleared, and then clear probe?.action to release the cycle. That is a separate negative ownership experiment with cleanup, not a compiler failure. Repeat the live/snapshot String exercise with changed values to demonstrate capture transfer. These language checks do not establish notification removal, async producer cancellation, actor safety, or learner mastery.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Captures and escaping closure parameters",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/closures/"
+        },
+        {
+          "label": "Swift: Strong cycles, weak and unowned capture",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/"
+        }
+      ],
+      "repo": [
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentNavigationCoordinator.swift",
+          "line": 28,
+          "label": "Escaping stored callback input",
+          "why": "Initializer parameter lifetime matches the property assignment at line 36."
+        },
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentNavigationCoordinator.swift",
+          "line": 64,
+          "label": "Outer weak capture with nested work",
+          "why": "Inspect the strong local guard binding and Task separately."
+        },
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentViewController.swift",
+          "line": 85,
+          "label": "Weak receiver callback",
+          "why": "The active controller installs a callback under a view/actions owner."
+        }
+      ],
+      "checklist": [
+        "I can read function type and capture/storage separately.",
+        "I can explain escaping without queue assumptions.",
+        "I can draw and clean up an intentional strong cycle.",
+        "I have proved safe post-release callback invocation."
+      ],
+      "guides": [
+        "callback-ownership"
+      ]
+    },
+    {
+      "id": "069",
+      "title": "Protocols, generics, any, some and Self",
+      "summary": "Preserve useful type relationships, expose capabilities through explicit requirements, and predict dispatch at the consumer’s actual boundary.",
+      "duration": 75,
+      "level": "Foundation",
+      "prerequisites": [
+        "057",
+        "058",
+        "059",
+        "060",
+        "061",
+        "062",
+        "063",
+        "064",
+        "065",
+        "066",
+        "067",
+        "068"
+      ],
+      "objectives": [
+        "Define a protocol requirement and a constrained generic operation.",
+        "Distinguish Any, existential any and opaque/generic some.",
+        "Explain associated types, Self and extension-only helper dispatch with complete small fixtures."
+      ],
+      "sections": [
+        {
+          "id": "why-contracts",
+          "title": "Reuse a rule without erasing the useful type",
+          "html": "<p>An Android interface lets a consumer depend on a capability, while a generic parameter preserves relationships such as input and output sharing a type. Swift protocol and generics supply related tools. A protocol declares requirements a conforming type must satisfy. A colon after a struct/class name can declare conformance. Requirements describe callable/property capabilities rather than mandate a class hierarchy. Structs, classes and enums can conform. A property requirement <code>var title: String { get }</code> permits readable access and does not require stored mutable state.</p><p>A generic type parameter is a locally named type relationship, not the unrestricted Any container. A function <code>identity&lt;T&gt;(_ value: T) -&gt; T</code> preserves the input type in its output. The caller chooses a suitable T through arguments/context. Operations on T require declared constraints; equality needs Equatable, and ordering needs a suitable comparison contract. Kotlin’s generic syntax is useful for intent, but Swift constraints, associated types and existential rules differ from JVM erasure/reified assumptions. Start with the API information the caller needs. Do not choose a type-erasure mechanism merely because an error message mentions generics.</p>"
+        },
+        {
+          "id": "generic-functions",
+          "title": "Read a constrained operation one symbol at a time",
+          "html": "<pre><code class=\"language-swift\">func identity&lt;T&gt;(_ value: T) -&gt; T {\n    return value\n}\nfunc same&lt;T: Equatable&gt;(_ left: T, _ right: T) -&gt; Bool {\n    return left == right\n}\nlet number: Int = identity(3)\nlet text: String = identity(\"Ada\")\nprint(number)\nprint(text)\nprint(same(3, 3))\nprint(same(\"Ada\", \"Rae\"))</code></pre><p>Angle brackets declare the generic parameter T for each function. Identity’s input and result both use T, so there is no downcast to recover the returned type. In same, <code>T: Equatable</code> permits equality for values of that one chosen type. Both parameters share T; an Int variable and a String variable cannot satisfy the same signature. The output is three, Ada, true and false. T is a type name within the generic declaration, while left and right are ordinary value parameters.</p><p>Where clauses can express more relationships, including matching associated element types. A double equals in a type where-clause means types must match, not that runtime objects compare equal. Only constrain the operations you need: extra constraints can prevent useful callers without improving the algorithm. Generic specialization is a compiler optimization possibility, not proof of a performance benefit in every build. Equality does not supply hashing, copying, identity or concurrency safety. Kotlin Equatable has no exact named-interface counterpart with identical rules; Swift’s standard protocol authorizes == at this generic boundary. Keep comparison semantics and a domain’s stable identity distinct.</p>"
+        },
+        {
+          "id": "protocol-dispatch",
+          "title": "A declared requirement is the customization point",
+          "html": "<pre><code class=\"language-swift\">protocol Greeting {\n    func message() -&gt; String\n}\nextension Greeting {\n    func message() -&gt; String { \"Default\" }\n    func decoration() -&gt; String { \"Extension\" }\n}\nstruct CustomGreeting: Greeting {\n    func message() -&gt; String { \"Custom\" }\n    func decoration() -&gt; String { \"Concrete\" }\n}\nfunc throughGeneric&lt;G: Greeting&gt;(_ value: G) -&gt; String {\n    return value.message() + \"/\" + value.decoration()\n}\nlet concrete = CustomGreeting()\nlet erased: any Greeting = concrete\nprint(concrete.decoration())\nprint(throughGeneric(concrete))\nprint(erased.message() + \"/\" + erased.decoration())</code></pre><p>Greeting declares message as a requirement. Its extension supplies a default requirement implementation and also adds decoration as an extension-only helper. CustomGreeting provides its own message and a same-named decoration. A concrete decoration call returns Concrete. Through the generic Greeting constraint and the existential any Greeting, message uses the conformer’s requirement implementation while decoration uses the static extension helper. The two combined outputs are Custom/Extension. The same spelling on the concrete type does not create a requirement that was never declared.</p><p>If decoration must vary polymorphically through the protocol, declare it in Greeting and optionally retain the extension default. Kotlin extension functions provide a useful static-selection analogy, but Swift also has protocol requirement witnesses and retroactive conformances. Extensions can add methods, computed properties and conformances; they cannot add stored instance properties. Class hierarchies with inherited conformances add witness/override subtleties, so do not extend this simple fixture into a blanket claim about every subclass. Test the boundary the consumer actually uses instead of only calling a concrete object. None of these protocols implies every conformer is a class.</p>"
+        },
+        {
+          "id": "any-and-some",
+          "title": "Hiding a type can mean two different contracts",
+          "html": "<pre><code class=\"language-swift\">protocol Naming {\n    var name: String { get }\n}\nstruct Person: Naming { let name: String }\nstruct Place: Naming { let name: String }\nfunc chosenPerson() -&gt; some Naming {\n    return Person(name: \"Ada\")\n}\nfunc caption(_ value: some Naming) -&gt; String {\n    return value.name\n}\nlet mixed: [any Naming] = [Person(name: \"Ada\"), Place(name: \"Park\")]\nprint(chosenPerson().name)\nfor value in mixed { print(value.name) }\nprint(caption(Person(name: \"Rae\")))</code></pre><p>Any, uppercase, can store a value of any type and exposes little capability without inspection. <code>any Naming</code> is an existential constrained by a protocol; it can hold interchangeable concrete conformers and exposes the declared name capability. The array deliberately stores two distinct concrete types through that common contract. <code>some Naming</code> in a result position is opaque: the function chooses one underlying concrete result type while callers use its public capabilities. Ordinary return paths for that declaration must share that underlying type. Returning Person on one branch and Place on another is not made valid by writing some.</p><p>Parameter-position some is shorthand for a generic parameter with a protocol constraint. Two independently written some parameters do not inherently share one type; name a common T when that relationship matters. Kotlin interface values help explain existential substitution, but Swift opaque result identity and associated-type relationships need separate reasoning. This example uses language features supported by a modern toolchain, including Swift 5.7 onward for opaque parameter syntax; our scratch baseline is Swift 6 or newer. The output is Ada, Ada, Park and Rae. Existentials may incur boxing/dispatch costs depending on representation, so choose from contract requirements first and measure relevant code later.</p>"
+        },
+        {
+          "id": "associated-and-self",
+          "title": "A conformance can define a related element type",
+          "html": "<pre><code class=\"language-swift\">protocol Source&lt;Element&gt; {\n    associatedtype Element\n    var items: [Element] { get }\n}\nstruct ArraySource&lt;Value&gt;: Source {\n    let items: [Value]\n}\nfunc first&lt;S: Source&gt;(_ source: S) -&gt; S.Element? {\n    return source.items.first\n}\nprotocol ReplacingTitle {\n    func replacingTitle(_ text: String) -&gt; Self\n}\nstruct Note: ReplacingTitle {\n    let title: String\n    func replacingTitle(_ text: String) -&gt; Self {\n        return Self(title: text)\n    }\n}\nlet source = ArraySource(items: [2, 4])\nlet known: any Source&lt;Int&gt; = source\nprint(first(source) ?? -1)\nprint(known.items.count)\nprint(Note(title: \"Before\").replacingTitle(\"After\").title)</code></pre><p>Associatedtype names a type selected by each conformance. Source’s primary associated type list makes Element convenient to constrain; it is not the same thing as declaring an ordinary generic protocol class. ArraySource’s items property lets the compiler infer Element as Value. First preserves that relationship through S.Element? and returns nil for an empty source. The constrained existential any Source&lt;Int&gt; hides the concrete source but retains the element contract as Int. Existential operations involving unknown associated relationships can be limited, while modern Swift can implicitly open some existential values for generic calls.</p><p>Uppercase Self describes the current/conforming type relationship; lowercase self is an instance. Note’s method constructs a new value of its own type and preserves that result relationship. It is not a promise to clone nested classes, and class factories face additional construction/inheritance constraints. The outputs are two, two and After. The optional generic-contracts supplement expands where clauses, existential opening and class dispatch limits after this introduction. Do not assume any always discards every associated fact or that it can recover every missing relation; name the preserved relationship you need.</p>"
+        },
+        {
+          "id": "repo-and-failure",
+          "title": "Use actual constraints as evidence of capabilities",
+          "html": "<p>The active sequence utilities constrain sort keys to Comparable and uniqueness keys to Hashable. Those constraints authorize the operations used by their algorithms; they do not say every input element itself must have those capabilities. The cancellation selectedOption extension uses a same-type condition on Element to expose a domain-specific helper only for matching sequences. GooglePlaceDetailsServing declares a real protocol requirement with additional async/throws/Sendable effects for later concurrency study. Read its labels and required capability now without importing its runtime machinery.</p><p>Misconceptions include treating T as Any, thinking every any wraps a class, expecting some to return unrelated concrete types, and assuming an extension-only helper dynamically specializes. Classify missing constraints and mismatched types as compiler failures, while the wrong helper selection is valid code with a misleading API contract. Test concrete, generic and existential access before declaring substitution correct. We verified anchors and module membership, not generic specialization performance or a repository-wide any migration. The exercise uses standalone pure types so the caller-visible relationships, not framework complexity, decide the design.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does identity<T>(T) -> T preserve?",
+          "options": [
+            "The same chosen input/output type",
+            "A universal Any result",
+            "Reference identity for all values"
+          ],
+          "answer": 0,
+          "explanation": "The generic type parameter links the input and output types. It does not promise class identity or deep copying."
+        },
+        {
+          "question": "Which helper dynamically fulfills a protocol contract?",
+          "options": [
+            "Any same-named concrete method",
+            "A declared requirement supplied by its conformance",
+            "Every method added only by an extension"
+          ],
+          "answer": 1,
+          "explanation": "Requirements establish customization through the protocol boundary. An extension-only helper is selected statically from that boundary."
+        },
+        {
+          "question": "Can ordinary branches of one -> some Naming return Person and Place?",
+          "options": [
+            "Yes, because both conform",
+            "No, the opaque result requires one underlying result type",
+            "Only when wrapped in Array"
+          ],
+          "answer": 1,
+          "explanation": "An existential can represent changing implementations; an opaque result preserves a chosen concrete type identity."
+        }
+      ],
+      "exercise": {
+        "brief": "Build a protocol with a real caption requirement and compare concrete, generic and existential behavior; preserve an element type through a generic source.",
+        "steps": [
+          "Declare Captioning with caption() -> String and a default extension implementation.",
+          "Override that requirement in a struct and call it directly, through a generic, and through any Captioning.",
+          "Add an extension-only helper and predict its static selection.",
+          "Construct ArraySource<Int> and use first without casting.",
+          "Explain Any, any, some and Self with one caller-visible consequence each."
+        ],
+        "acceptance": [
+          "The custom requirement is used through all three declared boundaries.",
+          "The helper’s different static behavior is identified rather than silently accepted.",
+          "The first-source result retains Int? and handles empty input.",
+          "No force casts or advanced old-core prerequisites are needed."
+        ],
+        "solution": "<p>This complete requirement/dispatch answer can run in one file. The associated-source block above is a separate complete example for the element-type portion.</p><pre><code class=\"language-swift\">protocol Captioning { func caption() -&gt; String }\nextension Captioning {\n    func caption() -&gt; String { \"Default\" }\n    func helper() -&gt; String { \"Extension\" }\n}\nstruct Badge: Captioning {\n    func caption() -&gt; String { \"Custom\" }\n    func helper() -&gt; String { \"Concrete\" }\n}\nfunc inspect&lt;C: Captioning&gt;(_ value: C) -&gt; String {\n    value.caption() + \"/\" + value.helper()\n}\nlet badge = Badge()\nlet erased: any Captioning = badge\nprint(badge.caption())\nprint(badge.helper())\nprint(inspect(badge))\nprint(erased.caption() + \"/\" + erased.helper())</code></pre><p>Output is Custom, Concrete, Custom/Extension and Custom/Extension. If helper must specialize, add it as a requirement and rerun boundary calls. That change alters the API contract, not merely spelling. Explain why a concrete-only assertion would have missed the consumer’s behavior.</p><p>For the source task, first(ArraySource(items: [Int]())) returns nil while a nonempty integer source returns Int?. Any provides unrestricted storage, any provides a protocol-bound value, result some hides one chosen implementation type, and Self links behavior to the conforming type. These explanations are intentionally bounded; associated-type variance, inherited witnesses and ABI optimization require further specialist practice. Record independent predictions and runs rather than counting this answer as completion.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Type parameters, constraints and associated types",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/generics/"
+        },
+        {
+          "label": "Swift: Requirements, defaults and Self",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/protocols/"
+        },
+        {
+          "label": "Swift: Opaque and boxed protocol types",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/opaquetypes/"
+        }
+      ],
+      "repo": [
+        {
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDCorePlusSentry/Extensions/Sequence+Extensions.swift",
+          "line": 49,
+          "label": "Comparable sort-key constraint",
+          "why": "Generic capabilities match the comparison operation."
+        },
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentViewController.swift",
+          "line": 255,
+          "label": "Same-type extension contract",
+          "why": "The helper is constrained to one associated element type."
+        },
+        {
+          "path": "ios-client/Projects/Infra/ZDModules/Sources/ZDModules/GooglePlaceDetailsServing.swift",
+          "line": 12,
+          "label": "Active capability protocol",
+          "why": "Identify the declared requirement while deferring its concurrency effects."
+        }
+      ],
+      "checklist": [
+        "I can choose abstraction by the type relationships callers need.",
+        "I can explain Any, any and some separately.",
+        "I can predict requirement versus helper dispatch.",
+        "I have checked concrete and abstract consumers."
+      ],
+      "guides": [
+        "generic-contracts"
+      ]
+    },
+    {
+      "id": "070",
+      "title": "Integrated language lab, tests and retrieval",
+      "summary": "Combine values, collections, failure contracts and callback ownership in a small tested core, then record transfer evidence and remaining gaps.",
+      "duration": 120,
+      "level": "Lab",
+      "prerequisites": [
+        "057",
+        "058",
+        "059",
+        "060",
+        "061",
+        "062",
+        "063",
+        "064",
+        "065",
+        "066",
+        "067",
+        "068",
+        "069"
+      ],
+      "objectives": [
+        "Implement a standalone language core from requirements before consulting the answer.",
+        "Use meaningful tests for copy behavior, empty success, error identity and owner release.",
+        "Classify compiler, assertion and integration evidence without claiming automatic mastery."
+      ],
+      "sections": [
+        {
+          "id": "lab-contract",
+          "title": "Retrieve first, then build a changed example",
+          "html": "<p>This session combines the beginner sequence; it does not certify automatic Swift mastery. Close earlier answers and draft a synthetic quantity-import core from these rules: editing input must preserve the original; each accepted text must represent a positive integer; successful empty input is still success; malformed and nonpositive input retain different reasons; a saved refresh callback must tolerate an owner that has been released. Use your Android unit-test instincts to describe observable behavior before choosing language constructs. Keep all inputs synthetic.</p><p>The core remains synchronous and independent of UI, networking, actors and persistence. Cancellation and freshness have distinct host workshops later, so do not infer those guarantees from a weak callback. Write a prediction sheet with certain, tentative and guessed answers for assignment, argument labels, optional conversion, enum payloads and capture lifetime. Then implement before opening the worked core. Passing authored examples supports their language behavior; your own changed-input implementation demonstrates transfer. Any unfinished attempt remains pending. A useful handoff identifies what you can now explain and the two rules you still need to retrieve under new fixtures.</p>"
+        },
+        {
+          "id": "worked-core",
+          "title": "A complete source file with a replaceable boundary",
+          "html": "<pre><code class=\"language-swift\">struct Draft: Equatable {\n    var texts: [String]\n}\nenum LabFailure: Error, Equatable {\n    case invalid(String)\n    case nonpositive(Int)\n    case unexpected\n}\nenum Outcome: Equatable {\n    case idle\n    case loaded([Int])\n    case failed(LabFailure)\n}\nprotocol Parsing {\n    func parse(_ texts: [String]) throws -&gt; [Int]\n}\nstruct Parser: Parsing {\n    func parse(_ texts: [String]) throws -&gt; [Int] {\n        var values: [Int] = []\n        for text in texts {\n            guard let value = Int(text) else { throw LabFailure.invalid(text) }\n            guard value &gt; 0 else { throw LabFailure.nonpositive(value) }\n            values.append(value)\n        }\n        return values\n    }\n}\nfunc load(_ draft: Draft, using parser: any Parsing) -&gt; Outcome {\n    do {\n        return .loaded(try parser.parse(draft.texts))\n    } catch let failure as LabFailure {\n        return .failed(failure)\n    } catch {\n        return .failed(.unexpected)\n    }\n}\nfinal class Owner {\n    var draft: Draft\n    let parser: any Parsing\n    private(set) var outcome: Outcome = .idle\n    var refresh: (() -&gt; Void)?\n\n    init(draft: Draft, parser: any Parsing) {\n        self.draft = draft\n        self.parser = parser\n        self.refresh = { [weak self] in\n            guard let self else { return }\n            self.outcome = load(self.draft, using: self.parser)\n        }\n    }\n}</code></pre><p>Place this entire source in <code>Sources/BootcampCore/Core.swift</code> for the package below, or combine it with the smoke check in one standalone file. It uses only the Swift standard library, so no Foundation import is needed. Draft stores an array value. LabFailure is an Error-conforming enum with payloads; Outcome separates idle, loaded and failed. Parsing declares one throwing requirement. Parser builds an output array in input order and throws at the first invalid row. The explicit for loop makes all-or-error policy visible; compactMap would silently drop rejected input instead.</p><p>Load calls through an existential capability. Its known-error catch retains the LabFailure payload, while an unrelated error becomes unexpected rather than successful empty data. Owner is a reference type only because the exercise deliberately needs lifetime. It owns draft, parser and the optional refresh function value; the callback captures it weakly. The successful guard creates a strong local binding for that synchronous invocation. Private(set) confines outcome writes while allowing ordinary internal reads. Every declaration is internal by default. The parser’s synchronous throws contract grants failure, not a background executor. There is no hidden dependency on the company resolver or the companion package’s API.</p>"
+        },
+        {
+          "id": "package-and-visibility",
+          "title": "Set up a new scratch module and test target",
+          "html": "<pre><code class=\"language-swift\">// swift-tools-version: 6.0\nimport PackageDescription\n\nlet package = Package(\n    name: \"BootcampCore\",\n    products: [.library(name: \"BootcampCore\", targets: [\"BootcampCore\"])],\n    dependencies: [],\n    targets: [\n        .target(name: \"BootcampCore\"),\n        .testTarget(name: \"BootcampCoreTests\", dependencies: [\"BootcampCore\"])\n    ],\n    swiftLanguageModes: [.v6]\n)</code></pre><p>Place this manifest at your own scratch package root, with the core under Sources/BootcampCore and the test file under Tests/BootcampCoreTests. The tools header requires Swift tools 6.0 or later; swiftLanguageModes selects Swift 6 source checking. Dependencies is empty. The library product exposes a target, and the test target declares its dependency on that module. Import PackageDescription belongs to the manifest’s execution environment, not the core source. Import Testing belongs to the test target and provides the macros used below.</p><p>The source intentionally uses internal APIs because the tests use testable import under a testing-enabled build. A separate ordinary importing module would require explicit public declarations and construction APIs; making the product a library does not promote internal members. This matches the access lesson. Do not place test macros into the standalone script or expect a source-only compiler run to discover tests. From the scratch package root, swift test builds the modules and executes discovered tests. In restricted host environments, use isolated temporary caches as needed. No minimum-toolchain run, Linux run, simulator build or company app verification is implied by an author’s newer macOS toolchain.</p>"
+        },
+        {
+          "id": "tests",
+          "title": "Protect requirements, not the source’s line count",
+          "html": "<pre><code class=\"language-swift\">import Testing\n@testable import BootcampCore\n\n@Test func editsPreserveOriginal() {\n    let original = Draft(texts: [\"2\"])\n    var edited = original\n    edited.texts.append(\"3\")\n    #expect(original.texts == [\"2\"])\n    #expect(edited.texts == [\"2\", \"3\"])\n}\n@Test func successAndEmptyStaySuccessful() {\n    #expect(load(Draft(texts: [\"2\", \"3\"]), using: Parser()) == .loaded([2, 3]))\n    #expect(load(Draft(texts: []), using: Parser()) == .loaded([]))\n}\n@Test func failuresKeepTheirReasons() {\n    #expect(load(Draft(texts: [\"bad\"]), using: Parser()) == .failed(.invalid(\"bad\")))\n    #expect(load(Draft(texts: [\"0\"]), using: Parser()) == .failed(.nonpositive(0)))\n}\nenum OtherFailure: Error { case offline }\nstruct FailingParser: Parsing {\n    func parse(_ texts: [String]) throws -&gt; [Int] { throw OtherFailure.offline }\n}\n@Test func unexpectedFailureIsNotSuccess() {\n    #expect(load(Draft(texts: []), using: FailingParser()) == .failed(.unexpected))\n}\n@Test func savedCallbackToleratesRelease() {\n    var owner: Owner? = Owner(draft: Draft(texts: [\"2\"]), parser: Parser())\n    let saved = owner?.refresh\n    weak var probe = owner\n    saved?()\n    #expect(owner?.outcome == .loaded([2]))\n    owner = nil\n    #expect(probe == nil)\n    saved?()\n}</code></pre><p>The first test protects independent draft edits. The second protects nonempty success and successful emptiness. The third preserves parse versus domain error identity. The fourth uses a replaceable fake that throws an unrelated error and protects the unexpected-failure classification. The fifth retains a callback independently, invokes it while the owner exists, removes the owner, observes release through a weak probe, and safely invokes the surviving closure again. Each test creates local fixtures, so parallel test discovery need not share mutable globals or depend on order.</p><p>@Test declares a Swift Testing test function and #expect records an observable condition with diagnostics. They are macros from Testing, not preprocessor directives or language-only assert replacements. Testable import enables internal module access in this test build but does not grant arbitrary private access. The final test uses no sleep: its behavior is synchronous, so waiting would add uncertainty without creating a needed event. XCTest remains a separate common framework with test methods and assertion APIs; this scratch suite deliberately follows the modern Testing pattern already present in the active repository. A passing compile and a passing executed suite are separate pieces of evidence.</p>"
+        },
+        {
+          "id": "smoke-and-failures",
+          "title": "Choose the smallest check and challenge its meaning",
+          "html": "<pre><code class=\"language-swift\">func check() {\n    let original = Draft(texts: [\"2\"])\n    var edited = original\n    edited.texts.append(\"3\")\n    assert(original.texts == [\"2\"])\n    assert(load(edited, using: Parser()) == .loaded([2, 3]))\n    assert(load(Draft(texts: []), using: Parser()) == .loaded([]))\n    assert(load(Draft(texts: [\"bad\"]), using: Parser()) == .failed(.invalid(\"bad\")))\n    assert(load(Draft(texts: [\"0\"]), using: Parser()) == .failed(.nonpositive(0)))\n    var owner: Owner? = Owner(draft: edited, parser: Parser())\n    let saved = owner?.refresh\n    weak var probe = owner\n    saved?()\n    assert(owner?.outcome == .loaded([2, 3]))\n    owner = nil\n    assert(probe == nil)\n    saved?()\n    print(\"Language checks passed\")\n}\ncheck()</code></pre><p>For a standalone check, combine the complete core declaration block with this smoke block in one file and run it without optimization that disables assert. It prints Language checks passed only after its synchronous assertions succeed. The assertions protect the same key boundaries, but this is an executable check, not Swift Testing discovery. A source file containing only declarations can compile while producing no test evidence. The package suite additionally exercises unexpected failure. Write down which route you ran.</p><p>Introduce one wrong behavior in a private scratch copy: replace explicit error classification with loaded empty output in every catch. Predict which expectations fail before executing. Restore it afterward. Separately predict a strong capture cycle and explain why the weak probe would remain nonnil until the stored closure is cleared; do not leave that intentional cycle retained. Compiler failures, failed expectations and ownership retention are different categories. An invalid same-variable inout example from lesson 064 should be rejected rather than included in the passing suite. Keep these intentional negatives labeled so a reviewer can distinguish them from mistakes in the runnable answer.</p>"
+        },
+        {
+          "id": "companion-and-retrieval",
+          "title": "Use the host companion after reading its actual files",
+          "html": "<p>The course companion at labs/SwiftLanguageLab is a separate dependency-free host package. Its inspected manifest declares a library, a swift-workbench executable and a test target in Swift 6 mode. Its README describes isolated-cache commands and language, gate and Foundation scopes. Read those actual files before invoking any API; this lesson’s BootcampCore has its own complete contract and does not assume interchangeability with the companion’s functions. The companion’s public construction APIs and imports are separate evidence from our testable internal module. Its Foundation fixture practice belongs to its own workshop.</p><p>For repository retrieval, trace the active question model, its enum wrapper, the stored callback, and the test source glob. Explain what each observed line establishes. Then return to your core and add a changed fixture, such as a negative value or several positive rows, predicting output first. Revisit in two days and a week with different inputs and without opening the answer. Write a limits note: pure host tests do not verify UI lifecycle, platform availability, module distribution, actor isolation, cancellation, serialization or real error telemetry. Progress checkboxes and quiz results for earlier lessons remain untouched. Choose further practice from your mistaken predictions instead of declaring the whole language mastered.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does a passing host suite establish?",
+          "options": [
+            "The iOS app is ready to release",
+            "The exercised core behaviors passed on the recorded host/toolchain",
+            "Automatic mastery of Swift"
+          ],
+          "answer": 1,
+          "explanation": "Verification is scoped to the code, fixtures and environment actually executed. Independent transfer and platform checks remain separate."
+        },
+        {
+          "question": "Why does empty input yield loaded([])?",
+          "options": [
+            "Empty input is a successful result under this contract",
+            "All errors should become empty arrays",
+            "Enums require arrays to be nonempty"
+          ],
+          "answer": 0,
+          "explanation": "Success with zero rows is distinct from invalid/domain/unexpected failure and from idle. The tests protect that domain distinction."
+        },
+        {
+          "question": "Why does the test target use @testable import?",
+          "options": [
+            "The core APIs are internal and testing-enabled access is intentional",
+            "It exports private members to every app",
+            "It replaces the target dependency"
+          ],
+          "answer": 0,
+          "explanation": "The test build can access internal declarations. It still needs a target dependency and does not generally expose private APIs."
+        }
+      ],
+      "exercise": {
+        "brief": "Implement your own quantity core and tests from the stated rules, then submit changed-input predictions, actual results and a focused retrieval plan.",
+        "steps": [
+          "Write the behavior table without reading the core answer.",
+          "Create your own scratch module/test target or a combined standalone file.",
+          "Implement value input, typed outcomes, throwing parser substitution and weak stored refresh.",
+          "Test original/edit independence, nonempty/empty success, malformed/nonpositive/unexpected failure and owner release.",
+          "Introduce and restore the deliberate errors-to-empty bug, recording which meaningful test detects it.",
+          "Read the companion README before running its package; keep its output separate from your core evidence.",
+          "Repeat two weak concepts later with changed fixtures and leave unattempted learner work pending."
+        ],
+        "acceptance": [
+          "All declared output distinctions have independently authored assertions or explicit paper predictions.",
+          "A saved callback can outlive a released owner without a cycle or crash.",
+          "The record distinguishes compile, test execution and any companion run.",
+          "No existing quiz/checklist indices or learner completion are altered.",
+          "The handoff lists two remaining practice goals and verification limits rather than automatic mastery."
+        ],
+        "solution": "<p>The complete core, manifest and test file above form the worked package answer. The core plus smoke block form the worked standalone answer. Run the route matching your scratch layout, then capture the toolchain, command, exit result and final test summary. The intended package has five discovered Swift Testing tests. A compatibility runner reporting zero XCTest tests does not by itself mean the Swift Testing functions were skipped; inspect their final summary.</p><p>The deliberate errors-to-empty mutation should fail malformed, nonpositive and unexpected-failure expectations while successful empty input still passes. That shows the tests defend domain distinctions instead of mirroring implementation structure. Restore explicit classification before keeping your completed scratch answer. The lifetime test establishes a weak owning edge and safe missing-owner path; it proves no producer cancellation because the program has no producer work.</p><p>For a changed exercise, parse [4, 6] and predict loaded([4, 6]), then parse [-1] and predict failed(nonpositive(-1)). Explain how an accept-valid-rows policy would require an output carrying rejection evidence rather than merely changing compactMap. Optional matching guides can deepen construction, generic contracts and callback ownership afterward. Author verification does not pre-complete the learner’s attempt; readiness depends on independent implementation, explained predictions and a documented remaining-practice plan.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Swift Testing test declaration and expectations",
+          "url": "https://developer.apple.com/documentation/testing"
+        },
+        {
+          "label": "SwiftPM: Package, targets and tools configuration",
+          "url": "https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html"
+        },
+        {
+          "label": "Swift: Error propagation and handling",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/errorhandling/"
+        }
+      ],
+      "repo": [
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Tests/ZDAppointmentsCancellationTests/CancelAppointmentBookingPromptManagerTests.swift",
+          "line": 8,
+          "label": "Active Swift Testing pattern",
+          "why": "Compare local fixtures and @Test/#expect with the scratch suite."
+        },
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Project.swift",
+          "line": 101,
+          "label": "Separate source/test membership",
+          "why": "The test target owns its glob and dependency rather than discovering arbitrary source files."
+        },
+        {
+          "path": "ios-client/Projects/Features/ZDAppointments/Sources/ZDAppointmentsCancellation/CancelAppointmentQuestionData.swift",
+          "line": 8,
+          "label": "Start a bounded source trace",
+          "why": "Retrieve value fields, optional absence and the computed enum wrapper."
+        }
+      ],
+      "checklist": [
+        "I have authored a changed-input implementation before reading the answer.",
+        "I can explain what each executed check protects.",
+        "I can distinguish host evidence from platform integration.",
+        "I have scheduled my own retrieval intentions without automatic completion.",
+        "I can name two remaining practice goals."
+      ],
+      "guides": [
+        "initialization-access",
+        "generic-contracts",
+        "callback-ownership"
+      ]
+    }
+  ]
+}

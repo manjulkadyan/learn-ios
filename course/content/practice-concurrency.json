@@ -1,0 +1,190 @@
+{
+  "workshops": [
+    {
+      "id": "swift6-migration-lab",
+      "title": "Audit a Swift 6 migration with deterministic contracts",
+      "summary": "Compile positive and negative settings cases, test clock/context/channel transitions, and audit a bounded pointer owner without changing a client.",
+      "kind": "Host implementation",
+      "sessions": [
+        "089",
+        "090",
+        "091",
+        "092"
+      ],
+      "sections": [
+        {
+          "id": "scope-evidence",
+          "title": "Set up an evidence ledger before running",
+          "html": "<p>This workshop practices a migration audit, not an application upgrade. You will work only in ConcurrencyMigrationLab, which has no remote package dependencies, account fixtures or native app target. Start by predicting which compiler cases pass, which warn, and which fail. Record compiler version, language mode, module isolation default, upcoming feature flags, deployment assumptions and observed exit status. A rejected unsafe program is a successful negative check only when it fails for the expected reason.</p><p>The package requires a Swift 6.2+ toolchain, Swift 6 language mode and macOS 15+ for its Synchronization-based manual clock. It explicitly chooses nonisolated default inference. The author verified it on Apple Swift 6.4; that establishes current local behavior, not identical behavior on an untested 6.2 compiler. If your compiler is older, the diagnostic runner reports a skip rather than calling missing-feature errors a successful migration. Do not edit a company target to make the exercise runnable.</p><p>Run sh verify-host.sh and python3 verify-diagnostics.py from the lab directory. Both place outputs and caches in fresh unique /private/tmp directories. The host script records the toolchain and Swift Testing output; the diagnostic script preserves each stderr log, command and status in results.json. Keep the printed evidence paths in your own submission. These files are scratch evidence, not bundled learner completion records. The lab README records the author's actual checks and limits.</p>"
+        },
+        {
+          "id": "settings-investigation",
+          "title": "Investigate settings as separate decisions",
+          "html": "<p>Begin with MutableGlobal.swift. Predict a concurrency warning under Swift 5 with complete checking and an error under Swift 6. The variable has no mutation owner. A successful warning build does not prove runtime safety, and the language-mode change does not create an actor. Write the intended repair for a synthetic UI counter and separately for an account cache; their owners differ even when both diagnostics mention shared state.</p><p>DefaultIsolation.swift isolates a different input. An unannotated free function returns an integer and an explicitly nonisolated function calls it. It passes with a nonisolated module default and fails when that free function becomes MainActor-isolated. Imported code is not rewritten by this setting. Compare this module-local rule with the real client helper's selective SWIFT_VERSION declaration, which is read-only source evidence rather than a resolved compile invocation.</p><p>CallerIsolation.swift then changes execution policy: a mutable worker held by an actor is called through an ordinary nonisolated async method. Without NonisolatedNonsendingByDefault the cross-domain call is rejected; with it the example passes. ConcurrentBoundary.swift explicitly leaves the actor and remains rejected. Explain why this can protect race safety while exposing a UI responsiveness risk for synchronous parsing. Kotlin dispatcher vocabulary motivates deliberate execution policy but does not promise Swift's exact executor scheduling.</p><p>Finish this stage with a rollout proposal that names the module owner, scope, dependent callers and independent rollback settings. Do not merge MainActor defaults, Swift 6 enforcement and caller execution into one unreviewable preference. A device recording plan belongs in the evidence ledger as pending until actually performed.</p>"
+        },
+        {
+          "id": "transfer-context",
+          "title": "Trace values and metadata through their own boundaries",
+          "html": "<p>Transfer.swift tests a fresh mutable reference handed to an actor through sending. The positive branch has no later source use. INVALID reads that region after transfer and must be rejected. In Contracts.swift the actor returns only a String snapshot. Explain why this is a one-way ownership decision rather than a permanent Sendable conformance or deep copy. Then audit Conformance.swift: same-domain Caption use succeeds while a concurrent generic consumer of the isolated conformance is rejected.</p><p>Task-local context is a separate dimension. Predict that an async-let child and ordinary Task inherit the synthetic trace while Task.detached sees nil. The host test joins all handles and checks nested binding restoration. Inheriting metadata does not make an unstructured task a structured child or establish parent cancellation. Compare it to Kotlin CoroutineContext without relabeling it Java ThreadLocal. For detached work requiring correlation, define an explicit permitted value and binding, along with an independent task owner.</p><p>For time, inspect delayed(using:delay:) and ManualClock. Await the registration barrier before advancing virtual time. Four of five seconds keeps one pending sleep; the final second produces ready. Cancellation removes a registered sleeper; later advancement must not resume it twice. The fake clock ignores tolerance, advances only forward and does not model operating-system wakeup jitter. Those limitations are appropriate for a deadline contract test and insufficient for battery or native background claims.</p>"
+        },
+        {
+          "id": "channel-demand",
+          "title": "Prove cancellation and demand without an unbounded queue",
+          "html": "<p>DemandChannel has zero accepted buffering and at most one retained proposal from a blocked sender. Its next method requests one element. A match removes pending state before either continuation resumes, so that acceptance decision is atomic within one actor execution segment. Another blocked producer or consumer is rejected. This is a deliberately small local API, not a complete AsyncSequence or AsyncAlgorithms implementation.</p><p>Read the producer-first and consumer-first tests to see both registration directions. Then inspect cancellation after registration: canceled sender data must disappear before a replacement is received, and a canceled receiver must not consume a later value. The pre-registration test cancels its own current task before entry and expects immediate rejection. A separate match-wins test receives first, then cancels the sender, and still joins the accepted send successfully. It documents a legal ordering rather than using sleeps to force a fragile race.</p><p>Finish resolves a blocked producer with closed and a blocked receiver with nil. Calling it twice does not resume either continuation twice. New sends fail. The test-only registration observers require a schedule that actually produces the event; they are not cancellation-aware production wait APIs. A consumer leaving early needs an explicit finish-and-join path or the producer can stay suspended indefinitely.</p><p>The official AsyncAlgorithms guide supplies broader channel semantics and a nonthrowing send operation. Cancellation and termination can unblock that send without delivering a command. Neither that API nor this local receipt acknowledgment proves persistence completion. Bound producers and payloads; if durable processing matters, add a separate bounded acknowledgment with request identity and failure recovery. Do not claim a global memory bound by counting accepted buffer slots alone.</p>"
+        },
+        {
+          "id": "ownership-review",
+          "title": "Audit unsafe storage within a bounded elective",
+          "html": "<p>Contracts.swift also contains scopedSum, OwnedInt and retainedRoundTrip. Identify allocation, initialization, value reads, destruction and release separately. ScopedSum initializes two integer slots, returns eight and deinitializes/deallocates them in defer. OwnedInt exposes only borrowed read and consuming extraction. The returned integer can outlive its allocation; the consumed owner binding cannot be read again. Ownership.swift verifies both positive compilation and invalid reuse rejection.</p><p>Exclusivity.swift rejects two inout arguments aliasing the same local variable. That rule matters on one thread and is distinct from actor isolation. A pointer can bypass some checks while remaining invalid; it is not an exception that makes shared memory safe. No dangling-pointer run is provided. Native C allocation must be freed by its documented allocator family, and a pointer borrowed from a withUnsafe closure must not escape its scope.</p><p>The synchronous Unmanaged sample takes one retained context back into managed ownership exactly once and checks a weak observation after scope. Describe a repeating callback separately: registration owns one retain, callbacks borrow it, unregister must acknowledge callback quiescence, and one terminal path releases it. The sample does not execute that native registration or prove vendor callback behavior. Cancellation is not immediate deallocation and deinit cannot await unregister. Java AutoCloseable and Kotlin use help explain cleanup while allowing different aliasing behavior.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Submit an independent migration audit containing diagnostic predictions, host evidence and one cancellation/ownership design decision.",
+        "steps": [
+          "Predict all fourteen diagnostic cases and run the verifier.",
+          "Run the host checks, preserve the printed evidence path and explain each new boundary rather than its duration.",
+          "Build a table for warning/error, inference, caller execution, transfer, conformance, consumed reuse and aliasing.",
+          "Choose receipt versus processing acknowledgment for a synthetic persisted command.",
+          "Write a repeating-callback ownership ledger and mark unverified target work."
+        ],
+        "acceptance": [
+          "Fourteen diagnostic cases match expected success/failure and category on a supported compiler.",
+          "All thirteen host tests pass without elapsed-time sleeps.",
+          "The report separates clock/context/channel contracts from legacy stale-result tests.",
+          "Receipt, cancellation, ordinary failure and shutdown have explicit meanings.",
+          "The callback ledger has one final release after quiescence and no escaped temporary pointer.",
+          "No production migration, simulator execution, sanitizer result or learner certification is asserted."
+        ],
+        "solution": "<p>A substantial worked submission begins with the actual toolchain and settings, then pairs each prediction with a log. Mutable-global warning/error establishes checking enforcement; default-isolation pass/error establishes module inference; ordinary-worker off/on and explicit-concurrent rejection establish execution boundaries. Transfer pass/use-after rejection and isolated-conformance valid/invalid calls establish region and witness contracts. Ownership pass/use-after-consume rejection and inout-alias rejection establish separate language access rules. A missing compiler feature is a skip to resolve, not a matching diagnostic.</p><p>The host answer follows registered events rather than wall-clock scheduling. Receive one proposed value and join its sender, cancel registered sender/receiver independently before replacement, close each type of waiter, and reject overlapping blocked operations. The newly added schedules check canceled entry and accepted match before late cancellation. For time, advance a registered five-second sleep by four plus one and cancel another; for context, join inherited and detached observations and check restoration. For transfer, ask only for the actor's snapshot. For ownership, verify bounded values and the local retain round trip.</p><p>For a persisted command, choose explicit processing acknowledgment keyed by a synthetic command ID. A receipt only proves the consumer obtained the value, and a terminal channel wakeup may not prove even that under the library API. The owner resolves acknowledgment with committed, ordinary failure or canceled according to a documented transaction policy and bounds outstanding entries. On early consumer exit it finishes the channel and joins the producer. For repeating callbacks, retain at registration, borrow per callback, acknowledge quiescence, then release once. Device responsiveness, native callback implementation, sanitizer evidence and supported older compiler runs stay pending. The learner's submission needs its own predictions and evidence; this worked path does not record completion.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift — complete concurrency checking",
+          "url": "https://www.swift.org/documentation/concurrency/"
+        },
+        {
+          "label": "Swift SE-0461 — caller execution",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0461-async-function-isolation.md"
+        },
+        {
+          "label": "Swift SE-0430 — sending",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0430-transferring-parameters-and-results.md"
+        },
+        {
+          "label": "Apple Swift AsyncAlgorithms — channel guide",
+          "url": "https://github.com/apple/swift-async-algorithms/blob/main/Sources/AsyncAlgorithms/AsyncAlgorithms.docc/Guides/Channel.md"
+        },
+        {
+          "label": "Swift — memory safety",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/memorysafety/"
+        }
+      ],
+      "files": [
+        {
+          "label": "Requirements and actual evidence",
+          "path": "labs/ConcurrencyMigrationLab/README.md"
+        },
+        {
+          "label": "Explicit package settings",
+          "path": "labs/ConcurrencyMigrationLab/Package.swift"
+        },
+        {
+          "label": "Fresh host verification",
+          "path": "labs/ConcurrencyMigrationLab/verify-host.sh"
+        },
+        {
+          "label": "Compiler matrix runner",
+          "path": "labs/ConcurrencyMigrationLab/verify-diagnostics.py"
+        },
+        {
+          "label": "Bounded demand channel",
+          "path": "labs/ConcurrencyMigrationLab/Sources/ConcurrencyMigrationLab/DemandChannel.swift"
+        },
+        {
+          "label": "Injected deterministic clock",
+          "path": "labs/ConcurrencyMigrationLab/Sources/ConcurrencyMigrationLab/ManualClock.swift"
+        },
+        {
+          "label": "Transfer and ownership examples",
+          "path": "labs/ConcurrencyMigrationLab/Sources/ConcurrencyMigrationLab/Contracts.swift"
+        },
+        {
+          "label": "Deterministic contract tests",
+          "path": "labs/ConcurrencyMigrationLab/Tests/ConcurrencyMigrationLabTests/ContractTests.swift"
+        },
+        {
+          "label": "Checking fixture",
+          "path": "labs/ConcurrencyMigrationLab/Diagnostics/MutableGlobal.swift"
+        },
+        {
+          "label": "Default isolation fixture",
+          "path": "labs/ConcurrencyMigrationLab/Diagnostics/DefaultIsolation.swift"
+        },
+        {
+          "label": "Caller execution fixture",
+          "path": "labs/ConcurrencyMigrationLab/Diagnostics/CallerIsolation.swift"
+        },
+        {
+          "label": "Explicit concurrent boundary",
+          "path": "labs/ConcurrencyMigrationLab/Diagnostics/ConcurrentBoundary.swift"
+        },
+        {
+          "label": "Transfer positive/negative case",
+          "path": "labs/ConcurrencyMigrationLab/Diagnostics/Transfer.swift"
+        },
+        {
+          "label": "Conformance positive/negative case",
+          "path": "labs/ConcurrencyMigrationLab/Diagnostics/Conformance.swift"
+        },
+        {
+          "label": "Noncopyable positive/negative case",
+          "path": "labs/ConcurrencyMigrationLab/Diagnostics/Ownership.swift"
+        },
+        {
+          "label": "Compile-only exclusivity rejection",
+          "path": "labs/ConcurrencyMigrationLab/Diagnostics/Exclusivity.swift"
+        },
+        {
+          "label": "Scoped content audit",
+          "path": "labs/ConcurrencyMigrationLab/verify-content.py"
+        },
+        {
+          "label": "Separate lesson-snippet compilation",
+          "path": "labs/ConcurrencyMigrationLab/verify-examples.py"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "The INVALID consumed-value fixture fails because its syntax is unknown on an older compiler. Is that expected evidence?",
+          "options": [
+            "Yes, any failure proves the contract.",
+            "No; the supported compiler and expected diagnostic category must match.",
+            "Yes, because failed compilation is device testing."
+          ],
+          "answer": 1,
+          "explanation": "A missing feature is an availability gap. The runner gates compiler version and checks the specific contract diagnostic rather than accepting arbitrary failure."
+        },
+        {
+          "question": "A channel matched an element, then the sender was canceled. What does the local contract permit?",
+          "options": [
+            "Retraction after the consumer received it.",
+            "Duplicate delivery.",
+            "Successful receipt remains accepted; later processing has its own policy."
+          ],
+          "answer": 2,
+          "explanation": "Match removes the pending sender before resume. A later cancellation cannot undo receipt; it may still affect separately owned processing."
+        },
+        {
+          "question": "Which evidence does retainedRoundTrip provide?",
+          "options": [
+            "A bounded synchronous retain balance and weak lifetime observation.",
+            "Quiescence of every native repeating callback.",
+            "Proof that the opaque pointer is Sendable."
+          ],
+          "answer": 0,
+          "explanation": "The host sample is synchronous and one-shot. Native callback cardinality, unregister behavior and concurrency safety require separate target evidence."
+        }
+      ]
+    }
+  ]
+}

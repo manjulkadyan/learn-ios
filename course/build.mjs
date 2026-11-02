@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildCatalogue } from './inventory.mjs';
+import { createHash } from 'node:crypto';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const workspace = path.resolve(root, '../..');
@@ -19,7 +20,7 @@ if (manifest?.version !== 1 || !Array.isArray(manifest?.units) || !manifest.unit
 let nextSession = 1;
 for (const [unitIndex, entry] of (manifest?.units || []).entries()) {
   const unitNumber = unitIndex + 1;
-  if (!/^unit-\d{2}\.json$/.test(entry.file) || entry.order !== unitNumber || entry.first !== nextSession || entry.count !== 7 || !['Core', 'Deep dive'].includes(entry.track)) { errors.push(`manifest unit ${unitNumber}: invalid file, order, range, count, or track`); continue; }
+  if (!/^unit-\d{2}\.json$/.test(entry.file) || entry.order !== unitNumber || entry.first !== nextSession || !Number.isInteger(entry.count) || entry.count < 1 || entry.count > 14 || unitNumber <= 12 && entry.count !== 7 || !['Core', 'Deep dive', 'Swift bootcamp', 'SwiftUI bootcamp', 'Advanced practice', 'Specialist electives'].includes(entry.track)) { errors.push(`manifest unit ${unitNumber}: invalid file, order, range, count, or track`); continue; }
   nextSession += entry.count;
   const filename = `content/${entry.file}`;
   let content;
@@ -73,7 +74,8 @@ for (const [unitIndex, entry] of (manifest?.units || []).entries()) {
       requiredString(repo.why, `${label} source explanation`);
     }
     const wordCount = words((lesson.sections || []).map(section => section.html).join(' ') + ' ' + (lesson.exercise?.solution || ''));
-    if (wordCount < 900) errors.push(`${label}: only ${wordCount} teaching words; add depth`);
+    const minimumWords = Number(lesson.id) >= 85 ? 1300 : 900;
+    if (wordCount < minimumWords) errors.push(`${label}: only ${wordCount} teaching words; expected at least ${minimumWords}; add depth`);
     lessons.push({ ...lesson, unitId: content.unit.id, track: entry.track, wordCount });
   }
 }
@@ -111,12 +113,22 @@ for (const guide of essentials?.guides || []) {
   }
   guide.wordCount = words((guide.sections || []).map(section => section.html).join(' ') + ' ' + (guide.exercise?.solution || ''));
   if (guide.wordCount < 900) errors.push(`${label}: add teaching depth`);
+  if (!Array.isArray(guide.quiz) || guide.quiz.length < 3) errors.push(`${label}: add explained assessment for supplementary concepts`);
+  for (const quiz of guide.quiz || []) {
+    requiredString(quiz.question, `${label} question`); requiredString(quiz.explanation, `${label} explanation`);
+    if (!Array.isArray(quiz.options) || quiz.options.length < 3 || !Number.isInteger(quiz.answer) || quiz.answer < 0 || quiz.answer >= quiz.options.length) errors.push(`${label}: invalid quiz`);
+  }
 }
 const interviewQuestions = [];
-for (const file of ['interview-core.json', 'interview-deep.json']) {
+const interviewBankFiles = new Set();
+if (!Array.isArray(manifest?.interviewBanks) || !manifest.interviewBanks.length) errors.push('manifest.json: expected interview banks');
+for (const bank of manifest?.interviewBanks || []) {
+  const { file, count: expected } = bank;
+  if (!/^interview-[a-z][a-z0-9-]*\.json$/.test(file || '') || interviewBankFiles.has(file) || !Number.isInteger(expected) || expected < 1) { errors.push('manifest.json: invalid or duplicate interview bank'); continue; }
+  interviewBankFiles.add(file);
   try {
     const data = JSON.parse(await fs.readFile(path.join(root, 'content', file), 'utf8'));
-    if (!Array.isArray(data.questions) || data.questions.length !== 56) errors.push(`${file}: expected 56 interview prompts`);
+    if (!Array.isArray(data.questions) || data.questions.length !== expected) errors.push(`${file}: expected ${expected} interview prompts`);
     interviewQuestions.push(...(data.questions || []));
   } catch (error) { errors.push(`${file}: ${error.message}`); }
 }
@@ -139,7 +151,7 @@ for (const lesson of lessons) for (const suffix of ['a','b']) if (!interviewIDs.
 let interviewRounds = [];
 try { interviewRounds = JSON.parse(await fs.readFile(path.join(root, 'content/interview-rounds.json'), 'utf8')).rounds; }
 catch (error) { errors.push(`interview-rounds.json: ${error.message}`); }
-if (!Array.isArray(interviewRounds) || interviewRounds.length !== 8) errors.push('Expected eight mock interview rounds');
+if (!Array.isArray(interviewRounds) || interviewRounds.length < 8) errors.push('Expected at least the eight original mock interview rounds');
 const roundIDs = new Set();
 for (const round of interviewRounds || []) {
   if (!/^[a-z0-9-]+$/.test(round.id) || roundIDs.has(round.id)) errors.push('Invalid/duplicate mock round ID');
@@ -148,6 +160,93 @@ for (const round of interviewRounds || []) {
   if (!Number.isInteger(round.minutes) || round.minutes < 30 || round.minutes > 120) errors.push('Invalid mock round duration');
   for (const key of ['steps','evidence','questions']) if (!Array.isArray(round[key]) || round[key].length < 3) errors.push(`Mock round ${round.id}: missing ${key}`);
   for (const id of round.questions || []) if (!interviewIDs.has(id)) errors.push(`Mock round ${round.id}: unknown question ${id}`);
+  const rehearsal = (round.questions || []).reduce((total, id) => total + (interviewQuestions.find(question => question.id === id)?.minutes || 0), 0);
+  if (!Number.isInteger(round.setupMinutes) || round.setupMinutes < 0 || !Number.isInteger(round.debriefMinutes) || round.debriefMinutes < 5 || rehearsal + round.setupMinutes + round.debriefMinutes > round.minutes) errors.push(`Mock round ${round.id}: question, setup and debrief time must fit its advertised duration`);
+}
+const workshops = [];
+const workshopIDs = new Set();
+const artifacts = new Map();
+const practiceBankFiles = new Set();
+if (!Array.isArray(manifest?.practiceBanks) || !manifest.practiceBanks.length) errors.push('manifest.json: expected practice banks');
+for (const file of manifest?.practiceBanks || []) {
+  if (!/^practice-[a-z][a-z0-9-]*\.json$/.test(file || '') || practiceBankFiles.has(file)) { errors.push('manifest.json: invalid or duplicate practice bank'); continue; }
+  practiceBankFiles.add(file);
+  let content;
+  try { content = JSON.parse(await fs.readFile(path.join(root, 'content', file), 'utf8')); }
+  catch (error) { errors.push(`${file}: ${error.message}`); continue; }
+  if (!Array.isArray(content.workshops) || !content.workshops.length) { errors.push(`${file}: expected workshops`); continue; }
+  for (const workshop of content.workshops) {
+    const label = `Workshop ${workshop.id}`;
+    if (!/^[a-z0-9-]+$/.test(workshop.id) || workshopIDs.has(workshop.id)) errors.push(`${label}: invalid/duplicate ID`);
+    workshopIDs.add(workshop.id);
+    for (const key of ['title', 'summary']) requiredString(workshop[key], `${label}.${key}`);
+    if (!['Host implementation', 'Native implementation', 'Tool investigation', 'Design review'].includes(workshop.kind)) errors.push(`${label}: invalid evidence kind`);
+    if (!Array.isArray(workshop.sessions) || !workshop.sessions.length) errors.push(`${label}: missing lesson connections`);
+    for (const id of workshop.sessions || []) if (!lessonIDs.has(id)) errors.push(`${label}: unknown lesson ${id}`);
+    if (!Array.isArray(workshop.sections) || workshop.sections.length < 4) errors.push(`${label}: expected four teaching sections`);
+    const sectionIDs = new Set();
+    for (const section of workshop.sections || []) {
+      if (!/^[a-z0-9-]+$/.test(section.id) || sectionIDs.has(section.id)) errors.push(`${label}: invalid/duplicate section ID`);
+      sectionIDs.add(section.id);
+      requiredString(section.title, `${label} section title`); requiredString(section.html, `${label} section HTML`);
+      htmlBlocks.push({ label, html: section.html });
+    }
+    if (!Array.isArray(workshop.exercise?.steps) || !workshop.exercise.steps.length || !Array.isArray(workshop.exercise?.acceptance) || !workshop.exercise.acceptance.length) errors.push(`${label}: incomplete practice contract`);
+    requiredString(workshop.exercise?.brief, `${label} exercise`); requiredString(workshop.exercise?.solution, `${label} worked answer`);
+    htmlBlocks.push({ label, html: workshop.exercise?.solution || '' });
+    if (!Array.isArray(workshop.quiz) || workshop.quiz.length < 3) errors.push(`${label}: add three explained knowledge checks`);
+    for (const quiz of workshop.quiz || []) {
+      requiredString(quiz.question, `${label} question`); requiredString(quiz.explanation, `${label} explanation`);
+      if (!Array.isArray(quiz.options) || quiz.options.length < 3 || !Number.isInteger(quiz.answer) || quiz.answer < 0 || quiz.answer >= quiz.options.length) errors.push(`${label}: invalid quiz`);
+    }
+    if (!Array.isArray(workshop.references) || workshop.references.length < 2) errors.push(`${label}: add official references`);
+    for (const reference of workshop.references || []) {
+      requiredString(reference.label, `${label} reference`);
+      try { if (new URL(reference.url).protocol !== 'https:') errors.push(`${label}: HTTPS reference required`); }
+      catch { errors.push(`${label}: invalid reference`); }
+    }
+    if (!Array.isArray(workshop.files) || !workshop.files.length) errors.push(`${label}: missing companion artifacts`);
+    for (const file of workshop.files || []) {
+      requiredString(file.label, `${label} artifact label`);
+      if (typeof file.path !== 'string' || !/^labs\/[A-Za-z0-9][A-Za-z0-9_./ -]*$/.test(file.path) || file.path.split('/').some(part => !part || part.startsWith('.'))) { errors.push(`${label}: unsafe artifact path`); continue; }
+      try {
+        const filename = await fs.realpath(path.join(root, file.path));
+        const labRoot = await fs.realpath(path.join(root, 'labs'));
+        if (!filename.startsWith(labRoot + path.sep)) throw new Error('Artifact escapes lab directory');
+        const stats = await fs.stat(filename);
+        if (!stats.isFile() || stats.size > 500_000) throw new Error('Artifact must be a bounded text file');
+        const source = await fs.readFile(filename, 'utf8');
+        if (source.includes('\u0000')) throw new Error('Binary artifact is not supported');
+        artifacts.set(file.path, { path: file.path, source, sha256: createHash('sha256').update(source).digest('hex') });
+      } catch (error) { errors.push(`${label}: ${file.path}: ${error.message}`); }
+    }
+    workshop.wordCount = words((workshop.sections || []).map(section => section.html).join(' ') + ' ' + (workshop.exercise?.solution || ''));
+    if (workshop.wordCount < 900) errors.push(`${label}: only ${workshop.wordCount} words; add guided teaching`);
+    workshops.push(workshop);
+  }
+}
+let learningPaths;
+try { learningPaths = JSON.parse(await fs.readFile(path.join(root, 'content/paths.json'), 'utf8')); }
+catch (error) { errors.push(`paths.json: ${error.message}`); }
+if (learningPaths?.version !== 1 || !Array.isArray(learningPaths?.paths) || learningPaths.paths.length < 6) errors.push('Expected at least the six original learning paths');
+const pathIDs = new Set();
+for (const learningPath of learningPaths?.paths || []) {
+  if (!/^[a-z0-9-]+$/.test(learningPath.id) || pathIDs.has(learningPath.id)) errors.push('Invalid/duplicate learning path');
+  pathIDs.add(learningPath.id);
+  for (const key of ['title', 'summary', 'audience']) requiredString(learningPath[key], `Path ${learningPath.id}.${key}`);
+  if (!Array.isArray(learningPath.evidence) || learningPath.evidence.length < 3 || !Array.isArray(learningPath.stages) || !learningPath.stages.length) errors.push(`Path ${learningPath.id}: missing stages/evidence`);
+  const pathLessons = new Set();
+  for (const stage of learningPath.stages || []) {
+    requiredString(stage.title, `Path ${learningPath.id} stage`); requiredString(stage.summary, `Path ${learningPath.id} stage summary`);
+    if (!Array.isArray(stage.lessons) || !stage.lessons.length || !Array.isArray(stage.workshops) || !Array.isArray(stage.guides)) errors.push(`Path ${learningPath.id}: invalid stage references`);
+    for (const id of stage.lessons || []) { if (!lessonIDs.has(id) || pathLessons.has(id)) errors.push(`Path ${learningPath.id}: invalid/duplicate session ${id}`); pathLessons.add(id); }
+    for (const id of stage.workshops || []) if (!workshopIDs.has(id)) errors.push(`Path ${learningPath.id}: missing workshop ${id}`);
+    for (const id of stage.guides || []) if (!guideIDs.has(id)) errors.push(`Path ${learningPath.id}: missing guide ${id}`);
+  }
+}
+for (const lesson of lessons) {
+  if (lesson.guides !== undefined && !Array.isArray(lesson.guides)) errors.push(`${lesson.id}: guide links must be an array`);
+  for (const id of lesson.guides || []) if (!guideIDs.has(id)) errors.push(`${lesson.id}: unknown guide ${id}`);
 }
 const allowedTags = new Set('p h3 h4 ul ol li strong em code pre table thead tbody tr th td blockquote details summary a br caption'.split(' '));
 const allowedAttributes = new Set(['class', 'href', 'title', 'scope', 'colspan', 'rowspan']);
@@ -208,12 +307,30 @@ for (const group of coverage?.groups || []) {
     for (const id of topic.sessions || []) if (!lessonIDs.has(id)) errors.push(`Coverage ${topic.id}: missing lesson ${id}`);
     if (topic.guides !== undefined && !Array.isArray(topic.guides)) errors.push(`Coverage ${topic.id}: guides must be an array`);
     for (const id of topic.guides || []) if (!guideIDs.has(id)) errors.push(`Coverage ${topic.id}: unknown supplementary guide ${id}`);
+    if (topic.workshops !== undefined && !Array.isArray(topic.workshops)) errors.push(`Coverage ${topic.id}: workshops must be an array`);
+    for (const id of topic.workshops || []) if (!workshopIDs.has(id)) errors.push(`Coverage ${topic.id}: unknown workshop ${id}`);
   }
 }
+try {
+  const contract = JSON.parse(await fs.readFile(path.join(root, 'content/progress-contract.json'), 'utf8'));
+  if (contract.version !== 1 || contract.sessions?.length !== 56) errors.push('Invalid original-progress contract');
+  for (const original of contract.sessions || []) {
+    const lesson = lessons.find(item => item.id === original.id);
+    if (!lesson || createHash('sha256').update(JSON.stringify({ quiz: lesson.quiz, checklist: lesson.checklist })).digest('hex') !== original.sha256) errors.push(`${original.id}: original quiz/checklist storage contract changed`);
+  }
+} catch (error) { errors.push(`progress-contract.json: ${error.message}`); }
+try {
+  const contract = JSON.parse(await fs.readFile(path.join(root, 'content/progress-expansion-contract.json'), 'utf8'));
+  if (contract.version !== 1 || contract.sessions?.length !== 84) errors.push('Invalid 84-session progress contract');
+  for (const original of contract.sessions || []) {
+    const lesson = lessons.find(item => item.id === original.id);
+    if (!lesson || createHash('sha256').update(JSON.stringify({ quiz: lesson.quiz, checklist: lesson.checklist })).digest('hex') !== original.sha256) errors.push(`${original.id}: pre-expansion quiz/checklist storage contract changed`);
+  }
+} catch (error) { errors.push(`progress-expansion-contract.json: ${error.message}`); }
 if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1; }
 else {
   const catalogue = await buildCatalogue(workspace);
-  const data = { version: 1, title: 'Across the Stack', generatedAt: new Date().toISOString(), units, lessons, reference: reference.reference, syntax: reference.syntax, coverage, catalogue, essentials: essentials.guides, interview: { questions: interviewQuestions, rounds: interviewRounds } };
+  const data = { version: 1, title: 'Across the Stack', generatedAt: new Date().toISOString(), units, lessons, paths: learningPaths.paths, workshops, artifacts: [...artifacts.values()], reference: reference.reference, syntax: reference.syntax, coverage, catalogue, essentials: essentials.guides, interview: { questions: interviewQuestions, rounds: interviewRounds } };
   if (!checkOnly) await fs.writeFile(path.join(root, 'data.js'), `/* Generated from course/content by build.mjs. */\nwindow.IOS_COURSE = ${JSON.stringify(data, null, 2).replace(/</g, '\\u003c')};\n`);
-  console.log(`${checkOnly ? 'Validated' : 'Built'} ${lessons.length} detailed sessions, ${lessons.reduce((total, lesson) => total + lesson.wordCount, 0).toLocaleString()} lesson teaching words, ${essentials.guides.length} Swift supplementary guides (${essentials.guides.reduce((total, guide) => total + guide.wordCount, 0).toLocaleString()} words), ${coverage.groups.flatMap(group => group.topics).length} coverage topics, ${catalogue.packages.length} remote dependency entries, ${reference.reference.length} reference comparisons, ${interviewQuestions.length} interview prompts and ${interviewRounds.length} mock rounds. All repository paths and line anchors resolve.`);
+  console.log(`${checkOnly ? 'Validated' : 'Built'} ${lessons.length} detailed sessions, ${lessons.reduce((total, lesson) => total + lesson.wordCount, 0).toLocaleString()} lesson teaching words, ${essentials.guides.length} Swift supplementary guides, ${learningPaths.paths.length} learning paths, ${workshops.length} implementation/tool/review workshops, ${artifacts.size} offline companion source files, ${coverage.groups.flatMap(group => group.topics).length} coverage topics, ${catalogue.packages.length} remote dependency entries, ${interviewQuestions.length} interview prompts and ${interviewRounds.length} mock rounds. Repository anchors and companion paths resolve.`);
 }

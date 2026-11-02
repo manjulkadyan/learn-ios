@@ -1,0 +1,438 @@
+{
+  "workshops": [
+    {
+      "id": "swift-workbench",
+      "title": "Swift workbench: run, predict, change, and explain",
+      "summary": "Build a host Swift package, inspect public collection and value contracts, and turn a deliberate assertion failure into a justified fixture change.",
+      "kind": "Host implementation",
+      "sessions": [
+        "057",
+        "058",
+        "059",
+        "060",
+        "061",
+        "062",
+        "063",
+        "064",
+        "065",
+        "066",
+        "067",
+        "068",
+        "069",
+        "070",
+        "012"
+      ],
+      "sections": [
+        {
+          "id": "run-boundary",
+          "title": "Start with a program you can actually run",
+          "html": "<p>Think of this workshop as a small JVM command-line project with a library and its tests, rather than an Android activity. SwiftPM builds the library, a command-line executable, and a test target from separate directories. The library product is named SwiftLanguageLab; the executable product is swift-workbench. Neither is an iOS application. The exercise gives you fast feedback on Swift syntax before Xcode destinations, signing, and view lifecycle add other sources of failure. All topics and values are synthetic; nothing imports the company client or contacts a service.</p>\n<p>Open the supplied Package.swift first. Its tools-version comment selects the minimum SwiftPM tools contract, while swiftLanguageModes selects Swift 6 language checking. The macOS platform entry is a deployment floor, not a promise that the oldest operating system includes your compiler. dependencies is empty: Swift Testing comes from the installed toolchain, so there is no remote testing package to fetch. Author verification used Apple Swift 6.4 on macOS; a Swift 6.0 compiler and Linux were not executed. Record your own version rather than treating that observation as your environment.</p>\n<p>From the course directory, enter labs/SwiftLanguageLab and reproduce the isolated-cache shell function in the supplied README. It creates a unique directory beneath /private/tmp, passes SwiftPM scratch, package cache, configuration, and security paths, and sets the compiler module cache paths. The two-job setting limits build pressure. Keep the same shell open so the lab_swift function and lab_cache variable still exist. These commands then build the examples, execute them, and discover the language tests:</p>\n<pre><code>swift --version\nlab_swift run swift-workbench language\nlab_swift test --filter LanguageTests</code></pre>\n<p>Read Sources/SwiftWorkbench/main.swift as the executable entry. import makes another module's public declarations available. @main identifies its entry type; static func main is the entry function. Its async throws declaration permits awaiting gates and propagating fixture failures in the other modes. A top-level failure is not silently converted into success. Sessions 057–060 supply the first-program, type, flow, and function vocabulary; sessions 067 and 068 explain errors and closures. This package supplies host execution evidence, while a future native workshop supplies app execution evidence.</p>"
+        },
+        {
+          "id": "collection-contracts",
+          "title": "Collections are observable contracts, not just syntax",
+          "html": "<p>Read LanguageExamples.swift and LanguageTests.swift side by side. Reading is an immutable struct with named topic and minutes fields. Its public initializer is explicit because importing another module does not automatically expose a struct's synthesized memberwise initializer. The label for readings parameter makes calls read labels(for: readings). A function's external argument labels are part of the call syntax; they are not Kotlin named-argument syntax applied to any parameter at will. The following code uses the actual public API inside a function or the workbench entry point:</p>\n<pre><code class=\"language-swift\">let readings = [\n    Reading(topic: \"Swift\", minutes: 20),\n    Reading(topic: \"Actors\", minutes: 15),\n    Reading(topic: \"Swift\", minutes: 10),\n    Reading(topic: \"Skipped\", minutes: 0)\n]\nlet labels = LanguageExamples.labels(for: readings)\nlet totals = LanguageExamples.totalsByTopic(readings)\nlet topics = LanguageExamples.distinctTopics(readings)</code></pre>\n<p>labels first filters positive minutes, then maps surviving entries into strings. The expected sequence is Swift: 20, Actors: 15, Swift: 10. filter and map retain array encounter order. The zero-minute item disappears here, but distinctTopics includes its topic: deduplication and positive-minute filtering are different policies. A Kotlin filter followed by map offers a familiar conceptual bridge, while Swift closure parameter shorthand $0 and argument labels require their own explanation.</p>\n<p>totalsByTopic accumulates in a dictionary using its default-value subscript. A missing topic starts at zero before adding minutes. Repeated Swift entries produce thirty minutes. The function sorts keys before returning named tuples, giving the display an explicit alphabetical contract. Dictionary and Set iteration are not a sorting policy. A test that only checks the number of rows would miss a reordered or incorrectly accumulated result. Named tuple fields permit totals.map(\\.topic), where the key-path expression selects a property from each element.</p>\n<p>parsePresentIntegers uses compactMap: Int conversion returns an optional, and nil conversions disappear. The malformed input bad does not become zero and does not throw. firstEvenSquare uses lazy filtering and mapping to obtain the first qualifying result; it does not evaluate or cache every transformed value. Optional nil represents no matching result. The square calculation accepts small fixtures; Int overflow is not a general numeric-domain policy. Sessions 061–063 cover arrays, sets, dictionaries, transformations, and lazy iteration. Predict both values and ordering before running, and distinguish an intentional lossy transformation from validation that must report bad input.</p>"
+        },
+        {
+          "id": "value-generic-boundaries",
+          "title": "Prove copying and generic behavior through public calls",
+          "html": "<p>ReadingPlan owns an array and exposes its topics with a public getter and a restricted setter. Its append method is mutating because changing a struct changes the receiving value. Assigning one plan to another creates independent observable values: appending Actors to the copy does not append it to the original. Swift arrays can share storage internally through copy-on-write, but the program must preserve value behavior. This test demonstrates semantics; it neither counts allocations nor proves that every mutation copies every byte.</p>\n<pre><code class=\"language-swift\">var original = ReadingPlan(topics: [\"Swift\"])\nvar copy = original\ncopy.append(\"Actors\")\noriginal.append(\"Files\")\n// original.topics is [\"Swift\", \"Files\"]\n// copy.topics is [\"Swift\", \"Actors\"]\n\nvar source = 10\nvar destination = 4\nLanguageExamples.transfer(3, from: &amp;source, to: &amp;destination)</code></pre>\n<p>The ampersand at an inout argument grants temporary mutable access, not a general-purpose address you may retain. transfer needs two nonoverlapping accesses. Passing the same variable to both arguments violates that requirement; do not run that as if Swift promised an atomic self-transfer. The worked input satisfies the function's preconditions and leaves both values at seven. Preconditions identify unsupported inputs; they are not recoverable validation errors. Sessions 064 and 065 connect mutation, exclusivity, properties, initialization, and access control.</p>\n<p>Copy CounterEnvelope next. It is a struct containing a ReferenceCounter class. The copied envelopes still refer to the same counter, so mutating that object is visible through both. The identity operator === answers whether two class references identify the same object; == answers a value equality contract when available. A Kotlin data class holding a mutable collection has a similar shallow-copy trap, but Swift struct assignment and Kotlin copy are different mechanisms. ReferenceCounter deliberately does not claim Sendable, because unrestricted shared mutable state would not become safe merely by wrapping it in a struct.</p>\n<p>Stack&lt;Element: Sendable&gt; is generic: the caller chooses an element type satisfying the constraint, and push and pop retain that type. pop returns Element? because an empty stack is valid. LessonLabel is a protocol requiring readable text. renderedLabel preserves a generic concrete parameter, makeLabel returns some LessonLabel hiding one fixed implementation type, and renderLabels accepts an array of any LessonLabel so different conforming types can coexist. some is not a runtime choice among arbitrary unrelated implementations; any is an existential storage contract. The tests add a second label type to prove heterogeneity. Sessions 066–069 cover class relationships, errors, capture lifetime, and generic boundaries; inheritance and closure ownership still require their numbered exercises beyond this package's selected examples.</p>"
+        },
+        {
+          "id": "read-change-test",
+          "title": "Read a failure and make a meaningful fixture change",
+          "html": "<p>Swift Testing discovers @Test functions rather than XCTest method-name prefixes. The suites import SwiftLanguageLab through its public surface; they do not use @testable to reach private state. #expect records a failed condition and continues, while try #require establishes a condition or unwraps an optional for later work. Because tests may run concurrently, every language fixture is local. The Foundation suite creates separate directories, and the concurrency suites create separate actors. Serial execution is not the isolation strategy.</p>\n<p>After a successful baseline, deliberately replace the expected parsePresentIntegers array with [10, 0, -2], run the language suite, and read the issue. This exact teaching mutation was executed during author verification: the focused run exited with a failure and displayed an actual result of [10, -2]. That is consistent with compactMap dropping nil conversions. Restore the expectation immediately. The shipped expectation is the correct one; the deliberate failure is a diagnostic exercise, not an unresolved defect or evidence that the learner has completed it.</p>\n<p>For a meaningful new exercise, add Reading(topic: &quot;Actors&quot;, minutes: 5) to the collection fixture. Calculate expected labels, sorted totals, and distinct topics on paper. The additional reading appears at the end of labels because that operation retains input order. Actors accumulates twenty minutes; Swift remains thirty. The distinct topic sequence does not gain another Actors entry. Change those expectations deliberately and run the focused suite, then the full suite. If an assertion fails, identify whether membership, value, or ordering differs. Do not rewrite the expected value by calling the same aggregation algorithm inside the test.</p>\n<p>A compiler diagnostic about mutation of a let binding happens before tests can run. An assertion issue points at a violated fixture expectation after the program ran. A build-environment problem may involve unavailable toolchain components or cache paths and needs its own fix. Session 012 teaches the framework distinction, and session 070 integrates retrieval and independent explanation. Passing the instructor tests establishes that the shipped examples behave under the recorded host conditions. Your exercise needs your changed fixture, command, result, and explanation. The course records no automatic completion or certification from this package.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Run the host language baseline, observe one deliberately wrong expectation, restore it, then extend the duplicate-topic fixture and explain value and generic boundaries.",
+        "steps": [
+          "Follow README's isolated-cache setup, record swift --version, and run swift-workbench language plus the LanguageTests suite.",
+          "Predict labels, alphabetical totals, and distinct topics from the existing four readings before inspecting assertions.",
+          "Temporarily expect [10, 0, -2] for parsePresentIntegers, run the focused suite, read the diagnostic, and restore [10, -2].",
+          "Add a five-minute Actors reading. Independently change the expected labels and totals; justify why distinct topics are unchanged.",
+          "Predict ReadingPlan copying and CounterEnvelope identity. Run the tests and explain inout's nonoverlapping-access requirement.",
+          "Push and pop a Stack<Int> in your scratch exercise, then explain how generic parameters, any LessonLabel, and some LessonLabel differ.",
+          "Run the full instructor suite after restoring any deliberate failure, and record your separate learner evidence."
+        ],
+        "acceptance": [
+          "The toolchain, isolated cache setup, executed commands, and actual exit statuses are recorded.",
+          "The modified collection fixture proves Actors totals twenty and Swift thirty, with alphabetical totals and encounter-order labels.",
+          "The deliberate failure is explained and restored; malformed numeric input is not silently redefined as zero.",
+          "Value copying is distinguished from shared nested class identity without invented allocation measurements.",
+          "Public generic and optional contracts are explained; passing instructor tests does not mark learner work complete."
+        ],
+        "solution": "<p>The additional fixture reading contributes five positive minutes to Actors. The labels become Swift: 20, Actors: 15, Swift: 10, Actors: 5; totals remain alphabetically Actors then Swift with values twenty and thirty. distinctTopics remains Actors, Skipped, Swift because the zero-minute topic still belongs to the input and duplicate Actors membership adds nothing. This answer uses independent small values instead of rerunning the production algorithm to manufacture its expectations.</p>\n<pre><code class=\"language-swift\">var stack = Stack&lt;Int&gt;()\nstack.push(3)\nstack.push(8)\nlet last = stack.pop() // Optional(8)\nlet earlier = stack.pop() // Optional(3)\nlet empty = stack.pop() // nil</code></pre>\n<p>The concrete element type is Int throughout, and nil is an ordinary empty-stack result. The copying exercise gives original Swift/Files and copy Swift/Actors, while both CounterEnvelope values observe the same counter mutation. The deliberately incorrect parse expectation fails because bad converts to nil and compactMap omits it. Restore that expectation before assessing new changes. Capture your own run; the worked answer describes the intended behavior but does not create your fixture, pre-complete your exercise, or make a claim about an iOS app.</p>"
+      },
+      "quiz": [
+        {
+          "question": "What does a passing ReadingPlan copying test establish?",
+          "options": [
+            "The copied plans can change independently according to the value contract.",
+            "Every assignment eagerly allocates a new array buffer.",
+            "Any struct deeply copies objects reachable from its properties."
+          ],
+          "answer": 0,
+          "explanation": "The assertions observe independent values. Copy-on-write may share internal storage until needed, and nested class references keep their identity; no allocation measurement occurred."
+        },
+        {
+          "question": "Why does totalsByTopic sort dictionary keys before returning rows?",
+          "options": [
+            "Swift dictionaries reject repeated keys.",
+            "The display contract requires alphabetical order independent of dictionary iteration.",
+            "Sorting changes every total into a String."
+          ],
+          "answer": 1,
+          "explanation": "Accumulation and ordering are separate behaviors. Explicit sorting establishes reproducible row order, while the dictionary still stores integer totals."
+        },
+        {
+          "question": "Why is [10, 0, -2] an incorrect expectation for the supplied numeric fixture?",
+          "options": [
+            "Int never accepts negative strings.",
+            "Swift Testing cannot compare arrays.",
+            "compactMap omits the nil conversion of bad rather than substituting zero."
+          ],
+          "answer": 2,
+          "explanation": "Int conversion of malformed input yields nil. compactMap drops that element. A validation or zero-substitution policy would need a different API and separate evidence."
+        }
+      ],
+      "references": [
+        {
+          "label": "Swift: The basics, optionals, and values",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/thebasics/"
+        },
+        {
+          "label": "Swift: Collection types",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/collectiontypes/"
+        },
+        {
+          "label": "Swift: Generics",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/generics/"
+        },
+        {
+          "label": "Swift: Opaque and boxed protocol types",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/opaquetypes/"
+        },
+        {
+          "label": "Swift: Memory safety and conflicting access",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/memorysafety/"
+        },
+        {
+          "label": "Apple: Swift Testing",
+          "url": "https://developer.apple.com/documentation/testing"
+        }
+      ],
+      "files": [
+        {
+          "label": "SwiftPM targets and Swift 6 language mode",
+          "path": "labs/SwiftLanguageLab/Package.swift"
+        },
+        {
+          "label": "Run commands, isolation, and evidence boundaries",
+          "path": "labs/SwiftLanguageLab/README.md"
+        },
+        {
+          "label": "Public collection, value, reference, and generic examples",
+          "path": "labs/SwiftLanguageLab/Sources/SwiftLanguageLab/LanguageExamples.swift"
+        },
+        {
+          "label": "Host executable entry and selected demonstrations",
+          "path": "labs/SwiftLanguageLab/Sources/SwiftWorkbench/main.swift"
+        },
+        {
+          "label": "Public language behavior tests",
+          "path": "labs/SwiftLanguageLab/Tests/SwiftLanguageLabTests/LanguageTests.swift"
+        }
+      ]
+    },
+    {
+      "id": "concurrency-gates",
+      "title": "Concurrency gates: own work and prove hostile schedules",
+      "summary": "Use start and completion signals to test stale success, stale error, account epochs, independent refresh cancellation, and limits that count work until it exits.",
+      "kind": "Host implementation",
+      "sessions": [
+        "060",
+        "064",
+        "067",
+        "068",
+        "069",
+        "070",
+        "012",
+        "015",
+        "016",
+        "018",
+        "020"
+      ],
+      "sections": [
+        {
+          "id": "events-and-continuations",
+          "title": "An await is a suspension point, not an ordering guarantee",
+          "html": "<p>An Android fake built around CompletableDeferred can express a useful test schedule: wait until a request started, then decide when it receives an answer. CompletionGate supplies that capability in Swift without sleeps, Task.yield assumptions, or a live endpoint. It is an actor with a single-use run operation, start and resolution observers, and explicit succeed and fail methods. Actor isolation serializes its mutable continuation state. The @Sendable and Sendable vocabulary from sessions 016 and 069 describes transfer safety; it does not make arbitrary shared mutation safe or force an async operation to terminate.</p>\n<p>Set up the shell function from README with caches under /private/tmp and run the following focused suites. Each suite creates its own actors, so parallel tests cannot share one pending gate by accident. A separate executable mode also demonstrates B surviving an old error; it is a program demonstration, not an assertion suite.</p>\n<pre><code>lab_swift test --filter GateTests\nlab_swift test --filter LatestLoaderTests\nlab_swift test --filter SharedRefreshTests\nlab_swift run swift-workbench gates</code></pre>\n<p>run marks the operation started and resumes any start observers, then suspends through a checked throwing continuation. succeed carries a value; fail carries an error. Both require a started, unresolved operation. Repeating completion throws alreadyResolved, and repeating run throws alreadyStarted. Resuming a continuation twice is a programming error, so the actor centralizes the transition and clears the stored continuation before delivering it. Swift's checked continuation helps diagnose misuse; it does not design cancellation for you.</p>\n<p>CancellationPolicy.cooperative resolves with CancellationError when cancellation is observed. CancellationPolicy.ignore deliberately models an adapter that keeps running after its owner cancels. That policy is essential for freshness testing: otherwise cooperative cancellation could conceal a missing stale-result guard. Event observers return immediately if the event already happened. They are simple test observation helpers without a general cancellation/deadline contract. Resolution means the result was delivered to the suspended continuation, not that a loader already processed it. Await a handle or caller task before asserting terminal state. A test that forgets to release an ignoring gate may hang; the suite time limit is a diagnostic aid, not a substitute for finishing every owned operation.</p>"
+        },
+        {
+          "id": "latest-and-account-epochs",
+          "title": "Guard old success and old failure at the same commit boundary",
+          "html": "<p>LatestLoader demonstrates a presentation owner rather than a repository cache. start creates a RequestTicket with account, account epoch, and request generation; records loading; retains an unstructured task; and returns a handle that can join it. The owner deliberately needs a task that survives the start method returning. This differs from session 020's caller-owned async repository, whose load returns or throws to that caller. Here ordinary newest errors become a failed phase and the handle itself completes without throwing. There are no cache hits, TTL rules, durable commits, refresh retries, or real account credentials.</p>\n<p>Before finishing, the task enters the loader actor again. finish first removes the tracked task, then validates the entire ticket against current ownership and the account epoch. Both success and failure pass through the same guard before changing the phase, with no intervening await. Actor isolation alone would not supply this guarantee: during the service suspension, another start or changeAccount may execute. A stale success can replace new data, and a stale catch can remove a new loading indicator or display the wrong error. Both paths need evidence.</p>\n<pre><code class=\"language-swift\">let loader = LatestLoader(account: \"A\", cancelSuperseded: false)\nlet old = CompletionGate&lt;[String]&gt;(cancellationPolicy: .ignore)\nlet new = CompletionGate&lt;[String]&gt;(cancellationPolicy: .ignore)\nlet first = try await loader.start(using: old)\nawait old.waitUntilStarted()\nlet second = try await loader.start(using: new)\nawait new.waitUntilStarted()\ntry await new.succeed([\"B\"])\nawait second.wait()\ntry await old.fail(GateFailure.synthetic(\"old A\"))\nawait first.wait()\nlet state = await loader.snapshot()</code></pre>\n<p>Request labels A and B describe ordering in this schedule; the selected synthetic account remains A. Disabling cancelSuperseded ensures the old operation remains live independently of cancellation. The tests parameterize old success versus old error and exercise both B-already-loaded and B-still-loading schedules. Assertions check whole phases rather than only the number of returned strings. If you change the catch guard, the old-error case should expose it; increasing a delay cannot repair the ownership rule.</p>\n<p>changeAccount increments the epoch, clears ownership and visible state, resets request numbering, and requests cancellation of tracked work. Returning from A to B to A restores the account text but not the previous epoch. The account-cycle tests deliberately give both A requests generation one, release the earlier A while the newer A is still loading, and prove it cannot commit. Comparing account text or request number alone would fail this case. Sessions 015, 016, and 020 provide the cancellation, actor-reentrancy, and ownership groundwork; session 012 explains why these event schedules are stronger than timing guesses.</p>"
+        },
+        {
+          "id": "cancellation-and-capacity",
+          "title": "Cancellation does not free a work slot until the task exits",
+          "html": "<p>LatestLoader exposes cancel(ticket) as the owner's cancellation operation. If that ticket is current, cancellation immediately clears visible ownership and returns to idle. It then requests task cancellation. A separate task awaiting handle.wait does not become the owner of the retained request: cancelling that waiting task is not the loader's cancel API. This explicit distinction prevents a UI caller from assuming that stopping its wait automatically stopped some longer-lived owner's work.</p>\n<p>The model counts all retained tasks, including superseded requests and canceled ignoring gates. maximumActiveWork is a positive bound on that count. When capacity is reached, start throws capacityReached before changing visible phase, current ticket, or request generation. It does not pretend that task.cancel synchronously freed a slot. The tests begin two operations, request cancellation through supersession, reject a third while both remain active, release a real slot, start another request, and finally release the oldest operation. Peak tracked activity stays two. Cancellation-aware gates demonstrate the cooperative path separately.</p>\n<p>This is a reject-on-capacity policy, not a queue, debounce, rate limiter, fairness guarantee, or bound on final payload memory. A caller can retry after joining completed work, but this lab has no production retry policy. If an adapter never responds to cancellation or completion, a slot remains occupied. The owner can prevent state corruption and additional launch growth; it cannot force arbitrary work to stop. A real implementation must choose transport deadlines and shutdown policy at the appropriate boundary. These are consequences of the contract, not an invitation to silently discard active tasks from accounting.</p>\n<p>To change the fixture, use the cancel-and-ignore test first. Keep the gate ignoring cancellation, call cancel after waitUntilStarted, and finish with a distinct old payload. Then repeat with a synthetic error. Idle must survive both, and activeWork must become zero only after handle.wait finishes. To explore capacity, change maximumActiveWork and independently adjust the number of started gates; do not leave the original expected peak as an unexplained magic number. Read a failure by asking whether ownership, phase, or actual active-work accounting broke. An error being swallowed into an empty successful result would be a separate contract defect. Session 018 covers preserving cancellation through real transport adapters; this host fake does not exercise URLSession.</p>"
+        },
+        {
+          "id": "shared-waiter-contract",
+          "title": "Two refresh callers need two cancellation paths",
+          "html": "<p>A shared refresh is more subtle than giving everyone one Task.value. SharedRefresh gives each waiter its own continuation while retaining one underlying flight. A second refresh call joins the current flight, and its supplied gate is not started. This is suitable only when both callers want the same operation in one declared scope. One actor instance represents that scope; there is no account-change or authentication implementation here. Do not reuse it across account boundaries merely because coalescing seems convenient.</p>\n<p>Cancelling one caller schedules removal of its waiter on the actor and resumes that caller with CancellationError. The underlying task continues if any waiter remains. The independent-cancellation tests run this schedule for either caller: register two waiters, await waitUntilWaiterCount(2), cancel one, await that caller's failure, inspect one remaining waiter, release the gate, and obtain success from the survivor. A shared-error test separately proves one ordinary failure reaches both registered callers. When the last waiter cancels, current flight eligibility clears and the underlying task receives cancellation.</p>\n<p>An abandoned ignoring flight still consumes active capacity until its gate exits. With the default one-flight limit, a replacement request is rejected during that interval. With two slots, a replacement can coexist with abandoned work; completion uses the original flight identity so a late old error cannot terminate the replacement. This protects both continuation ownership and accounting. The tests release and join all operations, including abandoned fakes. No test depends on a fixed sleep to infer registration or completion.</p>\n<p>Cancellation and successful completion can race. The contract uses the actor's handling order: if completion delivers a result before cancellation removes the waiter, that caller may receive success. It does not promise that a concurrent cancel call rewrites a result already delivered. The ordered test avoids ambiguity by awaiting the cancelled caller before releasing the gate. A precancelled caller creates no flight. Callback cancellation bridges still use a short Task to enter the actor; storing continuations and clearing them in one isolated transition prevents duplicate resume. A passing instructor suite proves these chosen schedules on the host. It does not prove every possible scheduler interleaving or complete your learner exercise.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Explain the owner contract and extend one deterministic stale-response schedule without replacing event signals with time guesses.",
+        "steps": [
+          "Run GateTests, LatestLoaderTests, and SharedRefreshTests using README's isolated cache setup; record actual summaries.",
+          "Trace the B-before-A tests for both old success and old failure, then the tests where B is still loading.",
+          "Explain why account A to B to A can reuse generation one but must get a new epoch.",
+          "Change one old payload or synthetic error label and confirm the new phase remains untouched; release every ignoring gate and join every handle.",
+          "Change the active-work limit in a scratch exercise and name which start must be rejected while old work remains alive.",
+          "Trace both shared-waiter cancellation parameters and distinguish ordered cancellation from a simultaneous completion race.",
+          "Add your own documented schedule, expected phases, actual run, and explanation; keep learner completion separate from instructor validation."
+        ],
+        "acceptance": [
+          "Each request starts only after the test observes its start signal, and completion is explicitly controlled.",
+          "Both late success and late error are rejected while newer data is loaded and while newer work is loading.",
+          "A to B to A invalidation is justified by epoch, not only account text or request numbering.",
+          "Cancelled ignoring work stays counted until exit; rejected starts preserve visible state.",
+          "Either refresh waiter can cancel independently, ordinary error reaches both waiters, and abandoned flights are joined.",
+          "The report distinguishes this phase owner from a caching repository, transport adapter, and real authentication refresh."
+        ],
+        "solution": "<p>A useful added schedule releases old A successfully while B is still loading. Use cancelSuperseded false and ignoring gates so cancellation cannot supply the expected result. The following addition belongs in a learner scratch Swift Testing target importing SwiftLanguageLab:</p>\n<pre><code class=\"language-swift\">import Testing\nimport SwiftLanguageLab\n\n@Test func learnerSchedule() async throws {\n    let owner = LatestLoader(account: \"A\", cancelSuperseded: false)\n    let old = CompletionGate&lt;[String]&gt;(cancellationPolicy: .ignore)\n    let new = CompletionGate&lt;[String]&gt;(cancellationPolicy: .ignore)\n    let first = try await owner.start(using: old)\n    await old.waitUntilStarted()\n    let second = try await owner.start(using: new)\n    await new.waitUntilStarted()\n    try await old.succeed([\"obsolete\"])\n    await first.wait()\n    #expect(await owner.snapshot().phase == .loading(second.ticket))\n    try await new.succeed([\"current\"])\n    await second.wait()\n    #expect(await owner.snapshot().phase == .loaded(account: \"A\", values: [\"current\"]))\n}</code></pre>\n<p>The intermediate assertion proves an old result cannot clear loading, and the final assertion proves the newer request commits. Replacing old.succeed with old.fail exercises the catch boundary. For shared refresh, two registered waiters represent one active flight; cancel one and await its outcome before releasing success to the other. If all waiters cancel an ignoring gate, capacity remains occupied until you explicitly finish it. Those values are expected outcomes of the defined schedule, not a claim that your new test has been authored or executed.</p>"
+      },
+      "quiz": [
+        {
+          "question": "Why test an old error after a new success?",
+          "options": [
+            "Errors cannot cross actor boundaries.",
+            "A stale catch can overwrite current phase just as stale success can.",
+            "The test runner always delays catch blocks."
+          ],
+          "answer": 1,
+          "explanation": "Reentrancy allows newer ownership while an old operation awaits. Both success and error must check freshness before committing; actor isolation alone does not validate request identity."
+        },
+        {
+          "question": "After cancelling an ignoring gate, when may its active-work slot be freed?",
+          "options": [
+            "As soon as cancel returns.",
+            "When another account name is selected.",
+            "After the operation actually exits and its owner records completion."
+          ],
+          "answer": 2,
+          "explanation": "Cancellation is a request. Removing unresponsive work from accounting would permit unbounded real activity while reporting a misleading low count."
+        },
+        {
+          "question": "What does cancelling one registered shared-refresh waiter guarantee in the ordered test?",
+          "options": [
+            "That waiter stops, while the other can still receive the shared result.",
+            "Every waiter receives CancellationError.",
+            "A simultaneous result already delivered is retroactively removed."
+          ],
+          "answer": 0,
+          "explanation": "Each waiter owns a separate continuation. The ordered test waits for cancellation handling before completion; simultaneous cancellation and completion are governed by actor handling order."
+        }
+      ],
+      "references": [
+        {
+          "label": "Swift: Concurrency and task cancellation",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"
+        },
+        {
+          "label": "Swift Evolution: Actor isolation and reentrancy",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0306-actors.md"
+        },
+        {
+          "label": "Apple: withTaskCancellationHandler",
+          "url": "https://developer.apple.com/documentation/swift/withtaskcancellationhandler(operation:oncancel:isolation:)"
+        },
+        {
+          "label": "Apple: withCheckedThrowingContinuation",
+          "url": "https://developer.apple.com/documentation/swift/withcheckedthrowingcontinuation(isolation:function:_:)"
+        },
+        {
+          "label": "Apple: Testing asynchronous code",
+          "url": "https://developer.apple.com/documentation/testing/testing-asynchronous-code"
+        }
+      ],
+      "files": [
+        {
+          "label": "SwiftPM library and test target declaration",
+          "path": "labs/SwiftLanguageLab/Package.swift"
+        },
+        {
+          "label": "Isolated run commands and cancellation contracts",
+          "path": "labs/SwiftLanguageLab/README.md"
+        },
+        {
+          "label": "Single-use start, success, failure, and cancellation gate",
+          "path": "labs/SwiftLanguageLab/Sources/SwiftLanguageLab/CompletionGate.swift"
+        },
+        {
+          "label": "Latest request, account epoch, and real active-work accounting",
+          "path": "labs/SwiftLanguageLab/Sources/SwiftLanguageLab/LatestLoader.swift"
+        },
+        {
+          "label": "Shared refresh with per-waiter continuations",
+          "path": "labs/SwiftLanguageLab/Sources/SwiftLanguageLab/SharedRefresh.swift"
+        },
+        {
+          "label": "Gate event and duplicate-resolution tests",
+          "path": "labs/SwiftLanguageLab/Tests/SwiftLanguageLabTests/GateTests.swift"
+        },
+        {
+          "label": "Adversarial success/error, account, and capacity schedules",
+          "path": "labs/SwiftLanguageLab/Tests/SwiftLanguageLabTests/LatestLoaderTests.swift"
+        },
+        {
+          "label": "Independent cancellation and abandoned-flight tests",
+          "path": "labs/SwiftLanguageLab/Tests/SwiftLanguageLabTests/SharedRefreshTests.swift"
+        }
+      ]
+    },
+    {
+      "id": "foundation-files",
+      "title": "Foundation fixtures: locale, Unicode, and honest file failures",
+      "summary": "Fix interpretation inputs, exercise missing and corrupt documents plus real and injected write failure, and separate host assertions from device storage guarantees.",
+      "kind": "Host implementation",
+      "sessions": [
+        "057",
+        "058",
+        "061",
+        "062",
+        "064",
+        "065",
+        "067",
+        "070",
+        "012",
+        "018",
+        "020",
+        "052"
+      ],
+      "sections": [
+        {
+          "id": "meaning-before-format",
+          "title": "A fixture chooses meaning before presentation",
+          "html": "<p>Foundation is the host-capable part of the Apple platform story that handles dates, locale-aware formatting, strings at text-system boundaries, URLs, and files. An Android engineer may recognize java.time, NumberFormat, and java.nio responsibilities, but matching responsibilities do not imply matching defaults. This workshop fixes every input that affects interpretation instead of reading the user's current locale or timezone. It builds on session 052's Foundation correctness and the Swift type and error vocabulary in sessions 058 and 067. It uses no client container, personal text, or real account data.</p>\n<p>Use the isolated-cache function in README from the lab directory. Run FoundationTests to obtain assertions and the executable foundation mode to see a small demonstration. The demonstration prints results; the tests prove particular fixture expectations. Record the installed toolchain and actual command outcomes, and read the Swift Testing summary rather than only the XCTest compatibility preamble.</p>\n<pre><code>lab_swift test --filter FoundationTests\nlab_swift run swift-workbench foundation</code></pre>\n<p>springCivilDaySeconds chooses a Gregorian calendar and the America/New_York timezone. It constructs noon on March 9, 2024 and adds one calendar day, then verifies the end remains noon before measuring the elapsed interval. The named historical spring transition gives 82,800 seconds, not 86,400. That is a tested fixture for civil-day arithmetic, not a rule that days everywhere are twenty-three hours. Adding an elapsed duration answers a different question. The Kotlin analogy is a zoned date-time plus a day versus an instant plus a duration, with API-specific matching and gap policies still needing their own study.</p>\n<p>The decimal fixture explicitly chooses en_US for 1,234.50 and de_DE for 1.234,50. Both represent the same Decimal value. A local NumberFormatter is configured for decimal style and two displayed fractional digits; the formatter is not shared mutable global state. The test asserts the numeric value and a locale-aware format/parse round trip. It checks the decimal marker and fractional digits without asserting every byte of a localized presentation string. Locale data can change between operating systems. These known well-formed inputs do not establish strict whole-input validation: NumberFormatter may accept more than a product's grammar allows. Currency scale, rounding, overflow, and authorization are separate domain contracts; formatted text must not become a machine wire representation.</p>"
+        },
+        {
+          "id": "unicode-boundaries",
+          "title": "Visible characters and UTF-16 offsets answer different questions",
+          "html": "<p>Kotlin and Java string indexing commonly exposes UTF-16 code units. Swift String is a collection of Character values, where one Character can represent an extended grapheme cluster containing several scalars. The composed accent é and decomposed e followed by a combining acute accent compare equal in Swift, yet their UTF-8 bytes differ. Equality expresses canonical textual equivalence; it does not promise byte-identical encoding. A byte limit for transport and a visible-character limit for editing therefore need separate fixtures and policies.</p>\n<pre><code class=\"language-swift\">let composed = \"é\"\nlet decomposed = \"e\\u{301}\"\nlet sameText = composed == decomposed // true\nlet visibleCount = decomposed.count // 1\nlet byteCount = decomposed.utf8.count // 3\n\nlet text = \"A👩🏽‍💻B\"\nif let b = text.range(of: \"B\") {\n    let foundationRange = NSRange(b, in: text)\n    let roundTrip = Range(foundationRange, in: text)\n    let aligned = FoundationFixtures.isCharacterAligned(foundationRange, in: text)\n}</code></pre>\n<p>The emoji cluster in that string contains a modifier and a joiner sequence. The complete string has three Characters; B begins at UTF-16 offset eight. NSRange conversion takes the exact source string so Foundation offsets can become the appropriate Swift positions. Converting back can fail for an invalid range, so the result is optional. Do not manufacture an integer Character offset from the NSRange location, and do not reuse positions after changing the underlying string. Sessions 061 and 064 connect collection iteration and mutation with these invalidation concerns.</p>\n<p>Conversion and editing policy are distinct. Range(_:in:) establishes whether a Foundation range can be represented in the string; it should not be treated as a blanket guarantee that the endpoints follow the application's Character boundaries. isCharacterAligned additionally builds the set of actual Character indices and endIndex, then requires both endpoints to belong to that set. Including endIndex allows a selection reaching the end of the string. The test rejects an out-of-bounds range and a range covering only the first scalar of a decomposed cluster. It asserts the policy result rather than depending on whether a particular partial conversion happens to succeed.</p>\n<p>Building a boundary set scans the text, so repeated large edits need a considered strategy rather than an assumed constant-cost operation. The fixture does not implement normalization for wire storage, confusable-identifier detection, secure search, or a text editor. Change the fixture by adding a distinct emoji-adjacent selection and independently deriving its UTF-16 range from the actual string. Assert both round-trip identity and Character alignment. An observed difference in byte count is useful evidence; it is not permission to log real user text while debugging.</p>"
+        },
+        {
+          "id": "temporary-file-contract",
+          "title": "Missing, corrupt, and empty are different states",
+          "html": "<p>TemporaryWorkspace creates a UUID-named directory under FileManager's temporaryDirectory. Every file test constructs a new workspace and defers cleanup of only that directory. The tests may run in parallel without competing for a shared filename. FixtureFileStore always uses snapshot.json beneath its supplied workspace, so an arbitrary learner label cannot become a path traversal input. File URLs are constructed with URL path APIs, not with URL(string:) interpreting a filesystem path as a web URL. The code never reads Documents, Application Support, a company store, or an account cache.</p>\n<pre><code class=\"language-swift\">let workspace = try TemporaryWorkspace()\ndefer { try? workspace.cleanup() }\nlet store = FixtureFileStore(workspace: workspace)\nlet absent = try store.load() // .missing\nlet empty = PracticeDocument(topics: [])\ntry store.save(empty)\nlet present = try store.load() // .value(empty)</code></pre>\n<p>load reads bytes first. A specifically classified Cocoa missing-file error returns FileLoad.missing. Other I/O errors become readFailed with diagnostic context. The implementation does not call fileExists and then assume a later read will have the same outcome; that separate check would introduce a race. Successfully decoded version-one bytes produce value(document), including an empty topics array. Missing and successful-empty are observably different, which mirrors session 020's distinction between absent cache knowledge and known empty results.</p>\n<p>Malformed JSON or a field of the wrong type produces corrupt. A valid document with an unsupported version produces unsupportedVersion instead of masquerading as current data. save rejects unsupported versions too. These explicit errors make a future migration policy possible, but this workshop has no migration implementation and does not automatically discard or repair corrupted bytes. Session 018 supplies the related Codable boundary: decoding is evidence about a particular schema, not proof that the data is valid for every domain use.</p>\n<p>The missing/corrupt test first observes missing, saves a successful empty document, reads it, and then replaces the bytes with a malformed synthetic fixture. It requires a typed corrupt outcome. Another fixture writes a numeric topics field and checks corruption, while a version-two document checks the version outcome. To change a fixture, edit only its synthetic bytes in the test and calculate the intended outcome. A valid JSON object can still violate the schema. Inspect the failure category before changing a decoder; catching everything and returning an empty array would erase the distinction the test exists to preserve. Cleanup failures are best-effort in defer, while a dedicated directory test verifies bounded removal and isolation.</p>"
+        },
+        {
+          "id": "write-failure-and-evidence",
+          "title": "Exercise real failure without relying on ambient permissions",
+          "html": "<p>The default writer uses Data.write with atomic replacement. That option helps readers avoid seeing partial-file contents, but it does not coordinate independent logical read-modify-write sequences or guarantee crash durability for every filesystem. Two owners could read the same old document, derive different updates, and each atomically replace it, losing one logical update. The host example supplies a file boundary, not a transaction protocol or cross-process account store. Do not add an await after an account freshness guard and assume the eventual durable write inherits that guard automatically.</p>\n<p>The writer is an injected @Sendable throwing closure. One test saves a previous synthetic snapshot, substitutes a writer that throws before writing, attempts a replacement, and checks that the writeFailed outcome is visible and the prior document remains. This proves this injected failure path. It does not promise every failure leaves the filesystem unchanged: a different writer might modify bytes and then throw. That limitation belongs in the contract instead of being hidden by a generic test name. Sessions 065 and 068 explain initialization of that dependency and the escaping closure it retains.</p>\n<p>A separate test creates a directory at the exact snapshot.json path. Replacing that directory with atomic file data produces a real filesystem write failure, and reading it as document bytes produces readFailed. The directory remains a directory. This fixture does not depend on chmod being effective for the current user, filling a disk, or altering a real file. The malformed-document fixture likewise lives only in its newly created workspace. Each test cleans up its own temporary directory after success or a thrown path.</p>\n<p>Read an issue by separating read failure, decoding corruption, version rejection, and write failure. When changing the injected writer, preserve the assertion that an error remains observable; printing a warning and reporting save success would change the caller contract. When changing valid topics, assert the decoded PracticeDocument rather than merely checking that some file exists. Keep actual run output with your fixture change and explain what that result establishes. Passing the instructor tests proves only the supplied host cases. iOS locked-file protection, backup attributes, document-provider coordination, App Group writers, and device lifecycle need native or device evidence. They are specialist follow-up practice, not simulated host successes or completed learner work.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Create your own synthetic fixture matrix for civil time, two locales, Unicode boundaries, and distinct file outcomes, then run the host assertions and report their limits.",
+        "steps": [
+          "Record the toolchain and run FoundationTests plus swift-workbench foundation with the README cache setup.",
+          "Explain why the named civil-day interval is 82,800 seconds and why adding 86,400 seconds asks a different question.",
+          "Parse the two locale fixtures into the same Decimal value; format and parse again without using localized output as transport data.",
+          "Add another Unicode selection fixture, derive its NSRange from the exact string, and check range conversion and Character alignment separately.",
+          "Extend valid topics with a synthetic value and assert the decoded document. Then change a field to a wrong JSON type and require corruption.",
+          "Inspect missing, successful-empty, unsupported-version, unreadable-directory, injected-write-failure, and real-write-failure outcomes in separate isolated workspaces.",
+          "Write an evidence note separating executed host cases from pending device protection, backup, and multiple-writer checks."
+        ],
+        "acceptance": [
+          "Locale, Gregorian calendar, and named timezone are explicit inputs, not ambient defaults.",
+          "Character count, UTF-16 range, and UTF-8 byte counts are distinguished using synthetic strings.",
+          "Every file fixture uses its own temporary directory and bounded cleanup; no client or account files are accessed.",
+          "Missing, corrupt, unsupported-version, read-failed, and write-failed outcomes cannot be redefined as successful empty.",
+          "An injected pre-write failure preserves the previous snapshot, and a directory obstruction exercises a real I/O failure.",
+          "The report identifies the limited atomic-write contract and the device behaviors that remain unverified."
+        ],
+        "solution": "<p>A worked fixture extension changes topics from empty to a synthetic Unicode label and reads it back. The error fixture then changes the type of topics rather than merely inventing another valid label. This code belongs in a learner function or scratch test with Foundation and SwiftLanguageLab imported:</p>\n<pre><code class=\"language-swift\">let workspace = try TemporaryWorkspace()\ndefer { try? workspace.cleanup() }\nlet store = FixtureFileStore(workspace: workspace)\nlet expected = PracticeDocument(topics: [\"Cafe\\u{301}\", \"👩🏽‍💻\"])\ntry store.save(expected)\nlet recovered = try store.load()\n// Assert recovered == .value(expected) in your test.\ntry Data(#\"{\\\"version\\\":1,\\\"topics\\\":7}\"#.utf8).write(to: store.file)\ndo {\n    _ = try store.load()\n    // Record a failed expectation here: decoding should not succeed.\n} catch FileStoreError.corrupt {\n    // The bytes are valid JSON but incompatible with [String].\n}</code></pre>\n<p>The corresponding test should fail if corrupt is replaced with missing or an empty value. The two locale fixtures converge on Decimal 1234.5, the decomposed accent is one Character with three UTF-8 bytes, and the named New York civil day spans twenty-three elapsed hours. The pre-write injection preserves the prior snapshot because it never modifies the file; the directory obstruction independently verifies real read and write failure. Your report should include actual commands and outcomes, while listing device protection and coordinated multi-writer behavior as pending evidence. This worked answer does not execute or complete your changed fixture.</p>"
+      },
+      "quiz": [
+        {
+          "question": "What does Swift equality of composed and decomposed accents imply?",
+          "options": [
+            "Their UTF-8 bytes must be identical.",
+            "Their textual values are canonically equivalent, while byte representations can differ.",
+            "Each scalar is always a separate Character."
+          ],
+          "answer": 1,
+          "explanation": "String equality respects canonical equivalence. Character count, scalar count, UTF-16 length, and encoded byte count answer different questions."
+        },
+        {
+          "question": "Why create a directory at snapshot.json for the write-failure fixture?",
+          "options": [
+            "It exercises a real obstruction without depending on chmod, privileges, or disk exhaustion.",
+            "Directories are always decoded as empty documents.",
+            "It proves all iOS protected files are readable while locked."
+          ],
+          "answer": 0,
+          "explanation": "A directory cannot be atomically replaced as the intended regular document in this fixture. The test uses only a unique temporary workspace and establishes no device file-protection behavior."
+        },
+        {
+          "question": "What is missing from an atomic replacement when two owners read and modify the same old file?",
+          "options": [
+            "A localized filename.",
+            "A larger JSON indentation setting.",
+            "A protocol coordinating the logical read-modify-write operations."
+          ],
+          "answer": 2,
+          "explanation": "Complete-file visibility is not logical update serialization. Independent replacements can still lose an update, requiring ownership or transaction coordination suited to the real store."
+        }
+      ],
+      "references": [
+        {
+          "label": "Apple: Calendar",
+          "url": "https://developer.apple.com/documentation/foundation/calendar"
+        },
+        {
+          "label": "Apple: NumberFormatter",
+          "url": "https://developer.apple.com/documentation/foundation/numberformatter"
+        },
+        {
+          "label": "Swift: Strings and characters",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/stringsandcharacters/"
+        },
+        {
+          "label": "Apple: FileManager temporaryDirectory",
+          "url": "https://developer.apple.com/documentation/foundation/filemanager/temporarydirectory"
+        },
+        {
+          "label": "Apple: Data writing options",
+          "url": "https://developer.apple.com/documentation/foundation/data/writingoptions"
+        },
+        {
+          "label": "Apple: Encoding and decoding custom types",
+          "url": "https://developer.apple.com/documentation/foundation/encoding-and-decoding-custom-types"
+        }
+      ],
+      "files": [
+        {
+          "label": "Host toolchain and dependency declaration",
+          "path": "labs/SwiftLanguageLab/Package.swift"
+        },
+        {
+          "label": "Cache setup, fixture changes, and evidence boundaries",
+          "path": "labs/SwiftLanguageLab/README.md"
+        },
+        {
+          "label": "Time, locale, range, temporary workspace, and file contracts",
+          "path": "labs/SwiftLanguageLab/Sources/SwiftLanguageLab/FoundationFixtures.swift"
+        },
+        {
+          "label": "Independent Foundation and filesystem fixtures",
+          "path": "labs/SwiftLanguageLab/Tests/SwiftLanguageLabTests/FoundationTests.swift"
+        }
+      ]
+    }
+  ]
+}

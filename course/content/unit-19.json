@@ -1,0 +1,612 @@
+{
+  "unit": {
+    "id": "apple-specialists",
+    "title": "Apple specialist entry electives",
+    "summary": "Concrete policy and feature-selection entry exercises for transactions, live state, cloud/documents, text/media performance and adjacent Apple platforms.",
+    "order": 19
+  },
+  "lessons": [
+    {
+      "id": "109",
+      "title": "StoreKit and ActivityKit: verified rights and bounded live state",
+      "summary": "Separate verified transactions from entitlement policy, and live presentation from the durable event it describes.",
+      "duration": 150,
+      "level": "Specialist electives",
+      "prerequisites": [
+        "015",
+        "025",
+        "050",
+        "056",
+        "097"
+      ],
+      "objectives": [
+        "Project verified transactions into product-specific entitlements and handle refunds, replay and offline uncertainty.",
+        "Distinguish ActivityKit attributes, content state, freshness, update delivery and final lifetime.",
+        "Design independently testable policy with an explicit native and sandbox evidence boundary."
+      ],
+      "sections": [
+        {
+          "id": "rights-before-ui",
+          "title": "Start with the right you are selling and the event you are showing",
+          "html": "<p>Think of an Android app that sells a permanent theme and shows the progress of a delivery. Billing owns evidence that the theme was purchased; a widget or ongoing notification presents delivery state. Neither a purchase button nor a visible notification proves the underlying fact. On Apple platforms, StoreKit and ActivityKit answer similarly separate questions. The exercise uses a synthetic permanent theme, demo.pro, and a fictional parcel. It never models a medical service, charges money, or starts a real Live Activity.</p><p>Define entitlement before writing UI: a verified, recognized, non-revoked non-consumable transaction permits the theme. A consumable credit needs an independently persisted fulfillment ledger; finishing a transaction is not that ledger. An auto-renewable subscription needs expiration and subscription-status policy, including renewal, grace period and billing retry distinctions. Do not reuse one Boolean rule for all product types. A development catalog being available also does not prove an App Store product is approved or configured in the intended environment.</p><p>Play Billing's purchase token and acknowledgment provide a useful reminder to process evidence and delivery separately. StoreKit 2 exposes verified transaction values and asynchronous sequences with different contracts; finish is not a rename of every Android acknowledgment or consumption operation. Your existing Kotlin experience transfers best as questions about replay, cancellation and durable effect. Staff ownership adds who configures the catalog, who repairs failed fulfillment, and which evidence the product considers authoritative when devices disagree.</p>"
+        },
+        {
+          "id": "verification-and-reconciliation",
+          "title": "Verification, the transaction listener, and current entitlement reconciliation",
+          "html": "<p>StoreKit 2 is available from iOS 15, but individual later APIs and overloads have their own availability. VerificationResult wraps the transaction in verified or unverified cases. Pattern matching unwraps the value only after deciding whether its evidence is acceptable. An unverified case still carries information useful for bounded diagnostics; it is not permission to unlock content. Never replace verification with a client preference called purchased or silently treat verification failure as an empty successful restore.</p><p>Install one owned listener for Transaction.updates early in the application's lifetime, then reconcile Transaction.currentEntitlements. The listener receives transactions occurring outside the immediate purchase call, such as another device or deferred approval. Current entitlements is a projection, not every historical purchase: consumables are not a durable credit balance, and refunded or revoked products are excluded. A foreground reconciliation can repair a missed observation. Cancellation must end the listener when its account/service owner is replaced; a short-lived purchase screen is a poor owner.</p><p>Purchase returns success with a verification result, pending, or userCancelled. Pending is a visible unresolved state, not an exception that justifies retrying the charge. After verification, persist the intended delivery or entitlement effect idempotently before finishing. If the process stops between delivery and finish, replay must discover the previous effect. For an update about the same transaction's revocation, an unconditional seen-transaction-ID guard is wrong: identity can remain stable while the facts relevant to entitlement change.</p>"
+        },
+        {
+          "id": "small-storekit-adapter",
+          "title": "Read one deliberately narrow StoreKit adapter",
+          "html": "<p>The following is a target-only example for an iOS 15+ app using the Apple SDK. It queries permanent-theme rights without initiating a purchase or refund. It is shown for reading and later scratch compilation; the host companion does not invoke it. The product identifier is synthetic and the allow-list is an argument so unknown catalog items cannot accidentally grant a feature.</p><pre><code class=\"language-swift\">import StoreKit\n\n@available(iOS 15.0, *)\nfunc permanentThemeIDs(allowed: Set&lt;String&gt;) async -&gt; Set&lt;String&gt; {\n    var result: Set&lt;String&gt; = []\n    for await evidence in Transaction.currentEntitlements {\n        guard case .verified(let transaction) = evidence else { continue }\n        guard transaction.productType == .nonConsumable,\n              transaction.revocationDate == nil,\n              allowed.contains(transaction.productID) else { continue }\n        result.insert(transaction.productID)\n    }\n    return result\n}</code></pre><p>The colon declares a type; Set&lt;String&gt; prevents duplicate identifiers in the result. The allowed: argument label makes the call's contract explicit. async permits suspension, while for await consumes the asynchronous sequence without assuming a callback arrives on the main thread. guard case extracts only verified transactions. The second guard deliberately restricts product type; there is no claim that this function evaluates subscriptions or grants consumable credit. A UI owner can await the value and commit it only if its account generation still matches.</p><p>This snapshot is only one adapter operation. A production service still needs the long-lived listener, cancellation ownership, product loading errors, customer support, restore affordances and server reconciliation where required. AppStore.sync is a user-initiated synchronization tool, not a launch-time polling loop. Signed transaction verification and any server-notification validation need their own implementation and tests. A source example with an availability annotation is not evidence that an installed app completed those integrations.</p>"
+        },
+        {
+          "id": "refund-offline-policy",
+          "title": "Refunds and offline verification require honest state",
+          "html": "<p>A refund request sheet reports whether submission succeeded or the user canceled. Submission success is not approval. Keep the entitlement until the relevant verified transaction or authoritative reconciliation establishes revocation, subject to the documented product policy. Transaction.revocationDate can represent an App Store refund or a Family Sharing revocation; it is not a timestamp the app invents when support opens a ticket. Recompute the entitlement projection and preserve useful customer-facing explanations without logging signed payloads or account identifiers indiscriminately.</p><p>StoreKit can verify its signed transaction evidence on device. That supports a useful offline experience, but a valid signature does not prove that no refund happened elsewhere after the device lost connectivity. Explain this difference between authenticity and freshness. For a permanent theme, a product may allow the last verified projection offline and reconcile later. A subscription may show access valid through a known period, with an explicit grace policy based on subscription status rather than a random extra day. High-consequence server actions may require fresh server evidence even when local presentation remains available.</p><p>The companion injects verified as a fixture input. It performs no signature checking. Its revision integers establish deterministic test ordering, not an ordering promise from StoreKit. In a real adapter, preserve actual signed metadata and authoritative reconciliation semantics instead of incrementing a made-up global revision. Also distinguish the App Store identity from your application's signed-in account: switching app accounts does not automatically change the store account. Association and recovery policy need explicit ownership rather than silently transferring purchases between users.</p>"
+        },
+        {
+          "id": "activity-mechanism",
+          "title": "ActivityKit presents an evolving event with a bounded lifetime",
+          "html": "<p>A Live Activity is useful for an ongoing parcel journey with a meaningful end. Its ActivityAttributes describe stable identity, such as a synthetic parcel label, while a nested ContentState describes changing facts, such as stage and estimated arrival. WidgetKit's ActivityConfiguration renders that state; ActivityKit requests, updates and ends the activity. The view is not an always-running controller that fetches your backend. ActivityKit began with iOS 16.1; the ActivityContent-based request/update/end family used in modern examples requires iOS 16.2 or later.</p><p>Set a staleDate for content whose usefulness expires. Stale means the displayed estimate is old; it is different from ending the underlying event. The system can present an ended activity for a dismissal interval. Apple's current documented iPhone contract permits up to eight active hours and up to four additional hours on the Lock Screen; other surfaces and later APIs need their own checks. Combined static and dynamic data is limited to 4 KB. These are design constraints, not recommended parcel durations or a promise of a particular rendering instant.</p><p>Local updates require available execution time. ActivityKit push notifications can update state through APNs without turning the extension into a general background service. Push-to-start and newer initiation options have separate availability, tokens and budgets; do not infer them from basic iOS 16.1 support. Track activity state and current activities after relaunch, handle disabled activities and user dismissal, and end with final content. An Android ongoing notification or widget does not reproduce ActivityKit's system-managed surfaces, lifecycle or update budget.</p>"
+        },
+        {
+          "id": "coupling-and-repo",
+          "title": "Keep domain rights, event state, and presentation ownership separate",
+          "html": "<p>Suppose the parcel becomes ready while the permanent theme is revoked. One event changes the entitlement store; another changes parcel state. A Live Activity must not become the authority for either. Build an immutable presentation from current domain facts, redact it for the destination, and tag adapter work with an owner generation. If a late update arrives after logout or activity end, reject it before publication. An app-controlled sequence number can order your own parcel facts, but cannot force APNs to deliver every update or resurrect an ended activity.</p><p>The inspected MedicationWidgetTimelineProvider uses WidgetKit timelines and separates gallery preview from current entries. Its getTimeline method returns an atEnd policy at line 33. That demonstrates snapshot ownership and system-controlled refresh, not ActivityKit integration. The app manifest declares the widget extension separately at line 152. StoreKit imports found in Application.swift include an app-review request around line 806; an import or review prompt does not establish purchase handling. These distinctions stop a source audit from overstating existing specialist support.</p><p>Select ActivityKit only when an ongoing event benefits from a glanceable, bounded presentation. A regular widget may fit a daily summary; an in-app screen may fit detailed inspection. Keep user consent, privacy on visible surfaces, and stop behavior in the feature contract. Native rendering, real device dismissal, token renewal and sandbox refund behavior remain independent practice. The companion checks state policy and replay, while a deeper project owns server verification, product operations and platform integration evidence.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "The refund request sheet returns success. What changes immediately?",
+          "options": [
+            "The transaction is necessarily revoked.",
+            "The request was submitted; approval and entitlement evidence remain separate.",
+            "Every product for that customer must be disabled."
+          ],
+          "answer": 1,
+          "explanation": "Submission is not approval. Reconcile verified transaction state and revocation evidence before changing the product-specific entitlement."
+        },
+        {
+          "question": "Why is a permanent seen-transaction-ID filter insufficient?",
+          "options": [
+            "Transaction IDs are irrelevant.",
+            "Revocation evidence for an existing transaction may change the projection.",
+            "Every duplicate must grant content again."
+          ],
+          "answer": 1,
+          "explanation": "Idempotent fulfillment and entitlement reconciliation are distinct. A known identity can carry a newly relevant revocation fact; replay must not duplicate delivery."
+        },
+        {
+          "question": "A Live Activity reaches its staleDate. Which interpretation is correct?",
+          "options": [
+            "The domain event finished successfully.",
+            "Content is out of date; stale and ended are different states.",
+            "The extension now gets unlimited refresh execution."
+          ],
+          "answer": 1,
+          "explanation": "Staleness labels freshness. Ending and dismissal have separate semantics, and execution/update opportunities remain system-controlled."
+        }
+      ],
+      "exercise": {
+        "brief": "Independently design a synthetic permanent-theme entitlement projector and parcel surface policy, then add one missing adversarial case to the host companion. Do not purchase, request a refund, or start an activity.",
+        "steps": [
+          "Write product and offline policy before running supplied checks; enumerate unverified, pending, duplicate, expiration, revocation and account-change cases.",
+          "Read policy_model.py and distinguish fixture revision from real signed evidence. Add a case for two transactions where revoking the older one must preserve the newer right.",
+          "Create a timeline where content becomes stale, becomes fresh after a current update, then ends; reject an old owner and a post-end update.",
+          "Submit a native/sandbox checklist with every unperformed row pending and explain the listener's lifetime and finish ordering."
+        ],
+        "acceptance": [
+          "Unverified and old-generation input cannot grant a right; same-ID revocation is processed without duplicate delivery.",
+          "A newer independently valid transaction survives revocation of an older transaction; any expiry boundary is specified.",
+          "Stale presentation can refresh before end, while ended presentation cannot be resurrected.",
+          "Evidence identifies actual host commands separately from pending StoreKit, APNs and device checks."
+        ],
+        "solution": "<p>A worked design keeps transactions indexed by transaction identity and derives the permanent-theme right from any verified, allowed, non-revoked record. It does not store one mutable isPro flag independently of the ledger. For the fixture, apply purchase A at revision one, its revocation at revision two, and purchase B under a distinct identity. Replaying A's earlier purchase must not erase its newer revocation; B can still grant the same product. This explains why a revocation is scoped to its evidence rather than blindly disabling every historical purchase of a product.</p><p>For a consumable, the answer would change: persist an operation receipt and the credit mutation in the same durability boundary, then finish after that effect is recoverable. The lesson's permanent-theme model does not implement that balance. For subscription access, reconcile the subscription's verified status and chosen grace policy; a fixture expires_at comparison alone is insufficient to implement billing retry. Name the unsupplied adapter work rather than treating the generic policy as all three product types.</p><p>Use parcel revision three with stale_at twenty and ends_at eighty. At time nineteen it is fresh; at twenty it is stale. Revision four at twenty-one can publish ready and a new stale threshold. At eighty any later update is rejected regardless of its revision. A mismatched owner is rejected even earlier. Ending explicitly also stops updates before the deadline. The supplied Python tests exercise these boundaries under synthetic time without implying when the OS renders them.</p><p>The resulting evidence ledger says host policy checks were run only if the learner actually runs them and records output. StoreKit target compilation, local StoreKit configuration tests, App Store sandbox approval/revocation, and ActivityKit/APNs/device behavior are separate rows. A strong submission explains that verified offline evidence authenticates known facts but does not detect a remote refund instantly. It assigns catalog/support and server-notification ownership, preserves customer recovery, and leaves real integration and learner completion pending.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Transaction.currentEntitlements",
+          "url": "https://developer.apple.com/documentation/storekit/transaction/currententitlements"
+        },
+        {
+          "label": "Apple: Transaction.updates",
+          "url": "https://developer.apple.com/documentation/storekit/transaction/updates"
+        },
+        {
+          "label": "Apple: Transaction.revocationDate",
+          "url": "https://developer.apple.com/documentation/storekit/transaction/revocationdate"
+        },
+        {
+          "label": "Apple: Support customers and handle refunds",
+          "url": "https://developer.apple.com/videos/play/wwdc2021/10175/"
+        },
+        {
+          "label": "Apple: Displaying live data with Live Activities",
+          "url": "https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities"
+        },
+        {
+          "label": "Apple: ActivityContent.staleDate",
+          "url": "https://developer.apple.com/documentation/activitykit/activitycontent/staledate"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Widget timeline is a different mechanism",
+          "path": "ios-client/Projects/Apps/Zocdoc/Extensions/MedicationWidget/MedicationWidgetTimelineProvider.swift",
+          "line": 33,
+          "why": "Inspected timeline construction and atEnd policy establish WidgetKit snapshot behavior, not a Live Activity implementation."
+        },
+        {
+          "label": "Explicit extension target",
+          "path": "ios-client/Projects/Apps/Zocdoc/Project.swift",
+          "line": 152,
+          "why": "The MedicationWidget appExtension has separate source, identity and dependency declarations."
+        },
+        {
+          "label": "StoreKit review prompt",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Application/Application.swift",
+          "line": 806,
+          "why": "The observed requestReview use must not be reported as verified purchase or entitlement integration."
+        }
+      ],
+      "checklist": [
+        "I can distinguish transaction identity, verified evidence, delivery and entitlement policy.",
+        "I can explain refund submission versus revocation and offline authenticity versus freshness.",
+        "I can define stale, ended and dismissed Live Activity state separately.",
+        "I can name the native and server evidence that the synthetic model cannot supply."
+      ]
+    },
+    {
+      "id": "110",
+      "title": "CloudKit and documents: reconcile versions without losing offline edits",
+      "summary": "Practice three-way conflicts, opaque change tags, checkpointed fetches, and document coordination under explicit account and schema boundaries.",
+      "duration": 150,
+      "level": "Specialist electives",
+      "prerequisites": [
+        "019",
+        "052",
+        "053",
+        "056",
+        "098",
+        "100"
+      ],
+      "objectives": [
+        "Model CloudKit record identity, server change tags, schema environments and retry responsibilities.",
+        "Merge offline edits using an explicit base/local/server policy and stable operation identity.",
+        "Distinguish coordinated document access from domain conflict resolution and cloud delivery."
+      ],
+      "sections": [
+        {
+          "id": "choose-sync-boundary",
+          "title": "Room-style local ownership is useful; iCloud adds separate boundaries",
+          "html": "<p>Imagine an Android note app backed by Room and an outbox. Two phones edit a fictional packing list offline, then reconnect. The local transaction gives each phone a coherent draft; it cannot decide which remote edit wins. CloudKit supplies records and server-side version checks within an iCloud container, but it does not turn every local database operation into a synchronized business transaction. A document provider introduces a different boundary again: the whole file may be edited, moved or downloaded by another process.</p><p>Choose one bounded feature for this lesson: synchronize title and note fields of a synthetic card. Define the record identifier, local account generation, last synchronized base, current draft and pending operation. Keep CloudKit private, shared and public database scopes conceptually distinct. An app login is not an iCloud account, and public storage is not the default place for private user drafts. Availability of the framework, signed container access, account availability and server success are separate facts.</p><p>Room plus WorkManager is an analogy for durable local work and opportunistic scheduling, not an exact CloudKit implementation. CKSyncEngine, introduced in iOS 17, can organize change fetching and sending, but delegates still supply records and handle business conflicts and failures. NSPersistentCloudKitContainer is another path when Core Data owns your model; manually sending the same mirrored objects through a second engine creates competing authorities. Select an approach from the data contract and ownership needs before choosing an API name.</p>"
+        },
+        {
+          "id": "tags-and-schema",
+          "title": "Record change tags protect a conditional save; schemas protect compatibility",
+          "html": "<p>A CKRecord has a recordID and typed fields. Its recordChangeTag is an opaque server version token updated on save. With an ifServerRecordUnchanged save policy, a stale tag produces serverRecordChanged instead of silently replacing a newer version. Do not parse the tag as a timestamp or integer, sort tags, or construct a new record from only its business fields and assume its server identity survives. Preserve the record's system fields through the documented encoding path when local persistence needs them.</p><p>On a conflict, retain the server record, the attempted client record and the ancestor/base available to your policy. Those are different versions, not redundant objects. Rebase the intended operation onto the current server version and save using that version's system fields. If another writer changes it again, the second attempt can conflict too. Bound retries, preserve the draft and surface unresolved choices instead of spinning a tight retry loop. Partial failures in a batch require per-record recovery; one successful record does not certify the whole batch.</p><p>Development and production are separate environments. Deploying a schema copies record types, fields and indexes, not the development records. Production schema evolution is additive; previously deployed types and fields cannot simply be deleted. A schema review should therefore include older installed clients, missing optional fields, query indexes and staged adoption. A synthetic tag counter can test stale-write rejection, but cannot establish any real container, entitlement, production query or deployment behavior.</p>"
+        },
+        {
+          "id": "worked-three-way",
+          "title": "Three-way merging preserves independent edits and exposes disagreement",
+          "html": "<p>Use base title Draft and note Blue. Phone A changes title to Draft A; phone B changes note to Green. Comparing only A and B says they differ in both fields, but comparing each to base shows the changes are independent. Preserve both. If both change title differently, record a conflict rather than calling one value fresher because its device clock is larger. A clock can be wrong, and a later timestamp does not automatically mean a better edit.</p><p>This Foundation-free Swift helper is standalone Swift 5.9+ syntax. Its fixed-schema dictionaries have the same keys; a precondition makes that teaching constraint explicit. A real untrusted payload boundary should return a validation error instead of terminating. Missing fields and deletion require a separately designed policy.</p><pre><code class=\"language-swift\">func mergeCard(\n    base: [String: String],\n    local: [String: String],\n    server: [String: String]\n) -&gt; (values: [String: String], conflicts: Set&lt;String&gt;) {\n    precondition(Set(base.keys) == Set(local.keys))\n    precondition(Set(base.keys) == Set(server.keys))\n    var values = server\n    var conflicts: Set&lt;String&gt; = []\n    for key in base.keys {\n        if local[key] != base[key] {\n            if server[key] != base[key] &amp;&amp; local[key] != server[key] {\n                conflicts.insert(key)\n            } else {\n                values[key] = local[key]\n            }\n        }\n    }\n    return (values, conflicts)\n}</code></pre><p>The function returns a named tuple so callers can read result.values and result.conflicts. Dictionary subscripts return optionals because a key can be absent; the schema preconditions establish that all three contain the same keys before comparison. var values starts from a copy of the server projection. A locally changed field replaces it only when the server left that field unchanged or both sides chose the same value. Same-field disagreement remains visible while the server value stays in the tentative projection. Do not publish that tentative projection as a resolved draft without presenting or recording the conflicts.</p><p>This is a field merge, not collaborative text editing. Concurrent insertion positions inside a note, attachments, ordered collections, delete-versus-edit and sharing permissions need deeper models. A CRDT or operation transformation can address different requirements but adds its own storage, causality and adoption costs. The entry exercise intentionally teaches one decision boundary that you can inspect completely.</p>"
+        },
+        {
+          "id": "offline-retry-and-fetch",
+          "title": "Offline work needs operation identity and a recoverable fetch checkpoint",
+          "html": "<p>Suppose save operation op-1 succeeds remotely but its acknowledgment is lost. The client must retry without creating a second semantic effect. A stable recordID makes a replacement-style save address the same record; it does not magically deduplicate increments or appended events. For effects that require exactly-once application, define a durable operation receipt within the authoritative transaction boundary. CloudKit does not give the companion's arbitrary receipt protocol to every backend; represent idempotent records or choose an explicit server authority that supports the required atomic mutation.</p><p>Persist the local edit, base version and pending operation before reporting durable local success. After acknowledgment, update the stored server version and operation state together where possible. A crash between separate writes can otherwise clear pending work before the draft is recoverable. The companion reconstructs effect and receipt from a JSON snapshot to test replay policy; it does not test filesystem persistence, process crashes or CloudKit's atomic batch constraints.</p><p>A subscription notification is a hint to fetch changes, not a complete reliable record stream. Fetch on appropriate foreground recovery too. Persist the change token only with the locally applied changes it represents, handle pagination and deletions, and recover deliberately when tokens expire. A full refetch must retain still-pending drafts and apply the same conflict rules. CKSyncEngine manages useful scheduling and state, but you still persist its state, supply pending records, and recover account or zone changes under your application's policy.</p>"
+        },
+        {
+          "id": "coordinated-documents",
+          "title": "File coordination protects access; it cannot choose the winning edit",
+          "html": "<p>For a document feature, prefer the platform's document abstractions when they match the product. UIDocument coordinates file interaction and supplies document lifecycle behavior; document pickers and providers define access outside your private sandbox. A security-scoped URL may require startAccessingSecurityScopedResource and a balanced stop, retained for the bounded operation. Being able to spell a filesystem path does not grant access. Downloading an ubiquitous document and coordinating a file are also different steps.</p><p>NSFileCoordinator brackets coordinated read or write access; its accessor receives the URL to use for that coordinated operation. NSFilePresenter lets an interested owner respond to external changes and moves on its declared operation queue. Keep callbacks short and preserve thread/actor ownership when handing a new immutable snapshot to UI. Do not synchronously wait on the main thread for work that needs a presenter callback on that same thread. Cancellation and error delivery belong to the document owner rather than a global unstructured task.</p><p>Atomic file replacement prevents readers from seeing a partially replaced file; it does not merge two read-modify-write edits based on the same base. Cooperation matters: arbitrary processes that bypass coordination do not gain safety because your process uses an actor. Likewise, a coordinated write can correctly serialize access while still persisting a stale semantic version. Compare document revisions or preserve unresolved file versions according to the domain policy. Provider-specific conflicts, large package documents and multiwindow undo histories are separate specialist projects.</p>"
+        },
+        {
+          "id": "account-and-client-anchor",
+          "title": "Inspect the existing local store, then define the missing integration evidence",
+          "html": "<p>The inspected MedicationReminderStore.save method transforms a collection, encodes JSON and performs an atomic write at line 124. The store accepts an injected clock and a directory, which makes local policy testable. This is evidence of Foundation file persistence. It is not evidence of CloudKit synchronization, a coordinated document presenter, or a transaction shared between processes. Do not claim a lost update was observed: a source review can identify the concurrency question but requires an adversarial test to demonstrate it.</p><p>For the synthetic card feature, one local owner should apply server changes and pending drafts within an account-scoped transaction. Increment an owner generation on any account/session reset, including A-to-B-to-A, then reject completion from older generations before mutation. An iCloud account change may invalidate a different set of resources from app logout. Document URLs, server tokens and pending operation receipts need the correct identity scope; clearing only the visible screen is insufficient.</p><p>A staff decision compares explicit CloudKit records, Core Data mirroring and a local document feature using the required collaboration model, Android interoperability, account expectations and support burden. Apple platform integration may be a poor fit for a cross-platform server-authoritative workflow. The answer can legitimately choose local export first and postpone cloud collaboration. Native evidence must then verify coordinated file behavior separately from any future two-installation conflict test. No real container or user document is touched during this course authoring task.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does a CKRecord.recordChangeTag mean?",
+          "options": [
+            "An opaque version used for conditional saves.",
+            "A sortable device wall-clock timestamp.",
+            "A guarantee that all related records were saved atomically."
+          ],
+          "answer": 0,
+          "explanation": "Use the server tag as version evidence; ifServerRecordUnchanged rejects a stale version. Tags do not supply ordering arithmetic or a cross-record transaction guarantee."
+        },
+        {
+          "question": "Both devices change different fields relative to a retained base. What is the bounded merge policy?",
+          "options": [
+            "Always keep the device with the later clock.",
+            "Preserve independent changes; surface conflicting same-field changes.",
+            "Discard all offline changes."
+          ],
+          "answer": 1,
+          "explanation": "The base identifies which fields each side changed. Clock-based whole-record replacement can lose a valid independent edit."
+        },
+        {
+          "question": "A subscription push was lost. Which recovery design is sound?",
+          "options": [
+            "Wait forever because pushes are the entire truth.",
+            "Fetch changes on recovery and checkpoint applied data with its token.",
+            "Delete the local draft and invent a new record ID."
+          ],
+          "answer": 1,
+          "explanation": "Notifications are fetch hints. Recovery preserves pending work, handles pagination/token expiry, and prevents advancing the checkpoint ahead of applied changes."
+        }
+      ],
+      "exercise": {
+        "brief": "Independently extend the fixed-schema synthetic card policy with a deleted field and define delete-versus-edit resolution. Do not access iCloud or a real document provider.",
+        "steps": [
+          "Write base/local/server examples for disjoint edits, identical edits and conflicting title edits; predict each result before running checks.",
+          "Add a fixed-schema deleted Boolean to fixture dictionaries and specify whether deletion blocks publication or requires a user choice when the other side edits content.",
+          "Add a stale-tag save, lost-ack replay after model reconstruction and old-generation completion; retain the draft when save fails.",
+          "Produce a document coordination and native CloudKit evidence plan with explicit pending rows."
+        ],
+        "acceptance": [
+          "Disjoint edits preserve both values; same-field disagreement never silently becomes resolved.",
+          "Delete-versus-edit has a documented result and preserves enough data for recovery.",
+          "Retry keeps the same operation identity; stale tags and old owners cannot mutate the authoritative record.",
+          "Evidence distinguishes JSON reconstruction, local persistence, coordinated access and actual cloud conflict delivery."
+        ],
+        "solution": "<p>Begin with three immutable versions and compute changed fields against base. For title Draft/note Blue, local title Draft A and server note Green produce title Draft A/note Green without a conflict. If local title A and server title B both differ from Draft, return title as a conflict and retain both candidate values and the base in a resolution record. The companion's returned tentative values use the server side for that field; the user-facing draft must still preserve the local candidate. A conflict marker without its lost text would be an incomplete recovery design.</p><p>For the extension, retain a fixed deleted Boolean in all three dictionaries. When local changes deleted to true while the server changes note, classify this as a semantic delete-versus-edit conflict even though the individual keys are disjoint. This is the reason generic field merging is only a first layer. A suitable exercise policy blocks synchronized publication until the user chooses restore-and-merge or confirm deletion, while preserving a tombstone and the edited content for bounded recovery. Deleting the local row immediately would erase both conflict evidence and retry identity.</p><p>For a stale tag, save returns server-record-changed without changing the authoritative state. Fetch current server fields, merge against the retained base, and retry only a resolved proposal with the fetched tag. A lost acknowledgment uses the same op-1 receipt; reconstructing the synthetic store and retrying returns duplicate with the tag still incremented once. Reusing op-1 for a different proposal is rejected. Before any of these checks, validate the owner generation so a receipt from a previous account cannot acknowledge new-account work.</p><p>A complete handoff names local transaction durability, token checkpoint recovery, document presenter scheduling and two-installation CloudKit testing as different evidence classes. The native checklist remains pending until separately authorized execution. Production schema review, public/shared database security, conflict UX, quota recovery and collaborative text algorithms remain deeper project boundaries. Neither a passing merge helper nor a coordinated file write establishes those capabilities.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: CKRecord.recordChangeTag",
+          "url": "https://developer.apple.com/documentation/cloudkit/ckrecord/recordchangetag"
+        },
+        {
+          "label": "Apple: Conditional record save policy",
+          "url": "https://developer.apple.com/documentation/cloudkit/ckmodifyrecordsoperation/recordsavepolicy/ifserverrecordunchanged"
+        },
+        {
+          "label": "Apple: Sync to iCloud with CKSyncEngine",
+          "url": "https://developer.apple.com/videos/play/wwdc2023/10188/"
+        },
+        {
+          "label": "Apple: Deploying an iCloud container's schema",
+          "url": "https://developer.apple.com/documentation/cloudkit/deploying-an-icloud-container-s-schema"
+        },
+        {
+          "label": "Apple: NSFileCoordinator",
+          "url": "https://developer.apple.com/documentation/foundation/nsfilecoordinator"
+        },
+        {
+          "label": "Apple: UIDocument",
+          "url": "https://developer.apple.com/documentation/uikit/uidocument"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Atomic local file persistence",
+          "path": "ios-client/Projects/Features/ZDMedicationReminders/Sources/ZDMedicationRemindersCore/MedicationReminderStore.swift",
+          "line": 97,
+          "why": "Inspected pruning, encoding and atomic write establish a local persistence contract, not cloud conflict merging or interprocess coordination."
+        }
+      ],
+      "checklist": [
+        "I can explain opaque record tags and production schema compatibility.",
+        "I can retain base/local/server and surface unresolved semantic conflicts.",
+        "I can distinguish idempotent replacement from deduplicated business effects.",
+        "I can separate document coordination, cloud delivery and local checkpoint correctness."
+      ]
+    },
+    {
+      "id": "111",
+      "title": "Text editing and performance branches: preserve interaction before optimizing",
+      "summary": "Build a Unicode-safe edit contract with selection and undo, then choose a bounded media, audio, compositing, GPU, or inference investigation.",
+      "duration": 180,
+      "level": "Specialist electives",
+      "prerequisites": [
+        "033",
+        "036",
+        "038",
+        "039",
+        "055",
+        "102"
+      ],
+      "objectives": [
+        "Distinguish UTF-16 ranges, grapheme boundaries, marked text, selection and semantic undo.",
+        "Explain TextKit 1 and 2 ownership without accidentally forcing compatibility mode.",
+        "Select AVFoundation, audio, Core Animation, Metal or Core ML work from a falsifiable bottleneck and correctness contract."
+      ],
+      "sections": [
+        {
+          "id": "editing-is-state",
+          "title": "An editor owns a buffer, selection, composition and revision",
+          "html": "<p>An Android engineer who has built an EditText or Compose editor already knows that replacing the whole string can move the cursor or disrupt composition. On iOS, carry that insight further: text, selected range, marked text, typing attributes and undo history are one interaction state. A synthetic note editor must preserve a user's selection while another UI field refreshes. A new model value is not automatically permission to overwrite the active editing session.</p><p>Separate the document revision from the rendering revision. If asynchronous highlighting or validation returns for document revision seven after the user reaches eight, discard that obsolete result before it changes attributes or selection. UIKit text controls should be mutated by their UI owner on the main actor. A worker can compute an immutable highlight proposal, but cannot safely hold and modify the live text storage from arbitrary tasks. The Kotlin analogy is background parsing followed by a current-revision UI commit, not a claim that Swift actors and Android dispatchers have identical contracts.</p><p>Define the smallest useful task: replace a whole selected grapheme sequence with a literal, preserve the resulting caret, and undo it as one semantic command. Do not promise a complete code editor. Large documents, bidirectional navigation, custom attachments, collaborative positions and syntax-aware editing add separate mechanisms. That boundary keeps the entry lesson practical while still exposing the cases a production editor must own.</p>"
+        },
+        {
+          "id": "unicode-replacement",
+          "title": "Name the range unit and validate the boundaries you actually require",
+          "html": "<p>UIKit commonly exposes NSRange in UTF-16 code units, while Swift String uses indices and Character iteration based on extended grapheme clusters. Kotlin and Java String length also count UTF-16 units, which helps explain the bridge but does not make a Swift integer subscript valid. The emoji in A🙂B occupies two UTF-16 units. A profession emoji with a skin-tone modifier and joiner occupies still more units while remaining one displayed Character. A composed e plus combining accent is another useful fixture.</p><p>Range(range, in: text) converts the representation; it does not by itself establish your domain's whole-Character policy for every fabricated input. This host Swift 5.9+/Foundation example rejects positions that are not boundaries in the current string's Character index sequence. It is a deliberately bounded command helper, not a replacement for UIKit's full input-method engine.</p><pre><code class=\"language-swift\">import Foundation\n\nfunc replaceWholeCharacters(\n    _ text: String, range: NSRange, replacement: String\n) -&gt; String? {\n    guard range.location != NSNotFound,\n          let converted = Range(range, in: text) else { return nil }\n    let boundaries = Set(text.indices).union([text.endIndex])\n    guard boundaries.contains(converted.lowerBound),\n          boundaries.contains(converted.upperBound) else { return nil }\n    return text.replacingCharacters(in: converted, with: replacement)\n}</code></pre><p>The optional result carries rejected input. The endIndex is an allowed insertion boundary even though it is outside text.indices. Comparing converted endpoints with this set makes the additional grapheme rule explicit. Building the set costs work proportional to text length; it is appropriate for this small exercise, not a proposed per-keystroke scan of a novel. Keep a validated revision with any saved range: a range from an older buffer may be in bounds yet point at different content.</p><p>When textView.markedTextRange is present, avoid normalizing or rewriting the entire buffer. Let the input method finish its provisional text before a product-specific transformation. A delegate gate may intentionally reject a user edit under a declared rule, but arbitrary reassignments can break selection, composition and accessibility services. UIKit-native edit ranges and your custom semantic-command ranges serve different purposes; do not impose this helper blindly on every system editing operation.</p>"
+        },
+        {
+          "id": "textkit-stack",
+          "title": "Choose the layout stack deliberately and preserve system editing services",
+          "html": "<p>TextKit 1 connects NSTextStorage, NSLayoutManager and NSTextContainer. Text storage holds attributed content, the layout manager produces glyph layout, and the container constrains geometry. TextKit 2 uses a content/layout architecture with NSTextContentStorage, NSTextLayoutManager and layout fragments, supporting viewport-oriented work and richer international text behavior. A glyph is not necessarily one Unicode scalar or one visible character, so selection policy should not be invented by counting glyphs.</p><p>For a UIKit scratch target on iOS 16 or later, UITextView(usingTextLayoutManager: true) explicitly selects the newer stack. Inspect textLayoutManager when using its APIs. Accessing the legacy layoutManager can trigger a one-way fallback to TextKit 1; it is not a neutral diagnostic property read. Do not copy macOS NSTextView construction code into UIKit without checking its target and availability. A plain text control often provides more selection, input and accessibility behavior than a custom canvas whose developer must reimplement those services.</p><p>The inspected MezzanineExpandableTextView comments describe its legacy truncation check and TextKit compatibility interaction, and line 169 conditionally evaluates isTruncating. That is a real source decision tied to a snapshot path, not a measured text performance result. CharacterCountingTextView at line 119 applies NSString replacement and then counts Swift Characters. It demonstrates two different length units in one control. The inspection does not prove its composition, undo or every Unicode input case; those remain explicit scratch tests rather than unsolicited client changes.</p>"
+        },
+        {
+          "id": "selection-and-undo",
+          "title": "A semantic command restores selection as well as content",
+          "html": "<p>Suppose the selected emoji is replaced with X. The resulting caret should be after X in the new buffer, expressed in the range unit expected by the control. For the simple literal replacement, its UTF-16 offset is the old selection start plus replacement.utf16.count. Validate the old selection first and remap against the resulting buffer. More complex normalization may alter earlier content, so that arithmetic is no longer a universal transformation rule.</p><p>UndoManager registers a reversal with an owner and can group related mutations. A custom Replace selection command should capture before text and selection, apply after state, then register restoration as one semantic action. The reverse action registers its inverse so redo restores the after state. Give it an understandable action name. Ordinary UITextView editing already participates in undo; adding a second custom registration around the same native edit can produce duplicate undo steps. Choose whether the text system or your command layer owns each operation.</p><p>Limit retained history for large data and sensitive content; an undo closure retaining a view controller forever is an ownership bug, not a necessary editor feature. A SwiftUI bridge should avoid setting identical text on every update and should not copy the caret only after replacing the whole string. Observe editing events, preserve a stable UIKit instance, and deliberately reconcile external revisions. Native acceptance includes one undo/redo cycle restoring both selection and text, IME composition, VoiceOver and hardware keyboard behavior. Foundation helper checks cannot establish those UI interactions.</p>"
+        },
+        {
+          "id": "media-and-audio",
+          "title": "Choose AVFoundation and audio work from a concrete pipeline",
+          "html": "<p>For a bundled synthetic clip, AVPlayer provides playback ownership; AVAsset describes media and AVPlayerItem represents the timed playback item. Loading metadata, buffering, decoding, presenting and user controls have different failure points. Keep one owner for player state and observations, remove time observers during teardown, and define pause on navigation or scene changes. A slow first frame might involve file access or decode rather than layout. Compare this to Android Media3 as a pipeline analogy, while checking Apple's observation, timing and lifecycle rules directly.</p><p>Audio session category and mode express how the app intends to interact with system audio. Playback of a bundled clip does not require microphone permission. Recording does, along with a purpose string and an appropriate request path. The inspected PermissionUtility uses the older AVAudioSession permission API; current Apple guidance points to AVAudioApplication. Individual audio APIs, including newer interruption/resumption notifications, must be checked against the actual SDK and deployment floor rather than copied from a recent sample into every target.</p><p>Interruption began, interruption ended and permission granted are different events. Resume only when current user intent, route and system guidance permit it; a user who paused during an interruption should remain paused. An audio-engine render callback has deadline-sensitive work: preallocate buffers and avoid blocking, disk access or arbitrary allocation there. The entry exercise designs control policy and intervals without claiming DSP, codec, DRM, voice-processing or live capture implementation. Physical-device latency and routing are separate evidence, just as emulator playback does not prove Android hardware audio performance.</p>"
+        },
+        {
+          "id": "graphics-and-inference",
+          "title": "Core Animation, Metal and Core ML answer different bottleneck questions",
+          "html": "<p>For a card animation, Core Animation separates committed model-layer values from presentation-layer values while the system renders intermediate frames. Choose it when ordinary layer geometry, opacity or transforms describe the effect. Investigate layout work, offscreen composition, image preparation and hitch intervals before writing a custom renderer. Rasterization can trade repeated composition for cached bitmap memory and invalidation; it is a hypothesis to measure, not a default optimization. Android RenderThread experience supplies useful questions but does not establish Apple's render-server behavior.</p><p>Metal is a separate project when a measured workload requires explicit GPU rendering or computation. A command queue creates command buffers; encoders describe work against pipelines and resources; completion determines when resources can be reused or CPU results consumed. Calling waitUntilCompleted blocks the current thread, so placing it in a frame's UI path can remove the intended overlap. Bound in-flight work and validate numerical or visual output. A faster shader with incorrect edge pixels fails the feature contract.</p><p>For a synthetic image classifier, Core ML performance includes model loading, image conversion/crop/orientation, prediction and postprocessing. Allowed compute units describe a configuration choice; they do not promise that every operation runs on a Neural Engine or becomes faster. Record cold versus warm load, representative input shape, model version, memory pressure and accuracy fixtures. Async prediction can improve responsiveness but still needs bounded concurrency and current-result publication. Select one branch from evidence: media loading, realtime audio, composition, GPU kernel or inference. This course supplies branch entry contracts; training datasets, numerical validation and production device optimization remain deeper practice.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "An NSRange converts to a Swift range. Does that alone prove a custom command replaces whole Characters?",
+          "options": [
+            "Yes, every valid UTF-16 position is a grapheme boundary.",
+            "No; the command's whole-Character boundary policy requires additional validation.",
+            "Only ASCII can be edited safely."
+          ],
+          "answer": 1,
+          "explanation": "Representation conversion and semantic boundary policy are separate. Validate endpoints in the current revision when whole graphemes are required."
+        },
+        {
+          "question": "What can accessing UITextView.layoutManager do in a TextKit 2 control?",
+          "options": [
+            "Provide harmless inspection of the same layout manager.",
+            "Force compatibility fallback to TextKit 1.",
+            "Create unlimited background layout workers."
+          ],
+          "answer": 1,
+          "explanation": "The legacy NSLayoutManager belongs to a different stack. Apple's UIKit guidance describes a one-way compatibility transition, so use the chosen stack's APIs deliberately."
+        },
+        {
+          "question": "A classifier feels slow after a camera frame arrives. What should be investigated first?",
+          "options": [
+            "Assume model inference alone is the entire delay.",
+            "Measure preprocessing, loading, prediction and postprocessing while preserving output correctness.",
+            "Increase parallel predictions without a bound."
+          ],
+          "answer": 1,
+          "explanation": "End-to-end latency includes several stages. Hardware and model choices need evidence, and unbounded work can increase contention and stale results."
+        }
+      ],
+      "exercise": {
+        "brief": "Independently specify and verify a selected-replacement command, then choose one synthetic media/performance branch with a falsifiable experiment. Do not record audio, access a camera, or claim measured optimization.",
+        "steps": [
+          "Predict the UTF-16 selected range for A👩🏽‍💻éB using Swift indices; replace the emoji and reject a fabricated interior boundary.",
+          "Design before/after selection capture and one-command undo/redo; explain how it coexists with native editing and marked text.",
+          "Compile/run the bounded Foundation snippet if tooling permits and record exact output; leave UIKit interaction pending.",
+          "Choose bundled playback, layer animation, GPU array addition or bundled-model inference. Define correctness fixtures, intervals, representative device setup and a stop/rollback condition."
+        ],
+        "acceptance": [
+          "Replacement preserves adjacent combining text and rejects out-of-bounds, NSNotFound and non-Character boundaries.",
+          "Undo/redo design restores text and selection once; composition is never rewritten as committed text.",
+          "The performance branch has a named bottleneck hypothesis, correctness oracle and bounded work policy.",
+          "Evidence separates host string checks, native editor behavior and physical-device performance observations."
+        ],
+        "solution": "<p>Construct the emoji range from the string's Character indices and convert with NSRange(start..&lt;end, in: text). This avoids guessing its UTF-16 length. Replace that entire selection with X and obtain AXéB, with the combining accent still attached to e. A fabricated location inside the emoji must be rejected under the command's whole-Character policy, even if a representation conversion can produce an index. A range beyond the buffer and NSNotFound also return no result. The host file tests these cases; it does not submit edits to an input method.</p><p>Capture before text and selectedRange plus after text and the collapsed caret. For this literal replacement, compute the caret in UTF-16 at the validated selection start plus the replacement's UTF-16 length. The undo action restores the complete before state and registers redo for the after state. Group only this custom command, label it Replace selection, and avoid registering a second action for the native text control's same edit. If composition is active, defer the custom normalization command or require an explicit committed edit boundary rather than silently replacing marked text.</p><p>For a branch example, choose bundled playback and hypothesize that delayed first frame is dominated by metadata load or decode. Define intervals for item creation/loading, readiness, first presented frame and pause/teardown. Preserve expected content, orientation, controls and interruption behavior as correctness oracles. Keep one player owner, release observers and bound concurrent preparation to the visible item plus a declared prefetch allowance. A future device experiment retains actual traces and conditions; this answer supplies no timings and claims no speedup.</p><p>A different acceptable choice is GPU array addition with a CPU numerical oracle and bounded in-flight buffers, or inference with labeled accuracy fixtures and separate preprocessing intervals. Choosing Metal merely because animation exists is insufficient reasoning. Document the evidence that would justify the branch, the simpler alternative and the point at which a specialist project takes over. Foundation compilation, UIKit interaction, GPU correctness, realtime audio and model validation remain distinct evidence rows.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: What's new in TextKit and text views",
+          "url": "https://developer.apple.com/videos/play/wwdc2022/10090/"
+        },
+        {
+          "label": "Swift: Strings and characters",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/stringsandcharacters/"
+        },
+        {
+          "label": "Apple: UndoManager",
+          "url": "https://developer.apple.com/documentation/foundation/undomanager"
+        },
+        {
+          "label": "Apple: Handling audio interruptions",
+          "url": "https://developer.apple.com/documentation/avfaudio/handling-audio-interruptions"
+        },
+        {
+          "label": "Apple: AVAudioApplication",
+          "url": "https://developer.apple.com/documentation/avfaudio/avaudioapplication"
+        },
+        {
+          "label": "Apple: Core Animation programming guide",
+          "url": "https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/CoreAnimation_guide/Introduction/Introduction.html"
+        },
+        {
+          "label": "Apple: Performing calculations on a GPU",
+          "url": "https://developer.apple.com/documentation/metal/performing-calculations-on-a-gpu"
+        },
+        {
+          "label": "Apple: Improve Core ML integration with async prediction",
+          "url": "https://developer.apple.com/videos/play/wwdc2023/10049/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "UTF-16 replacement and Character counting",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDUI/Views/Text/CharacterCountingTextView.swift",
+          "line": 119,
+          "why": "Inspected NSString replacement followed by newText.count demonstrates distinct range and length units; no native input behavior was executed."
+        },
+        {
+          "label": "Conditional legacy truncation check",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDMezzanineLibrary/Library_Legacy/Components/TextInputs/MezzanineExpandableTextView.swift",
+          "line": 169,
+          "why": "Inspected code and comments connect truncation checks with TextKit compatibility and a snapshot path; this is not a performance measurement."
+        },
+        {
+          "label": "Capture has a simulator-specific boundary",
+          "path": "ios-client/Projects/Features/ZDCardCapture/Sources/ZDCardCapture/Internal/Camera/CameraSessionManager.swift",
+          "line": 87,
+          "why": "Simulator setup deliberately skips real capture, so source or simulator success cannot certify camera/audio/media hardware integration."
+        }
+      ],
+      "checklist": [
+        "I can distinguish buffer revision, UTF-16 range and grapheme boundary.",
+        "I can preserve selection, composition and one semantic undo step.",
+        "I can choose a text stack without triggering accidental compatibility fallback.",
+        "I can select a performance branch from correctness and interval evidence."
+      ]
+    },
+    {
+      "id": "112",
+      "title": "Watch, spatial, Bluetooth and health features: choose a task and own its fallback",
+      "summary": "Define one useful cross-device or capability feature, then constrain its input, transport, background, consent and recovery contracts.",
+      "duration": 165,
+      "level": "Specialist electives",
+      "prerequisites": [
+        "025",
+        "034",
+        "050",
+        "055",
+        "056",
+        "108"
+      ],
+      "objectives": [
+        "Choose snapshot, queued command and immediate message semantics for a bounded watchOS feature.",
+        "Explain visionOS system input, Bluetooth state and HealthKit consent without collapsing them into a universal permission Boolean.",
+        "Produce a staff-level feature decision with ownership, fallback, evidence and explicit deeper-project boundaries."
+      ],
+      "sections": [
+        {
+          "id": "feature-selection",
+          "title": "Choose the user's task before selecting a specialist framework",
+          "html": "<p>Imagine a synthetic packing checklist. A watch could acknowledge one item without taking out a phone; a spatial window could show the checklist beside a work surface; a Bluetooth accessory could supply a harmless counter; a health feature could display an optional activity summary. These are four different product proposals, not four capabilities that must ship together. Choose one based on the task, frequency, fallback and support cost. A principal-level answer can reject a branch whose benefit does not justify its operating burden.</p><p>Your Android background supplies useful comparisons: Wear OS data/message clients, Bluetooth GATT, runtime permission prompts and Health Connect. Those concepts help ask about transport, authorization and lifecycle, but Apple APIs have their own state machines, target configuration and privacy rules. Kotlin and Java 11 experience does not imply a matching Swift language version or permission model. An iOS app target and shared Swift package also do not create a watchOS or visionOS executable automatically.</p><p>Write a feature contract with five separate inputs: platform/API availability, device capability, user intent or consent, current execution opportunity and authoritative data readiness. Add identity and freshness to any command crossing a device or process boundary. A denied capability should lead to a usable manual path rather than a broken task. For this lesson all inputs are synthetic values. The author does not pair a watch, open an immersive space, scan Bluetooth, query health data or request a real permission.</p>"
+        },
+        {
+          "id": "watch-transport",
+          "title": "watchOS needs transport semantics and its own lifecycle owner",
+          "html": "<p>For a watch acknowledgment, distinguish displaying latest checklist state from applying a command. WCSession.updateApplicationContext replaces pending context with the latest dictionary: it fits a snapshot, not a queue of every acknowledgment. transferUserInfo queues dictionaries for background transfer under system scheduling. sendMessage is an immediate exchange with a reachable counterpart and may fail. Reachability is momentary, not proof that the message will receive an acknowledgment. Use stable operation identity and account generation in the payload, and display pending until the authoritative mutation is acknowledged.</p><p>Activate and retain the session with its delegate before transferring, check supported/installed counterpart state where appropriate, and handle activation changes. Delegate delivery should be translated into immutable values under the feature owner's isolation before touching UI. For queued commands, the receiver persists a receipt and effect within its actual durability boundary. If reply delivery fails after applying the command, a retry with the same identity returns the earlier result. A second tap representing a distinct intention needs a distinct operation ID.</p><p>This pure Swift 5.9+ helper expresses only a local product decision. ready collapses the fixture's session/support setup; it does not perform WCSession activation.</p><pre><code class=\"language-swift\">enum WatchDeliveryPlan: Equatable {\n    case fallback, queueCommand, tryImmediate\n}\n\nfunc watchPlan(ready: Bool, optedIn: Bool, reachable: Bool) -&gt; WatchDeliveryPlan {\n    guard ready, optedIn else { return .fallback }\n    return reachable ? .tryImmediate : .queueCommand\n}</code></pre><p>The return case tryImmediate still needs error recovery to queue or preserve a pending draft. Watch lifecycle, complications, independent app operation and background refresh are separate from this helper. Extended runtime or workout sessions are for eligible tasks; they do not grant a generic permanent background loop. Wear DataClient and MessageClient are helpful transport analogies, but WCSession's replacement, activation and reachability contracts must be read directly. An independent watch feature may need its own data source rather than an always-present phone.</p>"
+        },
+        {
+          "id": "vision-input",
+          "title": "Start visionOS with a window and system input",
+          "html": "<p>A packing checklist usually fits a visionOS window. A volume provides bounded three-dimensional content, while an immersive space changes the surrounding experience and deserves a stronger product reason. Start with readable content and system controls before inventing spatial gestures. A SwiftUI Button can participate in indirect selection: the person looks toward the control and makes a gesture. That does not give the app a raw stream of eye coordinates or license to infer private attention.</p><p>Spatial input is not touchscreen coordinates moved into three dimensions. Support indirect interaction, focus, keyboard and accessible alternatives; design legible spacing and comfortable placement without demanding constant arm reach. Custom hand tracking or surrounding-space use adds separate API availability, authorization and privacy requirements. Ordinary system control interaction is a narrower path than directly collecting sensor data. The simulator can reveal layout and basic interaction problems, but cannot establish wearer comfort, calibration or real-world tracking behavior.</p><p>Give the scene an owner that pauses expensive work when inactive and restores the user's task when resumed. If a future immersive branch is chosen, entry can fail or the person can leave it; keep the document accessible in a normal window. Sharing domain values across iOS and visionOS is reasonable when they are platform-neutral, but unsupported UIKit assumptions and framework availability still need target review. The entry exercise produces a window/input contract and pending hardware checklist, not an immersive application or an eye-tracking implementation.</p>"
+        },
+        {
+          "id": "bluetooth-lifecycle",
+          "title": "Bluetooth discovery, connection and data validity are different states",
+          "html": "<p>For a synthetic counter accessory, Core Bluetooth central behavior begins with CBCentralManager state and authorization. Powered off, unsupported, unauthorized, resetting and powered on are distinct outcomes. A manager object existing does not mean it may scan. The target needs the applicable Bluetooth purpose string and configuration; background modes such as bluetooth-central describe a capability choice, not a permanent execution entitlement or user approval. Verify symbol and platform support instead of assuming all iPhone hardware and simulator behavior match.</p><p>When the product is ready for a separately authorized hardware exercise, use a service-filtered, bounded scan, retain the selected CBPeripheral and stop scanning when selection completes or times out. Connection success precedes service and characteristic discovery. Check characteristic properties before reading, writing or enabling notifications, and validate the payload's version, length and unit. A peripheral identifier is not cryptographic identity; pairing and a GATT characteristic do not automatically authenticate a business operation.</p><p>Background scanning differs from foreground behavior: duplicate discoveries may be coalesced, discovery intervals may change and wake time is limited. State restoration is an opt-in recovery mechanism, not a promise that your arbitrary task runs continuously. Handle disconnection, out-of-order or duplicate notifications and a new owner generation. A sensor reading should never mutate a new account's data because the previous screen connected the device. Android GATT experience transfers as a state-machine discipline, while exact callback and background contracts need Apple-device verification.</p>"
+        },
+        {
+          "id": "health-consent",
+          "title": "HealthKit's privacy contract prevents a simple read-permission Boolean",
+          "html": "<p>A health summary must be optional and scoped to named data types. HealthKit requires target capability and purpose descriptions before an authorization request, and access varies by type and platform. Check capability availability and request only the reading or writing needed for the selected task. A successful authorization request callback means the request process succeeded; it does not prove that every requested type was granted. App-owned opt-in is a product preference, distinct from system authorization.</p><p>HealthKit intentionally prevents the app from determining whether the person granted read access. An empty query may reflect no samples, filtering, unavailable data or withheld access. authorizationStatus(for:) describes saving authorization, not a universal read grant. Therefore a UI should say No visible activity data with a manual path, rather than inventing Read denied or repeatedly pressuring the person to authorize. Health Connect familiarity does not override this Apple privacy boundary. The companion's read_visibility samples/unknown inputs describe observed result shape, not discovered permission.</p><p>Observer queries and background delivery can indicate data changes, but they do not create an always-running service or a complete event payload. Use the appropriate query/checkpoint mechanism for incremental data, handle deleted samples, and call the observer completion after bounded handling according to the framework contract. Background delivery configuration and entitlement availability require target-specific review. Separate a synthetic summary from clinical claims: medical interpretation, regulatory requirements, data sharing, retention and deletion need a deeper project with specialist ownership. No health authorization, query or write is performed here.</p>"
+        },
+        {
+          "id": "client-and-decision",
+          "title": "Audit the client's boundaries and make an accountable feature choice",
+          "html": "<p>The inspected PermissionUtility distinguishes unknown, granted and denied for microphone, while its camera helper groups restricted with denied. These are local convenience abstractions. They cannot safely become a universal HealthKit read-state model, and they do not describe Bluetooth power or a watch counterpart's reachability. Read the native service's semantics before mapping it into product states. The app manifest explicitly declares an iOS MedicationWidget extension; that is evidence of one target boundary, not evidence that a watch or spatial target has been delivered.</p><p>For a staff proposal, compare the smallest useful branch with a manual alternative. A watch acknowledgment may reduce interaction time for a recurring task, but introduces queued command reconciliation and counterpart support. A spatial window may reuse the draft model but needs input/accessibility and scene review. A Bluetooth branch owns accessory firmware/protocol compatibility. A health branch owns fine-grained purpose and ambiguous results. Each should have a named platform owner, fallback acceptance, observability without sensitive payloads, staged adoption and an exit plan.</p><p>The companion's feature_plan returns bounded decisions from injected facts. It neither requests consent nor enforces signed entitlements. Choosing manual-fallback is an intentional usable product behavior, not evidence of a failing Apple service. Record compiler/model checks separately from paired-device transport, wearer comfort, background hardware behavior and HealthKit privacy testing. Shared framework names are only the beginning; finishing an entry exercise means making its contract reviewable, while full platform implementations and learner certification remain outside this lesson.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which watch transport fits a latest-state snapshot that may replace an older pending snapshot?",
+          "options": [
+            "updateApplicationContext.",
+            "A mandatory sequence of immediate sendMessage calls.",
+            "A process-local singleton on the phone."
+          ],
+          "answer": 0,
+          "explanation": "Application context is replacement semantics. Commands that must preserve each intention need queue/replay policy rather than replacing the snapshot."
+        },
+        {
+          "question": "A HealthKit read query returns no samples. Which conclusion is justified?",
+          "options": [
+            "Read access was definitely denied.",
+            "There is no visible data for that query; read authorization remains intentionally ambiguous.",
+            "All requested write types were granted."
+          ],
+          "answer": 1,
+          "explanation": "HealthKit protects read authorization privacy. Empty data and write authorization cannot establish a read-permission Boolean."
+        },
+        {
+          "question": "What does ordinary visionOS indirect selection imply?",
+          "options": [
+            "The app receives a raw gaze coordinate stream.",
+            "System controls can respond to eyes-and-hands interaction without exposing raw gaze to the app.",
+            "Every window must enter an immersive space."
+          ],
+          "answer": 1,
+          "explanation": "Use system interaction for ordinary controls. Direct sensor access, immersive experience and scene lifecycle are separate choices with distinct requirements."
+        }
+      ],
+      "exercise": {
+        "brief": "Independently choose exactly one synthetic packing-checklist branch and produce its state machine, fallback, ownership and evidence contract. Use only host policy inputs.",
+        "steps": [
+          "Compare watch acknowledgment, visionOS window, Bluetooth counter and optional health summary against the same user task; justify one branch and one simpler alternative.",
+          "Create at least five state transitions including unavailable capability, user opt-out, execution loss, stale identity and recovery.",
+          "For watch, add lost-reply replay; for vision, define pause and window fallback; for Bluetooth, define disconnect/payload rejection; for health, preserve ambiguity of empty results.",
+          "Run applicable model checks and submit NativeChecklist rows as pending unless you independently perform them in an authorized scratch setting."
+        ],
+        "acceptance": [
+          "Selection describes one measurable user benefit, accountable owner, alternative and reversal condition.",
+          "Availability, capability, consent, execution and data readiness are distinct in the decision.",
+          "Old-generation or duplicate input cannot cause a new unintended mutation; fallback remains usable.",
+          "The evidence ledger does not infer real transport, read authorization, wearer comfort or background execution from host success."
+        ],
+        "solution": "<p>A worked watch proposal offers a single Mark packed command and a latest checklist snapshot. The phone or chosen independent authority owns the durable checklist; the watch owns its pending command presentation. Context updates carry a document revision and replace earlier snapshots. A command carries operation ID, item ID and account generation. The receiver atomically persists the effect and receipt; after a lost reply, replay returns the existing acknowledgment. A new user intention is not confused with a transport retry.</p><p>The state machine starts unavailable, ready, pending, acknowledged or recoverable failure. Unavailable support or product opt-out offers the ordinary checklist. Activated but unreachable transport queues the command without promising when it will apply. A reachable message attempts immediate delivery but still handles failure. On account rotation, old pending commands cannot mutate the new document. A duplicate acknowledgment may update pending presentation once but does not repeat the mutation. Background opportunities are used when offered, not converted into a promise of constant watch execution.</p><p>Compare this with keeping the action on the phone. The branch is justified only if the repeated task benefits from a wrist interaction enough to support pairing, delayed delivery and watch-specific UI. A trial needs actual user-task evidence and transport failure observations before wider adoption. Name the owner of phone/watch protocol versions and the owner of support recovery. If delayed pending state confuses users or counterpart support becomes too costly, the reversal path preserves the phone task and stops promoting the watch action.</p><p>Other branch choices are valid when they provide equally concrete contracts. A health answer must preserve No visible data without inventing denial. A Bluetooth answer must stop discovery and reject malformed payloads. A vision answer must provide system input and a window path on immersion failure. The supplied model verifies policy only. Target construction, signing claims, native interactions and physical-device evidence remain explicitly pending, and neither the worked answer nor passing example checks records learner completion.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Transferring data with Watch Connectivity",
+          "url": "https://developer.apple.com/documentation/watchconnectivity/transferring-data-with-watch-connectivity"
+        },
+        {
+          "label": "Apple: WCSession",
+          "url": "https://developer.apple.com/documentation/watchconnectivity/wcsession"
+        },
+        {
+          "label": "Apple: Designing for visionOS",
+          "url": "https://developer.apple.com/design/human-interface-guidelines/designing-for-visionos"
+        },
+        {
+          "label": "Apple: visionOS privacy and user preferences",
+          "url": "https://developer.apple.com/documentation/visionos/adopting-best-practices-for-privacy"
+        },
+        {
+          "label": "Apple: Core Bluetooth background processing",
+          "url": "https://developer.apple.com/library/archive/documentation/NetworkingInternetWeb/Conceptual/CoreBluetooth_concepts/CoreBluetoothBackgroundProcessingForIOSApps/PerformingTasksWhileYourAppIsInTheBackground.html"
+        },
+        {
+          "label": "Apple: Authorizing access to health data",
+          "url": "https://developer.apple.com/documentation/healthkit/authorizing-access-to-health-data"
+        },
+        {
+          "label": "Apple: HealthKit saving authorization status",
+          "url": "https://developer.apple.com/documentation/healthkit/hkhealthstore/authorizationstatus(for:)"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Service-specific permission abstraction",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDUI/Permissions/PermissionUtility.swift",
+          "line": 13,
+          "why": "Inspected three-state abstraction and microphone/camera mappings must not be generalized to HealthKit read visibility, Bluetooth power or watch transport."
+        },
+        {
+          "label": "Explicit iOS widget target boundary",
+          "path": "ios-client/Projects/Apps/Zocdoc/Project.swift",
+          "line": 152,
+          "why": "Observed appExtension declaration demonstrates separate target identity and dependency planning, without claiming watchOS or visionOS implementation."
+        }
+      ],
+      "checklist": [
+        "I can choose snapshot, queued-command and immediate-message semantics.",
+        "I can explain system spatial input without claiming raw gaze access.",
+        "I can model Bluetooth readiness separately from permission and payload validity.",
+        "I can preserve HealthKit read ambiguity and propose a usable optional feature.",
+        "I can assign ownership and pending evidence for one justified specialist branch."
+      ]
+    }
+  ]
+}

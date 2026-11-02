@@ -1,0 +1,39 @@
+{
+  "provenance": "Synthetic design review; invented constraints, estimates and targets; no company ownership or outcomes",
+  "problem": "Three product teams need account-safe one-shot reads during a transport transition; platform internals differ",
+  "decisionOwner": "Proposed mobile platform lead",
+  "staffScope": "One iOS consumer seam, deterministic ownership/error fixtures, installation and rollback rehearsal",
+  "principalScope": "Cross-team product contract, sequence and funding, adoption exceptions, long-lived compatibility and deprecation accountability",
+  "constraints": ["Older installed clients remain supported", "No shadow execution of writes", "Account resets invalidate final commits", "Unknown device and artifact evidence stays pending"],
+  "options": [
+    {"id": "local", "choice": "Keep local adapters and publish shared contract fixtures", "effortEngineerWeeks": 4, "recurringOwnerDaysPerMonth": 3, "tradeoff": "Least adoption disruption; continued duplicated implementation and review"},
+    {"id": "contract", "choice": "Shared behavior contract with native platform adapters and staged adoption", "effortEngineerWeeks": 10, "recurringOwnerDaysPerMonth": 2, "tradeoff": "Common invariants and evidence; adapter maintenance and migration effort remain"},
+    {"id": "engine", "choice": "One shared execution engine across platforms", "effortEngineerWeeks": 22, "recurringOwnerDaysPerMonth": 4, "tradeoff": "Potential code reuse; new interoperability, lifecycle, tooling and deployment coupling"}
+  ],
+  "recommendation": "Provisionally test contract option with one read consumer on each platform; reject expansion if ownership/cancellation parity or meaningful cost improvement is absent",
+  "costInterpretation": "Planning estimates only, not measured savings; include feature opportunity cost, parallel maintenance, support, training and corrective delivery",
+  "owners": [
+    {"role": "Mobile platform lead", "accountableFor": "Decision contract, funding, exception ledger and debt deadline"},
+    {"role": "iOS adapter lead", "accountableFor": "Credential/session seam, cancellation and final-commit fixtures"},
+    {"role": "Android adapter lead", "accountableFor": "Native coroutine/transport behavior under the common product contract"},
+    {"role": "Product consumer leads", "accountableFor": "Adoption plans, selection continuity and user-visible failure behavior"},
+    {"role": "Service lead", "accountableFor": "Authorization, backwards-compatible responses and write reconciliation"},
+    {"role": "Release and observability leads", "accountableFor": "Installed cohorts, artifact evidence, comparable metrics and stop authority"}
+  ],
+  "stages": [
+    {"stage": "Characterize", "gate": "Independent full-value and error/ownership fixtures for existing adapters", "evidence": "Pending test results"},
+    {"stage": "Pilot", "gate": "One read consumer per platform, ordinary review, documented exceptions", "evidence": "Pending artifact and representative interaction results"},
+    {"stage": "Adopt", "gate": "No contract regression; comparable task outcomes; maintenance cost reviewed", "evidence": "Pending denominator, time window and cohort dashboard"},
+    {"stage": "Retire", "gate": "Supported consumers migrated or documented exception; old resources drained; installed clients and services compatible", "evidence": "Pending signed retirement decision and reconstruction ledger"}
+  ],
+  "rollback": "Select the existing adapter for future reads where the installed binary honors that selection; retain the chosen adapter for active requests; do not replay ambiguous writes or promise a binary downgrade",
+  "rejectedExperiment": "Retire the candidate and temporary selection after restoring the supported old contract",
+  "deprecation": {"owner": "Mobile platform lead", "reviewAfterWeeks": 6, "rule": "Date prompts review, never automatic removal; require adoption/recovery evidence and budget for exceptions"},
+  "metrics": [
+    {"signal": "Adoption", "denominator": "Eligible consumers, split by team and platform", "target": "Synthetic proposal: all pilot consumers pass before a second wave"},
+    {"signal": "Correctness", "denominator": "Controlled success/error/cancel/account-reset schedules", "target": "Zero stale commits in executed contract fixtures"},
+    {"signal": "Task outcomes", "denominator": "Attempted reads in matching build/cohort/time window, including failures", "target": "No agreed guardrail regression; actual budget remains pending"},
+    {"signal": "Cost", "denominator": "Adapter maintenance, incident and onboarding hours in a declared review window", "target": "Compare observed cost with the planning estimate before expansion"}
+  ],
+  "critique": ["Can another team implement the contract without inheriting the same runtime?", "Who absorbs adoption cost and owns exceptions?", "What evidence reverses the recommendation?", "Which installed clients cannot honor rollback?", "Does successful retirement remove the old path rather than the adopted replacement?", "Are measured, estimated and pending claims distinct?"]
+}

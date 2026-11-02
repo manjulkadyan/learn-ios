@@ -2,6 +2,38 @@
   "guides": [
     {
       "id": "initialization-access",
+      "quiz": [
+        {
+          "question": "A public struct has public stored properties but no declared initializer. Can a different module necessarily construct it through the synthesized memberwise initializer?",
+          "options": [
+            "Yes; public on the type exports all synthesized APIs.",
+            "No; provide an explicit public initializer when construction is part of the external contract.",
+            "Only when its stored properties use var."
+          ],
+          "answer": 1,
+          "explanation": "The synthesized memberwise initializer is not automatically public. Access to the type, its properties and its construction API are separate decisions; property mutability does not grant visibility."
+        },
+        {
+          "question": "A struct has lazy var caption. What changes when you first read it?",
+          "options": [
+            "Its stored lazy value may be initialized, so access can require a mutable struct binding.",
+            "The getter is recalculated on every read and never stores anything.",
+            "The compiler creates a thread-safe once-only initializer."
+          ],
+          "answer": 0,
+          "explanation": "Lazy defers initialization into stored state. A read can mutate a struct's storage, and later reads return the stored value. Isolation and concurrent initialization guarantees require their own design."
+        },
+        {
+          "question": "Which ordering belongs to a subclass's designated initialization path?",
+          "options": [
+            "Use the unfinished instance, then initialize storage in deinit.",
+            "Assign inherited state before the superclass initializes it.",
+            "Establish the subclass's introduced stored properties, delegate to super.init, then use the fully initialized instance under the initialization rules."
+          ],
+          "answer": 2,
+          "explanation": "Swift's two-phase initialization establishes storage throughout the hierarchy before ordinary use of self. Convenience delegation and inherited properties have distinct rules; Kotlin constructor intuition is not a substitute for these checks."
+        }
+      ],
       "title": "Initialization, access, and property contracts",
       "summary": "Read initializer and property syntax precisely, protect construction invariants, and expose only the API another module can actually use.",
       "sections": [
@@ -33,19 +65,81 @@
       ],
       "exercise": {
         "brief": "Construct synthetic values and subclass instances, then predict each optional, error, access boundary, and property update before checking it in a scratch Swift target.",
-        "steps": ["Add the declarations to a scratch target; construct Badge and TaggedRecord through their declared APIs.", "Compare PositiveCount(0) and PositiveCount(3), then catch the empty-label error explicitly.", "Read a QuantityDraft's lazy caption at quantity two, change quantity to four, and compare caption with doubled.", "Explain how a separate importing module would differ from a second file in the same module."],
-        "acceptance": ["TaggedRecord(name: \"A\") produces tag zero, while the full initializer preserves its explicit tag.", "Invalid count is nil; invalid label throws LabelError.empty without being silently mapped to success.", "The lazy caption remains the first-read snapshot while doubled reflects current quantity.", "The explanation identifies the explicit public initializer and distinguishes internal, public, open, and restricted setters."],
+        "steps": [
+          "Add the declarations to a scratch target; construct Badge and TaggedRecord through their declared APIs.",
+          "Compare PositiveCount(0) and PositiveCount(3), then catch the empty-label error explicitly.",
+          "Read a QuantityDraft's lazy caption at quantity two, change quantity to four, and compare caption with doubled.",
+          "Explain how a separate importing module would differ from a second file in the same module."
+        ],
+        "acceptance": [
+          "TaggedRecord(name: \"A\") produces tag zero, while the full initializer preserves its explicit tag.",
+          "Invalid count is nil; invalid label throws LabelError.empty without being silently mapped to success.",
+          "The lazy caption remains the first-read snapshot while doubled reflects current quantity.",
+          "The explanation identifies the explicit public initializer and distinguishes internal, public, open, and restricted setters."
+        ],
         "solution": "<p>The declarations above are standalone Swift. Keep a mutable draft binding because accessing its lazy property mutates its storage. This worked check records value semantics, not a production feature.</p><pre><code class=\"language-swift\">let badge = Badge(title: \"Demo\")\nassert(badge.title == \"Demo\")\nlet record = TaggedRecord(name: \"A\")\nassert(record.name == \"A\" &amp;&amp; record.tag == 0)\nassert(TaggedRecord(name: \"B\", tag: 7).tag == 7)\nassert(PositiveCount(0) == nil)\nassert(PositiveCount(3)?.value == 3)\ndo {\n    _ = try NonEmptyLabel(validating: \"\")\n    assertionFailure(\"Expected validation error\")\n} catch LabelError.empty {\n    // The expected reason remains observable.\n} catch {\n    assertionFailure(\"Unexpected error\")\n}\nvar draft = QuantityDraft()\ndraft.quantity = 2\nlet caption = draft.initialCaption\ndraft.quantity = 4\nassert(draft.doubled == 8)\nassert(draft.initialCaption == caption)\nassert(caption == \"First read: 2\")</code></pre><p>For an access audit, explain that another file in the same target still sees internal declarations, whereas an importing target needs the public API. Badge's private normalizedKey is unavailable to either ordinary outside caller. A public class would be usable across that boundary; an open class/member additionally permits external inheritance/overriding. These statements are language contracts, not a claim that a separate module experiment or a client build ran. Add that scratch-module experiment when studying packaging in sessions 043–044.</p>"
       },
       "references": [
-        {"label": "Swift: Initialization", "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/initialization/"},
-        {"label": "Swift: Access control", "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/accesscontrol/"},
-        {"label": "Swift: Properties", "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/properties/"}
+        {
+          "label": "Swift: Initialization",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/initialization/"
+        },
+        {
+          "label": "Swift: Access control",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/accesscontrol/"
+        },
+        {
+          "label": "Swift: Properties",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/properties/"
+        }
       ],
-      "sessions": ["001", "003", "004", "008", "010", "043", "044"]
+      "sessions": [
+        "001",
+        "003",
+        "004",
+        "008",
+        "010",
+        "043",
+        "044",
+        "064",
+        "065",
+        "066"
+      ]
     },
     {
       "id": "generic-contracts",
+      "quiz": [
+        {
+          "question": "What does func same<T: Equatable>(_ a: T, _ b: T) -> Bool preserve?",
+          "options": [
+            "The two inputs fit one chosen type supporting equality.",
+            "All inputs are stored as unrestricted Any.",
+            "A and b must be references to the same object."
+          ],
+          "answer": 0,
+          "explanation": "A shared generic parameter describes a type relationship. Equatable grants equality behavior; it does not establish class identity or accept unrelated input types merely because both conform."
+        },
+        {
+          "question": "An ordinary function returns some ItemSource<Int>. May separate branches choose unrelated underlying source types just because both provide Int?",
+          "options": [
+            "Yes; some is always heterogeneous boxing.",
+            "No; the opaque return contract requires one underlying type for the relevant substitution.",
+            "Only when the result is declared optional."
+          ],
+          "answer": 1,
+          "explanation": "Opaque results hide a chosen concrete type while retaining its identity. An existential can intentionally hide changing implementations. A builder can encode conditional alternatives in one composed type, but that is a different mechanism."
+        },
+        {
+          "question": "A protocol extension declares a helper absent from the protocol requirements. Which call must you test before assuming conformer-specific behavior?",
+          "options": [
+            "Only a call directly on the concrete type.",
+            "Only the type's initializer.",
+            "A call through the actual generic or existential protocol boundary."
+          ],
+          "answer": 2,
+          "explanation": "An extension-only helper is selected through the static protocol constraint. A same-named concrete method does not create a requirement witness. Declare customization as a real requirement and verify the consumer's actual boundary."
+        }
+      ],
       "title": "Generics, associated types, opaque results, and protocol dispatch",
       "summary": "Preserve the type relationships a caller needs, understand what any and some hide, and distinguish protocol requirements from extension-only helpers.",
       "sections": [
@@ -77,20 +171,83 @@
       ],
       "exercise": {
         "brief": "Use the synthetic sources and greetings to predict which type relationships and implementations remain visible through concrete, generic, existential, and opaque boundaries.",
-        "steps": ["Call first and firstMatches with two Int sources, then verify the empty-source policy.", "Use integers() as an opaque source and knownIntegers as a constrained existential without downcasts.", "Compare direct, generic, and existential message/decoration calls.", "Explain which change would make decoration customizable through the protocol contract."],
-        "acceptance": ["Generic first returns the associated element type as an optional, and mismatched element types cannot satisfy firstMatches.", "Opaque and constrained existential examples retain Int as their element contract.", "Generic/existential decoration returns the extension helper; message returns the declared requirement's custom implementation.", "The answer distinguishes Self from self and proposes a protocol requirement when polymorphic customization is intended."],
+        "steps": [
+          "Call first and firstMatches with two Int sources, then verify the empty-source policy.",
+          "Use integers() as an opaque source and knownIntegers as a constrained existential without downcasts.",
+          "Compare direct, generic, and existential message/decoration calls.",
+          "Explain which change would make decoration customizable through the protocol contract."
+        ],
+        "acceptance": [
+          "Generic first returns the associated element type as an optional, and mismatched element types cannot satisfy firstMatches.",
+          "Opaque and constrained existential examples retain Int as their element contract.",
+          "Generic/existential decoration returns the extension helper; message returns the declared requirement's custom implementation.",
+          "The answer distinguishes Self from self and proposes a protocol requirement when polymorphic customization is intended."
+        ],
         "solution": "<p>These checks are standalone Swift when combined with the guide's declarations. They verify behavior at the boundary rather than mirroring compiler machinery.</p><pre><code class=\"language-swift\">let source = ArraySource(items: [2, 4])\nlet typedFirst: Int? = first(source)\nassert(typedFirst == 2)\nassert(firstMatches(source, ArraySource(items: [2, 8])))\nassert(!firstMatches(source, ArraySource(items: [Int]())))\nlet opaque = integers()\nassert(first(opaque) == 2)\nassert(itemCount(knownIntegers) == 2)\nlet greeting = CustomGreeting()\nassert(greeting.decoration() == \"concrete helper\")\nassert(throughGeneric(greeting) == [\"custom requirement\", \"extension helper\"])\nlet erased: any Greeting = greeting\nassert(erased.message() == \"custom requirement\")\nassert(erased.decoration() == \"extension helper\")\nlet changed: Note = Note(title: \"Before\").replacingTitle(\"After\")\nassert(changed.title == \"After\")</code></pre><p>To make decoration part of polymorphic customization, add <code>func decoration() -&gt; String</code> to Greeting itself. The extension may still provide its default, but CustomGreeting's implementation now fulfills a declared requirement. Recheck the generic/existential results after that deliberate API change. Avoid changing the original example while predicting it, because the comparison depends on decoration being extension-only.</p><p>A separate explanatory answer should state that an existential hides the implementation under a protocol boundary, an opaque result hides a chosen concrete result while retaining its identity, and a generic names relationships among its inputs/outputs. The example uses modern language syntax without asserting every checkout target uses the same Swift mode. It does not demonstrate all associated-type, variance, inheritance, or ABI cases; those are further study once the small contract is clear.</p>"
       },
       "references": [
-        {"label": "Swift: Generics and associated types", "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/generics/"},
-        {"label": "Swift: Opaque and boxed protocol types", "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/opaquetypes/"},
-        {"label": "Swift: Protocol requirements and extensions", "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/protocols/"},
-        {"label": "Swift Evolution SE-0352: Implicitly opened existentials", "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0352-implicit-open-existentials.md"}
+        {
+          "label": "Swift: Generics and associated types",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/generics/"
+        },
+        {
+          "label": "Swift: Opaque and boxed protocol types",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/opaquetypes/"
+        },
+        {
+          "label": "Swift: Protocol requirements and extensions",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/protocols/"
+        },
+        {
+          "label": "Swift Evolution SE-0352: Implicitly opened existentials",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0352-implicit-open-existentials.md"
+        }
       ],
-      "sessions": ["001", "003", "006", "019", "041", "044"]
+      "sessions": [
+        "001",
+        "003",
+        "006",
+        "019",
+        "041",
+        "044",
+        "069",
+        "070"
+      ]
     },
     {
       "id": "callback-ownership",
+      "quiz": [
+        {
+          "question": "What ends a NotificationCenter block-observer registration?",
+          "options": [
+            "Dropping the variable holding its returned token always unregisters it.",
+            "Removing the returned token through the registering center under the intended lifecycle policy.",
+            "Setting an unrelated delegate to nil."
+          ],
+          "answer": 1,
+          "explanation": "The center retains the block registration. Keep the opaque token and remove that registration explicitly or through an owned wrapper. Selector-observer object cleanup is a different API contract."
+        },
+        {
+          "question": "A block observer registered with queue: nil receives a notification from a worker. What should a UI adapter assume?",
+          "options": [
+            "Delivery occurs synchronously in the posting context, so extract a safe payload and marshal deliberately to the UI owner.",
+            "NotificationCenter guarantees MainActor isolation.",
+            "Every observer creates a new dedicated thread."
+          ],
+          "answer": 0,
+          "explanation": "Posting context, queue scheduling and actor isolation are separate. A Sendable payload can cross deliberately; a lifecycle generation can additionally reject work queued before stop or restart."
+        },
+        {
+          "question": "Why is DispatchSemaphore.wait not a substitute for await?",
+          "options": [
+            "Both always suspend only the current Swift task.",
+            "Semaphores automatically propagate typed errors and cancellation.",
+            "Waiting blocks a thread and can prevent the awaited completion from making progress; await can suspend the task."
+          ],
+          "answer": 2,
+          "explanation": "Blocking dependencies can deadlock main or cooperative executor work. Use a completion or continuation with exactly-once and cancellation policies rather than synchronously waiting for asynchronous code."
+        }
+      ],
       "title": "Callback ownership, notifications, queues, and actor boundaries",
       "summary": "Give delegates, observation tokens, actions, and asynchronous work explicit owners; separate registration, execution context, cancellation, and stale-result protection.",
       "sections": [
@@ -127,19 +284,61 @@
       ],
       "exercise": {
         "brief": "Verify synthetic delegate delivery, block-observer cleanup, and completion-gated actor marshaling; explain why a blocking group/semaphore wait would change the design.",
-        "steps": ["Combine the declarations in a scratch Apple-platform Swift target, retaining the delegate receiver explicitly.", "Post a synthetic count notification and await a completion signal from the MainActor receiver.", "Stop observation, post again, and confirm no new delivery; reason through a pre-stop queued callback and restart generation.", "Await legacyBatch through a checked continuation without blocking main or a cooperative task thread."],
-        "acceptance": ["A retained delegate receives an ID; clearing the delegate stops delivery without claiming producer cancellation.", "The notification payload crosses as Int and visible state changes only under MainActor.", "Stop removes the block token and advances a generation before any stale publication can commit.", "The group check completes through notify and no semaphore/group wait or main.sync is introduced.", "The explanation distinguishes selector cleanup, block-token removal, target ownership, and in-flight work."],
+        "steps": [
+          "Combine the declarations in a scratch Apple-platform Swift target, retaining the delegate receiver explicitly.",
+          "Post a synthetic count notification and await a completion signal from the MainActor receiver.",
+          "Stop observation, post again, and confirm no new delivery; reason through a pre-stop queued callback and restart generation.",
+          "Await legacyBatch through a checked continuation without blocking main or a cooperative task thread."
+        ],
+        "acceptance": [
+          "A retained delegate receives an ID; clearing the delegate stops delivery without claiming producer cancellation.",
+          "The notification payload crosses as Int and visible state changes only under MainActor.",
+          "Stop removes the block token and advances a generation before any stale publication can commit.",
+          "The group check completes through notify and no semaphore/group wait or main.sync is introduced.",
+          "The explanation distinguishes selector cleanup, block-token removal, target ownership, and in-flight work."
+        ],
         "solution": "<p>This Foundation/Dispatch check uses explicit completion gates. Run the async function from an async scratch entry point with <code>await checkCallbacks()</code>; do not block a main thread to wait for it.</p><pre><code class=\"language-swift\">@MainActor\nfinal class Recorder: DraftDelegate {\n    var ids: [String] = []\n    func didChange(id: String) { ids.append(id) }\n}\n\n@MainActor\nfunc checkCallbacks() async {\n    let source = DraftSource()\n    let receiver = Recorder()\n    source.delegate = receiver\n    source.publish(\"synthetic-a\")\n    assert(receiver.ids == [\"synthetic-a\"])\n    source.delegate = nil\n    source.publish(\"synthetic-b\")\n    assert(receiver.ids == [\"synthetic-a\"])\n\n    let center = NotificationCenter()\n    let screen = CounterScreen()\n    screen.start(center: center)\n    await withCheckedContinuation { (done: CheckedContinuation&lt;Void, Never&gt;) in\n        screen.onReceive = { value in\n            guard value == 7 else { return }\n            screen.onReceive = nil\n            done.resume()\n        }\n        center.post(name: .syntheticCount, object: nil, userInfo: [\"count\": 7])\n    }\n    assert(screen.count == 7)\n    screen.stop()\n    center.post(name: .syntheticCount, object: nil, userInfo: [\"count\": 99])\n    assert(screen.count == 7)\n\n    await withCheckedContinuation { (done: CheckedContinuation&lt;Void, Never&gt;) in\n        legacyBatch { done.resume() }\n    }\n}</code></pre><p>The receiver binding keeps the weak delegate alive. Notification posting executes the nil-queue callback synchronously, but the UI Task finishes later; the continuation waits for actual receipt. Clearing onReceive before resumption prevents that test callback from resuming twice. After stop, another post has no registered block to schedule. An already queued callback instead checks its captured generation, so removal and stale-publication protection remain distinct mechanisms.</p><p>The legacy group path leaves each entered operation and uses notify to resume once. It does not propagate arbitrary errors or cancellation; a production adapter needs those additional contracts. For background posting, move only the synthetic post into a controlled worker and retain the same receiver completion gate. For selector/target-action practice, use the documented registration shape in a suitable NSObject/UIKit target and verify its owner/lifetime separately. These checks do not represent a production app build or complete coverage of every event API.</p>"
       },
       "references": [
-        {"label": "Apple: NotificationCenter block observer registration", "url": "https://developer.apple.com/documentation/foundation/notificationcenter/addobserver(forname:object:queue:using:)"},
-        {"label": "Apple: NotificationCenter selector observer registration", "url": "https://developer.apple.com/documentation/foundation/notificationcenter/addobserver(_:selector:name:object:)"},
-        {"label": "Apple: UIControl target-action registration", "url": "https://developer.apple.com/documentation/uikit/uicontrol/addtarget(_:action:for:)"},
-        {"label": "Apple: DispatchGroup", "url": "https://developer.apple.com/documentation/dispatch/dispatchgroup"},
-        {"label": "Apple: DispatchQueue sync", "url": "https://developer.apple.com/documentation/dispatch/dispatchqueue/sync(execute:)-3segw"},
-        {"label": "Swift: Concurrency and actor isolation", "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"}
+        {
+          "label": "Apple: NotificationCenter block observer registration",
+          "url": "https://developer.apple.com/documentation/foundation/notificationcenter/addobserver(forname:object:queue:using:)"
+        },
+        {
+          "label": "Apple: NotificationCenter selector observer registration",
+          "url": "https://developer.apple.com/documentation/foundation/notificationcenter/addobserver(_:selector:name:object:)"
+        },
+        {
+          "label": "Apple: UIControl target-action registration",
+          "url": "https://developer.apple.com/documentation/uikit/uicontrol/addtarget(_:action:for:)"
+        },
+        {
+          "label": "Apple: DispatchGroup",
+          "url": "https://developer.apple.com/documentation/dispatch/dispatchgroup"
+        },
+        {
+          "label": "Apple: DispatchQueue sync",
+          "url": "https://developer.apple.com/documentation/dispatch/dispatchqueue/sync(execute:)-3segw"
+        },
+        {
+          "label": "Swift: Concurrency and actor isolation",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"
+        }
       ],
-      "sessions": ["003", "004", "008", "011", "015", "016", "017", "034", "040", "047"]
+      "sessions": [
+        "003",
+        "004",
+        "008",
+        "011",
+        "015",
+        "016",
+        "017",
+        "034",
+        "040",
+        "047",
+        "068",
+        "081"
+      ]
     }
   ]
 }

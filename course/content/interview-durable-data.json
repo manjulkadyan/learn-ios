@@ -1,0 +1,216 @@
+{
+  "questions": [
+    {
+      "id": "iq-097-a",
+      "lesson": "097",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "How would you prove that a title rename preserved installed Core Data records?",
+      "scenario": "A synthetic V2 Draft renames title to displayTitle and adds a required origin. The new app launches against a fresh database, but no old-store fixture has been run.",
+      "minutes": 8,
+      "androidBridge": "Use Room migration testing as a preservation analogy. Core Data maps managed object models and owns its private SQLite schema; it is not a place to copy raw Room SQL.",
+      "rubric": [
+        "Creates and saves an actual V1 SQLite store with the historical model before opening V2.",
+        "Keeps source model availability and destination renamingIdentifier/default explicit.",
+        "Checks account/ID/title/default projections rather than just row count or construction success.",
+        "Distinguishes inferred mapping, automatic model discovery, current CRUD and JSON format upgrades.",
+        "States actual compiler/runtime evidence and any unexecuted device or cutover checks."
+      ],
+      "answerHTML": "<p>I would seed a V1 SQLite store with two accounts sharing an ID and different titles, save it on its context queue, and close its writer. That establishes historical persisted data rather than reconstructing current-model objects. V2 attaches the old canonical rename identity to displayTitle and gives origin a meaningful historical default. I would retain both model versions and either use supported automatic inference or explicitly obtain a mapping and migrate into a separate candidate.</p><p>After opening that candidate with V2, I would compare complete account, ID, title and origin projections against expected values. Equal counts could hide lost text or cross-account replacement. I would also reopen the preserved source with V1 and inject unsupported-source and destination-failure cases.</p><p>A JSON decoder version test verifies another format, and an in-memory CRUD test skips SQLite compatibility. The evidence must name the actual store, toolchain and assertions. Candidate acceptance is separate from cutover, which needs quiesced contexts, sidecar-aware replacement and a compatible recovery path.</p>",
+      "followUps": [
+        "What changes if V3 renames displayTitle again?",
+        "How would you test a relationship or uniqueness transformation that cannot be inferred?"
+      ],
+      "pitfalls": [
+        "Calling a current-model in-memory insert a migration test.",
+        "Treating successful open or equal row count as complete preservation."
+      ]
+    },
+    {
+      "id": "iq-097-b",
+      "lesson": "097",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design recovery for an upgrade that cannot open some installed stores without erasing local drafts.",
+      "scenario": "A release sees unsupported metadata, corrupted bytes and destination I/O failures. A legacy cache helper has a remove-and-retry branch, and a rollout owner proposes reusing it.",
+      "minutes": 15,
+      "androidBridge": "Room destructive fallback is similarly a data-policy decision. The recovery mechanics differ for Core Data coordinators, model bundles and SQLite sidecars.",
+      "rubric": [
+        "Separates unsupported, corrupt, unavailable, packaging and destination errors.",
+        "Preserves irreplaceable source and isolates any partial candidate.",
+        "Names the cutover/rollback owner and source-compatible restore or forward repair.",
+        "Defines preservation fixtures, rollout stop conditions and diagnostic privacy.",
+        "Explains why the observed legacy branch does not classify every stored object as disposable."
+      ],
+      "answerHTML": "<p>I would classify the data before choosing recovery: unsent drafts remain irreplaceable even if another store is a reconstructible cache. Unsupported metadata can be valid data a newer binary understands; corruption and access unavailability need different responses. The legacy branch is evidence of an existing policy, not authorization to erase new durable intent.</p><p>The migration owner should preserve the source, produce a distinct candidate, validate domain projections, and publish only after a quiesced supported replacement and reopen. Partial candidates are diagnostic artifacts under a bounded retention/protection policy. Missing packaged models should stop rollout as a build defect rather than trigger data reset.</p><p>I would require old-store fixtures for every supported source, plus corrupt, unsupported and destination-failure schedules. Stop rollout when preservation fails or classification is unknown. A rollback binary may not understand V2, so recovery needs a retained compatible source or forward repair; source rollback alone is insufficient. Diagnostics expose schema/error categories and synthetic evidence, not user draft contents.</p>",
+      "followUps": [
+        "Who coordinates an extension still holding the old store?",
+        "What recovery is available if a newer binary already committed V2 data?"
+      ],
+      "pitfalls": [
+        "Deleting failed stores to improve launch-success metrics.",
+        "Assuming reinstalling the previous binary reverses schema evolution."
+      ]
+    },
+    {
+      "id": "iq-098-a",
+      "lesson": "098",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "What must an outbox persist to recover from a lost acknowledgment after restart?",
+      "scenario": "A synthetic server applied a title change, but the client never received its response. The process exits with the operation pending.",
+      "minutes": 8,
+      "androidBridge": "Room plus WorkManager can provide local persistence and scheduling, but neither supplies remote idempotency. iOS scheduling grants are different; the queue must survive independently.",
+      "rubric": [
+        "Joins local domain change and pending command in one durable boundary.",
+        "Retains account scope, immutable payload, operation ID and precondition across restart.",
+        "Requires server-side effect/receipt atomicity and a documented idempotency contract.",
+        "Retains ambiguous intent until its acknowledgment is locally durable.",
+        "Distinguishes ordinary restart evidence from abrupt-crash, power-loss and real-service evidence.",
+        "Preserves dependency order during resolution; rejects multiple pending same-record edits unless the entire lane is reconciled atomically."
+      ],
+      "answerHTML": "<p>The outbox needs the immutable logical operation identity and payload, account scope, ordering/precondition information and delivery state. The local edit and command must be committed together, or process death can leave an edit with no future transmission. The operation ID remains stable across replay and credential refresh.</p><p>A timeout or lost response is ambiguous because the server may have committed. I would retain the command and replay only under a verified service contract that binds identity to payload and account. The server must persist its effect and receipt atomically; local UUID generation cannot manufacture exactly-once semantics. The original receipt must remain usable for the supported replay window.</p><p>After restart, authenticate/select the account, rotate session ownership, reload the command and resolve the receipt. If saving acknowledgment fails, keep the command and reconcile again. A deterministic separate-process fixture can prove ordinary exit/reload and one synthetic effect. It does not establish receipt expiry behavior, sudden power-loss durability or production endpoint support.</p><p>A fresh ID alone does not preserve intent order. Resolve the complete dependent lane and its preconditions atomically, or bound resolution to one pending command per record and replace that command in its original slot. Reject unsupported dependencies without changing the persisted queue.</p>",
+      "followUps": [
+        "What if the service receipt expires before replay?",
+        "What if acknowledgment arrives but the local removal write fails?"
+      ],
+      "pitfalls": [
+        "Creating a new operation ID on every retry.",
+        "Treating task cancellation as proof that the server did nothing.",
+        "Removing a conflict and appending its replacement behind dependent edits without revising their preconditions."
+      ]
+    },
+    {
+      "id": "iq-098-b",
+      "lesson": "098",
+      "level": "Staff",
+      "kind": "Debug",
+      "prompt": "Explain how an offline delete can be resurrected, then design a bounded prevention and resolution policy.",
+      "scenario": "An older update is queued behind a delete. The client removes the visible row immediately, and the proposed server implementation deletes all revision history.",
+      "minutes": 12,
+      "androidBridge": "A Room row deletion is not a remote tombstone protocol. Kotlin coroutine ordering or a WorkManager retry policy cannot resolve stale service intent.",
+      "rubric": [
+        "Keeps durable delete intent after visible row removal.",
+        "Retains revision-bearing tombstone or another reviewed stale-write prevention contract.",
+        "Orders dependent operations and pauses conflicts instead of automatic overwrite.",
+        "Creates a new identity/precondition for explicitly rebased or recreated intent.",
+        "Includes account-epoch acknowledgment checks and explicit residual retention/concurrency work.",
+        "Preserves dependency order during resolution; rejects multiple pending same-record edits unless the entire lane is reconciled atomically."
+      ],
+      "answerHTML": "<p>Removing the local row must not remove the command describing its deletion. If the server also forgets the latest revision, an old update may look like a legitimate create and resurrect the record. I would retain a revision-bearing tombstone or use another explicit server policy that rejects stale intent during the supported offline window.</p><p>The bounded fixture processes an account FIFO and stops on conflict. That sacrifices throughput for reviewable ordering. Per-record lanes are an alternative only after delete/recreate dependencies and concurrent acknowledgments are specified. A revision mismatch is retained for user/domain resolution rather than retried forever.</p><p>An explicit recreate or rebase is new intent: it receives a fresh operation ID and a current precondition. Reusing the conflicted ID with changed payload violates idempotency. I would test delete persistence through reload, stale update rejection and A-to-B-to-A before acknowledgment. The late effect may already exist remotely, but its old ticket cannot commit locally. Tombstone retention, server authorization and cross-device merge remain independently owned contracts.</p><p>A fresh ID alone does not preserve intent order. Resolve the complete dependent lane and its preconditions atomically, or bound resolution to one pending command per record and replace that command in its original slot. Reject unsupported dependencies without changing the persisted queue.</p>",
+      "followUps": [
+        "How would independent-record lanes change throughput and failure ordering?",
+        "When can the tombstone safely be compacted?"
+      ],
+      "pitfalls": [
+        "Deleting the pending command when the local row disappears.",
+        "Using last-write-wins without considering delete semantics and authorization.",
+        "Removing a conflict and appending its replacement behind dependent edits without revising their preconditions."
+      ]
+    },
+    {
+      "id": "iq-099-a",
+      "lesson": "099",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Trace state, PKCE and account ownership from callback to credential installation.",
+      "scenario": "The mock provider returns a valid authorization code while a second login attempt begins. Both callbacks have syntactically valid URLs.",
+      "minutes": 9,
+      "androidBridge": "External browser flows resemble Android Custom Tabs conceptually. Apple presentation/callback ownership and Keychain policies require their own APIs; neither platform's callback alone proves resource authorization.",
+      "rubric": [
+        "Checks exact callback destination and unambiguous state/code fields.",
+        "Explains state attempt binding separately from PKCE code redemption.",
+        "Consumes callback once and validates verifier/challenge at the provider.",
+        "Rechecks epoch after exchange and publishes only after vault success.",
+        "Identifies fixed test entropy, synthetic provider and unverified real browser/security boundaries."
+      ],
+      "answerHTML": "<p>State correlates the callback with the pending authorization attempt; PKCE binds code redemption to the verifier whose challenge accompanied authorization. I would validate the exact callback destination and reject missing, wrong or duplicate state and code values. A correct-looking URL is not sufficient.</p><p>The accepted attempt consumes its callback, then exchanges the code with its verifier. The mock provider checks S256 and consumes the code once. The fixed verifier demonstrates encoding against a reference vector; it is not production entropy or a complete provider implementation.</p><p>Exchange suspends, so a newer attempt or logout may invalidate account ownership while the old code is redeemed successfully. Credential installation must check the captured epoch at the final owner and save the vault before publishing a durable session. A storage failure stays distinct from denial or user cancellation. I would order a late-result test explicitly. Browser presentation, random generation, redirect registration, identity verification and server authorization need separate platform/provider evidence.</p>",
+      "followUps": [
+        "What if the callback contains duplicate state fields?",
+        "Where would a server-verified passkey result enter this ownership pipeline?"
+      ],
+      "pitfalls": [
+        "Saying PKCE replaces state and redirect validation.",
+        "Installing credentials because exchange succeeded without checking the current epoch."
+      ]
+    },
+    {
+      "id": "iq-099-b",
+      "lesson": "099",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Recover when refresh rotation succeeds but storing the new credential fails.",
+      "scenario": "The synthetic provider consumes the old refresh token. FakeVault.save then throws locked. The application still has the previous credential view, and another caller proposes retrying refresh.",
+      "minutes": 15,
+      "androidBridge": "A synchronized Kotlin repository can serialize refresh callers but cannot undo server rotation. Keychain and Android key storage also have different locked-state and restoration policies.",
+      "rubric": [
+        "Identifies remote-success/local-failure as a cross-boundary ambiguity.",
+        "Rejects plain old-token retry unless the provider explicitly supports reconciliation/grace.",
+        "Defines coalesced refresh ownership and waiter cancellation separately from logout.",
+        "Closes local authorization and retains failed cleanup obligations on logout.",
+        "Names fake-vault, durable sign-out, actual Keychain and provider evidence limitations."
+      ],
+      "answerHTML": "<p>The previous in-memory credential does not prove the old refresh token is still valid. Remote rotation already consumed it, while vault storage failed. In this mock, an unlocked retry is denied because there is no reconciliation endpoint or rotation grace rule. The checked recovery is explicit reauthentication. A real integration may use provider-documented reconciliation, but cannot infer replay safety from a transport or storage error.</p><p>I would give the account service one refresh operation that callers join, with waiter cancellation independent of account invalidation. The compact fixture is single-caller and does not verify coalescing. Logout invalidates ownership and closes local authorization even if credential deletion fails.</p><p>Persist a correctly protected cleanup/sign-out obligation and consult it before loading surviving vault data at restart. Classify interaction restrictions separately from item absence and configuration errors. Verification should include late refresh completion, post-rotation storage failure, denied retry and recovery. Fake-vault checks establish state decisions; signed Keychain availability, durable sign-out and real provider rotation semantics remain separate work.</p>",
+      "followUps": [
+        "How does a canceled waiter affect other refresh callers?",
+        "What if logout's durable sign-out marker also fails to write?"
+      ],
+      "pitfalls": [
+        "Treating unlock as sufficient reason to replay a consumed token.",
+        "Claiming an actor automatically coalesces operations across await."
+      ]
+    },
+    {
+      "id": "iq-100-a",
+      "lesson": "100",
+      "level": "Senior",
+      "kind": "Code",
+      "prompt": "Where should the epoch guard live when persisting a prepared snapshot into Core Data?",
+      "scenario": "An actor checks the account, then awaits privateContext.perform. Logout queues before that closure runs. A developer says the earlier guard was enough.",
+      "minutes": 9,
+      "androidBridge": "A Kotlin Mutex around repository state does not protect an independently queued Room transaction after the lock is released. Core Data additionally has context-queue confinement.",
+      "rubric": [
+        "Explains the suspension/queued-command gap and rejects the earlier guard.",
+        "Orders account reset and mutation on the actual transaction owner.",
+        "Checks epoch before mutation with no intervening ownership-changing suspension.",
+        "Keeps managed objects on their context and transfers snapshots/IDs.",
+        "Explains dedicated-context rollback scope and the MainActor/main-queue bridge limits."
+      ],
+      "answerHTML": "<p>The final guard belongs on the owner that orders account reset and the actual fetch/change/save transaction. Checking on an actor and then awaiting another queue leaves a window in which logout can win. A queued closure must validate the captured account and epoch before touching managed state.</p><p>The lab uses a dedicated main-queue writer with a MainActor owner. It resets and rotates epoch during activation, enters performAndWait for mutation, and asserts the established MainActor bridge inside the Sendable closure. No await separates the guard from save. A private context would need its own serialized command owner, not the same assumption.</p><p>Prepared data crosses as Sendable snapshots. Managed objects stay inside the context queue, and failed saves roll back the dedicated writer's whole pending scope. That design would be wrong if unrelated UI edits shared the context. I would test A-to-B-to-A with an old epoch and read through a fresh context after a valid commit, keeping in-memory host evidence separate from disk restart and device protection.</p>",
+      "followUps": [
+        "Why is MainActor.assumeIsolated invalid for an arbitrary private context?",
+        "How would a child context change the definition of durable save?"
+      ],
+      "pitfalls": [
+        "Assuming Swift actor isolation replaces Core Data confinement.",
+        "Using whole-context rollback as invisible per-row undo."
+      ]
+    },
+    {
+      "id": "iq-100-b",
+      "lesson": "100",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design startup when protected files are unavailable and previous logout cleanup is incomplete.",
+      "scenario": "A background launch sees an account label in its journal, a credential item that may survive, and a protected store that cannot currently be opened.",
+      "minutes": 15,
+      "androidBridge": "Android Direct Boot offers a familiar availability question, but iOS file protection and Keychain classes are distinct policies rather than direct equivalents of Android storage directories.",
+      "rubric": [
+        "Separates selected-account labels, usable authorization and storage availability.",
+        "Checks durable sign-out obligations before credential reload.",
+        "Defers protected access without replacing persisted intent with empty state.",
+        "Explains completeUnlessOpen retained-handle versus reopen behavior.",
+        "Assigns bootstrap/cleanup owners and separates host injection from device/platform evidence."
+      ],
+      "answerHTML": "<p>I would not infer usable authorization from the journal's account label or from potentially surviving vault material. Bootstrap first resolves durable sign-out and cleanup obligations, then establishes credential availability and selected-account policy. Only afterward can it inspect store compatibility, restore account-scoped intent and grant replay.</p><p>Protected-data failure should yield a truthful deferred state. It must not be converted to an empty store or trigger migration deletion. completeUnlessOpen can preserve access for a retained open handle, but it does not guarantee a new read or database sidecar can open while locked. Availability notifications can schedule bounded retry; actual I/O still decides the outcome.</p><p>One owner coordinates visible state, vault cleanup, durable marker and store access, while naming failures for each resource because they are not one transaction. If marker writing fails, withhold automatic credential restoration until explicit reconciliation. I would require injected no-write tests, account-ordering tests and a passcode-enabled scratch-device matrix. Host success and iOS type-checking do not establish locked-device, Keychain or sudden-process-death behavior.</p>",
+      "followUps": [
+        "What if bytes were replaced but backup-exclusion configuration failed?",
+        "Which evidence would justify changing the credential accessibility class?"
+      ],
+      "pitfalls": [
+        "Equating temporary unavailability with account absence.",
+        "Assuming logout across vault, files and network is one atomic operation."
+      ]
+    }
+  ]
+}

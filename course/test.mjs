@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { handleRequest } from './serve.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -18,6 +19,21 @@ function check(condition, message) { assert.ok(condition, message); checks++; }
 const manifest = JSON.parse(await fs.readFile(path.join(root, 'content/manifest.json'), 'utf8'));
 check(lessons.length === manifest.units.reduce((total, unit) => total + unit.count, 0) && course.units.length === manifest.units.length, 'Complete manifest curriculum');
 check(lessons.filter(item => item.track === 'Core').length === 28 && lessons.filter(item => item.track === 'Deep dive').length === 28, 'Stable core and expanded deep-dive tracks');
+check(lessons.length === 112 && lessons.filter(item => item.track === 'Swift bootcamp').length === 14 && lessons.filter(item => item.track === 'SwiftUI bootcamp').length === 14, 'Beginner tracks retained alongside the production expansion');
+check(lessons.filter(item => item.track === 'Advanced practice').length === 24 && lessons.filter(item => item.track === 'Specialist electives').length === 4, 'Runtime and production practice is distinct from specialist entry lessons');
+check(manifest.interviewBanks.reduce((total, bank) => total + bank.count, 0) === lessons.length * 2, 'Registered interview banks cover all lessons');
+const contract = JSON.parse(await fs.readFile(path.join(root, 'content/progress-contract.json'), 'utf8'));
+check(contract.sessions.length === 56, 'Original quiz/checklist baseline is complete');
+for (const item of contract.sessions) {
+  const lesson = lessons.find(lesson => lesson.id === item.id);
+  check(createHash('sha256').update(JSON.stringify({ quiz: lesson.quiz, checklist: lesson.checklist })).digest('hex') === item.sha256, `Original storage identity ${item.id}`);
+}
+const expansionContract = JSON.parse(await fs.readFile(path.join(root, 'content/progress-expansion-contract.json'), 'utf8'));
+check(expansionContract.sessions.length === 84, 'Pre-expansion beginner and core progress baseline is complete');
+for (const item of expansionContract.sessions) {
+  const lesson = lessons.find(lesson => lesson.id === item.id);
+  check(createHash('sha256').update(JSON.stringify({ quiz: lesson.quiz, checklist: lesson.checklist })).digest('hex') === item.sha256, `Pre-expansion storage identity ${item.id}`);
+}
 check(course.coverage.groups.length === 14 && course.coverage.groups.flatMap(group => group.topics).length >= 118, 'Auditable coverage breadth');
 check(course.catalogue.packages.length === 52 && course.catalogue.packages.filter(item => item.requirement).length === 23, 'Both checked-in remote pin graphs and direct declarations inventoried');
 check(course.catalogue.packages.find(item => item.id === 'peasy').graphs.length === 1, 'Legacy-only dependency is not called universally active');
@@ -29,12 +45,33 @@ for (const entry of manifest.units) {
   }
 }
 check(course.essentials.length === 3, 'Initialization, generics and callback ownership have supplementary guides');
-check(course.interview.questions.length === 112 && course.interview.rounds.length === 8, 'Two interview prompts per lesson and eight mock rounds');
+check(course.interview.questions.length === lessons.length * 2 && course.interview.rounds.length >= 11, 'Two interview prompts per lesson plus beginner and principal mock rounds');
 check(lessons.every(lesson => course.interview.questions.filter(question => question.lesson === lesson.id).length === 2), 'No numbered lesson lacks interview rehearsal');
+for (const round of course.interview.rounds) {
+  const duration = round.questions.reduce((total, id) => total + course.interview.questions.find(question => question.id === id).minutes, 0);
+  check(duration + round.setupMinutes + round.debriefMinutes <= round.minutes && round.debriefMinutes >= 5, `Honest full-round budget ${round.id}`);
+}
 for (const guide of course.essentials) {
   check(guide.sections.length >= 4 && guide.wordCount >= 900 && guide.references.length >= 2, `Supplement depth ${guide.id}`);
   check(guide.sessions.every(id => lessons.some(lesson => lesson.id === id)), `Supplement lesson connections ${guide.id}`);
+  check(guide.quiz.length >= 3 && guide.quiz.every(item => item.explanation && item.options[item.answer]), `Supplement assessments ${guide.id}`);
 }
+const expectedWorkshops = (await Promise.all(manifest.practiceBanks.map(async file => JSON.parse(await fs.readFile(path.join(root, 'content', file), 'utf8')).workshops.length))).reduce((total, count) => total + count, 0);
+check(course.paths.length === 8 && course.workshops.length === expectedWorkshops, 'Original paths plus advanced and elective paths with all registered practice');
+check(course.paths.find(item => item.id === 'advanced').stages.flatMap(stage => stage.lessons).length === 24 && course.paths.find(item => item.id === 'specialists').stages.flatMap(stage => stage.lessons).length === 4, 'All new lessons have a deliberate reading path');
+check(course.paths.find(item => item.id === 'swift').stages[0].lessons[0] === '057' && course.paths.find(item => item.id === 'swiftui').stages[0].lessons[0] === '071', 'Reading paths can start from zero without renumbering original IDs');
+for (const learningPath of course.paths) for (const stage of learningPath.stages) {
+  check(stage.lessons.every(id => lessons.some(lesson => lesson.id === id)) && stage.workshops.every(id => course.workshops.some(item => item.id === id)), `Path resolves ${learningPath.id}/${stage.title}`);
+}
+const declared = new Set(course.workshops.flatMap(item => item.files.map(file => file.path)));
+check(course.artifacts.length === declared.size && course.artifacts.every(item => declared.has(item.path)), 'Exactly the declared text artifacts are bundled');
+const labRoot = await fs.realpath(path.join(root, 'labs'));
+for (const artifact of course.artifacts) {
+  const real = await fs.realpath(path.join(root, artifact.path));
+  check(real.startsWith(labRoot + path.sep) && !(artifact.path.split('/').some(part => part.startsWith('.'))), `Contained artifact ${artifact.path}`);
+  check(await fs.readFile(real, 'utf8') === artifact.source && createHash('sha256').update(artifact.source).digest('hex') === artifact.sha256, `Exact offline source snapshot ${artifact.path}`);
+}
+for (const workshop of course.workshops) check(workshop.wordCount >= 900 && workshop.sections.length >= 4 && workshop.quiz.length >= 3, `Detailed explanation and assessment ${workshop.id}`);
 for (const item of course.catalogue.packages) for (const graph of item.graphs) {
   const source = await fs.readFile(path.resolve(root, '../..', graph.path), 'utf8');
   check(source.split('\n')[graph.line - 1].includes(`"${item.id}"`), `Pin identity anchor ${item.id} in ${graph.name}`);
@@ -77,6 +114,14 @@ const legacy = { ...emptyState(), lastLesson: '028', lessons: { '001': complete,
 const expanded = normalizeState(legacy, lessons);
 check(expanded.lessons['001'].reviewed && expanded.lessons['028'].notes === 'Original core note' && expanded.lastLesson === '028', 'Original 28-session progress survives expansion');
 check(!expanded.lessons['029'] && !expanded.lessons['056'], 'New sessions are not automatically reviewed or initialized');
+const old56 = { ...legacy, lastLesson: '056', lessons: { ...legacy.lessons, '056': { ...blankEntry(), notes: 'Pending device evidence', checks: [0], quizzes: { 0: lessons.find(item => item.id === '056').quiz[0].answer } } } };
+const expanded84 = normalizeState(old56, lessons);
+check(expanded84.lastLesson === '056' && expanded84.lessons['056'].notes === 'Pending device evidence' && !expanded84.lessons['056'].reviewed && expanded84.lessons['056'].checks[0] === 0, '56-session pending work survives beginner expansion unchanged');
+check(!expanded84.lessons['057'] && !expanded84.lessons['071'] && !expanded84.lessons['084'], 'New beginner availability is not learner completion');
+const old84 = { ...old56, lastLesson: '084', lessons: { ...old56.lessons, '084': { ...blankEntry(), notes: 'My capstone is still pending review', bookmark: true, checks: [0], quizzes: { 0: lessons.find(item => item.id === '084').quiz[0].answer } } } };
+const expanded112 = normalizeState(old84, lessons);
+check(expanded112.lastLesson === '084' && expanded112.lessons['084'].notes === old84.lessons['084'].notes && expanded112.lessons['084'].bookmark && !expanded112.lessons['084'].reviewed, '84-session notes, position and pending review survive the runtime expansion');
+check(expanded112.lessons['084'].quizzes[0] === old84.lessons['084'].quizzes[0] && expanded112.lessons['084'].checks[0] === 0 && !expanded112.lessons['085'] && !expanded112.lessons['112'], 'Old quiz/checklist indices survive and new practice is not inferred');
 check(!normalizeState({ ...legacy, lessons: { ...legacy.lessons, 'initialization-access': complete } }, lessons).lessons['initialization-access'], 'Supplement IDs cannot create numbered-session progress');
 
 async function request(url, method = 'GET') {
@@ -95,6 +140,12 @@ for (const asset of ['/', '/index.html', '/styles.css', '/data.js', '/state.js',
   check(response.headers['x-content-type-options'] === 'nosniff' && response.headers['content-security-policy'].includes("object-src 'none'"), `Asset ${asset} security headers`);
   check((await request(asset, 'HEAD')).body === '', `HEAD ${asset} is bodyless`);
 }
+for (const artifact of course.artifacts) {
+  const response = await request('/' + artifact.path.split('/').map(encodeURIComponent).join('/'));
+  check(response.status === 200 && response.body === artifact.source && response.headers['content-type'].startsWith(artifact.path.endsWith('.json') ? 'application/json' : 'text/plain'), `Declared artifact handler ${artifact.path}`);
+  check((await request('/' + artifact.path, 'HEAD')).body === '', `Artifact HEAD ${artifact.path}`);
+}
+for (const url of ['/content/progress-contract.json', '/labs/SwiftLanguageLab/.build/debug/SwiftWorkbench', '/labs/unknown.swift', '/labs/unknown.py', '/labs/unknown.sh', '/labs/SwiftUIWorkbench/App/../../../../serve.mjs']) check((await request(url)).status === 404, `Private/undeclared companion denied ${url}`);
 const anchors = new Map(lessons.flatMap(lesson => lesson.repo).map(item => [item.path, item]));
 for (const source of course.catalogue.sources) anchors.set(source.path, source);
 for (const item of anchors.values()) {

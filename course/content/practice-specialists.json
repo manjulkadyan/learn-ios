@@ -1,0 +1,137 @@
+{
+  "workshops": [
+    {
+      "id": "specialist-selection-lab",
+      "title": "Specialist selection lab",
+      "summary": "Run a synthetic entitlement/conflict/lifecycle workbench, extend one missing policy, and prepare an honest native evidence plan for a single specialist feature.",
+      "kind": "Host implementation",
+      "sessions": [
+        "109",
+        "110",
+        "111",
+        "112"
+      ],
+      "sections": [
+        {
+          "id": "bounded-companion",
+          "title": "One workbench, several explicit evidence boundaries",
+          "html": "<p>This workshop connects the specialist entry lessons through policy decisions that are safe to execute on a host. A synthetic theme transaction changes a right; a synthetic card edit can conflict; a synthetic surface becomes stale and ends; a product policy chooses a fallback for an elective platform feature. The companion contains no Apple accounts, signing, network operations, real permissions, purchases, Bluetooth discovery or health queries. It provides original executable policies that you can inspect end to end.</p><p>Use Python 3.11 or later with the standard library. Optional Foundation snippet checks require Swift 5.9 or later on macOS 13 or later. No package manager or remote dependency is needed. Run from labs/SpecialistLab: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_policy, then python3 policy_model.py with the same environment setting. The first command checks adversarial invariants; the second prints a deterministic synthetic demonstration. A demonstration output is not a measurement or the learner's completed submission.</p><p>Keep three evidence classes distinct. Host behavior establishes only the declared model. Compiling a scratch native target checks syntax, linked frameworks and availability for that destination. Simulator/device/sandbox interaction checks mechanisms that the host cannot access. The supplied NativeChecklist is a pending plan, not a completed test report. You may choose one branch for later authorized work; building every platform is outside this workshop.</p>"
+        },
+        {
+          "id": "transaction-checks",
+          "title": "Predict transaction behavior before reading passing checks",
+          "html": "<p>Read EntitlementLedger before executing it. The fixture receives an explicit verified input and an owner generation. It stores transactions by identity with a local revision convention, then derives a right from non-revoked, unexpired records. The revision integer is introduced by the synthetic exercise; StoreKit does not promise that counter. The model performs no cryptographic verification, product lookup, billing or refund submission.</p><p>Predict the outcomes for unverified purchase, stale owner, duplicate purchase, a higher-revision revocation on the same transaction and an older purchase delivered after that revocation. The meaningful test permutes the purchase, revocation and duplicate delivery and requires that none of those schedules restore the revoked right. A separate case grants through a newer independent transaction until its expiration boundary. That avoids a mistaken product-wide revoke when only an older transaction changed.</p><p>The ledger can serialize and reconstruct its model state. This tests that the fixture's replay information can be retained; it does not demonstrate a durable disk transaction or recovery after real process termination. In an Apple implementation, StoreKit evidence, customer-facing pending/cancel states, listener lifetime, finish ordering and subscription-specific policy remain native responsibilities. Compare Android billing acknowledgment only at the conceptual level of recoverable delivery and replay.</p>"
+        },
+        {
+          "id": "conflict-checks",
+          "title": "Read conditional save, three-way merge and operation receipt together",
+          "html": "<p>ConflictStore uses an integer tag so a stale conditional save is visible. CloudKit tags are opaque; the integer is a teaching representation, not server metadata you should synthesize. merge_fields compares fixed-schema base, local and server dictionaries. Independent changes combine. Different changes to the same field return a conflict and retain the server value in the tentative projection; a real conflict UI must also preserve the local candidate.</p><p>The lost-ack check saves op-1 once, reconstructs the store from a JSON snapshot and retries the same proposal with the same operation identity. Duplicate returns without a second tag increment. Reusing op-1 for a different proposal is rejected. A stale tag produces server-record-changed without mutation. Account rotation precedes receipt lookup, so an old completion cannot borrow an earlier acknowledgment in the new account.</p><p>This single-process model updates effect and receipt together in memory. It does not establish crash atomicity, interprocess exclusion or a CloudKit receipt transaction. Write down the authoritative transaction boundary your chosen implementation would require. For a local document, coordination protects cooperating access but not semantic merge; for structured sync, subscriptions hint that you should fetch and checkpoint changes. Do not treat either a passing field helper or an atomic file replacement as complete offline collaboration.</p>"
+        },
+        {
+          "id": "lifetime-selection",
+          "title": "Freshness, final lifetime and feature availability must stay distinct",
+          "html": "<p>Surface has an owner generation, content revision, stale threshold and end threshold. At stale_at, content becomes stale; it can become fresh after a current update with a new threshold. At ends_at or an explicit end, update_surface cannot resurrect it. The checks cover equality boundaries, obsolete revisions and old owners. These times are deterministic product policy values, not observations of ActivityKit callback or rendering timing.</p><p>FeatureInputs separates availability, foreground opportunity, synthetic product consent and transport readiness. feature_plan intentionally preserves framework-specific outcomes. An unreachable watch command stays queueable under the product contract; a Bluetooth feature without the required current readiness offers manual fallback; a spatial feature pauses work outside its scene. For health, visible samples can be displayed while empty/unknown stays no-visible-data. The consent field does not reveal HealthKit read authorization.</p><p>Select exactly one deeper branch and identify what the model omits. Watch needs target/session activation and actual transport recovery. A spatial window needs native controls, accessibility and wearer comfort evidence. Bluetooth needs hardware state and protocol validation. Health needs type-scoped authorization, observed data and background query recovery. Text/media work requires native composition, undo, observation and performance evidence. Shared policy values help plan these integrations, but they are not native adapter implementations.</p>"
+        },
+        {
+          "id": "evidence-and-extension",
+          "title": "Extend a missing semantic policy and prepare the next experiment",
+          "html": "<p>The independent extension adds a fixed-schema deleted Boolean to the synthetic card and a delete-versus-edit conflict rule. A generic field merger would combine deletion and a concurrent note edit because they change different keys. The product must decide whether that combination is valid. Preserve both proposals and block publication until the conflict is resolved, or choose another explicitly justified policy with recoverable evidence. Do not delete the draft and its operation receipt merely to make the test pass.</p><p>Add meaningful checks that would fail for the naive field-only merge: base not deleted, local deletes, server edits note; repeated conflict delivery; then deliberate resolution followed by replay after model reconstruction. Also reject an old owner. You are testing a semantic invariant, not mirroring every internal branch with assertions. Keep the supplied examples intact inside this assigned lab and explain your changed contract.</p><p>Run check_content.py to inspect only these assigned JSON banks, HTML constraints, word floors, repository anchors and explicit companion files. It is a local author validation command and does not execute the global builder or record learner state. For any future performance experiment, define the exact interval, correctness oracle, destination and retained artifact before collecting data. Write pending when no observation exists. This evidence discipline is the bridge from senior implementation skill to a staff decision another team can review.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Independently add and defend delete-versus-edit policy in the synthetic conflict model, run applicable host checks, and select one native follow-up with all unperformed work explicitly pending.",
+        "steps": [
+          "Predict the supplied transaction, conflict and lifecycle outcomes before execution; record fixture assumptions.",
+          "Extend fixed-schema fields with deleted and preserve base/local/server candidates when deletion conflicts with a concurrent edit.",
+          "Add tests for semantic conflict, duplicate input, resolution replay after reconstruction and stale owner; do not silently discard a draft.",
+          "Run Python tests/demo/content validation and optionally compile/run SnippetChecks.swift to a temporary executable.",
+          "Choose one follow-up in NativeChecklist.md and submit benefit, alternative, owner, fallback, correctness criteria and actual/pending evidence."
+        ],
+        "acceptance": [
+          "Deletion versus concurrent content edit cannot silently publish a combined result; the policy retains recoverable candidates.",
+          "A resolved operation is applied once under one identity and survives model reconstruction without duplicate effect.",
+          "Unverified rights, stale owner commits, stale saves and post-end updates remain rejected.",
+          "Command output is identified as synthetic host evidence; Apple target, sandbox and device rows remain separate.",
+          "The selected native branch has an accountable owner, usable fallback and observable reversal condition."
+        ],
+        "solution": "<p>A worked extension adds deleted=false to base and server, then sets local deleted=true while server note changes from Blue to Green. The field-only function returns deletion plus Green without a conflict, which reveals the missing domain rule. Wrap the generic merge with a semantic check: when one side newly deletes and the other changes a live content field from base, return a delete-versus-edit conflict record containing base, local and server. Do not acknowledge synchronized completion while that record is unresolved.</p><p>The learner's resolution can restore the card and preserve Green, or confirm deletion while retaining a bounded tombstone according to the declared policy. Use a new resolved proposal and stable operation identity for its retries. Save against the current server tag; if that version changed again, preserve the unresolved/resolved intent and re-evaluate rather than overwriting blindly. Reconstruct the fixture store after the save, then resend the same operation to prove no second effect. Rotation to a new owner must reject the old resolution before checking its receipt.</p><p>For a follow-up, choose a watch acknowledgment if wrist access has a concrete user benefit. The native plan separates latest application context from command transfer, defines pending/reply-loss recovery and keeps the phone task usable. Compilation of the target, paired-device transfer and actual background observations are different rows. Another valid choice is a UIKit text command with selection/undo tests, a coordinated document adapter or a bounded ActivityKit view. None is pre-completed by reading this answer.</p><p>The submitted evidence ledger contains exact commands and observed results only after execution. It labels JSON reconstruction as model replay, Foundation compilation as host source verification, and native service/device/sandbox work as pending. It states the model's missing cryptographic verification, remote scheduling, durable atomicity and platform authorization. Staff quality comes from a reviewable mechanism and next experiment, not from the number of frameworks listed or a passing synthetic demonstration.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Transaction.currentEntitlements",
+          "url": "https://developer.apple.com/documentation/storekit/transaction/currententitlements"
+        },
+        {
+          "label": "Apple: Conditional CloudKit saves",
+          "url": "https://developer.apple.com/documentation/cloudkit/ckmodifyrecordsoperation/recordsavepolicy/ifserverrecordunchanged"
+        },
+        {
+          "label": "Apple: ActivityContent.staleDate",
+          "url": "https://developer.apple.com/documentation/activitykit/activitycontent/staledate"
+        },
+        {
+          "label": "Apple: Authorizing access to health data",
+          "url": "https://developer.apple.com/documentation/healthkit/authorizing-access-to-health-data"
+        }
+      ],
+      "files": [
+        {
+          "label": "Synthetic transaction/conflict/lifecycle and selection policies",
+          "path": "labs/SpecialistLab/policy_model.py"
+        },
+        {
+          "label": "Adversarial host correctness checks",
+          "path": "labs/SpecialistLab/test_policy.py"
+        },
+        {
+          "label": "Foundation and standalone Swift snippet checks",
+          "path": "labs/SpecialistLab/SnippetChecks.swift"
+        },
+        {
+          "label": "Runtime requirements, commands and limits",
+          "path": "labs/SpecialistLab/README.md"
+        },
+        {
+          "label": "Pending native, sandbox and device checklist",
+          "path": "labs/SpecialistLab/NativeChecklist.md"
+        },
+        {
+          "label": "Assigned-content schema, HTML and word validation",
+          "path": "labs/SpecialistLab/check_content.py"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does reconstructing the JSON ConflictStore establish?",
+          "options": [
+            "A real CloudKit transaction passed.",
+            "The fixture retains operation receipts for model replay; disk/crash/cloud durability remains unproved.",
+            "Every native device conflict is resolved."
+          ],
+          "answer": 1,
+          "explanation": "The model can reject a duplicate after reconstruction, but no real storage or Apple service participates in that check."
+        },
+        {
+          "question": "Why add a semantic delete-versus-edit rule above a field merger?",
+          "options": [
+            "Different fields can still represent incompatible domain intentions.",
+            "CloudKit tags are integer timestamps.",
+            "Deletion always removes the need for receipts."
+          ],
+          "answer": 0,
+          "explanation": "Deletion of the card and editing its content can conflict even when separate keys changed. Preserve proposals and choose a declared resolution."
+        },
+        {
+          "question": "What is a successful workshop evidence submission?",
+          "options": [
+            "All native rows marked passed after host tests.",
+            "Actual host outputs plus explicitly pending native/service/device evidence and a bounded next experiment.",
+            "An invented timing improvement based on source inspection."
+          ],
+          "answer": 1,
+          "explanation": "Each evidence class supports different claims. The workbench does not perform permissions, purchases, transport, rendering or performance measurement."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,513 @@
+{
+  "workshops": [
+    {
+      "id": "instruments-first-run",
+      "title": "First Instruments recording: interval, stack and retaining path",
+      "summary": "Record one scratch operation, inspect its bounded stack, and distinguish sampled work from retained ownership without inventing device observations.",
+      "kind": "Tool investigation",
+      "sessions": [
+        "023",
+        "036",
+        "037",
+        "038",
+        "039",
+        "042"
+      ],
+      "sections": [
+        {
+          "id": "question-and-target",
+          "title": "Choose a question and an isolated target",
+          "html": "<p>If you have used Perfetto on Android, the transferable habit is to identify an operation before collecting a trace. On iOS, start with the isolated SwiftUIWorkbench app. Its Gallery, UIKit, Stores, and Platform tabs are synthetic practice surfaces. Pick a harmless Gallery navigation or UIKit list operation, rather than permission prompts or a real service. Write the exact start action and expected end state. A first run can teach capture mechanics even when three tiny cards produce no interesting hotspot.</p><p>For a mapping investigation, the supplied CapturePlan.swift contains a deliberately simple stable-first-occurrence scan and a MapRows signpost. It is a separate teaching file, not automatically included or invoked by the app. In your own scratch copy, add it to the app target and call it from a practice action. Construct a frozen array outside the call, retain its returned value, and check complete ordered output afterward. That makes the measured operation meaningful and keeps fixture construction out of a mapping-only interval.</p><p>Record source revision, fixture size and duplicate pattern, app configuration, destination, installed Xcode/Instruments version, and whether this is a simulator or phone. Do not infer a Release build from the Profile button: inspect the scheme’s Profile action. A simulator capture can explain that environment; product latency, rendering, thermal, and energy conclusions need the appropriate representative device evidence.</p>"
+        },
+        {
+          "id": "record",
+          "title": "Make and save the first recording",
+          "html": "<p>Open the scratch project and choose its verified app scheme and destination. Build/install through the native lab instructions when authorized and available. Use Product → Profile, or launch Instruments and attach to that already installed scratch process. Record which route you used, because attaching after launch cannot measure process preparation before attachment. Select Time Profiler for sampled CPU work and add the available signpost/points-of-interest view if your installed tool supports it. Template names vary by tool version; the relevant capabilities are stack sampling and locating the application interval.</p><p>Start recording, perform one declared operation, wait for its defined completion, and stop. Avoid a long session containing unrelated browsing, background work, and repeated fixtures. Confirm the intended process and a visible recording timeline before interpreting anything. If MapRows is absent, inspect target membership, whether the action actually called the function, subsystem/category filtering, and the selected process. The presence of the Swift source alone proves no interval ran.</p><p>Save the trace with the fixture and environment ledger. Keep matching executable and symbols available; an unattributed address cannot support a precise source claim. Record failed setup and missing tracks explicitly. You have completed a recording only after the tool actually produced the saved artifact. This course includes a procedure and synthetic interpretation excerpts, not a preexisting device trace.</p>"
+        },
+        {
+          "id": "interval",
+          "title": "Restrict the timeline before reading percentages",
+          "html": "<p>Select the single MapRows interval or the precise action range that matches your contract. Restrict the call tree to that selection, then inspect the main thread separately from worker threads. For an async operation, elapsed time can include suspension or waiting with little sampled CPU. A high total duration does not prove expensive synchronous Swift code. Conversely, a brief synchronous action may supply few samples, so absence of a visible stack is weak evidence.</p><p>The supplied diagnostic excerpt invents an interval from 2.000 to 2.160 seconds and eighty main-thread samples. The mapper contains sixty-four inclusive samples but only four self samples. Its descendants account for the rest. These are synthetic counts, not milliseconds or invocation counts. Inclusive cost contains child work; self cost attributes samples to the frame itself. Adding a parent’s inclusive count to its child’s count double-counts the same observations.</p><p>Try an inverted call tree to find a common expensive leaf and compare it with the ordinary caller path. Preserve the selected interval, thread filter, and any hidden-system-library filter in the report. A whole-process percentage can change merely because unrelated work changed. Keep the interpretation local: this selection supports a repeated-membership hypothesis, which still needs an equivalent candidate and matched confirmation measurements.</p>"
+        },
+        {
+          "id": "stack",
+          "title": "Turn a stack into a falsifiable mechanism",
+          "html": "<p>Read downward from the scratch action to captureStableMapping, membership searching, and String comparison. The plausible mechanism is repeated scanning as the output grows. That explanation predicts increasing work with input size and duplicate distribution, while preserving the first complete ordered values. Compare it with alternatives: fixture creation accidentally inside the interval, sorting, image decode, or layout work outside the mapper. A source function name alone cannot establish which mechanism dominates.</p><p>Record one representative expanded stack and its symbol identity. If the selected range contains mostly waits, use the appropriate activity, networking, or scheduling evidence instead of claiming the mapper consumed CPU. If the main thread is busy but the user-visible delay lies elsewhere, a mapping optimization may not improve the intended endpoint. Keep first-frame presentation, default launch-metric boundaries, and product readiness separate, as lesson 037 requires.</p><p>A candidate experiment can substitute set-backed membership while comparing complete expected output, not just result count. Collect diagnostic traces to explain the mechanism, then confirm the primary latency with comparable, minimally instrumented runs. Profiling overhead and a changed fixture can distort a before/after result. Do not invent a percentage improvement from this synthetic stack or treat one trace as a stable tail distribution.</p>"
+        },
+        {
+          "id": "retaining-path",
+          "title": "Investigate lifetime with Allocations and Memory Graph",
+          "html": "<p>CPU sampling does not answer why an object survives after navigation. For a lifetime question, start a separate Allocations recording, establish a baseline generation, enter and leave the chosen route, then mark another generation. Repeat a small fixed number of cycles and inspect instances created during those cycles that remain alive afterward. A surviving cache entry can be intentional; compare the observed lifetime with its stated owner before calling it a leak. Transient peak and retained population are also different memory questions.</p><p>The optional RetentionFixture.swift intentionally stores a closure that strongly captures its own instance. Add it only to a learner scratch experiment. Keep one route-owned reference, invoke it, then remove that reference. The synthetic ownership graph is instance → stored callback → closure context → instance. A weak observer can confirm survival without retaining it, and the supplied stop method breaks the stored edge. The file’s expected-value check demonstrates this small ARC contract when run.</p><p>For an actual retaining path, attach Xcode’s debugger to the same scratch process and capture Memory Graph after route exit. Select the surviving instance, follow incoming strong references, and distinguish a cycle from a still-live legitimate owner. The graph is a stopped snapshot, not an Allocations history. Break the intended ownership edge in your scratch copy, repeat the same route cycles, and verify behavior and retention. Weak capture must still deliver the required callback semantics.</p>"
+        },
+        {
+          "id": "evidence",
+          "title": "Hand off an honest first investigation",
+          "html": "<p>Your evidence packet contains the saved trace, matching app identity, environment ledger, selected interval, expanded stack, operation contract, expected-value checks, and memory ownership notes. Label every field observed, predicted, synthetic, or pending. If only Time Profiler ran, do not report a retaining path. If only a weak-reference assertion ran on the host, do not report a device footprint or Memory Graph capture. If a graph shows a cache root, explain its budget and invalidation before proposing teardown.</p><p>A useful first conclusion is narrow: “The selected interval contains synchronous repeated membership checks; their effect on action-to-usable content remains unmeasured.” Another is “The deliberately cyclic fixture survives owner removal and releases after stop; actual app ownership still needs a captured path.” Either can guide the next experiment without claiming a production defect.</p><p>Android trace markers resemble signposts as operation labels, but their APIs, frame boundaries, and tooling views differ. Allocations history and Memory Graph complement each other rather than mapping exactly to a Java heap dump. Ask a peer to reopen one saved interval and reconstruct one retaining path. Missing setup becomes a concrete documentation gap, while unexecuted device work remains an explicit next task.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Make one short Time Profiler capture and one bounded retaining-path investigation in a learner copy of SwiftUIWorkbench; attach observations or mark the exact missing tool/device step pending.",
+        "steps": [
+          "Freeze the operation, fixture, scheme Profile configuration and destination.",
+          "Add CapturePlan.swift to your scratch target if using MapRows, invoke it from one synthetic action and verify output.",
+          "Record, stop and save a short trace; select the intended interval and explain self versus inclusive samples.",
+          "Run a separate route-cycle allocation investigation and inspect the actual retaining path with Memory Graph when available.",
+          "Use the optional cyclic fixture only as a labeled experiment; repeat after stop and write an evidence ledger."
+        ],
+        "acceptance": [
+          "Process, configuration, fixture, trace and selected interval are identifiable.",
+          "Sample counts are not reported as invocation counts or exact elapsed milliseconds.",
+          "CPU, allocation history, graph ownership and product latency are separate claims.",
+          "Synthetic excerpts and unexecuted device steps remain labeled.",
+          "No client source, production account or learner completion is changed."
+        ],
+        "solution": "<p>A worked plan selects one MapRows call over a frozen duplicate fixture. The start is immediately before the synchronous mapper and the end is after its returned value. Output equality is checked outside the interval. In the synthetic excerpt, the mapper’s sixty-four inclusive samples contain its descendants; four self samples do not contradict a costly mapping subtree. The candidate is set-backed membership, conditional on complete ordered-value parity and equivalent confirmation runs. No measured saving follows from the excerpt.</p><p>The memory answer follows the deliberately stored callback cycle. A weak observer sees the instance after the route-like strong owner is cleared; calling stop removes the callback and permits release. For an actual report, attach the route-cycle generation and graph edges, then repeat under the same lifetime policy. Allocation count alone does not identify the owner. The final ledger leaves phone responsiveness, peak footprint, energy, and any uncaptured graph pending. Learners supply their own trace and results; the example never records course completion.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Improving your app’s performance",
+          "url": "https://developer.apple.com/documentation/xcode/improving-your-app-s-performance"
+        },
+        {
+          "label": "Apple: Gathering information about memory use",
+          "url": "https://developer.apple.com/documentation/xcode/gathering-information-about-memory-use"
+        },
+        {
+          "label": "Apple: OSSignposter",
+          "url": "https://developer.apple.com/documentation/os/ossignposter"
+        }
+      ],
+      "files": [
+        {
+          "label": "Mapping instrumentation for a scratch target",
+          "path": "labs/MeasurementLab/CapturePlan.swift"
+        },
+        {
+          "label": "Deliberately cyclic ownership fixture",
+          "path": "labs/MeasurementLab/RetentionFixture.swift"
+        },
+        {
+          "label": "Synthetic stack and retaining-path excerpts",
+          "path": "labs/MeasurementLab/fixtures/diagnostics.txt"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does a mapper’s inclusive sample count include?",
+          "options": [
+            "Only instructions directly in the mapper",
+            "Samples attributed to the mapper and its descendants in the selected range",
+            "The exact number of calls made"
+          ],
+          "answer": 1,
+          "explanation": "Inclusive samples contain child stacks. Self samples isolate attribution to that frame; neither is an exact invocation count."
+        },
+        {
+          "question": "After a route exits, what identifies an unexpected owner?",
+          "options": [
+            "The app’s total memory figure alone",
+            "A file containing the class declaration",
+            "A captured incoming strong-reference path for the surviving instance"
+          ],
+          "answer": 2,
+          "explanation": "The ownership graph supplies the actual retaining edges. A memory total or source file cannot identify who retains one object."
+        },
+        {
+          "question": "A short simulator trace shows repeated membership checks. Which conclusion is supported?",
+          "options": [
+            "A mechanism hypothesis for that captured operation and environment",
+            "An observed physical-device launch improvement",
+            "A lower fleet p95"
+          ],
+          "answer": 0,
+          "explanation": "The trace supports local attribution. Device outcomes and fleet distributions require their own comparable measurements."
+        }
+      ]
+    },
+    {
+      "id": "artifact-debugging",
+      "title": "Configuration, resources and symbols: a read-only artifact investigation",
+      "summary": "Resolve a synthetic variant, missing resource and UUID mismatch by inspecting declarations, effective settings and existing artifacts before proposing changes.",
+      "kind": "Tool investigation",
+      "sessions": [
+        "026",
+        "043",
+        "044",
+        "046",
+        "047",
+        "048",
+        "049"
+      ],
+      "sections": [
+        {
+          "id": "investigation-contract",
+          "title": "Ask which artifact failed",
+          "html": "<p>An Android engineer may diagnose the wrong application ID, a missing packaged resource, or a variant dependency by tracing Gradle inputs into an APK. The iOS question is similar, but target, scheme action, configuration, destination, environment, and installed bundle identity are separate coordinates. Start with a single symptom: a scratch Sandbox profile run takes the production branch, a resource lookup returns nil, or a crash stack has unresolved symbols. Record the expected behavior and the exact artifact you possess.</p><p>Use SwiftUIWorkbench as the native scratch boundary and SwiftLanguageLab for host language fixtures. The command menu is an investigation aid, not an automated build or a record of executed commands. Inspect the project and verify its actual scheme/product names before substituting placeholders. Do not run company archive, signing, publishing, or cache-cleanup operations for this workshop. A missing native product is a precise limitation: source inspection can proceed, while artifact identity remains pending.</p><p>The supplied diagnostics are explicitly synthetic. Their setting values, product paths, UUIDs, and resource inventory are invented to exercise reasoning. Separate a source declaration from a resolved setting and from a packaged file. Each can falsify a different claim. A correct report says what layer was inspected and which next observation would distinguish the remaining explanations.</p>"
+        },
+        {
+          "id": "settings",
+          "title": "Trace the selected action into effective settings",
+          "html": "<p>In case A, the hypothetical scheme is called Sandbox, its Run action uses Debug, and its Profile action uses Release. The xcconfig declares COURSE_SANDBOX, but the target’s Release condition list replaces that declaration with PROD. The effective excerpt therefore contains PROD and the built Info.plist identifies example.course.workbench. A scheme label is not an environment selector, and a Debug branch is not evidence about Profile’s Release behavior.</p><p>Read the relevant target settings and xcconfig include chain first. Then inspect selected effective settings for the same scheme action, configuration, and destination. xcodebuild’s showBuildSettings does not compile an app, although a project or package may require resolution first; record that limitation if encountered. Retain only the bounded keys needed for this diagnosis, such as configuration, bundle identifier, module name, compilation conditions, optimization, and debug-information format. Do not paste an unfiltered environment or signing dump.</p><p>The smallest correction proposal would restore the intended effective condition through the owning target contract, then verify branch behavior and installation identity. This workshop requests diagnosis; it performs no configuration rewrite. If the inspected project has different actual names or action choices, use those observations instead of forcing it to match the synthetic case. Android build-type/flavor intuition helps ask questions, but there is no automatic one-to-one iOS variant object.</p>"
+        },
+        {
+          "id": "resources",
+          "title": "Inspect the owner and packaged resource independently",
+          "html": "<p>Case B intentionally contains two problems: the source target processes bootstrap.json, but its hypothetical resource bundle is absent from the app; the consumer also searches Bundle.main rather than the resource owner. A nil URL alone does not identify which problem occurred. Inspect the declared resource target, consumer dependency edge, built bundle inventory, and lookup accessor as separate evidence. Correcting the lookup does not package a missing bundle, and packaging the bundle does not make Bundle.main the right owner.</p><p>For an already built scratch artifact, inspect only its verified app directory and the expected resource-bundle location. Read the two relevant Info.plist identity fields with plutil. List the specific owning bundle rather than recursively dumping unrelated build products. A source JSON file, asset catalog, or privacy declaration present in the repository proves neither target membership nor the final artifact’s contents. Generation, localization, and extension membership add their own consumers.</p><p>If an app and widget both consume the resource, inspect each product. A host Swift package lookup test may prove its fixture bundle contract while the extension packaging still remains pending. Missing, malformed, unavailable, and unsupported-schema outcomes should stay distinct; do not turn every lookup or decode failure into an empty successful result. The investigation should identify the smallest affected target and the evidence needed before any fix is recommended.</p>"
+        },
+        {
+          "id": "symbols",
+          "title": "Match UUID and architecture before interpreting addresses",
+          "html": "<p>Case C provides a hypothetical arm64 crash image and executable with UUID 11111111-2222-3333-4444-555555555555, while the offered dSYM has a different UUID. Matching product names do not establish symbol identity. Compare the crash’s Binary Images entry with the retained executable and dSYM UUIDs for the relevant architecture. Device arm64 and simulator arm64 also belong to different platform variants; architecture alone cannot establish artifact compatibility.</p><p>Use dwarfdump’s UUID inspection on explicit verified scratch paths. Those commands inspect existing files; they do not create a build or reconstruct missing symbols. If the UUID disagrees, stop precise symbol attribution and locate the matching retained build artifact. A nearby version, a freshly rebuilt executable, or the same source revision under changed settings can still be wrong. Record the missing-artifact request without claiming the crash was symbolicated.</p><p>Once identity matches, follow the supported symbolication workflow and retain crash addresses, load information, tool version, and the resulting attribution. An optimized frame can be inlined or lack ordinary local variables. A named stack is evidence to analyze, not automatic proof of a root cause. Distinguish a language trap, resource termination, loader failure, and asynchronous wait before selecting a fix or recovery operation.</p>"
+        },
+        {
+          "id": "debugger",
+          "title": "Keep stopped-state inspection separate from execution",
+          "html": "<p>For a scratch counter, set a source breakpoint, record why the process stopped, and select the relevant thread and frame. Inspect a stored count with frame variable and identify the loaded image. A breakpoint that never resolves can indicate a symbol/source mismatch, optimization, an unexecuted path, or attachment to another process. Treat these as alternatives rather than clearing global caches as a universal response.</p><p>LLDB expression can execute code. Reading a computed label through expression may call a getter; invoking recordTap changes state. This is different from inspecting a stored value in the selected frame. Optimization can make even stored-value inspection incomplete, so label unavailable values honestly. Never dump credentials, request bodies, all environment variables, or unrelated signing settings into a course artifact.</p><p>Objective-C interoperability failures need another contract: a missing generated Swift header concerns module and target identity; an unrecognized selector concerns exposed signature and receiver lifetime; a nil imported object concerns nullability and failure handling. None is fixed by a dSYM alone. The synthetic excerpt gives expected reasoning, while an executed debugger observation requires a real stopped scratch process and an identified artifact.</p>"
+        },
+        {
+          "id": "handoff",
+          "title": "Write a bounded diagnosis and next check",
+          "html": "<p>The diagnosis ledger should contain symptom, expected behavior, source evidence, resolved-setting evidence, artifact evidence, remaining hypotheses, and next check. For case A, the Release override explains why the declared Sandbox condition is absent. For case B, bundle packaging and owner lookup remain independent checks. For case C, mismatched symbols block address attribution. Each conclusion can be reproduced without changing a client configuration.</p><p>Preserve build-versus-runtime limits. Effective settings do not prove the app was built. A built app does not prove installation or a particular interaction. Host fixture tests do not certify device signing, shared-container access, resource protection, or distribution. Read-only inspection of an existing archive supplies bounded artifact evidence, while submitting that archive is an entirely different operation.</p><p>A reviewer should be able to repeat the selected command with the verified scratch path and obtain the same relevant fields. If the product is unavailable, leave that row pending and state which native lab build step would produce it. Do not replace missing files with invented output from the supplied excerpts. Use this artifact to propose the smallest targeted verification or correction, with a reconstruction boundary and accountable owner if implementation is later requested.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Diagnose the three synthetic cases, then perform any available read-only identity/settings checks against verified scratch artifacts; distinguish observed output from the invented excerpts.",
+        "steps": [
+          "Record target, scheme action, configuration, destination and expected environment.",
+          "Explain the condition override in case A and select the bounded effective-setting keys to inspect.",
+          "Trace resource owner, dependency edge, packaged bundle and lookup in case B.",
+          "Compare crash/executable/dSYM UUID and architecture in case C.",
+          "Produce a diagnosis ledger with exact inspected artifacts, pending rows and the smallest next check."
+        ],
+        "acceptance": [
+          "Declarations, effective settings, artifact contents and runtime behavior are distinct.",
+          "The symbol mismatch blocks precise attribution until matching artifacts exist.",
+          "Resource packaging and lookup ownership are checked independently.",
+          "No company configuration, signing input, live account, cache or release action changes.",
+          "Every claimed command/build/debugger observation has actual execution evidence."
+        ],
+        "solution": "<p>Case A predicts the production branch because the selected Profile action is Release and the target’s effective condition list contains PROD. COURSE_SANDBOX in an earlier declaration does not survive the override. The next check is the bounded effective condition and built bundle identity for the same coordinates. Case B requires both packaging the resource owner and using its accessor; a source file or one green host test cannot prove app and extension contents. Case C cannot establish a function at the crash address using the offered mismatched dSYM. Locate the UUID/architecture-matching retained artifact first.</p><p>The worked ledger labels all three excerpts synthetic. A learner may append observed scratch settings or existing product fields after running the read-only menu, retaining exact paths and tool identity. If no product exists, its row remains pending rather than borrowing an unrelated client archive. The recommendation is a small targeted follow-up for the diagnosed layer; no fix, app build, symbolication, or release is implied by reading this answer.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Build settings reference",
+          "url": "https://developer.apple.com/documentation/xcode/build-settings-reference"
+        },
+        {
+          "label": "Apple: Adding identifiable symbol names to a crash report",
+          "url": "https://developer.apple.com/documentation/xcode/adding-identifiable-symbol-names-to-a-crash-report"
+        },
+        {
+          "label": "SwiftPM: Resources",
+          "url": "https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html"
+        }
+      ],
+      "files": [
+        {
+          "label": "Read-only command menu and evaluation exit codes",
+          "path": "labs/MeasurementLab/diagnostic-commands.txt"
+        },
+        {
+          "label": "Synthetic configuration, resource and symbol excerpts",
+          "path": "labs/MeasurementLab/fixtures/diagnostics.txt"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A scheme named Sandbox uses a Release Profile action whose effective conditions contain only PROD. What determines the compiled branch?",
+          "options": [
+            "The scheme’s display name",
+            "The effective conditions for the selected action/configuration/target",
+            "Any condition written in any xcconfig file"
+          ],
+          "answer": 1,
+          "explanation": "Compilation uses resolved target settings. The scheme label and overridden declarations do not establish the emitted branch."
+        },
+        {
+          "question": "The source resource exists but the app’s owning resource bundle is absent. Does switching to Bundle.module alone prove the lookup will work?",
+          "options": [
+            "Yes, source presence guarantees packaging",
+            "Yes, the app’s main bundle owns all resources",
+            "No, bundle packaging and the correct owner lookup are independent requirements"
+          ],
+          "answer": 2,
+          "explanation": "The appropriate accessor cannot find a resource in a missing bundle. Verify the consumer graph and packaged artifact as well."
+        },
+        {
+          "question": "A dSYM has the right app name but a different UUID from the crash image. What is the next step?",
+          "options": [
+            "Find the UUID and architecture matching artifact before precise symbolication",
+            "Use it and assume nearby source lines are equivalent",
+            "Rebuild any current source and treat the new symbols as original"
+          ],
+          "answer": 0,
+          "explanation": "UUID/architecture identify the relevant symbols. A familiar name or newly rebuilt product does not establish that identity."
+        }
+      ]
+    },
+    {
+      "id": "regression-decisions",
+      "title": "Run a regression gate: pass, regression, invalid preparation and missing data",
+      "summary": "Execute a dependency-free JavaScript evaluator, retain outcome denominators, and separate policy decisions from synthetic arithmetic and real performance evidence.",
+      "kind": "Tool investigation",
+      "sessions": [
+        "023",
+        "036",
+        "040",
+        "041",
+        "042",
+        "048"
+      ],
+      "sections": [
+        {
+          "id": "measurement-versus-gate",
+          "title": "A gate consumes measurements; it does not collect them",
+          "html": "<p>An Android benchmark often finishes with a threshold or comparison, but the threshold cannot rescue a poorly defined operation. This workshop runs a real host program against deliberately invented records. MeasurementLab’s evaluator uses only Node’s built-in modules and has no network dependency. Executing it proves how its policy handles those inputs. It does not prove a phone became faster, an Instruments run happened, or a learner completed a native exercise.</p><p>The metric is lower-is-better elapsed milliseconds from immediately before a synchronous map to after its returned value. Baseline and candidate records identify revision and a matching cohort: device label, OS, toolchain, configuration, fixture, preparation, cache policy, instrumentation, and metric identifier. The supplied labels are synthetic. When using actual experiments, obtain these fields from the recorded setup and preserve the raw artifacts rather than retroactively making mismatched runs look comparable.</p><p>Correctness is a hard prerequisite. Each version declares its independent contract result. The evaluator requires pass before considering latency, but the declaration is not authenticated proof: attach the actual expected-value tests and results. A faster candidate that changes ordering, drops rows, suppresses errors, or publishes stale ownership fails the product question regardless of its timing.</p>"
+        },
+        {
+          "id": "records",
+          "title": "Retain every attempted outcome and preparation failure",
+          "html": "<p>A run has a unique identifier, a predeclared phase, a preparation state, an outcome, and a duration field. Successful completed operations require finite nonnegative milliseconds. Failure, timeout, and cancellation records use a null completed duration, because those are not completed-success latency samples. They remain in the attempted-operation denominator. Do not rewrite a timeout as a slow success or delete it from the failure rate.</p><p>Preparation failures use prepared false, outcome not-run, and null duration. They are counted among planned measurement records but do not enter attempted-operation latency or failure denominators. The policy separately limits preparation failure rate. This distinction prevents a broken fixture from being reported as a product regression while still exposing a failing harness. A declared warmup must complete successfully before measured records and match the policy’s count. Late relabeling of an inconvenient sample as warmup is invalid input.</p><p>The policy fixes minimum completed samples, warmup count, absolute p95 budget, allowed relative p95 increase, absolute failure rate, allowed failure-rate increase, preparation-failure limit, and an accountable reviewer. The fixture numbers are illustrative, not recommendations for an app. Real budgets depend on user requirements, baseline variability, repeatability, and the particular environment. Setting the budget after seeing the candidate defeats the decision contract.</p>"
+        },
+        {
+          "id": "estimator",
+          "title": "Understand the exact estimator and its limits",
+          "html": "<p>The evaluator sorts a copy of completed samples and implements nearest-rank p95: choose rank ceil(0.95 × n), using one-based ranks, then subtract one for the array index. Twenty ordered values from 100 to 119 give p95 118. The conventional median averages the two middle values for even n, yielding 109.5. Nearest-rank p50 would select 109 instead, so those two names are not interchangeable. Raw input order remains unchanged.</p><p>The supplied pass candidate has values 90 through 109, yielding median 99.5 and p95 108. These are arithmetic facts about invented arrays. Twenty samples permit this calculation, but the result is not a confidence interval or a stable fleet tail estimate. Repeated correlated observations on one warmed runner need their own interpretation. Do not average device p95 values or add phase p95 values and rename the result an end-to-end p95.</p><p>A zero baseline needs an explicit rule because percentage increase is undefined. The evaluator leaves relativeIncrease null; zero-to-zero can satisfy the comparison, while positive candidate latency fails the relative-growth guard. This is a deterministic policy choice for the teaching harness. If zero indicates timer resolution or a broken measurement in your actual experiment, classify and investigate that condition before treating the comparison as meaningful.</p>"
+        },
+        {
+          "id": "run",
+          "title": "Run the host checks and four decisions",
+          "html": "<p>From the course directory, run <code>node --test labs/MeasurementLab/test-evaluate.mjs</code>. Then run <code>node labs/MeasurementLab/evaluate.mjs labs/MeasurementLab/fixtures/pass.json</code>, substituting regression, invalid-preparation, and missing-data for the other supplied filenames. The command writes a JSON report and uses a distinct exit code. A nonzero exit for a deliberately failing fixture is the expected lesson outcome, not a test-run failure to hide.</p><p>Pass exits 0. Regression exits 1. Invalid preparation exits 2. Missing data exits 3. Additional guards use 4 for incompatible cohorts, 5 for failed correctness, and 6 for invalid data or a CLI file/JSON error. The test file asserts both the exported function result and the actual CLI status for the four main fixtures. It also covers percentile arithmetic, raw-order preservation, timeouts, metadata mismatch, malformed samples, duplicate IDs, warmup ordering, allowed preparation exclusions, and zero baselines.</p><p>Read the full report rather than only its status. It retains record counts, warmups, planned measurements, invalid preparation, attempts, outcome counts, completed-sample count, rates, median, p95, range, and the comparison. File and JSON errors emit no pass report. No script in this lab updates client source, a baseline file, a course progress record, or a release system.</p>"
+        },
+        {
+          "id": "decisions",
+          "title": "Interpret pass, regression and blocked experiments",
+          "html": "<p>The pass fixture compares baseline p95 118 with candidate p95 108 under a synthetic absolute budget of 130 and allowed relative increase of 10 percent. Both independent correctness declarations pass and the cohorts match. Pass means the supplied policy accepted these records. It is permission to review this experiment result, not an automatic product release or proof of statistical confidence.</p><p>The regression fixture changes candidate values to 120 through 139, giving p95 138. It fails the absolute budget and increases p95 by approximately 16.95 percent against 118. Keep both reasons visible. The invalid-preparation fixture completes its warmup but marks every planned measured candidate operation not-run. Its preparation-failure rate is 100 percent, so product performance remains undecidable. The missing-data fixture claims one completed operation without a duration; the evaluator refuses to fabricate or interpolate that observation.</p><p>Choose a bounded next action. For regression, inspect correctness and cohort records, retain the candidate/baseline artifacts, and confirm the suspected mechanism under the declared rerun policy. For invalid preparation, repair the fixture or runner before a comparable measurement. For missing data, recover the original result record or rerun a declared batch; do not copy a neighboring duration. Limit retries and retain first failures instead of repeatedly running until the gate happens to pass.</p>"
+        },
+        {
+          "id": "review-contract",
+          "title": "Keep automation inside an accountable review",
+          "html": "<p>Failure-rate guardrails matter even when completed latency improves. Two extra timeouts beside twenty completed candidate samples mean twenty-two attempts, with two failures counted separately. The evaluator can reject that candidate on outcome rates without changing its completed p95. A cancellation-heavy dataset might need a different product policy, but that decision must be made explicitly rather than by removing canceled attempts after collection.</p><p>Matched cohort metadata is necessary, yet not sufficient to guarantee a well-controlled experiment. This program does not verify device truth, measure thermal drift, pair alternating samples, estimate uncertainty, collect hitches, or inspect memory and energy. Keep those evidence rows separate. An absolute budget represents a product requirement; the relative guard detects deterioration against the chosen control. Both depend on the validity of their inputs.</p><p>The handoff names the policy owner, estimator, exclusions, raw artifact locations, conditions, tested behavior, and pending evidence. Any threshold update requires a documented decision and comparable new baseline evidence. A plain synthetic pass should remain a synthetic pass when incorporated into the course. Use the gate to make uncertainty and the next action visible, while preserving independent human review for adoption and recovery.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Execute the evaluator and its tests, explain all four fixture statuses, and add one learner-owned synthetic mutation that tests a denominator or comparability boundary.",
+        "steps": [
+          "Run the host tests and record the actual Node version and command result.",
+          "Run each of the four fixture files and record its status, exit code and reasons.",
+          "Compute baseline/candidate p95 and medians for pass and regression independently.",
+          "Add two timeout records in a scratch copy or through an imported evaluate call; explain attempts versus completed samples.",
+          "Write a bounded action for regression, invalid preparation and missing data, leaving device and product evidence pending."
+        ],
+        "acceptance": [
+          "Pass/regression/invalid-preparation/missing-data are demonstrated by actual program execution.",
+          "Twenty-value p95 uses rank nineteen and even-sample median uses the middle pair.",
+          "Timeouts remain in attempts and never enter completed-success latency.",
+          "Invalid/missing/cohort/correctness conditions cannot silently pass.",
+          "Fixture timings and budgets stay labeled synthetic; no baseline or release is automatically changed."
+        ],
+        "solution": "<p>The supplied pass arrays yield baseline median 109.5 and p95 118, candidate median 99.5 and p95 108. Regression yields candidate median 129.5 and p95 138, violating 130 and the allowed 10-percent increase. Invalid preparation reports a candidate preparation-failure rate of one with no valid measured attempt. Missing data rejects the claimed completion without a duration. These are predicted fixture results until the learner executes the commands, and actual script outputs should agree.</p><p>For the additional schedule, append two distinct measurement records with prepared true, timeout outcome, and null milliseconds. The twenty completed candidate samples still yield p95 108, but twenty-two attempts now include two timeouts. The rate is about 9.09 percent, exceeding the synthetic absolute 5-percent limit and the allowed 2-percentage-point increase. The test suite exercises this mutation. A reviewer preserves those failed outcomes, diagnoses under a bounded protocol, and collects appropriate device evidence before making a product decision.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Writing and running performance tests",
+          "url": "https://developer.apple.com/documentation/xcode/writing-and-running-performance-tests"
+        },
+        {
+          "label": "Apple: XCTClockMetric",
+          "url": "https://developer.apple.com/documentation/xctest/xctclockmetric"
+        },
+        {
+          "label": "Node.js: Built-in test runner",
+          "url": "https://nodejs.org/api/test.html"
+        }
+      ],
+      "files": [
+        {
+          "label": "Runnable policy evaluator",
+          "path": "labs/MeasurementLab/evaluate.mjs"
+        },
+        {
+          "label": "Host contract and CLI tests",
+          "path": "labs/MeasurementLab/test-evaluate.mjs"
+        },
+        {
+          "label": "Synthetic pass experiment",
+          "path": "labs/MeasurementLab/fixtures/pass.json"
+        },
+        {
+          "label": "Synthetic regression experiment",
+          "path": "labs/MeasurementLab/fixtures/regression.json"
+        },
+        {
+          "label": "Synthetic preparation failure",
+          "path": "labs/MeasurementLab/fixtures/invalid-preparation.json"
+        },
+        {
+          "label": "Synthetic missing observation",
+          "path": "labs/MeasurementLab/fixtures/missing-data.json"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Twenty successes and two timeouts have which outcome denominator?",
+          "options": [
+            "Twenty because only successes count",
+            "Twenty-two attempted operations, with twenty completed latency samples",
+            "Two because the gate cares only about failures"
+          ],
+          "answer": 1,
+          "explanation": "Timeouts remain attempted failures while completed-success latency uses the twenty successful observations."
+        },
+        {
+          "question": "A candidate fixture fails to prepare before every measured operation. What should happen?",
+          "options": [
+            "Approve if the warmup was fast",
+            "Report a product regression with invented durations",
+            "Classify invalid preparation and repair the experiment before comparing latency"
+          ],
+          "answer": 2,
+          "explanation": "The product operation never ran. Harness preparation must be made comparable before performance can be decided."
+        },
+        {
+          "question": "What does a synthetic pass from this evaluator establish?",
+          "options": [
+            "The declared policy accepts the supplied records under its arithmetic and validation rules",
+            "Representative device energy improved",
+            "Automatic readiness to release the application"
+          ],
+          "answer": 0,
+          "explanation": "The program evaluates records. It does not collect or authenticate measurements, establish uncertainty, or perform delivery."
+        }
+      ]
+    },
+    {
+      "id": "staff-principal-decisions",
+      "title": "Staff to principal decision practice: contracts, adoption and retirement",
+      "summary": "Defend a synthetic multi-team platform decision with alternatives, explicit cost and ownership, staged evidence, installed-client recovery and a critique rubric.",
+      "kind": "Design review",
+      "sessions": [
+        "021",
+        "024",
+        "025",
+        "027",
+        "028",
+        "045",
+        "048",
+        "049",
+        "050",
+        "053",
+        "056"
+      ],
+      "sections": [
+        {
+          "id": "scope",
+          "title": "Distinguish a strong seam from a platform strategy",
+          "html": "<p>Experience leading Android work is useful here because the difficult question is often who owns behavior during a transition. The synthetic scenario has three product teams that need account-safe one-shot reads while iOS transports coexist. Android has a different coroutine and transport implementation. Existing clients remain installed, a service owns authorization, and account resets must invalidate final commits. The proposal concerns read operations; it does not include replaying booking writes or migrating a database.</p><p>A staff-sized contribution can own one iOS consumer seam: characterize existing errors and cancellation, implement a bounded adapter, prove stale results cannot commit, validate its artifact, and rehearse recovery. A principal-sized exercise connects that work to a multi-team strategy: what product contract is shared, which implementations remain native, who pays adoption cost, how exceptions are handled, and who funds maintenance and retirement. The distinction is responsibility scope and evidence, not more obscure syntax or an automatic title.</p><p>The supplied platform-decision.json is an invented review record. Its roles, estimates, targets, and dates describe proposed accountability rather than company maintainers or approvals. No platform rollout, customer improvement, or team adoption is claimed. Use it to practice deciding under uncertainty and asking what evidence would overturn the recommendation.</p>"
+        },
+        {
+          "id": "options-and-cost",
+          "title": "Compare options and the cost of being wrong",
+          "html": "<p>Option A keeps local adapters and publishes common behavior fixtures. The synthetic estimate is four engineer-weeks of initial work plus three owner-days per month of maintenance. It minimizes adoption disruption, while duplicated implementation and repeated review continue. It may be the correct choice if shared failures are rare or consumers need materially different contracts. Documentation is an input; adoption must still be measured.</p><p>Option B defines a shared product contract with native iOS and Android adapters and staged adoption. The estimate is ten engineer-weeks plus two owner-days per month. It standardizes outcome, cancellation, ownership, and evidence requirements while retaining platform execution details. Its cost includes adapters, parallel paths during migration, training, consumer changes, and compatibility fixtures. A shared protocol does not eliminate maintenance or guarantee the two runtimes behave identically.</p><p>Option C builds one execution engine across platforms. The estimate is twenty-two engineer-weeks plus four owner-days per month. It could reduce some repeated logic, but introduces interop, lifecycle, debugging, resource, packaging, and deployment coupling. Treat these estimates as planning assumptions, not observed savings. Include feature opportunity cost and corrective delivery, state who bears them, and compare all options against leaving the system alone. Provisionally test B only if a pilot can establish useful shared invariants and a plausible cost advantage.</p><p>Make even an estimated cost model checkable. If one engineer-week means five comparable owner-days, B adds six weeks over A: thirty initial days. Its proposed maintenance saving is one day per month, so the simple undiscounted payback is thirty months, not six weeks or one quarter. Parallel maintenance, training, discounting and corrective work can lengthen that estimate; different owner capacities can invalidate the conversion. C has both higher initial and recurring estimates than A, so it needs a separately justified product or risk benefit rather than a claim of engineering-time savings from these numbers. This arithmetic can favor A or no change. The pilot must test benefits and costs that could actually reverse that conclusion; a preference for shared infrastructure is not a return on investment.</p>"
+        },
+        {
+          "id": "staff-evidence",
+          "title": "Make the staff contribution concrete and reviewable",
+          "html": "<p>The iOS adapter owner traces the approved composition and credential seam instead of constructing a new global session. The contract names request start, one terminal success/error, cancellation behavior, captured account epoch, and final synchronous commit ownership. A request snapshots its selected implementation before suspension. If a shared resource requires draining, explicit active-operation tracking and promotion gates are needed; renaming a snapshot gateway does not implement draining.</p><p>Characterization fixtures cover full-value success, empty success, ordinary remote failure, caller cancellation followed by late success or ordinary failure, supersession, and A-to-B-to-A account ownership. The repository contract in lesson 020 checks caller cancellation on the throwing path, otherwise preserving the remote failure. Successful stale results use account and request guards. Shared product outcome rules need not force Android and iOS to use the same exception classes or scheduler.</p><p>The staff handoff includes executed fixture results, source/target membership, matching build and runtime coordinates, a narrow interaction check, and pending device/artifact rows. It identifies the existing and candidate resource lifetimes and future-operation rollback. These artifacts make the pilot defensible, but do not prove another team adopted it. A strong local implementation is necessary evidence for expansion, while the principal exercise must still settle cross-team constraints and operational ownership.</p>"
+        },
+        {
+          "id": "principal-accountability",
+          "title": "Assign the decision, adoption and exception owners",
+          "html": "<p>The proposed mobile platform lead owns the contract, funding, exception ledger, and migration-debt deadline. The iOS adapter lead owns credential/session integration and final-commit fixtures; the Android adapter lead owns equivalent native behavior. Product consumer leads own user-visible loading/failure/selection contracts and their adoption schedules. The service lead owns authorization, backward-compatible responses, and write reconciliation. Release and observability leads own installed cohorts, matching artifacts, comparable metrics, and authority to pause expansion.</p><p>These roles need explicit deliverables and decision rights. A reviewer can challenge a privacy field without becoming the unnamed owner of all security risk. A consumer team can request an exception when its stream semantics differ from a one-shot read. The exception records the reason, affected contract, local owner, compensating tests, cost, and next review. It is not a silent fork or a blanket mandate to migrate every API.</p><p>Set a bounded pilot: one read consumer per platform, with a small number of consenting synthetic team roles in the exercise. Expansion requires evidence and an agreed budget for the next wave. If a team cannot allocate adoption time, adjust the sequence or fund assistance rather than counting a published guideline as adoption. The principal decision should explain how decentralized consumer work remains compatible while one accountable owner maintains the shared contract.</p>"
+        },
+        {
+          "id": "adoption-metrics",
+          "title": "Use staged gates and meaningful denominators",
+          "html": "<p>Characterize first, then pilot, adopt, and retire. Characterization needs independent expected outcomes for existing adapters. Pilot needs parity, controlled in-flight selection, app/consumer artifact evidence, and representative interactions. Adoption needs comparable task outcomes and an observed maintenance-cost review. Retirement needs migrated supported consumers or explicit exceptions, drained old resources, compatibility for installed clients, and a signed decision record from the accountable roles. A date schedules review; it does not bypass evidence.</p><p>Measure adoption as eligible consumers adopting the agreed contract, split by team and platform, with exceptions visible in the denominator. Count an implementation only when its consumer behavior and required artifacts pass, not when a dependency is added. Correctness metrics count controlled schedules and stale commits. Operational outcomes use attempted reads in a matching build/cohort/time window, including failure and cancellation. Success-only latency can conceal a worsening product.</p><p>Cost metrics include adapter maintenance, incident handling, onboarding, and repeated review effort in a declared window. Compare observed cost with the planning estimates before expanding. Device latency, error rate, and release evidence remain pending until collected. A synthetic gate pass or hypothetical cost table cannot become customer benefit in the portfolio. Define the smallest next observation that can falsify the recommendation, such as incompatible cancellation ownership or no meaningful reduction in repeated maintenance.</p>"
+        },
+        {
+          "id": "recovery-and-retirement",
+          "title": "Separate containment from successful deprecation",
+          "html": "<p>Containment selects the existing adapter for future reads only where the installed binary contains and honors that selection. Active requests retain their chosen adapter according to the switching policy. Do not destroy their session while they still depend on it. A timed-out write is not replayed through the other transport: its server effect can be ambiguous. Service authorization and any idempotency/reconciliation contract remain with their established owners.</p><p>Remote configuration may be unavailable before startup completes. A launch failure on that path can require a corrective binary and compatible service behavior for older clients, not an assumed flag reversal. Pausing a phased release limits further progression but does not downgrade installed apps. Keep reconstructible prior graph inputs and matching artifacts as delivery evidence, while acknowledging that developer reconstruction is different from installed-client rollback.</p><p>On successful adoption, retire the old adapter and temporary switching machinery after supported consumers, exceptions, resource draining, and recovery review permit it. If the experiment is rejected, retire the candidate instead and restore the supported old contract. Give debt an owner and review window; the synthetic example uses six weeks to revisit it, not as an automatic removal deadline. Persistent-format changes would require a separate compatibility and repair design beyond this read-only pilot.</p>"
+        },
+        {
+          "id": "critique",
+          "title": "Score evidence quality and change one assumption",
+          "html": "<p>Use a critique rubric with six observable dimensions: contract precision, viable alternatives, cost model, accountable owners, adoption evidence, and recovery/retirement. For each, score zero when missing, one when proposed but unverified, and two when supported by a reproducible artifact appropriate to the scope. A proposed owner role without confirmed acceptance remains a one. A cost estimate is useful planning but cannot receive the same evidentiary credit as observed cost.</p><p>The reviewer then changes one assumption: a consumer emits cached and fresh values, configuration cannot load, an extension shares durable state, or a team cannot adopt this quarter. Ask which contract, option, owner, gate, and cost change. A one-shot async adapter cannot silently absorb stream replay; a single-process actor cannot provide an interprocess transaction; a plan that survives only unanimous simultaneous adoption needs a better compatibility seam.</p><p>Finish with a conditional decision: accept a bounded pilot, revise the proposal, or defer expansion pending named evidence. Record a dissent and the evidence that would resolve it. Do not sum rubric scores into a principal-readiness certification. A course review can demonstrate reasoning and suggest a supervised next responsibility; sustained independent delivery, cross-team adoption, and operational accountability require actual evidence beyond this exercise.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Defend a bounded cross-team read-contract pilot, produce a staff implementation handoff and principal decision record, then critique the plan under a changed adoption or recovery assumption.",
+        "steps": [
+          "Write shared product invariants and explicit native runtime boundaries.",
+          "Compare the three options and their synthetic cost assumptions, including opportunity cost.",
+          "Assign accountable roles and evidence deliverables; record one justified consumer exception.",
+          "Define characterization/pilot/adoption/retirement gates and meaningful denominators.",
+          "Rehearse future-read rollback, a pre-configuration failure, and both success-retirement and rejected-experiment exits.",
+          "Use the six-dimension rubric to distinguish proposed evidence from reproduced results and decide the next bounded responsibility."
+        ],
+        "acceptance": [
+          "Staff implementation evidence and principal adoption/accountability work are distinct.",
+          "Options include costs, constraints and a condition that reverses the recommendation.",
+          "Owners, stop authority and exception review are explicit without invented company approvals.",
+          "Installed-client and ambiguous-write recovery limits are respected.",
+          "Successful deprecation removes the old path; rejected experimentation removes the candidate.",
+          "Metrics distinguish adoption, correctness, product outcomes and cost; synthetic values remain labeled."
+        ],
+        "solution": "<p>The worked recommendation is a conditional Option B pilot: one read consumer per platform, with native adapters implementing common outcome/ownership fixtures. The staff contribution owns the iOS seam and its controlled success/error/cancel/account schedules. The principal record funds the pilot, names the cross-team owner, specifies exception review, and compares ten estimated engineer-weeks with the smaller local-contract option and larger shared-engine option. No observed savings are supplied.</p><p>A consumer that emits cache then refresh receives an explicit stream-contract exception instead of pretending the one-shot adapter is equivalent. Adoption counts eligible consumers and unresolved exceptions by platform. Expansion waits for independent contract results, representative artifacts, attempted-read guardrails, and a maintenance review. Recovery selects the old path for future supported reads while preserving active resources; a pre-configuration fault can need corrective delivery. Successful adoption retires the old path after evidence review, while rejection retires the candidate. Rubric scores remain proposed where artifacts are pending, leading to a bounded pilot decision rather than a title or production-impact claim.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Concurrency, cancellation and isolation",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"
+        },
+        {
+          "label": "Kotlin: Coroutine cancellation and timeouts",
+          "url": "https://kotlinlang.org/docs/cancellation-and-timeouts.html"
+        },
+        {
+          "label": "Apple: Release a version update in phases",
+          "url": "https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases/"
+        }
+      ],
+      "files": [
+        {
+          "label": "Synthetic options, owners, stages, recovery and critique record",
+          "path": "labs/MeasurementLab/platform-decision.json"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which responsibility expands the exercise from a staff seam to a principal strategy?",
+          "options": [
+            "Replacing every native API with the same library",
+            "Owning cross-team adoption, funding, exceptions and retirement evidence",
+            "Knowing more framework trivia"
+          ],
+          "answer": 1,
+          "explanation": "Principal scope connects technical work to coordinated adoption and durable accountability; code breadth alone does not establish it."
+        },
+        {
+          "question": "After the candidate is adopted successfully, which path is normally retired after evidence review?",
+          "options": [
+            "The adopted candidate regardless of consumer state",
+            "Every route immediately on the review date",
+            "The old path and temporary switching machinery, subject to compatibility and recovery gates"
+          ],
+          "answer": 2,
+          "explanation": "Successful adoption retires superseded debt. A rejected experiment instead removes its candidate; dates do not bypass evidence."
+        },
+        {
+          "question": "A published guideline and a synthetic gate pass justify which claim?",
+          "options": [
+            "A proposed strategy with bounded fixture evidence, while adoption and product outcomes remain pending",
+            "Observed company-wide maintenance savings",
+            "Automatic principal readiness"
+          ],
+          "answer": 0,
+          "explanation": "Artifacts can support a proposal. Cross-team adoption, sustained outcomes and readiness require appropriate independent evidence."
+        }
+      ]
+    }
+  ]
+}

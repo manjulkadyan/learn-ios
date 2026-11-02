@@ -1,0 +1,214 @@
+{
+  "questions": [
+    {
+      "id": "iq-089-a",
+      "lesson": "089",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Why can the same source warn under a new compiler and fail when the target changes language mode?",
+      "scenario": "A scratch library's mutable global compiles with a warning under Swift 5 complete checking and fails under Swift 6. A teammate says upgrading Xcode already completed migration.",
+      "minutes": 6,
+      "androidBridge": "Compare compiler capability, Kotlin language compatibility, Gradle tooling and Android API levels as separate inputs; no numeric version mapping is implied.",
+      "rubric": [
+        "Separates compiler version from Swift language mode.",
+        "Explains complete checking as a Swift 5 staging option.",
+        "Identifies the mutable global's missing owner.",
+        "Distinguishes package tools version, default isolation and API availability.",
+        "Limits the evidence to compiler diagnostics rather than a demonstrated runtime race."
+      ],
+      "answerHTML": "<p>A newer compiler can compile several language modes. Swift 5 compatibility with complete concurrency checking can surface migration warnings, while Swift 6 makes race-safety violations language errors. The tools-version header governs manifest APIs and minimum tooling; it is not sufficient evidence of every target's language mode. Record the consuming target's flags rather than inferring them from Xcode's version.</p><p>The global counter lacks an isolation owner. Choose MainActor for UI-owned state, an actor for independently owned state, or an immutable constant if mutation is unnecessary. Merely lowering a historical checking setting is not a Swift 6 repair. Default MainActor inference and NonisolatedNonsendingByDefault are additional module settings that should be reviewed separately. Their behavior can change even when diagnostics improve.</p><p>The companion proves warning versus rejection with explicit compiler commands. It does not demonstrate a running race or a migrated client. Kotlin's compatibility settings and Android API requirements encourage the same input separation, but neither supplies identical checking rules. A defensible migration report names tested compiler/mode pairs and leaves target, runtime and adoption evidence pending.</p>",
+      "followUps": [
+        "How would you stage a dependency leaf before changing an app target?",
+        "Which evidence distinguishes a declared Tuist value from an effective compiler invocation?"
+      ],
+      "pitfalls": [
+        "Treating a new compiler as automatic app-wide Swift 6 enforcement.",
+        "Using unchecked annotations without defining the mutable global's owner."
+      ]
+    },
+    {
+      "id": "iq-089-b",
+      "lesson": "089",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design a rollout for caller-isolated async execution without losing UI responsiveness.",
+      "scenario": "A UI module enables MainActor inference and NonisolatedNonsendingByDefault. A formerly nonisolated parser now compiles cleanly, but its synchronous decode may run on the UI actor.",
+      "minutes": 12,
+      "androidBridge": "withContext(Dispatchers.Default) is an execution-policy analogy; @concurrent neither selects a Kotlin dispatcher nor promises a dedicated thread.",
+      "rubric": [
+        "Separates language enforcement from inference and execution settings.",
+        "Identifies synchronous work before suspension as a responsiveness risk.",
+        "Proposes Sendable input/output for an explicit concurrent boundary.",
+        "Preserves cancellation and stale-result behavior.",
+        "Names representative target evidence, accountable owner and independent rollback settings."
+      ],
+      "answerHTML": "<p>Treat language enforcement, default isolation and caller execution as three rollout choices. The parser's clean diagnostic does not establish a frame budget: caller execution can preserve safe access while serializing expensive work on MainActor. First inventory callers and identify whether the parser is a UI-only helper or a reusable computation service.</p><p>For expensive computation, accept Sendable snapshots and expose an explicit @concurrent function. Preserve thrown failures and cancellation checks between meaningful chunks, then commit results in the owning actor with the existing generation guard. Moving an unsafe shared mutable parser off the actor would recreate the race the compiler is rejecting. A caller-isolated helper remains appropriate for short work that intentionally accesses actor-owned state.</p><p>Assign a module owner, stage a leaf change, retain the diagnostic matrix, and plan representative target recordings before making responsiveness claims. Roll back the execution feature independently from Swift 6 checking if semantics require it. Host diagnostics validate the boundary; they cannot establish device frame timing, binary compatibility or cross-team adoption. Kotlin dispatcher selection helps explain intent but does not define Swift executor details.</p>",
+      "followUps": [
+        "How do you distinguish parsing cost from network waiting in the evidence plan?",
+        "What public API review is required when default MainActor changes inferred annotations?"
+      ],
+      "pitfalls": [
+        "Claiming @concurrent makes mutable captures safe.",
+        "Reporting host test durations as UI-frame measurements."
+      ]
+    },
+    {
+      "id": "iq-090-a",
+      "lesson": "090",
+      "level": "Senior",
+      "kind": "Code",
+      "prompt": "Explain why a fresh mutable Draft can be handed to an actor without making Draft Sendable.",
+      "scenario": "An actor's install parameter is sending Draft. The caller creates a Draft, transfers it, then asks the actor for an optional String snapshot.",
+      "minutes": 7,
+      "androidBridge": "A Kotlin val freezes an alias assignment, not its object; Java 11 has no equivalent checked isolation-region transfer.",
+      "rubric": [
+        "Describes disconnected region and aliases.",
+        "Distinguishes sending from general Sendable sharing.",
+        "Identifies forbidden source use after transfer.",
+        "Explains the actor's returned Sendable snapshot.",
+        "Separates transfer from consuming and deep copying."
+      ],
+      "answerHTML": "<p>Sending is a boundary contract: the argument must be safe to transfer into another isolation region. A freshly constructed Draft can be disconnected from concurrently accessible state, so the actor can become its mutation owner. Draft remains a non-Sendable mutable class. Nothing in this handoff authorizes concurrent access to the original reference or automatically deep-copies its children.</p><p>The caller must stop using the transferred region, including aliases that still reach it. Asking the actor for an optional String returns a Sendable snapshot rather than the retained mutable object. The diagnostic fixture adds source access after install and verifies rejection; the host test follows only the valid handoff. If the screen needs continued editing, construct independent value data before transfer.</p><p>Consuming expresses ownership conventions, whereas sending expresses isolation transfer; copyable aliases make that distinction important. A canceled sender cannot reclaim an already accepted region by reading the old binding. Define acceptance and reset under the receiving actor. Kotlin and Java mutable-reference behavior provide useful motivation, but their ordinary parameter calls do not enforce this Swift contract.</p>",
+      "followUps": [
+        "What changes if Draft contains a mutable child already stored elsewhere?",
+        "How would a sending result factory differ from returning a Sendable value?"
+      ],
+      "pitfalls": [
+        "Assuming sending adds a permanent Sendable conformance.",
+        "Treating a let alias or shallow wrapper as disconnected deep state."
+      ]
+    },
+    {
+      "id": "iq-090-b",
+      "lesson": "090",
+      "level": "Staff",
+      "kind": "Debug",
+      "prompt": "Why does a MainActor-isolated protocol conformance fail at a concurrent generic renderer?",
+      "scenario": "Row declares @MainActor Caption. A UI call succeeds; a renderer requiring Caption & Sendable and running @concurrent is rejected. A legacy dependency suggests assumeIsolated.",
+      "minutes": 10,
+      "androidBridge": "A UI-thread convention on a Java interface is weaker than Swift's isolated witness contract; dispatching is an alternative API design, not witness erasure.",
+      "rubric": [
+        "Separates instance Sendable capability from conformance isolation.",
+        "Explains same-domain witness use.",
+        "Proposes a pure Sendable snapshot conformance.",
+        "Evaluates legacy compatibility markers without presenting them as synchronization.",
+        "Names compiler availability, owner and regression evidence."
+      ],
+      "answerHTML": "<p>The instance and its conformance expose different capabilities. Safely carrying a main-actor-isolated reference does not permit invoking its synchronous protocol witness from any domain. @MainActor Caption restricts where the conformance can be used, so the concurrent generic requirement needs a nonisolated conformance that Row does not supply.</p><p>Keep the UI witness where it belongs and return a CaptionSnapshot containing immutable Sendable fields with a pure caption implementation. Alternatively change the consuming API to be actor-isolated if UI confinement is the actual contract. Both choices are explicit ownership designs. assumeIsolated would replace a static contract with a runtime assumption and requires justified caller evidence; it is not a general fix.</p><p>The syntax requires a Swift 6.2-capable compiler, independently of deployment availability. Verify valid and invalid consuming cases with the settings matrix and review imported protocol annotations. @preconcurrency import can stage legacy checking, but does not synchronize the dependency or verify queue affinity. Assign the adapter owner and retain a bounded removal plan before introducing any unchecked assertions.</p>",
+      "followUps": [
+        "When should the protocol itself be actor-isolated instead of one conformance?",
+        "How can default MainActor inference affect a snapshot defined in another module?"
+      ],
+      "pitfalls": [
+        "Assuming Sendable makes every witness nonisolated.",
+        "Using assumeIsolated or @preconcurrency as an unexplained repair."
+      ]
+    },
+    {
+      "id": "iq-091-a",
+      "lesson": "091",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Predict task-local observations and explain what is not inherited.",
+      "scenario": "Within a trace binding, code launches async let, Task and Task.detached; all handles are joined. A nested binding then restores the outer trace.",
+      "minutes": 6,
+      "androidBridge": "Kotlin CoroutineContext is a scoped-metadata analogy; Java ThreadLocal alone does not follow suspension across thread changes.",
+      "rubric": [
+        "Predicts inherited child and Task values.",
+        "Predicts detached default value.",
+        "Explains nested and outer restoration.",
+        "Separates inheritance from structured task lifetime.",
+        "Identifies Sendable metadata and intentional detached rebinding."
+      ],
+      "answerHTML": "<p>The structured async-let child and the ordinary Task observe the trace bound at their creation. Task.detached observes the default nil unless code explicitly supplies and rebinds an allowed value. A nested withValue binding temporarily shadows the trace, restores the outer binding on exit, and leaves the original default outside the outer scope. Suspension does not tie these values to one thread.</p><p>Ordinary Task creation is still unstructured. Inheriting a trace, actor context or priority does not make its lifetime a structured child or guarantee cancellation when the creating task is canceled. Join or otherwise own its handle. An inherited value may remain in that independent task after the lexical binding scope ends.</p><p>Use immutable Sendable metadata, not a mutable global account holder hidden behind a task-local wrapper. If detached work intentionally correlates with the request, capture the permitted value and bind it within the detached scope; also specify its independent shutdown owner. The companion confirms the bounded inheritance/restoration observations. Kotlin context elements offer similar motivation but have their own propagation APIs and cancellation semantics.</p>",
+      "followUps": [
+        "What happens if the Task handle is dropped before its work completes?",
+        "Why is a shared mutable object a poor trace-context value?"
+      ],
+      "pitfalls": [
+        "Calling task-local storage thread-local storage.",
+        "Equating metadata inheritance with automatic parent cancellation."
+      ]
+    },
+    {
+      "id": "iq-091-b",
+      "lesson": "091",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Specify a channel's demand and cancellation contract for a slow consumer.",
+      "scenario": "A producer emits commands that a consumer persists. An engineer assumes a returned AsyncChannel.send means persistence succeeded and spawns one task per command.",
+      "minutes": 12,
+      "androidBridge": "Kotlin rendezvous channels illustrate demand, but canceled-send exceptions and close semantics differ from AsyncChannel's nonthrowing send.",
+      "rubric": [
+        "Separates receipt from processing completion.",
+        "Bounds producers, pending elements and payload size.",
+        "Explains cancellation/finish unblocking and nondelivery possibility.",
+        "Defines an explicit bounded processing acknowledgment.",
+        "Uses deterministic registration/virtual-clock evidence.",
+        "Names producer/consumer shutdown ownership and recovery policy."
+      ],
+      "answerHTML": "<p>A channel's receipt boundary is not a persistence transaction. AsyncChannel.send waits for iteration consumption but can also unblock on cancellation or termination, so normal return alone cannot certify database commit. Use an explicit command identity and a separately owned acknowledgment if persistence completion is required. Bound outstanding acknowledgments and resolve them on failure or shutdown.</p><p>One task per command defeats a global memory bound because each suspended producer can retain a payload. Bound active producers and payload sizes as well as accepted buffering. The companion instead uses a zero-buffer channel with one pending sender and receiver, rejecting overlapping blocked operations. Its throwing cancellation/closed policy is deliberately narrower than AsyncChannel's API.</p><p>Assign a producer owner that finishes and joins tasks when the consumer exits. Preserve ordinary failure, cancellation and intentional end-of-input as distinct outcomes. Test registered sender cancellation, registered receiver cancellation, replacement delivery and idempotent finish with event barriers. Inject Clock for timeout policy rather than guessing wall-clock scheduling. Host tests establish those local transitions; a pinned library integration and persistence recovery need their own evidence.</p>",
+      "followUps": [
+        "Which operation wins if matching precedes cancellation?",
+        "How would you prevent a receipt acknowledgment from being mistaken for a durable commit?"
+      ],
+      "pitfalls": [
+        "Treating channel send completion as consumer processing completion.",
+        "Claiming zero buffering bounds an unlimited population of suspended producer tasks."
+      ]
+    },
+    {
+      "id": "iq-092-a",
+      "lesson": "092",
+      "level": "Senior",
+      "kind": "Code",
+      "prompt": "Audit an initialized typed buffer and a noncopyable allocation owner.",
+      "scenario": "OwnedInt allocates one initialized Int, offers borrowing read and consuming extract, and deinitializes/deallocates in deinit. A reviewer wants to read it after extract.",
+      "minutes": 8,
+      "androidBridge": "AutoCloseable and Kotlin use express cleanup scopes but generally allow aliasing; they do not give Java 11 Swift's consumed-binding rule.",
+      "rubric": [
+        "Separates allocation from initialization.",
+        "Pairs deinitialization with matching deallocation.",
+        "Explains borrowing versus consuming self.",
+        "Rejects consumed-binding reuse.",
+        "States that noncopyability does not imply Sendable or verify unsafe internals."
+      ],
+      "answerHTML": "<p>The pointer allocation reserves one slot, and initialize constructs the Int whose lifetime occupies that slot. Deinit must end that value lifetime before releasing the storage with the matching Swift allocator operation. A borrowed read accesses the owner without destroying or transferring it. Consuming extract takes self, returns an independent Int, and ends the caller's ability to reuse the owner.</p><p>Reading the original binding after extraction is therefore rejected, as the compiler fixture verifies. This is distinct from inout exclusivity, which forbids overlapping conflicting accesses even when a program uses a single thread. It is also distinct from sending, which concerns isolation-region transfer rather than the ownership calling convention.</p><p>Noncopyable prevents some duplicate-owner programs, but an incorrect deinitializer, escaped address or out-of-bounds access remains incorrect. It does not grant Sendable to unsafe storage. Keep the pointer private, return values rather than borrowed addresses, and check cancellation before allocating where practical. Native-resource cleanup can need asynchronous shutdown acknowledgment beyond synchronous deinit. The package verifies the bounded values and diagnostic boundaries, leaving unsafe ABI and sanitizer audits separate.</p>",
+      "followUps": [
+        "How would partial initialization change cleanup?",
+        "Why can a valid noncopyable owner still be unsafe across executors?"
+      ],
+      "pitfalls": [
+        "Calling deallocate on a C-owned allocation regardless of allocator.",
+        "Treating ~Copyable as a complete proof of memory or concurrency safety."
+      ]
+    },
+    {
+      "id": "iq-092-b",
+      "lesson": "092",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design ownership for a repeating C callback during cancellation.",
+      "scenario": "A C registration stores an opaque CallbackBox pointer. Completion can race cancellation, and callbacks may repeat until unregister acknowledges quiescence.",
+      "minutes": 12,
+      "androidBridge": "JNI global-reference and listener-registration lifetimes offer motivation; their release APIs are not interchangeable with Unmanaged retain operations.",
+      "rubric": [
+        "Identifies registration-owned retain and borrowed per-callback access.",
+        "Distinguishes passRetained/takeRetainedValue from unretained operations.",
+        "Requires quiescence before final release.",
+        "Names exactly one release owner across completion/cancellation.",
+        "Preserves error and shutdown outcomes.",
+        "Separates synchronous sample evidence from unverified foreign callback behavior."
+      ],
+      "answerHTML": "<p>A repeating registration should own one retained context for the registration lifetime. Each callback reconstructs the documented object type and borrows it while that registration ownership remains valid. Consuming the sole +1 with takeRetainedValue on the first callback would leave later callbacks without that ownership. Conversely, never balancing the registration retain leaks the box.</p><p>Cancellation must stop registration and obtain the foreign API's guarantee that callbacks have ceased before the final release. Setting a Swift task's cancellation flag or removing a UI owner is insufficient. Define a state machine in which exactly one terminal path owns release, and completion/cancellation messages cannot release twice. Keep ordinary callback failure, canceled waiting and successful shutdown distinct.</p><p>The companion's passRetained/takeRetainedValue round trip is synchronous and one-shot; its weak observation verifies only that local retain balance. Do not present it as proof that a real C API unregisters safely. Assign an adapter owner, cite the vendor's callback/lifetime contract, and test controlled repeated-callback and shutdown schedules in an appropriate target before shipping. Prefer a copied Sendable result at the Swift boundary.</p>",
+      "followUps": [
+        "What if unregister returns before an in-progress callback completes?",
+        "How would a true one-shot callback use a different retain-consumption policy?"
+      ],
+      "pitfalls": [
+        "Releasing context immediately when Task.cancel is called.",
+        "Consuming one retained registration context separately in every repeated callback."
+      ]
+    }
+  ]
+}

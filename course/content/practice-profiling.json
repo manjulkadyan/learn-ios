@@ -1,0 +1,160 @@
+{
+  "workshops": [
+    {
+      "id": "profiling-evidence-lab",
+      "title": "Integrated native profiling: capture, ownership and raw evidence",
+      "summary": "Build a standalone instrumented UIKit target, verify its shared workload on the host, and prepare a defensible native investigation with raw records.",
+      "kind": "Tool investigation",
+      "sessions": [
+        "101",
+        "102",
+        "103",
+        "104"
+      ],
+      "sections": [
+        {
+          "id": "scope-files",
+          "title": "Identify the target and evidence levels",
+          "html": "<p>This workshop adds the missing bridge between a measurement plan and a native workload. Existing MeasurementLab teaches synthetic regression decisions; this subtree supplies an actual app that executes projection, image decoding, file I/O and visible row rendering. Open ProfilingLab.xcodeproj and select its shared ProfilingLab scheme. App/ProfilingApp.swift is the UIKit entry and controls; Core/Workload.swift is compiled by both the app and host checker. There is no company dependency, network request or production-client modification.</p><p>The project declares iOS 17 and Swift language mode 5. Its Profile action uses Release, optimization and symbols. Signing is disabled for the checked-in scratch project; configure it in a learner-owned copy when you have authorized device access. Apple signposts require iOS 15 or macOS 12, independently of this target's deployment minimum. Host compilation requires an Apple toolchain with Foundation, ImageIO, CoreGraphics and os. The record scripts require Node with native ES modules and no downloaded dependencies.</p><p>Keep an evidence ladder in your notebook: source inspection, compiler build, executed host checks, native interaction, physical-device traces, and production review. A generic simulator artifact can be built without a working simulator runtime. This workshop records available verification in README and leaves unsupported levels pending. None of the supplied data marks learner work complete.</p>"
+        },
+        {
+          "id": "host-checks",
+          "title": "Execute meaningful correctness checks before timing",
+          "html": "<p>From the course directory, create a unique temporary output directory and follow README's swiftc command. Compile Core/Workload.swift together with Host/Checks.swift, using the specified language mode, optimization and module-cache path. Execute the resulting host-checks binary with an isolated fixture-output path. The checker compares both projection strategies with the full independent expected ordered array, checks empty input, and interrupts each projection at a controlled second cancellation poll.</p><p>The same checker generates the square PNG, verifies 2048-square full output and 240-square thumbnail output, rejects a corrupt image and proves temporary JSON round-trip cleanup. Its ARC test clears an external probe owner, observes the deliberate callback cycle, then clears callback and observes release. Its queue test suspends a one-worker queue, accepts four actions, requests cooperative cancellation and drains all terminal callbacks. This is a controlled schedule rather than a sleep-based race guess.</p><p>These checks establish mechanics on the host. They do not certify phone image quality, screen accessibility, memory ceiling, launch timing or energy. Kotlin/Java analogies help you reason about immutable fixtures, task outcomes and lifecycle ownership, but Swift ARC's cycle behavior and Apple image APIs are separate semantics. Preserve the output and actual tool versions rather than reporting that an iOS app ran because the shared core executed.</p>"
+        },
+        {
+          "id": "native-capture",
+          "title": "Record a bounded operation in the actual app",
+          "html": "<p>For projection, choose Linear, Thumb, Cached caption and one worker. Prepare local fixture generates the synthetic PNG outside Work. Begin an Instruments recording with os_signposts and Time Profiler, run one four-attempt batch, wait for pending zero, stop and save. Record the selected process, effective configuration, destination identity, OS build, source revision, fixture and preparation. If no runtime is available, prepare these coordinates and keep observation fields blank.</p><p>Work starts at worker entry and closes after model preparation, including string construction, projection, decoding, file verification and UIImage wrapping. It excludes queue delay, main delivery and presentation. Projection, Decode and Disk are nested intervals; ModelApplied is an event before reloadData. ShellConstruction is a root-window delegate subphase. Select one operation before reading a call tree, separate main and blocking-queue execution, and explain inclusive versus self samples. Array.contains descendants inside Projection support a membership hypothesis; a large whole-trace percentage does not.</p><p>Compare Indexed with the other controls frozen, check output first and collect a matched confirmation batch. For the separate caption experiment, populate the table before recording a fixed gesture and freeze projection, image and worker policy. Caption exists only for the repeated branch, so use a common hitch or responsiveness track to compare the two screen variants. A missing candidate span is an absent calculation, not a measured zero-duration frame.</p>"
+        },
+        {
+          "id": "memory-policy",
+          "title": "Follow allocations and pressure without changing the outcome",
+          "html": "<p>For the image comparison, hold projection, caption and worker count fixed. Record Full and Thumb under the same prepared source. Inspect transient allocation during Work and surviving images after the batch. The controller deliberately holds four successful images even though only the first is displayed. Clear displayed payload removes those owners after pending reaches zero. Pixel dimensions support a decoded-byte estimate, but actual peak and post-clear footprint require their own observations.</p><p>Create callback cycle, release its external owner and follow the RetentionProbe's strong closure capture in a stopped Memory Graph. The weak witness is only an observer. Resume, break the callback cycle and repeat the ownership check. Allocation generations show surviving populations; a Memory Graph shows ownership at an instant. An autorelease pool cannot fix this cycle, and a garbage-collector analogy cannot substitute for ARC edge reasoning.</p><p>One versus four workers is a separate scheduling experiment. The backlog remains four attempts, and lowering active capacity does not revoke decoders already executing. Required work reduces to one under serious pressure or Low Power Mode; the host-testable speculative branch declines optional work, but the app has no prefetch producer. Thermal endpoints and admission snapshots do not capture a full pressure history. Phone energy and sustained thermal behavior require supported device tooling; this local workload supplies no radio savings evidence.</p>"
+        },
+        {
+          "id": "raw-validation",
+          "title": "Export original attempts and validate an annotated copy",
+          "html": "<p>Export raw JSON only after the batch drains. Records preserve completion append order and a distinct admission ordinal. Keep the original file. The app uses source native-unannotated and blank environment fields; annotate a separate copy from real recording coordinates before validation. Do not use synthetic as a shortcut around missing device identity or revision. Worker outcome and elapsed time stop before UI delivery, so a late cancellation can suppress publication after the worker's success record has already been formed.</p><p>For deterministic arithmetic practice, run Records/make-synthetic.mjs into the temporary directory and validate that generated file. The synthetic records deliberately have blank device and OS fields. The validator checks identity, provenance, finite duration, correct success output, stable pressure, prepared fixtures and one revision per variant. It groups cohorts before computing median and nearest-rank p95, keeps failed attempts and refuses to make a release decision. Run Records/checks.mjs for timeout, cancellation, corruption of metadata, mixed revision, pressure drift and incorrect-output cases.</p><p>The generated baseline has twenty successful values from eighty to ninety-nine and the candidate from seventy to eighty-nine. Their medians are 89.5 and 79.5, and p95 values 98 and 88. These are invented fixture values verified by arithmetic, never phone observations. review_required means descriptive input readiness. invalid_capture, correctness_failure and insufficient_samples demand different next actions, and the original failed records remain audit evidence.</p>"
+        },
+        {
+          "id": "decision-packet",
+          "title": "Hand off a candidate with evidence and recovery",
+          "html": "<p>Retain source, commands, tool versions, fixture, original and annotated records, validator report, matching binary/symbols and selected trace coordinates. Name the declared user budget, correctness and failure guardrails, the reviewer and rollback. A source complexity argument may motivate a candidate, but a regression decision needs representative confirmation under comparable conditions. Existing synthetic evaluator practice can help express policy after capture provenance is correct.</p><p>A simulator comparison remains its own cohort. A successful unsigned build, host dimension check or synthetic p95 cannot become a device launch, smoothness, memory or energy result. When hardware is absent, the concrete completed deliverable is the target, host behavior, raw tooling and a ready-to-execute recording plan. Leave native interaction, allocation paths, phone samples, pressure history and operational review explicitly pending.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Build the independent target, execute host and raw-record checks, and prepare or perform one controlled native investigation.",
+        "steps": [
+          "Create a unique temporary directory and execute README's build and host commands.",
+          "Generate and validate the synthetic raw file, then run mutation checks.",
+          "Select exactly one native intervention and freeze other axes before recording.",
+          "Produce an evidence packet separating obtained results from required native/device execution."
+        ],
+        "acceptance": [
+          "All shared-core and raw mutation checks pass using isolated outputs.",
+          "The target builds for the declared SDK/configuration or an exact blocker is recorded.",
+          "The investigation defines signpost boundaries, variant, fixture, failure denominator and artifact paths.",
+          "Synthetic values remain labeled; no native/device measurement is claimed without its artifact."
+        ],
+        "solution": "<p>A worked delivery compiles the shared workload and executes the host gates. It retains the command output proving ordered projection parity, deterministic cancellation, full/thumbnail dimensions, corrupt-image rejection, file cleanup and callback lifetime. It also drains four queued cooperative cancellation callbacks. The independent Release app build demonstrates actual target wiring; native interaction still needs an available runtime. The raw checks verify the synthetic arithmetic and retain timeout counts while rejecting invalid successes, mixed revisions, pressure drift and incorrect output.</p><p>The worked investigation chooses Linear versus Indexed with Thumb, Cached caption and one worker fixed. Image preparation occurs before capture. Work is worker-entry-to-model-ready; the note explicitly excludes accepted-tap queue delay and presentation. The recording plan adds os_signposts and Time Profiler, selects one Projection child, and compares descendant/self attribution. Stack and timing observations remain blank until the learner saves a trace. A separate minimally instrumented batch supplies confirmation; no predicted saving is written as a measured result.</p><p>For an obtained native export, preserve the original and annotate a copy from actual device/OS/revision/configuration evidence. The validator report is attached alongside all failed and cancelled attempts. A final review names the budget owner and recovery if the isolated candidate regresses. If the runtime or hardware is unavailable, the packet states that build and host checks passed while launch, gesture, allocation graph, sustained pressure and energy remain pending. This answer demonstrates a substantial reproducible workflow without pre-completing a learner capture or a production decision.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: recording signposts in Instruments",
+          "url": "https://developer.apple.com/documentation/os/recording-performance-data"
+        },
+        {
+          "label": "Apple: ImageIO thumbnails",
+          "url": "https://developer.apple.com/documentation/imageio/cgimagesourcecreatethumbnailatindex(_:_:_:)"
+        },
+        {
+          "label": "Apple: queue concurrency limit",
+          "url": "https://developer.apple.com/documentation/foundation/operationqueue/maxconcurrentoperationcount"
+        },
+        {
+          "label": "Kotlin: cooperative cancellation",
+          "url": "https://kotlinlang.org/docs/coroutines-cancellation.html"
+        }
+      ],
+      "files": [
+        {
+          "label": "Verification log and learner commands",
+          "path": "labs/ProfilingLab/README.md"
+        },
+        {
+          "label": "Shared native and host workload",
+          "path": "labs/ProfilingLab/Core/Workload.swift"
+        },
+        {
+          "label": "Actual UIKit controls and workload wiring",
+          "path": "labs/ProfilingLab/App/ProfilingApp.swift"
+        },
+        {
+          "label": "App target information",
+          "path": "labs/ProfilingLab/App/Info.plist"
+        },
+        {
+          "label": "Independent Xcode target",
+          "path": "labs/ProfilingLab/ProfilingLab.xcodeproj/project.pbxproj"
+        },
+        {
+          "label": "Shared Release profiling scheme",
+          "path": "labs/ProfilingLab/ProfilingLab.xcodeproj/xcshareddata/xcschemes/ProfilingLab.xcscheme"
+        },
+        {
+          "label": "Deterministic host checks",
+          "path": "labs/ProfilingLab/Host/Checks.swift"
+        },
+        {
+          "label": "Raw provenance and cohort validator",
+          "path": "labs/ProfilingLab/Records/validate.mjs"
+        },
+        {
+          "label": "Labeled synthetic record generator",
+          "path": "labs/ProfilingLab/Records/make-synthetic.mjs"
+        },
+        {
+          "label": "Raw-record mutation checks",
+          "path": "labs/ProfilingLab/Records/checks.mjs"
+        },
+        {
+          "label": "Read-only disjoint content validation",
+          "path": "labs/ProfilingLab/Validation/check-content.py"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which evidence level does executing Host/Checks establish?",
+          "options": [
+            "A physical-device profiling result",
+            "Shared-core correctness and ownership behavior on the host",
+            "Production launch readiness"
+          ],
+          "answer": 1,
+          "explanation": "The checker runs actual Apple host code and verifies specific mechanics. It does not interact with the iOS screen or measure phone resource behavior."
+        },
+        {
+          "question": "Why keep the original native-unannotated export?",
+          "options": [
+            "It already passed release review",
+            "It preserves original provenance while annotations are added to a reviewable copy",
+            "It can be relabeled synthetic to avoid missing device fields"
+          ],
+          "answer": 1,
+          "explanation": "Annotations must come from obtained recording evidence. Retaining the original makes that change auditable and prevents fabricated environment claims."
+        },
+        {
+          "question": "What should you compare after reducing caption calculation?",
+          "options": [
+            "The absent candidate Caption span as a zero frame time",
+            "A common responsiveness/hitch metric under the same gesture plus behavioral parity",
+            "Only the app build log"
+          ],
+          "answer": 1,
+          "explanation": "The asymmetric span explains removed work; the shared screen metric establishes whether that work affected responsiveness."
+        }
+      ]
+    }
+  ]
+}

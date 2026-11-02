@@ -1,0 +1,175 @@
+{
+  "workshops": [
+    {
+      "id": "durable-data-lab",
+      "title": "Preservation and replay recovery workbench",
+      "summary": "Run old-store migrations, disk-backed outbox restart/replay and synthetic auth failures, then write an honest protected-data/account recovery handoff.",
+      "kind": "Host implementation",
+      "sessions": [
+        "097",
+        "098",
+        "099",
+        "100"
+      ],
+      "sections": [
+        {
+          "id": "isolated-run",
+          "title": "Choose an isolated evidence boundary",
+          "html": "<p>On Android, an instrumentation database migration test and a JVM repository fake answer different questions. Keep that separation in this macOS workbench. The lab uses only Swift, Foundation and Apple SDK frameworks; it has no remote packages, network calls, credentials, company capabilities or client writes. Run the script from the explicit companion directory. It creates a unique /private/tmp output root, keeps module caches and binaries there, and prints the path for your evidence record. Never substitute a user's application database.</p><p>The host checks exercise a JSON journal and synthetic server. CoreDataMigration creates a real old Core Data SQLite source and a distinct upgraded candidate. SwiftDataMigration creates a real disk store and reopens it with a versioned schema and plan. NativeChecks uses an in-memory Core Data store to verify context ownership. KeychainChecks constructs dictionaries and interprets statuses only. These rows must stay distinct even though one script orchestrates them.</p><p>Record compiler version, language mode, SDK path, command exit and assertions. The author used Apple Swift 6.4 in Swift 6 mode; exact commands and observed results are in README. The optional macro-helper flag addresses nested compiler sandbox initialization in this workspace; it does not change the outer workspace permission boundary. Successful host checks are available instruction, not learner completion or a production audit.</p>"
+        },
+        {
+          "id": "old-store",
+          "title": "Construct yesterday's data before accepting today's schema",
+          "html": "<p>Read CoreDataMigration.swift from model construction through the final assertions. It seeds account A and B under V1, with identical IDs and different titles, saves on a private context and removes the store from its coordinator. V2 adds a default and connects displayTitle to title through migration identity. The migration uses an inferred mapping and NSMigrationManager to a distinct URL. A complete account/ID/title/origin projection proves preservation rather than just successful open.</p><p>The failure matrix deliberately supplies an unsupported source model, invalid SQLite bytes and a blocked destination parent. Each checks that original source bytes remain available. DELETE journaling simplifies this closed-file fixture; do not generalize its single-file comparison to copying a live WAL-backed client store. Cutover is intentionally outside the runnable fixture. A real replacement must exclude other writers, coordinate contexts and sidecars, and retain a compatible recovery path.</p><p>SwiftDataMigration independently supplies V1/V2 VersionedSchema definitions and Plan. The old container explicitly saves before the new container opens the same URL. Attribute(originalName:) and the origin default preserve historical values. Its runtime assertions cover that particular path only. The author saw a store-notification registration diagnostic under the sandbox while the assertions passed, so extensions/cross-process notification behavior remains unverified. JSON decodeJournal verifies another format and cannot stand in for either framework migration.</p>"
+        },
+        {
+          "id": "two-processes",
+          "title": "Exit with ambiguous intent and replay from disk",
+          "html": "<p>Read DurableStore.swift before running RestartProbe. The journal combines optimistic local records and pending commands, and commit publishes memory after one atomic snapshot write. Operation identity, payload and base revision remain immutable across attempts. The synthetic server persists effects and idempotency receipts together. Its receipt table is scoped by account and rejects changed payload under the same ID. No real service is contacted.</p><p>RestartProbe seed writes a command, applies it at the synthetic server, intentionally loses the response and stores ambiguous delivery. That OS process exits. RestartProbe replay starts separately against the same directory, activates the account with a new epoch, reloads the pending command and server receipt, then persists acknowledgment. The asserted server effect count remains one. Use two invocations rather than claiming a newly constructed actor alone proves process restart.</p><p>Ordinary exit/restart demonstrates this controlled interval. It does not reproduce an abrupt kill during replacement, power loss, receipt expiry or real network behavior. Atomic writes also do not coordinate two unrelated writers for one path. The synchronous snapshot I/O is a bounded fixture on an actor's cooperative executor, with no fsync guarantee. Lesson 088 supplies the next production step: a bounded blocking-I/O worker whose result returns to a correctly ordered transaction owner.</p>"
+        },
+        {
+          "id": "failure-orders",
+          "title": "Inspect commands that should remain pending",
+          "html": "<p>HostChecks reloads commands, tests delete persistence, records conflict and rejects stale A-to-B-to-A acknowledgment. A delete is an explicit command after the local record disappears. The server retains a revision-bearing nil value so stale writes cannot automatically resurrect it. Conflict pauses the conservative account FIFO. The supplied scheduler does not automatically merge or rebase; that is the workshop extension below.</p><p>RejectingDisk throws before a write. The host compares old bytes and same-actor state, proving preservation for that seam. setAvailable(false) similarly prevents a commit without erasing the old snapshot. Corrupt and unsupported envelopes retain their bytes and fail distinctly. Cancellation before enqueue preserves the prior file. If cancellation happens after a server effect, replayable intent must remain; a canceled UI task cannot establish server rollback.</p><p>Failures after an atomic write need a different story. A production adapter can write bytes and then fail protection/backup configuration. It must report incomplete policy enforcement rather than imply that the old file necessarily survived. Keep this later-step risk separate from the pre-write fake. Bounded diagnostics should describe outcome category and test identity rather than secret data, raw callback URLs or user-authored text. The exercise uses only synthetic evidence.</p>"
+        },
+        {
+          "id": "auth-vault",
+          "title": "Exercise token rotation without making security claims",
+          "html": "<p>MockAuth integrates one-time synthetic authorization codes, state validation, S256 verifier binding, credential installation, refresh and logout. The host verifies a published S256 vector and rejects wrong/duplicate state and code reuse. It holds a provider result across logout and confirms the old epoch cannot install it. FakeVault.save can fail while locked; deletion can fail independently while local authorization stays closed and cleanup remains pending.</p><p>One assertion is especially important: provider refresh rotation succeeds, then the vault rejects the new bytes. The current view still contains the old token, but that token was consumed remotely. Once unlocked, plain retry is denied; explicit reauthentication recovers. This mock has no reconciliation endpoint or grace window. A real provider can offer documented recovery, but a storage error does not create retry safety. Refresh here is single-caller, with no coalescing; the existing shared-refresh workbench is a conceptual companion rather than behavior implemented here.</p><p>The fixed verifier/state and synthetic token strings exist for repeatable tests. They are not production entropy, provider security or passkey support. KeychainChecks performs no SecItem calls, and the fake cleanup marker is memory-only. Actual browser ownership, provider interoperability, durable sign-out, signed Keychain availability and relying-party passkey verification require additional target/service evidence. Keep those gaps visible when reporting a passing script.</p>"
+        },
+        {
+          "id": "native-availability",
+          "title": "Inspect the target seam and plan the device evidence",
+          "html": "<p>NativeTransactionOwner requires a dedicated main-queue context and a MainActor calling owner. Inside performAndWait, MainActor.assumeIsolated asserts that established bridge before checking captured account/epoch and saving. NativeChecks runs it against an in-memory macOS store, then reads through a fresh private context. The old A ticket fails after A-to-B-to-A and B remains intact. An arbitrary private context cannot use the same isolation assertion; it needs its own transaction command owner.</p><p>ProtectedDataExercise has an iOS-only gate for UIApplication availability and complete-protection writing options. The script type-checks it for an iOS 17 deployment target against the installed iPhoneOS SDK. That establishes API compilation, not device file access. Plan a passcode-enabled scratch-device experiment with synthetic complete and completeUnlessOpen files, comparing retained-open and closed/reopened handles across lock/unlock. Observe actual operation errors even when an availability property suggested access.</p><p>For Keychain, inspect the synthetic service/account query and status taxonomy first. Keep any future signed adapter bounded to those identities and its own scratch target; no broad delete helper belongs in this workshop. Treat unavailable, absent, duplicate and configuration as separate outcomes. A durable bootstrap policy must consult sign-out obligations before reloading surviving credentials and granting outbox replay. The current lab supplies the fake/state seams and evidence boundaries, not that complete device implementation.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Add one atomic conflict-resolution command and a historical optional migration field, then produce a recovery handoff that separates executed assertions from device/provider work.",
+        "steps": [
+          "Run ValidateContent.py and run-checks.sh using a new temporary root; record the compiler, SDK and individual outcomes.",
+          "Add a historical optional note to both Core Data models, seed nil for A and text for B, and expand the preservation projection.",
+          "Independently reproduce or extend resolveConflict: replace a single conflict in its original queue slot with a fresh-ID request, rejecting multiple pending edits to that record unless an atomic dependency policy reconciles them.",
+          "Inject a rejected write during resolution and assert the original conflict and acknowledged local state remain intact.",
+          "Write a durable sign-out bootstrap policy and a protected-file device matrix, explicitly marking unexecuted rows."
+        ],
+        "acceptance": [
+          "The old-store optional states and existing account/title/default values survive a real Core Data migration.",
+          "The conflict resolution uses a new identity/precondition and one durable local boundary.",
+          "A failed resolution write leaves the old command and memory/disk state intact.",
+          "The handoff includes separate-process replay, rotation/vault failure, native in-memory ownership and iOS type-check evidence.",
+          "Device protection, real Keychain/provider/passkeys, abrupt crash and cross-process writers are not claimed verified.",
+          "Conflict resolution preserves the original queue slot; unsupported same-record dependencies retain their bytes, order and preconditions."
+        ],
+        "solution": "<p>Make the optional note attribute identical across V1 and V2, with isOptional true. Populate only B in the V1 seed and render nil through a distinct sentinel in the projection. Keep projection assertions specific to each account so an empty string cannot masquerade as historical absence. The existing origin default and title rename remain independent preservation checks. Reject candidates that fail the expanded expected projection without touching the source.</p><p>Independently reproduce the bounded resolveConflict command, then change its fixture. Validate the ticket, locate the marked conflict and reject more than one pending command for that record. Replace the entry at its original index with a fresh-ID request using the chosen value and supplied current revision; update the copied local record and persist the entire snapshot before changing journal. Preserve unrelated queue positions. Removing and appending would let a later edit to the same record execute first and invalidate the replacement precondition. A multi-edit resolver needs a separate atomic reconciliation design rather than deleting dependent intent implicitly.</p><p>The supplied HostChecks.rebaseChecks tests successful single-edit resolution, immutable historical receipts, failed-write preservation and a two-edit rejection. Change one expected ordering or add a second record to your independent exercise. Explain why dependentCommands preserves the old bytes and complete queue. Fetching the current server revision provides a snapshot, not a lock over the later replay; an intervening remote edit can legitimately cause another conflict.</p><p>For the failure assertion, instantiate a sequential replacement owner on RejectingDisk reading the existing acknowledged file. Attempt resolution, expect injectedDisk, compare before-image bytes, and read the still-conflicted queue through the same current ticket. For a successful rebase, use a separate writable fixture, replay with the new ID and verify one additional intended effect. Keep this separate from the original operation's receipt, which must continue returning its historical conflict.</p><p>The recovery handoff states that sign-out closes local authorization first, persists an obligation under a reviewed protection policy, attempts narrow vault cleanup, and gates restart credential loading until reconciliation. Marker-write and credential-delete failures each need an explicit owner and user-visible state. The fake vault cannot validate persistence of that policy. Attach the actual host exits and assertions, then label signed device lock tests, actual Keychain operations, browser/provider flows, receipt-retention negotiation and crash-at-cutover as pending. This worked answer shows the implementation boundary; your extension and acceptance record remain learner work.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Core Data automatic migration",
+          "url": "https://developer.apple.com/documentation/coredata/migrating-your-data-model-automatically"
+        },
+        {
+          "label": "Apple: SwiftData SchemaMigrationPlan",
+          "url": "https://developer.apple.com/documentation/swiftdata/schemamigrationplan"
+        },
+        {
+          "label": "Apple: Keychain accessibility policy",
+          "url": "https://developer.apple.com/documentation/security/restricting-keychain-item-accessibility"
+        },
+        {
+          "label": "Apple: File protection completeUnlessOpen",
+          "url": "https://developer.apple.com/documentation/foundation/fileprotectiontype/completeunlessopen"
+        },
+        {
+          "label": "IETF: PKCE S256 specification and example",
+          "url": "https://www.rfc-editor.org/rfc/rfc7636.html"
+        }
+      ],
+      "files": [
+        {
+          "label": "Commands, scope and actual evidence",
+          "path": "labs/DurableDataLab/README.md"
+        },
+        {
+          "label": "Durable journal, outbox and synthetic receipts",
+          "path": "labs/DurableDataLab/DurableStore.swift"
+        },
+        {
+          "label": "Synthetic OAuth and fake vault",
+          "path": "labs/DurableDataLab/MockAuth.swift"
+        },
+        {
+          "label": "Host failure assertions",
+          "path": "labs/DurableDataLab/HostChecks.swift"
+        },
+        {
+          "label": "Separate-process exit and replay",
+          "path": "labs/DurableDataLab/RestartProbe.swift"
+        },
+        {
+          "label": "Actual Core Data old-store migration",
+          "path": "labs/DurableDataLab/CoreDataMigration.swift"
+        },
+        {
+          "label": "Actual SwiftData old-store migration",
+          "path": "labs/DurableDataLab/SwiftDataMigration.swift"
+        },
+        {
+          "label": "Keychain query-only and iOS protected-data seam",
+          "path": "labs/DurableDataLab/ProtectedDataExercise.swift"
+        },
+        {
+          "label": "Query/status assertions without SecItem calls",
+          "path": "labs/DurableDataLab/KeychainChecks.swift"
+        },
+        {
+          "label": "Dedicated native context owner",
+          "path": "labs/DurableDataLab/NativeTransaction.swift"
+        },
+        {
+          "label": "In-memory native ownership assertions",
+          "path": "labs/DurableDataLab/NativeChecks.swift"
+        },
+        {
+          "label": "Remote-dependency-free verification runner",
+          "path": "labs/DurableDataLab/run-checks.sh"
+        },
+        {
+          "label": "Bounded content validation",
+          "path": "labs/DurableDataLab/ValidateContent.py"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which result proves the separate-process outbox scenario?",
+          "options": [
+            "A new actor reads an in-memory dictionary",
+            "seed exits, replay loads the same disk files, and the server effect count stays one",
+            "A simulator screenshot shows Saved"
+          ],
+          "answer": 1,
+          "explanation": "Two OS invocations and persisted intent/receipts exercise ordinary restart and idempotent replay. They still do not prove abrupt-crash or real-service semantics."
+        },
+        {
+          "question": "The provider rotated a token before the vault write failed. What does the mock demonstrate?",
+          "options": [
+            "Unlock always makes the old token safe to retry",
+            "The failed write reverses provider rotation",
+            "Plain retry is denied; this provider requires explicit reauthentication"
+          ],
+          "answer": 2,
+          "explanation": "Storage failure cannot undo remote consumption. Reconciliation or grace requires a documented provider contract; this fake offers neither."
+        },
+        {
+          "question": "What does the iOS ProtectedDataExercise type-check establish?",
+          "options": [
+            "The seam compiles against the stated SDK/target",
+            "A passcode device allowed locked access",
+            "A real Keychain item was deleted"
+          ],
+          "answer": 0,
+          "explanation": "Type-checking verifies source/API compatibility. Device protection and actual Security operations require separate runtime evidence."
+        }
+      ]
+    }
+  ]
+}

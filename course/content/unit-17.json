@@ -1,0 +1,529 @@
+{
+  "unit": {
+    "id": "profiling-production",
+    "title": "Native profiling and defensible regression evidence",
+    "summary": "Integrated native workloads, controlled investigations, resource policy and raw capture provenance.",
+    "order": 17
+  },
+  "lessons": [
+    {
+      "id": "101",
+      "title": "A native profiling workload: from accepted operation to saved trace",
+      "summary": "Build an integrated scratch target, identify nested signposts, retain attempted outcomes and inspect attributable stacks.",
+      "duration": 110,
+      "level": "Senior",
+      "prerequisites": [
+        "015",
+        "023",
+        "036",
+        "042",
+        "048"
+      ],
+      "objectives": [
+        "Build the standalone native workload and identify its effective configuration.",
+        "Explain worker, UI and presentation boundaries separately.",
+        "Capture a bounded trace and preserve cancellation accounting."
+      ],
+      "sections": [
+        {
+          "id": "integrated-target",
+          "title": "Move from the plan to a workload that actually runs",
+          "html": "<p>On Android you can annotate a repository transformation with Trace sections and then discover the benchmark never executes that code. Lessons 036–042 already explain measurement contracts, distributions and controlled gates. This lesson supplies the executable wiring. ProfilingLab is an independent UIKit app with its own Xcode project and shared scheme. Prepare local fixture creates a synthetic square PNG. Run four attempts submits four operations to a bounded OperationQueue. Each operation constructs six thousand strings, preserves the first occurrence of fifteen hundred distinct rows, decodes the image, writes and reads an isolated JSON file, and returns data to the displayed table.</p><p>The fixture identity freezes the duplicate pattern, Unicode title, source image dimensions and output ordering. Linear versus Indexed changes membership lookup. Full versus Thumb changes decoded representation for an eighty-point display at a declared scale of three. Repeat caption versus Cached caption changes repeated UI calculation. These are independent experimental axes: hold the others constant when investigating one. Changing every control creates a demonstration of alternatives but prevents attribution to one mechanism. Preparation deliberately occurs before Work, because producing and encoding a large bitmap is real work.</p><p>Only image preparation is excluded; row string construction remains inside Work. This target has no production transport or company dependencies. Its purpose is to exercise a native ownership and rendering path that you can inspect, not to claim that a client workflow has improved.</p>"
+        },
+        {
+          "id": "operation-boundaries",
+          "title": "Give every endpoint a precise meaning",
+          "html": "<p>Work starts when an admitted operation enters its action. It includes projection, image decoding, file round-trip and UIImage wrapping. Its raw boundary is worker-entry-to-model-ready. Queue delay, main-queue delivery, reloadData, layout, drawing and presentation occur outside it. A shorter Work interval cannot establish shorter accepted-tap latency. To investigate that question in a learner copy, retain Work and add an outer boundary from accepted tap to a defined readiness interaction. A model assignment is not proof that a user could already select the correct row.</p><p>Projection, Decode and Disk are nested intervals with separate identities. ModelApplied is an event just before table reload, rather than a frame-presentation metric. ShellConstruction brackets root-window installation in the delegate. It starts after process preparation and closes before UIKit necessarily presents pixels, so it is a launch subphase. Android repository tracing, Activity startup and frame presentation also require separate boundaries, but platform callbacks and instrument attribution differ. Do not turn a conceptual analogy into identical startup semantics.</p><p>Separate source-derived definitions, compiler results, host functional results and recorded runtime observations in the evidence ledger. Reading the project proves which action it declares. A completed build proves an artifact was produced for a destination SDK. Neither proves that the destination ran it or that a trace contains the expected intervals.</p>"
+        },
+        {
+          "id": "paired-interval",
+          "title": "Read the signpost and cancellation code line by line",
+          "html": "<p>This excerpt belongs inside the companion projection helper, where input and cancelled are its parameters. It requires Core/Workload.swift in the Apple target or host compilation. The scratch project uses Swift language mode 5 and iOS 17. Apple's OSSignposter is available from iOS 15 and macOS 12; this deployment choice is not a claim about the client's target settings.</p><pre><code class=\"language-swift\">let state = Workload.poster.beginInterval(\n    \"Projection\", id: Workload.poster.makeSignpostID()\n)\ndefer { Workload.poster.endInterval(\"Projection\", state) }\nvar output: [String] = []\nfor (index, value) in input.enumerated() {\n    if index % 64 == 0 &amp;&amp; cancelled() { throw LabError.cancelled }\n    if !output.contains(value) { output.append(value) }\n}</code></pre><p>The first line starts an interval with a static name. id is an argument label and makeSignpostID creates an identity within this poster. state stores the information needed to pair the end. defer registers an end call on every function exit, including throwing cancellation. The array declaration fixes String as its element type. enumerated produces a tuple containing a position and value. Modulo polls cancellation once per sixty-four elements. contains provides the deliberately simple baseline, and append preserves first occurrence order. The complete helper also polls after the loop, covering empty and short input.</p><p>defer does not interrupt a blocking decoder, cancel sibling operations or undo a file write. Cancellation throws rather than returning partial successful rows. A record may retain its cancelled elapsed duration for diagnostics, but the success-latency distribution excludes it while keeping it in attempted-outcome counts.</p>"
+        },
+        {
+          "id": "recording-setup",
+          "title": "Record a short experiment with reviewable coordinates",
+          "html": "<p>Open the companion ProfilingLab.xcodeproj and choose its shared scheme. Inspect Profile: it selects Release, optimization and debug symbols. The checked-in target disables signing; use a learner-owned copy to configure physical-device signing. Select an available destination and choose Product > Profile. Apple's documented first workflow uses a Blank template with os_signposts; add Time Profiler for a CPU hypothesis. Instrument names and supported tracks depend on the installed tools and runtime, so record actual selections and versions.</p><p>For projection, choose Linear, Thumb, Cached caption and one worker. Prepare the local image before recording the workload. Record one four-attempt batch, wait for pending to reach zero, stop and save the trace. Record revision, configuration, device or simulator identity, OS build, fixture, preparation, pressure state and artifact path. A short controlled recording is easier to attribute than minutes mixing preparation, scrolling and variant changes. Diagnostic capture overhead also differs from a minimally instrumented confirmation batch.</p><p>Expand org.example.ProfilingLab and Workload in the signpost track. Select one Work interval and its Projection child before opening the call tree. Separate main-thread execution from the named blocking queue. If Projection is too brief to sample meaningfully, collect another declared batch or version a larger fixture. Extending the timeline into unrelated operations just to obtain a large stack changes the question. Preserve matching binaries and symbols, and explicitly identify unsymbolicated frames as unresolved evidence.</p>"
+        },
+        {
+          "id": "cancellation-ownership",
+          "title": "Keep queued cancellations in the attempt ledger",
+          "html": "<p>The controller owns accepted ProfileOperations and a pending count. Each operation stores immutable action captures and a lock-protected cancellation-request flag. @unchecked Sendable acknowledges a manual audit of that mutable state; it does not supply synchronization. requestCancellation changes the flag, and the action polls it while still executing terminal bookkeeping. Operation.cancel can cause OperationQueue to skip main for queued work. Using it here would lose accepted attempts and leave pending stuck, even if running operations cooperated.</p><p>A host schedule suspends a queue, accepts four operations, requests cooperative cancellation, then drains and checks every terminal callback. No sleep is used to guess when the operation started. In the native app, results dispatch to the main queue with a weak controller capture. Publication checks cancellation again, so a request arriving after worker completion cannot repaint the screen. The worker record can say success while later UI delivery is suppressed because its boundary ended earlier. A screen metric would need its own obsolete-delivery classification.</p><p>Kotlin ensureActive similarly needs cooperative checks inside long CPU loops. Java ExecutorService and Future cancellation require an interruption-aware task contract; requesting interruption does not guarantee a blocking library stops. None of these analogies automatically provides UIKit isolation, attempt accounting or stale-result protection. For this finite batch, all accepted operations eventually reach bookkeeping; a production scheduler also needs deadlines, bounds on pending admission, and shutdown behavior.</p>"
+        },
+        {
+          "id": "stack-intervention",
+          "title": "Use selected stacks to choose one intervention",
+          "html": "<p>If an actual selected Projection interval contains many samples beneath Array.contains and String equality, repeated membership searches become a plausible mechanism. Inclusive samples on the projection helper include its descendants. A low self count does not make the subtree cheap. Sampling percentages are neither invocation counts nor calibrated durations for every row. Check symbol identity, optimization and the selected range before attributing a hot leaf. High elapsed time with little CPU also invites a waiting hypothesis rather than a CPU conclusion.</p><p>Indexed uses Set.insert for membership while appending to the same ordered array; Set iteration never becomes UI order. First verify complete output parity and interruption behavior. Then compare diagnostic stacks and collect controlled confirmation samples with the other axes frozen. Hash storage is an additional memory cost to investigate, not a free improvement. If Decode dominates instead, revise the hypothesis rather than crediting a source-level complexity argument.</p><p>The inspected client Performance enum exposes Tracer.shared. That proves an instrumentation entry point exists, not that it emits these signposts, that this workload ran inside the client, or that its exported telemetry shares these denominators. Transfer back to the client as a proposal naming the operation, owner, candidate, correctness obligations and recording plan. Production behavior, device responsiveness and energy remain separate evidence requirements.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which boundary does Work measure?",
+          "options": [
+            "Tap through presented frame",
+            "Worker entry through model preparation",
+            "Only membership checks"
+          ],
+          "answer": 1,
+          "explanation": "Work includes row construction, projection, decoding, file verification and image wrapping. Queue delay and presentation are outside it; Projection is the narrower interval."
+        },
+        {
+          "question": "Why use the operation's cooperative request flag for queued cancellation?",
+          "options": [
+            "It makes cancellation synchronous",
+            "It preserves action execution and terminal attempt bookkeeping",
+            "It guarantees interruption of ImageIO"
+          ],
+          "answer": 1,
+          "explanation": "Operation.cancel may skip a queued main method. The flag lets every accepted action report a cancellation. ImageIO still needs before/after checks because the flag cannot interrupt its synchronous call."
+        },
+        {
+          "question": "What justifies a membership candidate?",
+          "options": [
+            "One whole-trace percentage",
+            "Selected stack attribution, ordered-output parity and controlled confirmation",
+            "Build success"
+          ],
+          "answer": 1,
+          "explanation": "The stack identifies a possible mechanism. Correctness and comparable confirmation are separate requirements; source inspection and compilation cannot establish a runtime benefit."
+        }
+      ],
+      "exercise": {
+        "brief": "Prepare and, when a runtime is available, record a bounded projection experiment in the actual scratch target.",
+        "steps": [
+          "Build Release using a fresh temporary output directory.",
+          "Freeze Thumb, Cached caption and one worker, then capture one Linear batch.",
+          "Select Work and Projection, inspect thread/self/inclusive attribution and compare Indexed.",
+          "Export raw attempts and retain missing annotations explicitly."
+        ],
+        "acceptance": [
+          "The target, effective configuration, fixture and exact boundary are recorded.",
+          "Host cancellation checks drain all four accepted operations.",
+          "Both projections preserve the complete expected ordered array.",
+          "Build, host, simulator interaction, device trace and production statuses are distinct."
+        ],
+        "solution": "<p>The worked setup identifies the shared ProfilingLab scheme and its Release Profile action. It fixes image, caption and worker controls, prepares the synthetic PNG before the recording, and declares worker-entry-to-model-ready as the primary raw metric. Expected output is Row 0 café through Row 1499 café in first-occurrence order. The host check compares both full arrays, handles empty input, and interrupts on a controlled second cancellation poll. The suspended-queue schedule verifies that four accepted cancellation requests still produce four callbacks.</p><p>The trace worksheet records one Work interval and its Projection child, actual thread attribution, and the relevant self/inclusive stack relationship. Until a capture exists, these observation cells remain blank. If selected samples identify membership descendants, the candidate substitutes Set membership while preserving ordered output. If decoding dominates, the projection hypothesis is weakened and the next experiment investigates decoding. No predicted saving becomes a measured result.</p><p>The confirmation sheet preserves attempt order, fixture, configuration, worker count, pressure and image state. It retains failures and cancellations beside successful latencies. Native exports begin as native-unannotated because device, OS build, revision and effective configuration still need evidence. A generic simulator build can succeed without a working runtime; record that limitation rather than marking simulator interaction complete. This worked answer supplies a concrete setup and interpretation contract. The learner must supply any saved trace, actual device samples, presentation checks and production review.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Recording Performance Data",
+          "url": "https://developer.apple.com/documentation/os/recording-performance-data"
+        },
+        {
+          "label": "Apple: OSSignposter",
+          "url": "https://developer.apple.com/documentation/os/ossignposter"
+        },
+        {
+          "label": "Kotlin: cooperative cancellation",
+          "url": "https://kotlinlang.org/docs/coroutines-cancellation.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client tracer entry point",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Metrics/Performance.swift",
+          "line": 13,
+          "why": "Inspected enum and shared tracer. This is source instrumentation evidence, not a recorded client profile."
+        }
+      ],
+      "checklist": [
+        "I can identify the actual scratch target and configuration.",
+        "I can distinguish worker completion from presented usability.",
+        "I can retain cancellations and inspect an attributable interval."
+      ]
+    },
+    {
+      "id": "102",
+      "title": "Launch, rendering and memory: three controlled native investigations",
+      "summary": "Separate launch subphases from usability, compare an identical row-rendering contract, and diagnose transient image allocation versus retained ownership.",
+      "duration": 120,
+      "level": "Senior",
+      "prerequisites": [
+        "037",
+        "038",
+        "039",
+        "101"
+      ],
+      "objectives": [
+        "Identify the limits of the native launch interval.",
+        "Compare caption and image interventions without changing output contracts.",
+        "Follow allocation generations and a concrete callback retaining path."
+      ],
+      "sections": [
+        {
+          "id": "launch-subphase",
+          "title": "Investigate the shell without confusing it with process launch",
+          "html": "<p>An Android engineer knows that Activity.onCreate excludes process loading and does not guarantee the first displayed frame. ProfilingLab's ShellConstruction has the same measurement limitation, through different UIKit mechanisms. Its delegate creates a window, installs a navigation controller and root controller, and makes the window visible. The span closes when the callback returns. It excludes dyld and runtime preparation before that callback, and it does not certify presentation or table usability. Begin a launch recording before process creation when using the installed launch instrument; attaching to an already running process cannot reconstruct the missing beginning.</p><p>Use separate fixtures for a terminated process with an existing prepared file, first-install preparation, and resume with process survival. The app does not prepare its image automatically at launch, so a fast empty shell and a prepared results screen are different endpoints. Record which one matters. A prior launch can leave helpful system caches even after termination; neither force-quit nor a repeated tap proves cold OS storage. Keep exact preparation steps rather than compressing them into an unsupported cold label.</p><p>For a launch intervention, measure startup and the first intended interaction after any deferral. Moving image preparation behind a button makes this lab explicit; doing something analogous in a product would require a readiness and error-state contract. The client delegate's startup subspan uses defer, providing an inspected callback boundary. That source is an audit clue, not a captured first-frame measurement.</p>"
+        },
+        {
+          "id": "render-baseline",
+          "title": "Freeze the rows and change only caption computation",
+          "html": "<p>The native table uses identical row strings, row height, default content configuration and image sizing in both caption modes. Repeat caption reconstructs the secondary text by reversing it twice in a loop. Cached caption uses a precomputed identical string. The result stays observable in the cell. The deliberately redundant baseline makes a synchronous UI mechanism easy to investigate, but optimization may change its actual cost. Confirm the Caption stacks in the optimized build rather than assuming a hundred and twenty-eight iterations necessarily produce a particular delay.</p><p>Prepare, choose one worker, Indexed and Thumb, then run a batch and wait for completion before scrolling. Fix those controls while comparing caption modes. Use the same table population, scroll start and gesture duration. The native cell creation method brackets Caption only in the repeated branch; record that asymmetry. Caption traces explain baseline work, while scrolling responsiveness needs a common screen-level instrument and equivalent confirmation. A missing candidate Caption span is an intentional absence of that calculation, not a zero-duration frame.</p><p>Choose the installed animation/hitch or responsiveness instrument and record the specific track and denominator. Select a missed-deadline interval, then check whether synchronous main-thread caption stacks align with it. A hitch can involve commit work, rendering, compositing or another process. A smaller cell CPU subtree does not establish fewer render-server hitches. Android frame timelines and RecyclerView binding suggest useful questions; UIKit content configuration and Apple deadline tracks require their own attribution.</p>"
+        },
+        {
+          "id": "decode-example",
+          "title": "Compare full decoding with an explicit thumbnail",
+          "html": "<p>The following excerpt comes from Workload.decode and requires the companion Apple-platform Core source. url is the prepared local PNG URL. The scratch iOS target requires iOS 17 and Swift mode 5, while the shared host helper uses Foundation, ImageIO and CoreGraphics. It returns CGImage; UIKit wraps that image in the app. The host check can inspect pixel dimensions without pretending to render an iOS screen.</p><pre><code class=\"language-swift\">guard let source = CGImageSourceCreateWithURL(\n    url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary\n) else { throw LabError.image }\nlet image = CGImageSourceCreateThumbnailAtIndex(source, 0, [\n    kCGImageSourceCreateThumbnailFromImageAlways: true,\n    kCGImageSourceCreateThumbnailWithTransform: true,\n    kCGImageSourceThumbnailMaxPixelSize: 240,\n    kCGImageSourceShouldCacheImmediately: true\n] as CFDictionary)\nguard let image else { throw LabError.image }</code></pre><p>guard unwraps the optional source and exits through a typed error if creation fails. The URL and dictionary casts bridge Swift values to Core Foundation API arguments. ShouldCache false avoids asking the source to retain a full decoded image during source creation. Index zero selects the first image. FromImageAlways requests thumbnail creation rather than relying on an embedded thumbnail. WithTransform applies source orientation handling. MaxPixelSize bounds the longest edge to the requested pixels. ShouldCacheImmediately requests decoding at creation instead of waiting for rendering. The final guard rejects a failed decode rather than displaying a successful empty result.</p><p>The generated fixture is square and opaque, so an eighty-point square at scale three can use a 240-pixel longest-edge bound. This does not solve arbitrary aspect-fill crop requirements or color-management quality. A panorama, rotated photograph and wide-gamut source need separate visual acceptance fixtures. A smaller UIKit image frame alone never proves a smaller decode.</p>"
+        },
+        {
+          "id": "allocation-evidence",
+          "title": "Separate compressed bytes, transient peak and retained population",
+          "html": "<p>Fix Indexed, Cached caption and one worker. Compare Full and Thumb using the same prepared PNG and presentation contract. The full source is 2048 by 2048; the thumbnail check verifies 240 by 240 on the host. Width times height times four estimates storage for a common four-byte pixel representation, but actual bytes per row, format, intermediates and framework caches can differ. Label this arithmetic as an estimate. The compressed PNG size is not a bound on decoded memory and is especially misleading for this uniform-color fixture.</p><p>Use Allocations in a separate diagnostic recording. Mark a generation before the batch, run the four attempts, wait until pending reaches zero and mark another generation. Four successful images are retained in the controller's images array, even though the table displays only its first entry. That is deliberate and documented batch ownership, not automatically a leak. Clear displayed payload removes rows, captions and all retained UIImages when no batch is pending. Repeat under the same route and worker policy, inspecting object classes, allocation stacks and surviving population.</p><p>Also inspect the transient peak while operations overlap. Four workers may decode concurrently and briefly hold larger buffers than the final displayed state suggests. Releasing all strong owners cannot force allocator pages or framework caches to return immediately to the operating system. Record allocation/footprint evidence separately and avoid treating every high process-memory value as a surviving application object. The host dimensions and cleanup tests establish mechanics, not a safe device memory ceiling.</p>"
+        },
+        {
+          "id": "retaining-path",
+          "title": "Follow one deliberate callback cycle to its owner",
+          "html": "<p>Create callback cycle allocates a RetentionProbe containing a two-megabyte Data payload and a callback that captures self. The controller holds probe strongly and witness weakly. Release owner clears probe. The object survives because its callback closure strongly captures the same object that owns the closure. This is a concrete retaining path: probe to callback storage, callback capture context back to probe, and probe to payload. The weak witness observes survival but adds no strong edge.</p><p>After releasing the owner, stop the app through Xcode's supported Memory Graph workflow and locate the probe. Follow incoming strong edges and the closure context, rather than merely searching for a large Data allocation. A stopped graph describes that instant; it is not a temporal peak trace. Resume and use Break callback cycle. The witness calls stop, which clears callback; the remaining cycle collapses when no other owner exists. Then repeat the graph or weak-observer check. The host test proves the intended ARC schedule; a device graph remains a separate learner artifact.</p><p>An Objective-C autorelease pool can shorten temporary lifetime but cannot remove this strong cycle or a visible image owner. Kotlin and Java garbage collectors can collect many unreachable cycles, whereas Swift ARC requires breaking strong ownership cycles. The analogy is lifecycle ownership, not matching collection semantics. Debugger temporaries, a retained operation or another callback can introduce additional roots, so a failed release after stop should trigger another path inspection instead of a claim that ARC is broken.</p>"
+        },
+        {
+          "id": "intervention-checks",
+          "title": "Reject attractive results that change the behavior",
+          "html": "<p>Verify complete row order, unchanged primary and secondary text, image size and orientation, row selection/readability, error handling and cancellation before accepting performance data. Caption caching must update when its input changes; this lab freezes a fixture rather than implementing a general live-update cache. Thumbnail mode changes representation while preserving the declared small square display, but visual parity on a phone still needs observation. Incorrect output is never a successful timing candidate.</p><p>Cancellation is checked around decoding and file work because synchronous ImageIO cannot be interrupted merely by setting the request flag. The main publication check prevents obsolete images from entering the visible array. Clearing payload is intentionally disabled while the batch is pending, avoiding a late completion refilling a supposedly released display. Memory, launch and rendering investigations each retain their own failure and readiness denominators. A cancelled decode with a measured elapsed value remains cancelled.</p><p>The inspected RMImageCache cached-file branch can create a UIImage on the main thread, or queue file loading and deliver through the main queue. Its later network completion creates another UIImage. These anchors establish actual decoding and callback questions but do not prove the code is slow, downsampled or leaking. Similarly, the real search list uses LazyVStack and row construction; source laziness alone cannot prove smoothness. Transfer a tested intervention only after preserving those production contracts and obtaining matching evidence.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "ShellConstruction ends when the delegate returns. What has been proved?",
+          "options": [
+            "All launch and first-frame work finished",
+            "One app-owned startup subphase completed",
+            "The first result row accepted interaction"
+          ],
+          "answer": 1,
+          "explanation": "The span excludes earlier process loading and later presentation. A usability endpoint needs another defined observation."
+        },
+        {
+          "question": "After four successful attempts, why can four images remain allocated?",
+          "options": [
+            "ARC cannot release CGImage",
+            "The images array intentionally retains each successful batch result",
+            "The weak witness retains them"
+          ],
+          "answer": 1,
+          "explanation": "The controller owns the images array. Clear displayed payload drops those owners; the weak witness belongs to a different probe and contributes no strong ownership."
+        },
+        {
+          "question": "What breaks the deliberate probe cycle?",
+          "options": [
+            "An autorelease pool around graph inspection",
+            "Clearing the stored callback through stop",
+            "Reducing the PNG display frame"
+          ],
+          "answer": 1,
+          "explanation": "The closure captures its owning probe strongly. Clearing callback removes that edge; autorelease and image sizing do not affect it."
+        }
+      ],
+      "exercise": {
+        "brief": "Produce three separate investigation ledgers for launch boundary, repeated caption rendering and full-versus-thumbnail memory.",
+        "steps": [
+          "Describe terminated-process, first-prepare and resume endpoints without assuming OS cache resets.",
+          "Freeze image/projection/worker controls and compare caption modes with a fixed gesture.",
+          "Mark allocation generations for Full and Thumb, clear payload, and follow the probe cycle before and after stop.",
+          "Run host dimension, corruption and ARC checks; keep native observation cells pending until captured."
+        ],
+        "acceptance": [
+          "No delegate or ModelApplied endpoint is called a presented usable frame.",
+          "Caption modes preserve complete row text and fixed UI geometry.",
+          "Dimensions, decoded-byte estimates, transient peak and post-clear ownership are separate fields.",
+          "The callback retaining path is explained and break-cycle behavior is verified at the available evidence level."
+        ],
+        "solution": "<p>The worked launch ledger lists ShellConstruction as delegate-entry-to-window-installed and reserves separate rows for process launch, presented frame and first usable interaction. A terminated-process run with an existing image is distinct from explicit preparation on first use. Configuration, installation history and process survival are recorded; nothing claims that force-quit flushed OS caches. The proposed intervention is evaluated against both readiness and subsequent interaction rather than shell timing alone.</p><p>For rendering, use an already populated table, Indexed, Thumb and one worker. Compare repeated captions with cached identical captions while preserving the same gesture and row height. If a saved missed-deadline interval aligns with main-thread Caption work, cache-at-input-boundary is a justified mechanism to test. If the relevant deadline is dominated by rendering or image work, caption CPU evidence is insufficient. The confirmation uses the common responsiveness track; the absent candidate Caption span is not treated as an equivalent frame metric.</p><p>For memory, the host proves 2048-square versus 240-square outputs and rejects a corrupt source. Pixel arithmetic remains an estimate. The native ledger marks generations before and after four-image retention, then after Clear displayed payload. A separate probe exercise releases the controller owner, follows the closure's capture back to the probe, and clears callback through stop. Its host weak observer becomes nil after stop. These results distinguish a deliberate image owner from a strong cycle. Native visual parity, transient device footprint, allocation graphs, launch and scrolling measurements remain learner execution; no predicted reduction or memory ceiling is inserted into the report.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Reducing app launch time",
+          "url": "https://developer.apple.com/documentation/xcode/reducing-your-app-s-launch-time"
+        },
+        {
+          "label": "Apple: CGImageSourceCreateThumbnailAtIndex",
+          "url": "https://developer.apple.com/documentation/imageio/cgimagesourcecreatethumbnailatindex(_:_:_:)"
+        },
+        {
+          "label": "Apple: immediate image decoding",
+          "url": "https://developer.apple.com/documentation/imageio/kcgimagesourceshouldcacheimmediately"
+        },
+        {
+          "label": "Apple: Gathering memory information",
+          "url": "https://developer.apple.com/documentation/xcode/gathering-information-about-memory-use"
+        },
+        {
+          "label": "Swift: ARC and closure reference cycles",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Actual cached-file image and callback branches",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDUIObjc/RMImageCache.m",
+          "line": 105,
+          "why": "Inspected synchronous cached-file image creation and queued/main callback paths; no measured decode or retention conclusion follows."
+        },
+        {
+          "label": "Client startup callback span",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/AppDelegate/AppDelegate.swift",
+          "line": 264,
+          "why": "Inspected startup subspan and defer boundary, which is distinct from first presentation."
+        }
+      ],
+      "checklist": [
+        "I can distinguish shell construction, presentation and usability.",
+        "I can compare caption work without changing output.",
+        "I can follow a strong closure cycle and separate it from batch image ownership."
+      ]
+    },
+    {
+      "id": "103",
+      "title": "CPU, disk and thermal pressure: schedule work with evidence",
+      "summary": "Use a bounded native queue, cooperative cancellation and resource policy to compare CPU/I/O mechanisms without inventing energy savings.",
+      "duration": 115,
+      "level": "Staff",
+      "prerequisites": [
+        "015",
+        "040",
+        "101"
+      ],
+      "objectives": [
+        "Distinguish CPU execution, synchronous disk waiting and queue delay.",
+        "Explain active and pending limits plus pressure-driven admission.",
+        "Plan device energy confirmation and preserve correctness while changing scheduling."
+      ],
+      "sections": [
+        {
+          "id": "native-cost",
+          "title": "Locate CPU and disk work in the same real workload",
+          "html": "<p>On Android, moving a blocking read to Dispatchers.IO protects the main thread but does not make storage free or cap every source of work. ProfilingLab similarly places native CPU projection, image decoding and synchronous file operations on a named OperationQueue. It accepts a fixed batch of four attempts and exposes one-worker versus four-worker controls. The Work boundary starts only after admission, so worker latency can improve while tap-to-completion latency worsens in a queue. Compare throughput, queue delay and user responsiveness as separate questions.</p><p>Projection performs membership work and produces stable ordered strings. Decode requests creation-time image decoding. Disk encodes those strings, writes a uniquely named JSON file atomically, reads it synchronously and validates round-trip equality before cleanup. These phases exercise CPU, allocation and local I/O with a visible result. No network or radio work occurs. The fixture's uniform PNG and small JSON are bounded mechanism probes, not representative payloads for every production feature. Version a larger fixture separately when testing a different cost regime.</p><p>Select one Work interval and inspect its Projection, Decode and Disk children. Active CPU samples under projection or ImageIO support an executing-work hypothesis. A long Disk interval with few CPU samples can involve waiting, but the absence of samples alone does not identify the storage layer. Add an available file-activity instrument and correlate actual file paths and operations. Do not infer disk latency from a wall-clock duration without considering allocation, encoding and waiting.</p>"
+        },
+        {
+          "id": "queue-contract",
+          "title": "Limit active work, accepted backlog and unrelated executors",
+          "html": "<p>maxConcurrentOperationCount limits executing operations on this queue. It does not bound other queues, UIKit work, system image services or every operation's memory. In this app, the accepted backlog is separately bounded to four and another batch is refused while pending is nonzero. A four-worker setting permits overlap but does not guarantee four physical cores, fairness or lower latency. The total result arrays and four retained decoded images still have their own memory cost.</p><p>Apple documents that reducing a queue's concurrency does not affect operations already executing. That matters when pressure increases mid-batch. This lab reduces admission for later work while allowing required in-flight operations to finish or honor user cancellation. An immediate stop policy would need explicit cooperative request handling and a user-visible outcome. Do not promise that lowering the property revokes executing decoders or that a priority hint reserves CPU capacity.</p><p>The queue is a deliberate boundary for synchronous blocking APIs. Swift tasks use cooperative scheduling; async in a function signature does not turn a synchronous Data(contentsOf:) into nonblocking I/O. Creating unbounded detached tasks can move contention while weakening ownership. Kotlin IO dispatchers and Java ExecutorService provide useful scheduling analogies, but their threads, elasticity, interruption and priority contracts differ. Identify the actual executor and its limits rather than treating every off-main mechanism as an interchangeable worker pool.</p>"
+        },
+        {
+          "id": "policy-code",
+          "title": "Read a pressure policy before wiring it to observations",
+          "html": "<p>The following is a complete companion policy implementation when compiled with its Pressure enum. It is host-testable and is called by the native controller before admitting a batch. The app has a Swift 5 language-mode, iOS 17 target; ProcessInfo thermal and Low Power Mode APIs are Apple SDK services rather than Swift language features. A host test supplies synthetic pressure values and proves branches, not real phone thermal behavior.</p><pre><code class=\"language-swift\">static func limit(\n    requested: Int, pressure: Pressure,\n    lowPower: Bool, speculative: Bool\n) -&gt; Int {\n    if speculative &amp;&amp; (lowPower || pressure == .serious || pressure == .critical) {\n        return 0\n    }\n    if pressure == .serious || pressure == .critical || lowPower { return 1 }\n    return pressure == .fair ? min(2, requested) : max(1, min(4, requested))\n}</code></pre><p>static attaches the function to Admission without constructing an instance. External labels make each input's role explicit. The first if declines speculative work under the listed conditions; zero is an admission result, not a valid active queue setting for required work. The next branch preserves one worker for required visible work. The final conditional expression caps fair pressure at two and normal admission between one and four. Equality compares enum cases; logical operators combine signals with different meanings.</p><p>The native app calls this with speculative false, so a user's accepted required batch is never silently dropped. Its host checks also exercise speculative true as a separate policy seam. There is no background prefetch producer in the app. Document this boundary instead of claiming that the target already implements a general demand-priority scheduler. A real speculative service would need bounded pending storage, expiry, coalescing and recovery rules.</p>"
+        },
+        {
+          "id": "pressure-lifetime",
+          "title": "Own pressure signals and their recovery policy",
+          "html": "<p>ProcessInfo reports nominal, fair, serious and critical thermal states. The app maps unknown future cases conservatively to critical. It reads current conditions for admission and observes thermal changes through a NotificationCenter token delivered on the main queue. The controller owns that token and removes it at deinitialization. A weak callback capture prevents NotificationCenter from becoming a controller owner. Policy state and UIKit controls are mutated on the main queue; cross-thread cancellation state is protected separately by the operation's lock.</p><p>Low Power Mode is a separate signal of an operating power policy, not temperature or battery percentage. This lab reads it when admitting the batch and records that admission snapshot in each attempt. The thermal notification can reduce future queue capacity; a Low Power Mode change during a running batch is not continuously monitored by this minimal implementation. Record such a change externally and invalidate or separately classify the experiment. A production service should observe both signals and retain a policy history so a change-and-recovery sequence cannot disappear from endpoint snapshots.</p><p>pressureStart and pressureEnd record worker-entry and worker-exit states. They help identify drift, but cannot prove that no intermediate change occurred. If thermal notifications change admission mid-batch, the initially recorded worker count is a requested batch policy rather than a per-instant active count. Use trace events or an added policy ledger when that distinction matters. Recovery should admit bounded work gradually; flushing every deferred operation at once can recreate pressure. Pressure handling grants no background execution entitlement and is not a guarantee against memory termination.</p>"
+        },
+        {
+          "id": "io-cancellation",
+          "title": "Preserve errors and ownership while changing overlap",
+          "html": "<p>roundTrip uses unique per-attempt filenames, preventing four concurrent workers from racing over one output file. JSONEncoder writes the ordered array and JSONDecoder verifies the same array. Data.write with atomic replacement avoids exposing this temporary file through a partially replaced pathname, but this helper makes no crash-durability or power-loss guarantee. A defer removes the temporary result after reading; the prepared PNG remains available for subsequent attempts. A failed write or decode becomes error, not an empty successful screen.</p><p>Cancellation is checked before writing and after the synchronous round-trip. A request cannot force an in-progress system call to stop, and cleanup still has to run after an accepted write. Projection polls during its loop, and decode has checks around the synchronous call. The callback checks again before UI publication. This staged contract keeps output and attempt accounting correct while exposing the possible cancellation-response delay. Compare cancellation responsiveness separately from success latency when selecting a scheduling policy.</p><p>The inspected client URLSessionDispatcher preserves CancellationError and URLError.cancelled before mapping other transport failures. It establishes that cancellation classification matters to the actual client. Its middleware, authentication and request body rules are absent from this scratch target, so do not borrow its transport semantics to claim native file work represents production networking. If a future experiment adds retries, preserve deadlines, bounded attempts and idempotency; faster retries that duplicate a mutation are an incorrect candidate.</p>"
+        },
+        {
+          "id": "energy-evidence",
+          "title": "Confirm the mechanism before claiming a resource benefit",
+          "html": "<p>Begin with a narrow comparison: Indexed, Thumb and Cached caption fixed, one worker versus four workers under the same device conditions. Record the batch start and finish, per-worker Work durations, active overlap from the trace, main-thread responsiveness, file operations and transient decoded-image peak. If parallel overlap shortens the batch but increases the peak or delays interaction, the scheduling choice requires an explicit product tradeoff. A smaller per-worker median alone can hide queue waiting.</p><p>Energy depends on CPU duty, wakeups, storage, display, radios and sustained resource conditions. This local workload can expose CPU and disk mechanisms but cannot establish radio savings. Use supported physical-device energy or power tools, retain their versions and actual observation units, and hold workload window, display, charging, connectivity and background conditions constant. A simulator stopwatch and policy branch tests cannot measure phone battery savings. Never publish invented milliwatts or thermal improvement from source inspection.</p><p>The decision should name an owner and a recovery action. A user-triggered visible workload may favor bounded responsiveness over maximal throughput. Optional work may be declined at serious pressure. If representative measurements are inconclusive, retain the conservative policy and collect a declared follow-up batch rather than increasing concurrency until a favorable result appears. Rollback restores the queue policy while preserving file and cancellation contracts. Specialist energy analysis remains necessary when supported device tooling or sustained workloads determine the decision.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Lowering maxConcurrentOperationCount from four to one does what?",
+          "options": [
+            "Immediately interrupts all but one running operation",
+            "Restricts later admission without revoking already executing operations",
+            "Caps CPU use across the whole process"
+          ],
+          "answer": 1,
+          "explanation": "Apple documents the current-queue limit and that lowering it does not affect operations already executing. Other queues and resources remain independent."
+        },
+        {
+          "question": "What does speculative=true with serious pressure return in the policy?",
+          "options": [
+            "Four workers",
+            "Zero admission",
+            "One successful partial result"
+          ],
+          "answer": 1,
+          "explanation": "Optional work is declined. Required visible work uses speculative=false and remains admitted with one worker; zero does not mean a completed user outcome."
+        },
+        {
+          "question": "What evidence can the host policy test establish?",
+          "options": [
+            "Lower phone energy consumption",
+            "Correct branch choices and deterministic cancellation/cleanup behavior",
+            "Safe sustained thermal limits for all supported phones"
+          ],
+          "answer": 1,
+          "explanation": "Fake conditions and host execution verify mechanics. Energy, sustained pressure and representative responsiveness require supported device observation."
+        }
+      ],
+      "exercise": {
+        "brief": "Compare one-worker and four-worker admission while preserving ordered output, per-attempt ownership and explicit resource evidence limits.",
+        "steps": [
+          "Freeze all non-scheduling controls and define per-worker, batch and interaction boundaries.",
+          "Run host pressure and queued-cancellation checks; inspect unique file cleanup.",
+          "Prepare matched physical-device recording batches when hardware is available.",
+          "Write an admission/recovery decision with correctness, memory, latency and energy evidence statuses."
+        ],
+        "acceptance": [
+          "Active capacity and accepted backlog are independently bounded.",
+          "The report distinguishes initial policy from actual overlap and pressure drift.",
+          "Cancelled and failed attempts remain counted and cannot publish obsolete data.",
+          "Any energy statement names real supported device evidence or remains pending."
+        ],
+        "solution": "<p>The worked policy preserves a finite backlog of four accepted attempts. Under nominal conditions the selected worker limit is honored within one to four. Fair pressure caps admission at two; serious, critical or Low Power Mode admits required work at one and declines speculative work through the policy seam. The native controller currently observes thermal changes and reads Low Power Mode at admission. The report explicitly names that limitation and requires an external condition ledger or a fuller observer before relying on runs with mode changes.</p><p>The host proof checks the pressure branches and drains queued cooperative cancellations. Each file round-trip uses a separate pathname and removes its temporary output; both projection variants return the full expected ordered array. This proves correctness under the available host schedules. It does not prove queue overlap, frame deadlines, phone I/O throughput or energy.</p><p>The device worksheet fixes projection, decoding and caption behavior and alternates one-worker and four-worker batches under a declared preparation policy. It records actual overlap, batch elapsed time, worker durations, pressure history, interaction and peak allocation separately. A recommendation for more overlap requires a useful batch improvement with preserved responsiveness and safe observed memory. A recommendation for lower admission can cite a measured contention or peak problem. Without those artifacts, the worked decision is a conditional experiment proposal with conservative recovery and named evidence owner. Energy conclusions stay pending; mechanism counts, theoretical storage and a fake thermal input are never relabeled battery savings.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: OperationQueue concurrency limit",
+          "url": "https://developer.apple.com/documentation/foundation/operationqueue/maxconcurrentoperationcount"
+        },
+        {
+          "label": "Apple: ProcessInfo thermal state",
+          "url": "https://developer.apple.com/documentation/foundation/processinfo/thermalstate-swift.property"
+        },
+        {
+          "label": "Apple: responding to power notifications",
+          "url": "https://developer.apple.com/documentation/xcode/responding-to-power-notifications"
+        },
+        {
+          "label": "Java 11: ExecutorService",
+          "url": "https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/ExecutorService.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client transport preserves cancellation before error mapping",
+          "path": "ios-client/Projects/Infra/ZDNetworking/Sources/ZDApiClient/URLSessionDispatcher.swift",
+          "line": 74,
+          "why": "Inspected CancellationError and URLError.cancelled branches. The local file workload does not claim to execute production transport."
+        }
+      ],
+      "checklist": [
+        "I can identify executing CPU, I/O and queue delay separately.",
+        "I can explain active, pending and pressure-policy limits.",
+        "I can make a resource decision with explicit unmeasured energy fields."
+      ]
+    },
+    {
+      "id": "104",
+      "title": "Raw capture to regression decision: provenance, tails and failed attempts",
+      "summary": "Export immutable native records, validate their provenance and cohort contract, and make a reviewable decision without mistaking synthetic arithmetic for production evidence.",
+      "duration": 110,
+      "level": "Staff",
+      "prerequisites": [
+        "036",
+        "042",
+        "101",
+        "102",
+        "103"
+      ],
+      "objectives": [
+        "Explain exactly what a raw native record measures and omits.",
+        "Validate ordered raw attempts and comparable cohorts before summarizing percentiles.",
+        "Separate invalid capture, correctness failure, sparse evidence and an accountable regression decision."
+      ],
+      "sections": [
+        {
+          "id": "raw-provenance",
+          "title": "Capture attempts before aggregating them",
+          "html": "<p>An Android benchmark summary can hide timeouts, warm-up choices and a different runner. The iOS equivalent risk is exporting one favorable number while discarding the operation records that explain it. ProfilingLab retains a RawRecord for every accepted worker attempt, including failure or cancellation. The ordinal is admission order. Records append as completions arrive, so file order can differ from ordinal order when workers overlap. Preserve both rather than sorting the original artifact into a persuasive narrative.</p><p>The worker reads DispatchTime uptime nanoseconds before executing its body and computes elapsed milliseconds at exit. This monotonic duration includes row construction, projection, image decoding, file verification and image wrapping. It excludes queue waiting, main delivery and presentation. Equality against the independent expected ordered array occurs after the elapsed calculation. File round-trip validation remains inside Disk and Work because that verification is part of the defined operation. State this distinction explicitly instead of calling every correctness check outside measurement.</p><p>Each record includes variant, fixture, boundary, worker policy, pressure endpoints, Low Power Mode admission snapshot, configuration, revision, device identity, OS build and cache policy. The app exports native-unannotated and blank environment fields because it cannot infer the full recording contract. A learner must annotate a retained copy from actual evidence. Never fill blanks with a plausible phone, borrow another revision's artifact or classify an exported native file as synthetic to make it validate.</p>"
+        },
+        {
+          "id": "swift-export",
+          "title": "Read the actual exporter and its availability contract",
+          "html": "<p>This excerpt is the central part of the controller's exportRecords method. It requires the app target, its records array and root URL; it is not a standalone command-line program. The target's Swift 5 language mode and iOS 17 minimum are explicit. JSONEncoder and Data write are Foundation operations; UIActivityViewController performs the user-controlled share step in the UIKit implementation.</p><pre><code class=\"language-swift\">let encoder = JSONEncoder()\nencoder.outputFormatting = [.prettyPrinted, .sortedKeys]\nlet url = root.appendingPathComponent(\"raw-records.json\")\ntry encoder.encode(RawEnvelope(schema: 1, records: records))\n    .write(to: url, options: .atomic)</code></pre><p>The first line constructs a new encoder for this export. The array of formatting options selects readable output and sorted object keys; it does not sort the records array or change attempt order. appendingPathComponent constructs a child URL without manual path concatenation. RawEnvelope labels the schema version and snapshots the records array as a value. encode can throw, and write can throw separately; try propagates either to the surrounding do/catch, which displays an export failure. Atomic replacement concerns the pathname update, not guaranteed durable storage after power loss.</p><p>The app only exports after pending reaches zero, reducing the chance of silently omitting outstanding attempts. A weak controller capture in worker delivery still means a destroyed controller cannot append into its old ledger. This scratch app is a single-root teaching target; a production recorder would require durable ownership outside a disappearing screen and a recovery protocol for interrupted exports. Kotlin data classes and serialization offer a familiar immutable-record idea, while Swift arrays, Codable, ARC and UIKit sharing have different lifetime and platform contracts.</p>"
+        },
+        {
+          "id": "validator-contract",
+          "title": "Validate capture identity and conditions before comparing",
+          "html": "<p>Run Records/make-synthetic.mjs to emit the labeled arithmetic dataset into a fresh temporary directory, then run Records/validate.mjs on that file. The generator uses source synthetic and blank device and OS fields. Its elapsed values are invented for deterministic tests. The validator accepts schema one, nonempty arrays, unique IDs and ordinals, recognized outcomes, bounded worker counts, explicit pressure and valid finite nonnegative durations. A successful record must also assert correct true. Zero duration is valid arithmetic, but suspicious real resolution still needs human review.</p><p>Observed device, simulator and host records require environment identity, OS build, revision and Debug or Release configuration. native-unannotated is rejected until annotation is complete. Synthetic records cannot name a device or OS build. Preparation failures and endpoint pressure drift violate this lab's predeclared stable-cohort protocol, so the report classifies them invalid while retaining their raw records and counts. A variant mixing multiple revisions is also invalid. These rules diagnose an experiment; they do not authorize deleting inconvenient rows.</p><p>The cohort key contains source, device, OS, configuration, fixture, boundary, cache policy, worker count, Low Power Mode snapshot and pressure endpoints. Revision stays within each variant so baseline and candidate revisions can differ while each remains internally consistent. Changing worker count creates a separate cohort. For the scheduling experiment, deliberately design a matching comparison protocol before modifying that rule; otherwise the validator correctly refuses to present the two policies as identical conditions. It is a narrow importer and descriptive validator, not a universal statistical gate.</p>"
+        },
+        {
+          "id": "tails-denominators",
+          "title": "Keep estimator arithmetic and failure denominators visible",
+          "html": "<p>The validator sorts successful latency values in a copy. For even n, median averages the two middle values. Nearest-rank p95 selects the one-based rank ceil(0.95 times n), converted to zero-based indexing. With twenty successes, p95 is the nineteenth sorted value. The synthetic baseline values eighty through ninety-nine have median 89.5 and p95 98; candidate values seventy through eighty-nine yield median 79.5 and p95 88. These are verified arithmetic outputs of a fictional dataset, not workload timings.</p><p>The report keeps attempts, counts for success/error/cancelled/timeout/incorrect/preparation-failure, successful n, range, median, p95, revision and raw ordinal order. Its failureRate counts error, timeout and incorrect divided by all retained attempts. Cancellation and preparation have separate counts; read those as well because a lower failureRate could otherwise coincide with more cancellations or unusable preparation. A cancelled or timed-out duration never enters successful latency. A candidate cannot improve its tail by silently turning slow operations into cancellations.</p><p>At least twenty successes for each of exactly two variants in one cohort is a lab review minimum. It supplies neither a stable population-tail estimate nor uncertainty bounds. More data may be needed according to the effect size, variance and product consequence. Do not average p95 values across devices, or add Projection p95 and Decode p95 to create an end-to-end p95. The slow samples may belong to different attempts. Preserve paired raw phase evidence if that decomposition is necessary.</p>"
+        },
+        {
+          "id": "decision-classes",
+          "title": "Use different responses for different failures",
+          "html": "<p>invalid_capture means provenance, shape or stable-condition rules failed. Fix the harness or annotation and collect a bounded replacement under the declared protocol, preserving the original. correctness_failure means an output invariant failed even if its measured latency looked attractive. Reject the candidate and diagnose behavior before performance review. insufficient_samples means the accepted data cannot support this validator's two-variant, single-cohort review. Collect the missing matched samples or split the question explicitly.</p><p>review_required means the descriptive dataset satisfies those preliminary rules. It deliberately never says ship or pass. Compare absolute user budgets and paired baseline/candidate change using a threshold declared before collection. Existing MeasurementLab already demonstrates configurable synthetic regression gates; this addition connects raw native capture to those decisions without duplicating its policy. A human review checks failures, cancellations, trace attribution, environment drift, memory and readiness evidence beside the successful percentile.</p><p>A regression decision needs an owner, bounded reproduction and recovery. If the candidate violates a meaningful declared budget while a comparable baseline does not, investigate and revert the isolated intervention or contain it behind an appropriate policy. Do not rerun until one lucky batch passes, hide failures or relax the budget after seeing the answer. If both variants move together, examine runner disturbance and changed conditions. A statistically or operationally uncertain result remains pending with a concrete next experiment rather than a fabricated confidence interval.</p>"
+        },
+        {
+          "id": "handoff",
+          "title": "Connect records, symbols and correctness artifacts",
+          "html": "<p>The audit packet retains original JSON, annotated copy, validator report, protocol, exact commands, tool versions, effective configuration, source revision, binary and matching symbols, selected trace intervals and functional results. Diagnostic trace coordinates should identify the process and operation, not merely a screenshot of a large stack. No trace was recorded by running the validator. Host image dimensions establish decoded output mechanics; device allocation and image quality remain independent guardrails.</p><p>The inspected client streaming benchmark creates a payload, starts consumption in a Task, waits for an expectation and discards the XCTWaiter return value. That source invites questions about successful completion, timeout and surviving task lifetime. It does not prove the benchmark timed out, nor that its source comment is a production threshold. A result bundle and actual selected runner/test plan are required to establish execution and outcomes. A wrapper that labels every returned measurement successful would conceal exactly the classifications this lab preserves.</p><p>The same disciplined handoff applies across Kotlin/Java and Swift: retain attempted outcomes, declaration and evidence, but verify each runtime's timing, cancellation and ownership separately. This course supplies no learner completion, release approval, fleet confidence or production optimization claim. Native interaction, sustained pressure, specialist statistics and organizational budget ownership remain explicit follow-up work when they determine the final decision.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A valid synthetic two-variant report returns review_required. What does that mean?",
+          "options": [
+            "The phone regression gate passed",
+            "The lab's descriptive input contract passed; a human decision still needs real evidence",
+            "The data can be presented as a device trace"
+          ],
+          "answer": 1,
+          "explanation": "Synthetic arithmetic establishes validator behavior. review_required is not a release or device-performance result."
+        },
+        {
+          "question": "How should a timeout affect summaries?",
+          "options": [
+            "Remove the entire attempt",
+            "Retain its outcome and attempted denominator, exclude it from successful latency",
+            "Replace its duration with zero"
+          ],
+          "answer": 1,
+          "explanation": "A timeout is an attempted failure, not a successful sample. Zero replacement and deletion manufacture favorable latency."
+        },
+        {
+          "question": "Which percentile statement is valid?",
+          "options": [
+            "p95 of end-to-end always equals the sum of phase p95 values",
+            "Nearest-rank p95 of integers 80 through 99 is 98",
+            "Average device p95 is always fleet p95"
+          ],
+          "answer": 1,
+          "explanation": "There are twenty ordered values; ceil(.95×20)=19 selects 98. Independent phase or device percentiles cannot be combined into those other distributions without raw data and a declared model."
+        }
+      ],
+      "exercise": {
+        "brief": "Export or generate raw records, validate them, and write a regression decision that distinguishes usable data from actual product approval.",
+        "steps": [
+          "Emit the synthetic dataset into a fresh temporary directory and inspect every provenance field.",
+          "Validate it and verify n, median, p95, attempt counts and admission order.",
+          "Create timeout, incorrect, missing duration, mixed revision and pressure-drift mutations; retain originals.",
+          "Prepare a native annotation and decision packet with absent device evidence explicitly pending."
+        ],
+        "acceptance": [
+          "Synthetic fields remain labeled synthetic with blank device and OS values.",
+          "The fictional summary is baseline 20/89.5/98 and candidate 20/79.5/88.",
+          "Malformed/incorrect/drifting records and retained timeout counts have distinct verified behavior.",
+          "No review_required output is called release approval or device evidence."
+        ],
+        "solution": "<p>Generate the arithmetic fixture and run the validator. Its two variants share one synthetic cohort and each contain twenty successes. The report returns review_required, synthetic true, medians 89.5 and 79.5, and nearest-rank p95 values 98 and 88. These values only demonstrate code and arithmetic. A timeout mutation removes that attempt from success latency while retaining twenty total attempts for its variant and a timeout count of one. The resulting nineteen successes no longer satisfy the lab minimum.</p><p>Set correct false with outcome incorrect and the report becomes correctness_failure. Remove a success duration, leave source native-unannotated, mix revisions in a variant, fail preparation or change endpoint pressure and the report is invalid_capture. Changing worker count splits cohorts and produces insufficient_samples. The checks script verifies these meaningful distinctions. Restore each mutation from the retained original before testing the next; otherwise compound failures obscure which rule was exercised.</p><p>For a real native export, keep the original file and create an annotated copy using the actual destination, OS build, revision and effective configuration. Preserve ordinal admission order and completion append order. The decision record names the exact metric boundary, budget owner, failure and cancellation guardrails, diagnostic attribution and recovery path. The synthetic demonstration cannot authorize release. Until the learner records a matching device cohort and obtains relevant launch, scrolling, allocation or energy evidence, those fields remain pending and the only completed claim is companion correctness and validation behavior.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: DispatchTime monotonic clock",
+          "url": "https://developer.apple.com/documentation/dispatch/dispatchtime"
+        },
+        {
+          "label": "Apple: JSONEncoder",
+          "url": "https://developer.apple.com/documentation/foundation/jsonencoder"
+        },
+        {
+          "label": "Apple: XCTest performance tests",
+          "url": "https://developer.apple.com/documentation/xctest/performance-tests"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client streaming benchmark wait and completion boundary",
+          "path": "ios-client/Projects/Infra/ZDNetworking/Tests/ZDNetworkingBenchmarkTests/StreamingPerformanceBenchmarkTests.swift",
+          "line": 40,
+          "why": "Inspected asynchronous consumption, expected completion and discarded XCTWaiter result at line 50. Actual benchmark execution/outcomes remain unverified."
+        }
+      ],
+      "checklist": [
+        "I can preserve provenance, attempt order and failed outcomes.",
+        "I can reproduce the declared percentile arithmetic.",
+        "I can separate capture validation, correctness and accountable regression review."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,920 @@
+{
+  "unit": {
+    "id": "swiftui-bootcamp-delivery",
+    "title": "SwiftUI bootcamp: delivery and verification",
+    "summary": "Scoped dependencies, navigation, presentations, safe tasks, adaptive accessibility, first persistence and a tested feature handoff.",
+    "order": 12
+  },
+  "lessons": [
+    {
+      "id": "078",
+      "title": "Environment, dependencies, ViewModifier, and ButtonStyle",
+      "summary": "Distribute scoped values, define a custom environment key, and reuse appearance while preserving semantic control behavior.",
+      "duration": 90,
+      "level": "Foundation",
+      "prerequisites": [
+        "077"
+      ],
+      "objectives": [
+        "Define and inject a custom environment value.",
+        "Distinguish dependency distribution from instance ownership.",
+        "Reuse ordered decoration through ViewModifier.",
+        "Style a semantic Button while preserving its action boundary."
+      ],
+      "sections": [
+        {
+          "id": "scope",
+          "title": "Distribution is not ownership",
+          "html": "<p>Compose CompositionLocal provides a useful analogy for values read from an ancestor scope. SwiftUI's environment also lets a descendant read values without threading each one through every initializer. Built-in values include appearance, Dynamic Type, locale and dismissal actions. The environment is associated with a view hierarchy, so an override applies to a subtree. It is not a process-wide dictionary or an automatic model factory.</p><p>This complete example targets an iOS 17+ scratch app using Xcode 15 or later. Replace the generated app and root declarations, keeping one entry. It supplies a synthetic copy configuration through a custom environment key and reuses decoration through a ViewModifier. A ButtonStyle customizes one semantic Button. All types and resources are included; no company dependency container or lab filename is required.</p><p>Use an initializer for a dependency that is part of a small component's explicit contract. Use environment when a value is genuinely scoped to a larger subtree and repeated plumbing would obscure that contract. Neither choice decides how long a reference dependency should live. If an app supplies a shared service or observable model, its owner still constructs and retains it deliberately. Environment gives consumers access, not a persistence or cancellation policy.</p>"
+        },
+        {
+          "id": "key",
+          "title": "A custom key specifies the value type and default",
+          "html": "<p>EnvironmentKey requires a defaultValue. LessonCopyKey supplies one immutable default LessonCopy value. The EnvironmentValues extension exposes a named computed property whose getter and setter access the key's typed slot. <code>self[LessonCopyKey.self]</code> uses the key type as a subscript argument; <code>.self</code> denotes the type value. This is not looking up a String-based key at runtime.</p><pre><code class=\"language-swift\">import SwiftUI\n\nstruct LessonCopy {\n    var heading: String\n    var explanation: String\n    static let standard = LessonCopy(\n        heading: \"Demo reading room\",\n        explanation: \"Synthetic local dependency\"\n    )\n}\n\nprivate struct LessonCopyKey: EnvironmentKey {\n    static let defaultValue = LessonCopy.standard\n}\n\nextension EnvironmentValues {\n    var lessonCopy: LessonCopy {\n        get { self[LessonCopyKey.self] }\n        set { self[LessonCopyKey.self] = newValue }\n    }\n}\n\nstruct LearningCardModifier: ViewModifier {\n    func body(content: Content) -&gt; some View {\n        content\n            .padding(16)\n            .frame(maxWidth: .infinity, alignment: .leading)\n            .background(.blue.opacity(0.1),\n                        in: RoundedRectangle(cornerRadius: 12))\n    }\n}\n\nextension View {\n    func learningCard() -&gt; some View {\n        modifier(LearningCardModifier())\n    }\n}\n\nstruct LearningButtonStyle: ButtonStyle {\n    @Environment(\\.isEnabled) private var isEnabled\n\n    func makeBody(configuration: Configuration) -&gt; some View {\n        configuration.label\n            .padding(.horizontal, 16)\n            .padding(.vertical, 12)\n            .frame(minHeight: 44)\n            .background(.blue, in: RoundedRectangle(cornerRadius: 10))\n            .foregroundStyle(.white)\n            .opacity(isEnabled ? 1 : 0.45)\n            .scaleEffect(configuration.isPressed ? 0.97 : 1)\n    }\n}\n\nstruct DependencyScreen: View {\n    @Environment(\\.lessonCopy) private var copy\n    @Environment(\\.colorScheme) private var colorScheme\n    @State private var count = 0\n\n    var body: some View {\n        VStack(alignment: .leading, spacing: 16) {\n            VStack(alignment: .leading) {\n                Text(copy.heading).font(.title2)\n                Text(copy.explanation)\n                Text(colorScheme == .dark ? \"Dark appearance\" : \"Light appearance\")\n            }\n            .learningCard()\n            Button(\"Practice event: \\(count)\") { count += 1 }\n                .buttonStyle(LearningButtonStyle())\n        }\n        .padding()\n    }\n}\n\n@main\nstruct DependenciesLessonApp: App {\n    var body: some Scene {\n        WindowGroup {\n            DependencyScreen()\n                .environment(\\.lessonCopy, .standard)\n        }\n    }\n}\n\n#Preview(\"Alternate copy\") {\n    DependencyScreen()\n        .environment(\\.lessonCopy, LessonCopy(\n            heading: \"Demo quiet room\", explanation: \"Preview fixture override\"\n        ))\n}</code></pre><p>The <code>\\.lessonCopy</code> syntax is a key path naming the EnvironmentValues property. <code>@Environment</code> reads that slot from the current hierarchy. The app installs the standard value outside DependencyScreen. The preview overrides it for its own subtree without changing a global singleton or the screen's source. LessonCopy is a struct, so this configuration is value data rather than a shared mutable reference model.</p><p>The default is intentionally safe synthetic copy. A critical required service should not silently fall back to a production singleton, a no-op that hides missing wiring, or an arbitrary crash without a diagnostic policy. You can model an optional service and show a configuration error, or require construction through a host with explicit injection. The exact choice depends on whether absence is legitimate; the defaultValue requirement does not eliminate that design decision.</p>"
+        },
+        {
+          "id": "reads",
+          "title": "Read dependencies inside the hierarchy",
+          "html": "<p>Environment values are meaningful when SwiftUI supplies the view's context. Do not assume a view initializer can read the final ancestor override and use it to seed permanent state. A seeded local copy can also become stale if the ancestor later changes the value. Read current configuration while describing the UI, or pass a construction dependency explicitly to the model's owner.</p><p>The built-in colorScheme read demonstrates that inherited system values and custom values use the same key-path shape. The preview can install a different LessonCopy and a different appearance at its boundary. A direct component preview does not inherit WindowGroup's complete environment automatically. If your screen later reads a required observable model, the preview must provide a suitable fixture instance.</p><p>For iOS 17 Observation models, SwiftUI also supports type-based environment distribution with <code>.environment(model)</code> and a typed Environment read. That differs from the custom key-path value mechanism shown here, and legacy EnvironmentObject expects ObservableObject. Do not mix these systems merely because they contain the word environment. When editing a distributed observable model, create the appropriate Bindable access rather than expecting every Environment wrapper to project all nested controls automatically.</p>"
+        },
+        {
+          "id": "modifier",
+          "title": "Reuse a wrapper without creating a new data owner",
+          "html": "<p>ViewModifier defines <code>body(content:)</code>, receiving the description being modified. Content is the framework's modifier content type, not the earlier generic card's named parameter. The implementation returns content wrapped by padding, a frame and a background. The View extension adds a convenient learningCard method that calls modifier. This hides repeated decoration while retaining the wrapper order explained in lesson 073.</p><p>The modifier supplies no network service and creates no draft state. That restraint makes it easy to apply to a title group, a summary or a fixture without unexpected lifecycle work. A modifier can contain state or environment reads when those are part of its real responsibility, but a reusable visual card should not become an invisible feature coordinator. Document such responsibilities when they exist.</p><p>Changing the modifier changes every caller that uses it, so its layout contract matters. Here it expands to offered width and aligns its child leading. If a caller expects a small content-hugging badge, that modifier may be the wrong abstraction. Reuse is valuable when behavior matches, not merely when two chains contain the same number of dots. Keep adaptive and accessibility requirements visible at the reusable boundary.</p>"
+        },
+        {
+          "id": "style",
+          "title": "Style the Button instead of replacing its action",
+          "html": "<p>ButtonStyle receives a Configuration containing the existing label and isPressed state. Its makeBody method changes appearance without implementing activation itself. The original Button action still owns the counter update and the semantic control still supports normal activation. Adding a second tap gesture inside the style can duplicate behavior or interfere with interaction. A style is not where the product's submit operation belongs.</p><p>The style reads isEnabled to communicate disabled state and uses isPressed for small visual feedback. Its minimum height supports a comfortable touch area while allowing the label to grow; it does not claim complete accessibility compliance. The fixed blue/white palette is a teaching fixture that still needs contrast checks for real designs, especially with appearance and accessibility settings. Lesson 082 covers those checks.</p><p>SwiftUI's built-in styles are often enough. Create a custom style when the app needs a consistent control contract, and test focus, disabled, pressed and large-text states. PrimitiveButtonStyle exposes deeper activation control and requires additional responsibility; this first example deliberately uses ordinary ButtonStyle. The difference is similar to styling an Android button versus replacing its entire input implementation, although the APIs are not exact counterparts.</p>"
+        },
+        {
+          "id": "failure",
+          "title": "Trace a missing override or surprising appearance",
+          "html": "<p>If the screen displays standard copy in the alternate preview, check where the environment modifier is attached and whether the child reads the same key. An override on a sibling cannot affect this child. If a model keeps using old configuration, check whether it copied environment input into state during construction. If a style ignores disabled state visually, inspect its isEnabled read rather than changing the Button action.</p><p>The repository's address view applies project-specific mezzanine text and card modifiers, providing a verified example of scoped visual reuse. Those helpers require company modules and may carry additional policy, so this scratch learningCard is independent. Read the actual wrapper behavior before assuming a same-looking chain has identical sizing or analytics effects. Source presence is not rendering evidence.</p><p>Run standard and alternate copy scenarios, then apply disabled to the Button and inspect interaction plus appearance. Verify that only the targeted subtree changes. A useful handoff explains where configuration is supplied, where it is read, what the card changes, and who owns the counter action. That separates dependency access from visual reuse without hiding their practical connections.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does a custom EnvironmentKey default define?",
+          "options": [
+            "A global service lifetime",
+            "The typed fallback value for that environment slot",
+            "A disk schema"
+          ],
+          "answer": 1,
+          "explanation": "It provides a value when no subtree override is supplied, not ownership or persistence."
+        },
+        {
+          "question": "Why should this ButtonStyle avoid another tap gesture?",
+          "options": [
+            "The Button already owns activation and its action",
+            "Styles cannot render labels",
+            "Tap gestures always persist state"
+          ],
+          "answer": 0,
+          "explanation": "Duplicate activation handling can interfere with semantic control behavior."
+        },
+        {
+          "question": "A preview constructs DependencyScreen directly. How does it get alternate copy?",
+          "options": [
+            "By changing the bundle identifier",
+            "By inheriting all app state automatically",
+            "By installing the environment override at its own boundary"
+          ],
+          "answer": 2,
+          "explanation": "Its hierarchy is explicitly configured."
+        }
+      ],
+      "exercise": {
+        "brief": "Inject two copy configurations and reuse a card and button style without moving event ownership.",
+        "steps": [
+          "Use the complete source in the scratch target.",
+          "Run standard copy and inspect the named alternate preview.",
+          "Add a second subtree with its own lessonCopy override and compare scopes.",
+          "Disable the practice Button and inspect appearance and activation.",
+          "Explain the model owner you would use if configuration were a shared reference instead."
+        ],
+        "acceptance": [
+          "Overrides apply to the intended descendants.",
+          "No production singleton or external service is created by a missing key.",
+          "The modifier preserves its documented wrapper order.",
+          "The style renders pressed/disabled state while the Button owns the action."
+        ],
+        "solution": "<p>Create a VStack containing two DependencyScreen instances and attach the alternate lessonCopy modifier only to the second. The first reads the inherited standard slot and the second reads its nearer override. Their local counter State values remain separate. Changing copy does not create a persistent model store.</p><p>Add <code>.disabled(true)</code> to the styled Button for the disabled fixture. Its action should not activate through normal user interaction and the style should use reduced opacity. Remove that fixture afterward or name it explicitly in a preview. The card remains content → padding → expanded frame → background. If you replace LessonCopy with a reference service, choose a host that owns the instance and install it at the intended feature scope; do not construct it inside the visual modifier. The worked record should identify the actual rendered states and leave contrast, focus and assistive checks pending until observed. The native companion's filenames remain its author's responsibility.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Environment",
+          "url": "https://developer.apple.com/documentation/swiftui/environment"
+        },
+        {
+          "label": "Apple: EnvironmentKey",
+          "url": "https://developer.apple.com/documentation/swiftui/environmentkey"
+        },
+        {
+          "label": "Apple: ViewModifier",
+          "url": "https://developer.apple.com/documentation/swiftui/viewmodifier"
+        },
+        {
+          "label": "Apple: ButtonStyle",
+          "url": "https://developer.apple.com/documentation/swiftui/buttonstyle"
+        }
+      ],
+      "repo": [
+        {
+          "label": "The active component applies project-specific text and card modifiers",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/AddressForm/BookingAddressFormView.swift",
+          "line": 17,
+          "why": "The active component applies project-specific text and card modifiers."
+        }
+      ],
+      "checklist": [
+        "I can define and inject a custom environment value.",
+        "I can distinguish dependency distribution from instance ownership.",
+        "I can reuse ordered decoration through ViewModifier.",
+        "I can style a semantic Button while preserving its action boundary."
+      ]
+    },
+    {
+      "id": "079",
+      "title": "Tabs, typed navigation, and split selection",
+      "summary": "Separate top-level tab choice, push routes, and record selection while handling missing destinations and adaptive navigation.",
+      "duration": 90,
+      "level": "Foundation",
+      "prerequisites": [
+        "078"
+      ],
+      "objectives": [
+        "Separate tab selection, push path and split row selection.",
+        "Register typed routes in the correct stack scope.",
+        "Recover when a selected record is unavailable.",
+        "Plan compact/expanded checks and explicit restoration policy."
+      ],
+      "sections": [
+        {
+          "id": "concepts",
+          "title": "Three kinds of state describe different movement",
+          "html": "<p>Android navigation teaches you to distinguish a destination stack from a top-level tab and a selected row in a two-pane interface. Carry that distinction into SwiftUI. TabView chooses between top-level areas. NavigationStack describes pushed destinations. NavigationSplitView relates a sidebar or content column to detail selection and adapts its column presentation. Using one Boolean for all movement hides which state owns which transition.</p><p>The complete example targets a scratch iOS 17+ app using Xcode 15 or later. NavigationStack and NavigationSplitView arrived in iOS 16; the track keeps its iOS 17 baseline. It uses the broadly supported tabItem form rather than assuming newer Tab APIs are available. Replace the generated app/root declarations with the complete source, keeping one entry. The forced unwraps are restricted to two fixed, valid fixture UUID strings; external route input must be parsed safely.</p><p>Browse demonstrates a typed push path, and Settings contains a split-selection practice screen. The label Settings is a teaching top-level area rather than a claim about standard app settings behavior. We want distinct owners for tab, path and selection, not a complete production router. The references and older session 010 provide further navigation study after these basics.</p>"
+        },
+        {
+          "id": "routes",
+          "title": "A typed value separates intent from construction",
+          "html": "<p>LibraryRoute is an enum with an associated UUID for a note route. Hashable enables equality and hashing for navigation values; Swift synthesizes it because UUID supports the requirements. The path type <code>[LibraryRoute]</code> can contain only that route family. A NavigationLink appends its value into the surrounding stack, and navigationDestination registers how that value type becomes a view description.</p><pre><code class=\"language-swift\">import Foundation\nimport SwiftUI\n\nstruct RouteNote: Identifiable {\n    let id: UUID\n    let title: String\n}\n\nenum LibraryRoute: Hashable {\n    case note(UUID)\n}\n\nenum LibraryTab: Hashable {\n    case browse, settings\n}\n\nstruct RouteDetail: View {\n    let id: UUID\n    let notes: [RouteNote]\n    var body: some View {\n        if let note = notes.first(where: { $0.id == id }) {\n            Text(note.title).padding().navigationTitle(\"Detail\")\n        } else {\n            Text(\"This note is no longer available\").padding()\n        }\n    }\n}\n\nstruct BrowseStack: View {\n    let notes: [RouteNote]\n    @State private var path: [LibraryRoute] = []\n\n    var body: some View {\n        NavigationStack(path: $path) {\n            List(notes) { note in\n                NavigationLink(note.title, value: LibraryRoute.note(note.id))\n            }\n            .navigationTitle(\"Browse\")\n            .navigationDestination(for: LibraryRoute.self) { route in\n                switch route {\n                case .note(let id):\n                    VStack {\n                        RouteDetail(id: id, notes: notes)\n                        Button(\"Return to browse\") { path.removeAll() }\n                    }\n                }\n            }\n        }\n    }\n}\n\nstruct SplitBrowser: View {\n    let notes: [RouteNote]\n    @State private var selection: UUID?\n\n    var body: some View {\n        NavigationSplitView {\n            List(notes, selection: $selection) { note in\n                NavigationLink(value: note.id) { Text(note.title) }\n            }\n            .navigationTitle(\"Library\")\n        } detail: {\n            if let id = selection {\n                RouteDetail(id: id, notes: notes)\n            } else {\n                Text(\"Select a synthetic note\").padding()\n            }\n        }\n    }\n}\n\nstruct NavigationRoot: View {\n    @State private var tab: LibraryTab = .browse\n    private let notes = [\n        RouteNote(id: UUID(uuidString: \"00000000-0000-0000-0000-000000000001\")!,\n                  title: \"Demo ownership\"),\n        RouteNote(id: UUID(uuidString: \"00000000-0000-0000-0000-000000000002\")!,\n                  title: \"Demo layout\")\n    ]\n\n    var body: some View {\n        TabView(selection: $tab) {\n            BrowseStack(notes: notes)\n                .tabItem { Label(\"Browse\", systemImage: \"books.vertical\") }\n                .tag(LibraryTab.browse)\n            SplitBrowser(notes: notes)\n            .tabItem { Label(\"Settings\", systemImage: \"gear\") }\n            .tag(LibraryTab.settings)\n        }\n    }\n}\n\n@main\nstruct NavigationLessonApp: App {\n    var body: some Scene { WindowGroup { NavigationRoot() } }\n}</code></pre><p><code>LibraryRoute.self</code> passes the type to registration, while <code>.note(let id)</code> extracts the associated identifier inside the switch. The route stores identity rather than an entire mutable record snapshot. RouteDetail resolves that identity against the available records and displays a recovery state when absent. Clearing path returns Browse to its root. Back navigation also changes the bound stack state through the framework.</p><p>Register destinations within the intended stack's hierarchy and outside lazily created row content. A declaration buried inside a row may not exist when the framework needs to resolve a value. If a value link appears inactive, inspect the surrounding stack and matching registration type before inventing a second nested stack. Type registration and scope are part of navigation behavior.</p>"
+        },
+        {
+          "id": "tabs",
+          "title": "Top-level selection is not a push route",
+          "html": "<p>The TabView selection is a LibraryTab enum, and each tab has a matching tag of that type. A tag is the value for tab selection, not the visible label. Changing title or localization does not need to change the selected identity. Both tabs provide labels with system images for recognizable platform controls. TabView's exact appearance can differ by OS and device; the data model should not assume a fixed screenshot.</p><p>BrowseStack owns its own push path. Selecting another tab should not be implemented by appending a Settings route to that path, because it changes a different state domain. For multiple navigation-heavy tabs, give each its intended stack owner and decide whether switching tabs preserves or resets their paths. A global singleton router is unnecessary for this small hierarchy and can make independent navigation lifetimes harder to explain.</p><p>Settings uses SplitBrowser directly because the split view already manages its column navigation. Adding another surrounding stack without an independent push flow would create unnecessary ownership and could produce confusing back behavior or duplicate toolbars. Give each top-level area the navigation scope it actually needs. When adding a new destination, explain which container resolves it and which state records it before changing the visual hierarchy.</p>"
+        },
+        {
+          "id": "split",
+          "title": "Selection links a record to the detail column",
+          "html": "<p>SplitBrowser's optional UUID represents either a selected note or no selection. List's selection binding and the NavigationLink value associate row identity with the detail. A nil selection displays an instructional placeholder. RouteDetail independently handles a nonnil identifier whose record no longer exists. Those two states differ: the user has not selected anything versus the selected record is unavailable.</p><p>NavigationSplitView can collapse columns in a compact window, such as a phone, and show multiple columns when space permits. It is not a guarantee that every iPad always presents two columns; window size, platform adaptation and column policy matter. Test selection and return behavior in both compact and expanded configurations. Do not use UIScreen's full-device width as a proxy for the current window's navigation arrangement.</p><p>If records are deleted or an account changes, the owner must reconcile selection. It can clear an invalid ID or show a removed-record state with a clear recovery action. Stable record IDs prevent selection jumping when display order changes. A mutable title or row index cannot provide that contract. The beginner example uses immutable synthetic records, while a real store should validate route and selection IDs against current data.</p>"
+        },
+        {
+          "id": "restoration",
+          "title": "In-memory navigation is not automatic deep-link restoration",
+          "html": "<p>A typed path is easier to reason about, but it does not automatically persist across process termination. Encoding routes, validating IDs, applying authentication gates and versioning saved state are additional policies. NavigationPath can support heterogeneous value types, but its extra flexibility is unnecessary when one enum covers a feature. Choose a broader abstraction only when the actual routing needs require it.</p><p>External links are untrusted inputs. Parse identifiers without force-unwrapping them, check which records are accessible and resolve ownership before constructing a destination. A correct hash or a valid UUID format does not authorize access to a record. Restoring a route whose record was deleted should produce a recoverable state, not a crash. The two literal fixture unwraps in NavigationRoot are not a model for external parsing.</p><p>The verified booking demo ContentView uses destination-based links, constructing the destination directly. That simpler form is reasonable for a small static menu. The typed-value form here adds a model for programmatic path changes and intent-based routing. Reading both patterns does not establish that the company app uses one universal router or that every SwiftUI screen owns its own stack.</p>"
+        },
+        {
+          "id": "checks",
+          "title": "Exercise the path, tab and selection independently",
+          "html": "<p>Open a Browse note, use the system Back action, open it again and activate Return to browse. Observe the path returning to empty. Switch tabs and record the intended Browse preservation behavior rather than assuming it is process restoration. In the split practice, select the second row, change window size where available and inspect the resulting detail and back affordances.</p><p>Inject an unknown UUID into a RouteDetail fixture and confirm the unavailable-message branch. Inspect which container owns the Browse stack and which owns the split columns; confirm the split tab has no redundant surrounding stack. If navigation appears twice, look for overlapping container ownership or repeated event triggers. If the wrong note opens after reorder, inspect identity and source resolution.</p><p>A useful handoff says that NavigationRoot owns tab selection, BrowseStack owns its route array, and SplitBrowser owns optional row selection. It states which changes preserve each owner and where invalid records recover. These are reviewable behavior contracts. A successful compile does not replace compact/expanded navigation interaction evidence.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What should a mutable-record route primarily carry?",
+          "options": [
+            "Its current display title",
+            "A stable record ID resolved against current data",
+            "Its row index"
+          ],
+          "answer": 1,
+          "explanation": "Labels and positions can change; unresolved IDs need recovery."
+        },
+        {
+          "question": "Where should typed destinations be registered?",
+          "options": [
+            "Inside the intended stack scope, outside lazy row construction",
+            "Only inside every row's action closure",
+            "In a global random-ID view"
+          ],
+          "answer": 0,
+          "explanation": "The registration must be available when values resolve."
+        },
+        {
+          "question": "What does a nil split selection mean in this example?",
+          "options": [
+            "A persistence failure",
+            "A tab-switch request",
+            "No record is currently selected"
+          ],
+          "answer": 2,
+          "explanation": "A nonnil missing ID is a separate unavailable-record state."
+        }
+      ],
+      "exercise": {
+        "brief": "Exercise typed pushes and split selection, then document navigation-container ownership and invalid-record recovery.",
+        "steps": [
+          "Use the complete source in the scratch app target.",
+          "Open and pop a Browse route and test Return to browse.",
+          "Select split rows in compact and expanded window configurations available to you.",
+          "Inspect the direct SplitBrowser tab root and explain why its column navigation needs no redundant surrounding stack.",
+          "Add a fixture with an unknown ID and write a restoration/recovery policy."
+        ],
+        "acceptance": [
+          "Typed route values resolve in the intended stack.",
+          "Tab, path and split selection have separately named owners.",
+          "The split root uses its own column navigation without a redundant surrounding stack.",
+          "Missing records show recovery rather than force-unwrapping external input.",
+          "Executed window checks are distinguished from planned ones."
+        ],
+        "solution": "<p>Settings uses SplitBrowser directly, with tabItem and LibraryTab.settings attached to that root. The split view manages column navigation, while BrowseStack owns a separate typed push path. For an unavailable fixture, construct RouteDetail with a valid but unknown synthetic UUID and the existing notes. It should display its recovery message without force-unwrapping a failed record lookup.</p><p>A correct route sequence is empty path → one note route → empty path after Back or removeAll. Selecting a tab changes LibraryTab, not that route's record identifier. The split sequence starts with nil, becomes a chosen UUID and resolves its current record. Restoration should validate any stored route against current records and user scope, discarding or recovering invalid destinations. That policy is additional work beyond this in-memory example. Record the actual compact and expanded interactions, including toolbars and return behavior, rather than declaring adaptive navigation passed from one phone screenshot.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: NavigationStack",
+          "url": "https://developer.apple.com/documentation/swiftui/navigationstack"
+        },
+        {
+          "label": "Apple: NavigationSplitView",
+          "url": "https://developer.apple.com/documentation/swiftui/navigationsplitview"
+        },
+        {
+          "label": "Apple: TabView",
+          "url": "https://developer.apple.com/documentation/swiftui/tabview"
+        }
+      ],
+      "repo": [
+        {
+          "label": "The active demo has a NavigationStack with destination-based links",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/ContentView.swift",
+          "line": 12,
+          "why": "The active demo has a NavigationStack with destination-based links."
+        }
+      ],
+      "checklist": [
+        "I can separate tab selection, push path and split row selection.",
+        "I can register typed routes in the correct stack scope.",
+        "I can recover when a selected record is unavailable.",
+        "I can plan compact/expanded checks and explicit restoration policy."
+      ]
+    },
+    {
+      "id": "080",
+      "title": "Sheets, covers, alerts, dialogs, popovers, and dismiss",
+      "summary": "Own presentation state, stage editable drafts, and handle cancellation through the correct presentation scope.",
+      "duration": 90,
+      "level": "Foundation",
+      "prerequisites": [
+        "079"
+      ],
+      "objectives": [
+        "Own item and Boolean presentation state deliberately.",
+        "Stage edits for reliable cancellation.",
+        "Scope dismiss to the presented child.",
+        "Distinguish closing, saving, destructive choices and adaptive popovers."
+      ],
+      "sections": [
+        {
+          "id": "purpose",
+          "title": "A presentation expresses a bounded interaction",
+          "html": "<p>Android dialogs and modal bottom sheets often collect an answer without replacing the whole navigation flow. SwiftUI offers sheet, fullScreenCover, alert, confirmationDialog and popover for different presentation needs. A sheet hosts a richer temporary flow; an alert communicates a small important message; a confirmation dialog offers action choices. Choosing one by its visual resemblance alone misses its semantic and adaptive behavior.</p><p>This complete source targets an iOS 17+ scratch app using Xcode 15 or later. Replace the generated app and root declarations, keeping one entry. It contains a staged title editor, a full-screen synthetic guide, an alert, a destructive confirmation and contextual help. Each uses local presentation state, and none accesses a server, persistent store or real account.</p><p>Write the outcome contract before the UI: Save commits a trimmed nonempty title, Cancel preserves the original, Clear removes only the in-memory title after confirmation, and the guide's Done simply closes it. An editor closing does not by itself mean Save succeeded. This separation is especially important when interactive dismiss gestures can close a presentation without invoking your explicit buttons.</p>"
+        },
+        {
+          "id": "state",
+          "title": "Choose Boolean or item-driven presentation",
+          "html": "<p>A Boolean binding is enough when content is fixed, as with the guide. An optional identifiable item is useful when the selection and presented content belong together. EditRequest packages the starting title and a UUID created for that presentation. A nil edit means there is no active request; assigning an item supplies both the reason to present and the initial content. This avoids a separate selected-title variable that can disagree with a show-editor flag.</p><pre><code class=\"language-swift\">import Foundation\nimport SwiftUI\n\nstruct EditRequest: Identifiable {\n    let id = UUID()\n    let title: String\n}\n\nstruct StagedEditor: View {\n    @Environment(\\.dismiss) private var dismiss\n    @State private var draft: String\n    let initial: String\n    let onSave: (String) -&gt; Void\n\n    init(initial: String, onSave: @escaping (String) -&gt; Void) {\n        self.initial = initial\n        self.onSave = onSave\n        _draft = State(initialValue: initial)\n    }\n\n    var body: some View {\n        NavigationStack {\n            Form { TextField(\"Demo title\", text: $draft) }\n                .navigationTitle(\"Edit draft\")\n                .toolbar {\n                    ToolbarItem(placement: .cancellationAction) {\n                        Button(\"Cancel\") { dismiss() }\n                    }\n                    ToolbarItem(placement: .confirmationAction) {\n                        Button(\"Save\") {\n                            let value = draft.trimmingCharacters(in: .whitespacesAndNewlines)\n                            guard !value.isEmpty else { return }\n                            onSave(value)\n                            dismiss()\n                        }\n                        .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)\n                    }\n                }\n        }\n        .interactiveDismissDisabled(draft != initial)\n    }\n}\n\nstruct FullScreenGuide: View {\n    @Environment(\\.dismiss) private var dismiss\n    var body: some View {\n        VStack(spacing: 20) {\n            Text(\"Synthetic practice guide\").font(.title)\n            Button(\"Done\") { dismiss() }\n        }\n        .padding()\n    }\n}\n\nstruct PresentationScreen: View {\n    @State private var title = \"Demo reading plan\"\n    @State private var edit: EditRequest?\n    @State private var showGuide = false\n    @State private var showAlert = false\n    @State private var showDelete = false\n    @State private var showHelp = false\n    @State private var closeMessage = \"\"\n\n    var body: some View {\n        VStack(spacing: 16) {\n            Text(title.isEmpty ? \"No plan\" : title).font(.title2)\n            Button(\"Edit in sheet\") { edit = EditRequest(title: title) }\n            Button(\"Open full-screen guide\") { showGuide = true }\n            Button(\"Show synthetic error\") { showAlert = true }\n            Button(\"Clear plan\", role: .destructive) { showDelete = true }\n            Button(\"Help\") { showHelp = true }\n                .popover(isPresented: $showHelp) {\n                    Text(\"This is a synthetic draft, stored only in memory.\")\n                        .padding()\n                }\n            Text(closeMessage).foregroundStyle(.secondary)\n        }\n        .padding()\n        .sheet(item: $edit, onDismiss: { closeMessage = \"Editor closed\" }) { request in\n            StagedEditor(initial: request.title) { title = $0 }\n        }\n        .fullScreenCover(isPresented: $showGuide) { FullScreenGuide() }\n        .alert(\"Synthetic error\", isPresented: $showAlert) {\n            Button(\"OK\", role: .cancel) {}\n        } message: {\n            Text(\"No external request was made.\")\n        }\n        .confirmationDialog(\"Clear the plan?\", isPresented: $showDelete,\n                            titleVisibility: .visible) {\n            Button(\"Clear\", role: .destructive) { title = \"\" }\n            Button(\"Cancel\", role: .cancel) {}\n        } message: {\n            Text(\"Only the synthetic in-memory title will be removed.\")\n        }\n    }\n}\n\n@main\nstruct PresentationLessonApp: App {\n    var body: some Scene { WindowGroup { PresentationScreen() } }\n}</code></pre><p>The sheet closure receives the current request. Its callback assigns the saved value to the root's title. FullScreenGuide is a complete child with its own dismissal read. Button roles indicate cancellation or destructive intent, while the product action still decides what data changes. Empty action closures in the alert's OK and dialog's Cancel mean there is no domain mutation beyond the framework presentation's closure behavior.</p><p>Give item identities a declared policy. A fresh EditRequest starts a new editing interaction. For a record editor, you might instead use the record's stable ID and handle explicit draft replacement. Do not use a mutable title as identity or rely on replacing the optional item to silently reset unsaved fields. As lesson 075 established, initial state seeds and later input synchronization differ.</p>"
+        },
+        {
+          "id": "draft",
+          "title": "Stage edits when cancellation must discard them",
+          "html": "<p>StagedEditor owns a local draft initialized from the request. The underscore in <code>_draft</code> addresses the State wrapper storage, and <code>State(initialValue:)</code> supplies its initial seed. The initializer retains onSave because it is escaping: the view calls it later in a button action. <code>(String) -&gt; Void</code> describes a function that receives the committed string and returns no value.</p><p>Typing changes only the staged draft. Save trims and validates at the action boundary, invokes the parent callback and requests dismissal. Cancel requests dismissal without invoking onSave, so the root's title stays unchanged. This is different from passing a live binding to the root and writing on every keystroke. A Cancel button cannot promise rollback if the presented editor already mutated committed data.</p><p>interactiveDismissDisabled blocks the ordinary interactive dismissal gesture when the draft differs from its initial value. It does not prevent our explicit Cancel action from dismissing, and it is not an automatic unsaved-changes confirmation dialog. The teaching policy is that dirty drafts require an explicit Save or Cancel. If a product wants swipe-to-close with a discard prompt, implement that outcome policy deliberately rather than assuming the modifier supplies it.</p>"
+        },
+        {
+          "id": "dismiss",
+          "title": "Read the action from the presented subtree",
+          "html": "<p><code>@Environment(\\.dismiss)</code> reads the current presentation context's dismissal action. Both StagedEditor and FullScreenGuide read it inside their presented hierarchies. Reading the root's action before creating a sheet and passing it down can target a different scope or do nothing. Dismissal can also pop an appropriate navigation destination, so the same spelling does not mean every caller closes the same container.</p><p>Calling dismiss requests a UI transition. It is not proof that an animation finished, a server write succeeded or a domain result was delivered exactly once. If a flow starts asynchronous saves, keep the draft active or show saving state until the operation's policy permits closing. Handle save failure without falsely reporting success. This lesson's callback is synchronous and updates only synthetic local state.</p><p>onDismiss updates a diagnostic closeMessage for any sheet closure path. It does not clear the root title or commit a pending draft, because closing does not identify the terminal business outcome. Production result delivery may need an idempotent finish operation that distinguishes saved, cancelled and failed states. Old session 010 traces that richer coordinator contract; this first editor makes the fundamental boundary visible.</p>"
+        },
+        {
+          "id": "adaptation",
+          "title": "Alerts, action choices and contextual popovers",
+          "html": "<p>The alert has a title, an acknowledgment action and a message. It uses a Boolean binding to describe visibility. A confirmationDialog presents Clear and Cancel choices with appropriate roles. The destructive action mutates only the synthetic title and its message says so. A role changes platform presentation semantics and styling; it does not authorize unrelated deletion or supply an undo store.</p><p>The popover attaches to the Help button, giving it an anchor in the hierarchy. In compact presentations, the system may adapt a popover into a sheet or other appropriate form. Test the actual window configuration instead of asserting a floating bubble always appears on a phone. For a design that needs an explicit adaptation preference, study presentationCompactAdaptation, available from iOS 16.4, and its applicable presentation behavior. A preference still needs actual interaction and content checks.</p><p>Keep presentation roots stable. Conditional removal of the view that owns a sheet can change its lifetime, and presenting competing flows from unrelated Booleans can create coordination problems. A larger feature may benefit from one presentation enum or optional identifiable route rather than many independent flags. Our flags represent separate user-triggered examples, so avoid triggering several at once and describe any future mutual-exclusion policy.</p>"
+        },
+        {
+          "id": "cases",
+          "title": "Verify every closure route",
+          "html": "<p>Open the sheet, edit the title and Cancel; the root should keep its original. Reopen, enter only spaces and inspect disabled Save plus the action guard. Enter Demo Lin and Save, then inspect the root. Open the sheet without editing and try interactive dismissal; closeMessage should change without saving. Edit again and inspect the deliberate dirty-dismiss restriction. Separately open and close the full-screen guide.</p><p>Trigger Clear, choose Cancel and verify preservation, then confirm Clear and verify the No plan display. Inspect Help on a compact and wider window if available. These are expected acceptance observations, not recorded execution results in this authored lesson. A compile does not prove the gesture or adaptation paths. Record actual evidence for each terminal outcome.</p><p>The active picker demo provides a verified source anchor for presentation ownership through a UIKit host and coordinator. Its architecture is more elaborate than these local SwiftUI presentations, and reading it does not justify copying internal feature views into the scratch target. Use it to compare who reports an outcome and who owns closing. A correct beginner handoff names both, including the difference between Cancel and onDismiss.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Cancel must discard sheet edits. Which source should typing change?",
+          "options": [
+            "A local staged draft until explicit Save",
+            "The committed root value immediately without rollback",
+            "A global singleton"
+          ],
+          "answer": 0,
+          "explanation": "Cancellation is reliable when uncommitted changes are staged."
+        },
+        {
+          "question": "Where should the sheet's dismiss action be read?",
+          "options": [
+            "Only in the application entry initializer",
+            "Inside the presented subtree",
+            "Inside an unrelated sibling"
+          ],
+          "answer": 1,
+          "explanation": "Dismiss is scoped by the environment context where it is read."
+        },
+        {
+          "question": "What does onDismiss prove about Save?",
+          "options": [
+            "The save succeeded",
+            "The user explicitly tapped Cancel",
+            "Only that the presentation closed"
+          ],
+          "answer": 2,
+          "explanation": "Domain outcomes require explicit state or callbacks."
+        }
+      ],
+      "exercise": {
+        "brief": "Verify save, cancellation, dirty dismissal and destructive confirmation for a staged synthetic editor.",
+        "steps": [
+          "Use the complete app source.",
+          "Edit then Cancel and compare the committed title.",
+          "Test whitespace validation and Save with a valid synthetic title.",
+          "Exercise unchanged swipe dismissal and the dirty-dismiss restriction.",
+          "Check full-screen Done, confirmation Cancel/Clear and compact/wide popover behavior."
+        ],
+        "acceptance": [
+          "Cancel and noncommitting dismissal preserve committed data.",
+          "Save validates and commits once through the callback.",
+          "Dismiss is read in each presented child.",
+          "onDismiss does not masquerade as a save result.",
+          "Presentation adaptation observations name the actual window configuration."
+        ],
+        "solution": "<p>The local draft isolates typing from root title. Save calls onSave only after the trimmed value is nonempty; the root callback replaces title and the sheet asks its own environment to dismiss. Cancel skips that callback. Dirty interactive dismissal is blocked by the chosen policy, while explicit Cancel still discards. Closing an unchanged editor merely sets the diagnostic Editor closed message.</p><p>For a swipe-with-confirmation product, introduce an explicit pending-discard outcome and prompt rather than writing to root during typing. For asynchronous saves, add a saving/error state and define when closing is allowed; a dismiss call cannot stand in for successful persistence. The guide is independently closable because it reads its own action. The confirmation Clear path runs only after that selected destructive action; Cancel makes no title assignment. Record actual gesture and popover checks separately from model predictions. Nothing in the source claims a stored record was deleted or an iOS app was executed here.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Sheet presentation",
+          "url": "https://developer.apple.com/documentation/swiftui/view/sheet(item:ondismiss:content:)"
+        },
+        {
+          "label": "Apple: DismissAction",
+          "url": "https://developer.apple.com/documentation/swiftui/dismissaction"
+        },
+        {
+          "label": "Apple: Popover presentation",
+          "url": "https://developer.apple.com/documentation/swiftui/view/popover(ispresented:attachmentanchor:arrowedge:content:)"
+        },
+        {
+          "label": "Apple: PresentationCompactAdaptation",
+          "url": "https://developer.apple.com/documentation/swiftui/view/presentationcompactadaptation(_:)"
+        }
+      ],
+      "repo": [
+        {
+          "label": "The active picker demo is a reference for externally owned presentation and result boundaries",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Sources/VisitReasonPickerDemo.swift",
+          "line": 90,
+          "why": "The active picker demo is a reference for externally owned presentation and result boundaries."
+        }
+      ],
+      "checklist": [
+        "I can own item and Boolean presentation state deliberately.",
+        "I can stage edits for reliable cancellation.",
+        "I can scope dismiss to the presented child.",
+        "I can distinguish closing, saving, destructive choices and adaptive popovers."
+      ]
+    },
+    {
+      "id": "081",
+      "title": "Tasks, onChange, lifecycle, cancellation, and freshness",
+      "summary": "Scope async work to a view, invalidate obsolete requests, and prevent both old successes and old errors from replacing current UI.",
+      "duration": 90,
+      "level": "Foundation",
+      "prerequisites": [
+        "080"
+      ],
+      "objectives": [
+        "Scope async work with task and compatible onChange signatures.",
+        "Separate cooperative cancellation from permission to publish.",
+        "Guard obsolete successes and errors with request generations.",
+        "Design deterministic freshness tests and lifecycle evidence."
+      ],
+      "sections": [
+        {
+          "id": "lifetime",
+          "title": "Rendering describes UI; a task performs work",
+          "html": "<p>Compose LaunchedEffect gives you a useful mental starting point for work associated with a key and composition lifetime. SwiftUI task attaches asynchronous work to a view and can restart it when an Equatable id changes. The mechanics and lifecycle are SwiftUI's, so it is not a complete Android lifecycleScope counterpart. Body can run repeatedly; starting requests there can duplicate work without a clear owner.</p><p>This complete source targets a scratch iOS 17+ app with Xcode 15 or later. It uses Observation and the iOS 17 two-parameter onChange overload. Task itself predates that minimum, but this particular example needs its newer dependencies. Replace the generated App and root declarations, keeping one entry. The service is a synthetic asynchronous fixture with no transport, account or disk operation.</p><p>Separate three questions: what starts work, what requests its cancellation, and what permits a result to become current UI? A view-associated task answers part of the lifetime question. Cancellation is cooperative; it does not forcibly terminate every callback or kill a thread. Freshness checks answer the publication question even when obsolete work completes. A correct design needs all three boundaries.</p>"
+        },
+        {
+          "id": "syntax",
+          "title": "Await the operation in the owned task scope",
+          "html": "<p>WorkKey is Equatable, so SwiftUI can compare the request token and active-state flag. The task closure captures the current token and query before awaiting model.load directly. It does not create another unstructured Task and return early. The synthetic service uses an async throwing function: await permits suspension, try handles a potential error, and Task.sleep is a cancellable asynchronous delay rather than a blocking thread sleep.</p><pre><code class=\"language-swift\">import Foundation\nimport Observation\nimport SwiftUI\n\nstruct WorkKey: Equatable {\n    let token: UUID\n    let active: Bool\n}\n\nenum FixtureFailure: Error { case unavailable }\n\nstruct FixtureSearch {\n    func search(_ query: String) async throws -&gt; [String] {\n        try await Task.sleep(for: .milliseconds(250))\n        if query == \"fail\" { throw FixtureFailure.unavailable }\n        return query.isEmpty ? [] : [\"Demo result for \\(query)\"]\n    }\n}\n\n@MainActor\n@Observable\nfinal class SearchState {\n    var query = \"\" {\n        didSet {\n            guard query != oldValue else { return }\n            invalidate()\n        }\n    }\n    private(set) var token = UUID()\n    private(set) var results: [String] = []\n    private(set) var status = \"Enter a synthetic query\"\n\n    func invalidate() {\n        token = UUID()\n        results = []\n        status = \"Waiting for current request\"\n    }\n\n    func load(query: String, token expected: UUID,\n              service: FixtureSearch) async {\n        guard token == expected, !Task.isCancelled else { return }\n        status = query.isEmpty ? \"No query\" : \"Loading\"\n        do {\n            let values = try await service.search(query)\n            guard token == expected, !Task.isCancelled else { return }\n            results = values\n            status = values.isEmpty ? \"No matches\" : \"Ready\"\n        } catch is CancellationError {\n            return\n        } catch {\n            guard token == expected, !Task.isCancelled else { return }\n            results = []\n            status = \"Synthetic request failed\"\n        }\n    }\n}\n\n@MainActor\nstruct TaskScreen: View {\n    @Environment(\\.scenePhase) private var scenePhase\n    @State private var model = SearchState()\n    @State private var observedChanges = 0\n    private let service = FixtureSearch()\n\n    var body: some View {\n        @Bindable var editable = model\n        VStack(spacing: 16) {\n            TextField(\"Synthetic query; fail tests the error\", text: $editable.query)\n                .textFieldStyle(.roundedBorder)\n            Text(model.status)\n            Text(\"Observed query changes: \\(observedChanges)\")\n            ForEach(model.results, id: \\.self) { Text($0) }\n        }\n        .padding()\n        .task(id: WorkKey(token: model.token, active: scenePhase == .active)) {\n            guard scenePhase == .active else { return }\n            let expected = model.token\n            let query = model.query\n            await model.load(query: query, token: expected, service: service)\n        }\n        .onChange(of: model.query) { _, _ in\n            observedChanges += 1\n        }\n        .onChange(of: scenePhase) { _, phase in\n            if phase != .active { model.invalidate() }\n        }\n        .onDisappear { model.invalidate() }\n    }\n}\n\n@main\n@MainActor\nstruct TasksLessonApp: App {\n    var body: some Scene { WindowGroup { TaskScreen() } }\n}</code></pre><p>The local Bindable declaration inside body provides the projection needed by TextField without creating another model. Query is still owned by SearchState. Its didSet observer ignores a same-value assignment and otherwise calls invalidate synchronously, changing the token before an obsolete completion can publish under that token. The token is a UUID for each request generation, not a row identity or persisted key.</p><p>The service returns a String array or throws FixtureFailure for the explicit fail input. The results' String identities are acceptable only because this fixture returns at most one unique result. A real result list should use stable domain IDs; repeated titles would not be valid unique row keys. The delay makes the demo visibly asynchronous, but it is not a test gate.</p>"
+        },
+        {
+          "id": "freshness",
+          "title": "Cancellation and publication checks are independent",
+          "html": "<p>When the task's id changes, SwiftUI cancels the previous associated task and starts work for the new identity as appropriate. When the view disappears, the associated work receives cancellation through the framework lifetime. Those are requests for cooperation. Our fixture cooperates through Task.sleep; a callback adapter or remote operation may have different cancellation behavior. Leaving a view does not prove a server stopped doing work.</p><p>The model checks both its current token and Task.isCancelled before writing success or an error. An old success cannot overwrite newer results, and an old failure cannot replace a newer success with an error message. Catching CancellationError separately avoids presenting ordinary cancellation as a domain failure. A transport may use a different error type for cancellation, so production adaptation must honor its actual contract; our additional cancellation flag check protects publication.</p><p>Comparing query strings alone is insufficient. If request A1 starts for A, then B starts, then A2 starts for A, A1's text still matches the current query. Only its token distinguishes the obsolete request from the new A request. Invalidation also runs when leaving or becoming inactive, ending the current publication permission even if underlying work ignores cancellation. The model's MainActor isolation serializes these UI commits but does not eliminate reentrancy across await.</p>"
+        },
+        {
+          "id": "lifecycle",
+          "title": "Use lifecycle events for defined policies",
+          "html": "<p>onChange observes an Equatable value change. The iOS 17 overload with two parameters gives old and new values; a zero-parameter overload is also available. The older onChange(of:perform:) closure receives one new value and has older availability. Choose the signature compatible with the target rather than guessing from an autocomplete snippet. The observedChanges handler records a small UI diagnostic; it does not start a second search.</p><p>scenePhase distinguishes active, inactive and background states for the scene context. It is not an Android Activity object and does not grant unlimited background execution. This sample invalidates visible search results on inactivity and includes active in the task key so a new active task can reload. The task guard prevents a token change from starting synthetic loading while inactive. Different products may preserve current results or suspend polling without clearing them; write that policy intentionally.</p><p>onAppear and onDisappear can occur more than once. Treat them as view-lifetime signals rather than globally unique startup or teardown events. Here disappearance invalidates current publication, complementing task cancellation. It does not destroy the app-owned service or save the draft. For a feature-owned task that must survive navigation, choose another explicit owner and retained handle; attaching it to a transient view would express the wrong lifetime.</p>"
+        },
+        {
+          "id": "testing",
+          "title": "Control completion order rather than hoping delays line up",
+          "html": "<p>A deterministic stale-result test starts A1, waits until the fixture records its start, starts B and A2, then releases A2 before A1. It asserts that current results remain from A2 after the old success. Repeat with A1 throwing an error and ensure the newer success remains. The fixture must be able to finish despite cancellation so the freshness guard is actually challenged. A test that only uses a cancellable sleep might never reach the obsolete-publication branch.</p><p>Also test an old completion after explicit invalidation without a replacement request. The model should leave it unpublished. Test duplicate starts and ensure one user event does not spawn work from body, onChange and task simultaneously. Track start, completion and publication as separate events. A delay-based screen demo is useful for learning, but it cannot prove deterministic ordering or transport cancellation.</p><p>The verified address form uses the iOS 17-style onChange signature for focus and field updates. The member-ID demo starts mock work on appearance, providing a legacy source comparison rather than a pattern to copy indiscriminately. No client code was changed and no production request cancellation was measured in this audit.</p>"
+        },
+        {
+          "id": "debug",
+          "title": "Diagnose old output at the publication boundary",
+          "html": "<p>If loading runs twice, inspect task keys and independent trigger paths before adding a throttle. If old data appears, inspect the success guard, token invalidation timing and whether the service writes directly into UI state. If an old error hides new data, inspect the catch branch with the same rigor. If work continues after leaving, distinguish a cancelled Swift task from a producer that needs an explicit cancellation adapter.</p><p>If an actor diagnostic appears, carry a safe result back to the MainActor model instead of removing isolation. Actor reentrancy means another request can invalidate the token while the first is suspended. Capture the expected token before await and recheck afterward. A weak capture solves some retention cycles but does not prove freshness or cancel a producer.</p><p>Record actual compiler and fixture checks separately from simulator lifecycle interaction. The lesson's source specifies expected behavior; it does not claim the app backgrounded, a callback stopped or every error race was tested. The capstone supplies a concrete completion-gated testing pattern, while larger concurrency adapters remain specialist practice in the existing deep dives.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does task(id:) cancellation guarantee?",
+          "options": [
+            "Immediate termination of every server operation",
+            "A cooperative cancellation request for the associated Swift task",
+            "Persistent saving of its current result"
+          ],
+          "answer": 1,
+          "explanation": "Producer cancellation and transport behavior need their own contracts."
+        },
+        {
+          "question": "Why does A → B → A need a request token?",
+          "options": [
+            "Old and new A requests share text but differ in freshness",
+            "Strings cannot be Equatable",
+            "Every query must be saved"
+          ],
+          "answer": 0,
+          "explanation": "The token distinguishes A1 from A2 and guards obsolete success and error publication."
+        },
+        {
+          "question": "Which paths need a freshness guard?",
+          "options": [
+            "Only success",
+            "Only failure",
+            "Both success and failure, plus explicit invalidation policy"
+          ],
+          "answer": 2,
+          "explanation": "An obsolete error can be just as harmful as obsolete data."
+        }
+      ],
+      "exercise": {
+        "brief": "Exercise task lifetime and design deterministic old-success and old-error tests.",
+        "steps": [
+          "Use the complete synthetic source and inspect query/token updates.",
+          "Try ordinary and fail inputs and leave the screen or change scene state where available.",
+          "Write the A1/B/A2 completion schedule and expected visible state.",
+          "Plan a fixture that signals start and lets the test release success or failure regardless of cancellation.",
+          "Identify every independent work trigger and keep search owned by task only."
+        ],
+        "acceptance": [
+          "No request begins from body or the query onChange diagnostic.",
+          "Success and failure commits both require the current token and uncancelled task.",
+          "Invalidation revokes publication even without a replacement query.",
+          "Cancellation evidence and freshness evidence are reported separately.",
+          "Deterministic tests use start/completion gates rather than sleep timing."
+        ],
+        "solution": "<p>The expected A1/B/A2 schedule retains A2 output after releasing either an A1 success or A1 error. The query didSet changes token synchronously, so A1 cannot become current again merely because its text is A. The task key also includes active state; returning active can trigger current work while inactive guards block it. Explicit invalidation changes publication permission before later outcomes arrive.</p><p>A worked test design retains one completion continuation per request and records a start signal. Start A1, await its signal, start A2 under a new token, await that signal, finish A2 successfully and await its load completion, then finish A1 and await it. Assert current output again. Repeat with old failure and with invalidation-only. The fixture intentionally ignores cancellation to exercise the token guard; every continuation must still be resumed during cleanup. Do not infer that a remote producer stopped from these UI assertions. Record the actual test execution separately. The source delay is a visual fixture, not that deterministic test.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Task view modifier",
+          "url": "https://developer.apple.com/documentation/swiftui/view/task(id:priority:_:)"
+        },
+        {
+          "label": "Apple: OnChange",
+          "url": "https://developer.apple.com/documentation/swiftui/view/onchange(of:initial:_:)"
+        },
+        {
+          "label": "Apple: ScenePhase",
+          "url": "https://developer.apple.com/documentation/swiftui/scenephase"
+        },
+        {
+          "label": "Swift: Concurrency and cancellation",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "The active form uses two-parameter onChange for focus transitions",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/AddressForm/BookingAddressFormView.swift",
+          "line": 48,
+          "why": "The active form uses two-parameter onChange for focus transitions."
+        }
+      ],
+      "checklist": [
+        "I can scope async work with task and compatible onChange signatures.",
+        "I can separate cooperative cancellation from permission to publish.",
+        "I can guard obsolete successes and errors with request generations.",
+        "I can design deterministic freshness tests and lifecycle evidence."
+      ]
+    },
+    {
+      "id": "082",
+      "title": "Adaptive layout, Dynamic Type, localization, and accessibility",
+      "summary": "Respond to available space and user settings, preserve semantic controls, and build a concrete accessibility evidence matrix.",
+      "duration": 90,
+      "level": "Foundation",
+      "prerequisites": [
+        "081"
+      ],
+      "objectives": [
+        "Adapt to local space and Dynamic Type without losing actions.",
+        "Preserve semantic controls and intentional reading groups.",
+        "Distinguish localization, locale and RTL fixtures.",
+        "Produce bounded accessibility and layout evidence."
+      ],
+      "sections": [
+        {
+          "id": "window",
+          "title": "Design for the current content and window",
+          "html": "<p>Android adaptive layouts teach you that a tablet can host a narrow window and a phone can have unusual text settings. Apply the same reasoning to iOS. The device model alone cannot determine available space. iPad multitasking, resizable windows, safe areas, keyboard presentation and content size can all alter the usable layout. Reading the physical screen's global width and choosing a fixed form width ignores those conditions.</p><p>This complete example belongs to a scratch iOS 17+ app using Xcode 15 or later. ViewThatFits arrived in iOS 16, and the track keeps its established minimum. Replace the generated App and root types, keeping one entry. It uses system controls, synthetic data and a scrollable container. The source provides a starting layout and test scenarios; it is not certification of accessibility or proof of device execution.</p><p>Prefer a layout that negotiates offered space. This example caps a readable content column at six hundred forty points and centers it when more width is available. That value is a teaching design choice, not a platform rule. In a narrow window the parent still constrains available width. Content remains scrollable vertically so large text does not require hiding information to fit a fixed-height card.</p>"
+        },
+        {
+          "id": "fit",
+          "title": "Provide meaningful alternatives rather than shrinking text",
+          "html": "<p>ViewThatFits evaluates candidates in order and chooses one fitting the specified dimension. The horizontal HStack candidate expresses a compact side-by-side relationship and asks for its ideal horizontal extent with fixedSize. If that does not fit, the vertical candidate offers a different arrangement. Without an intentional ideal-size policy, a candidate might compress text so much that it technically fits while becoming hard to read.</p><pre><code class=\"language-swift\">import Foundation\nimport SwiftUI\n\nstruct AdaptiveSummary: View {\n    let title: String\n    var body: some View {\n        VStack(alignment: .leading, spacing: 8) {\n            Text(verbatim: title).font(.title2)\n            Text(\"Synthetic progress\").foregroundStyle(.secondary)\n        }\n        .accessibilityElement(children: .combine)\n    }\n}\n\nstruct AdaptiveScreen: View {\n    @Environment(\\.dynamicTypeSize) private var textSize\n    @State private var reminders = false\n    @State private var count = 0\n    let title: String\n\n    private var practiceButton: some View {\n        Button {\n            count += 1\n        } label: {\n            Label(\"Practice\", systemImage: \"book\")\n                .frame(maxWidth: .infinity, minHeight: 44)\n        }\n        .buttonStyle(.borderedProminent)\n        .accessibilityHint(\"Increases the synthetic practice count\")\n        .accessibilityIdentifier(\"practiceButton\")\n    }\n\n    var body: some View {\n        ScrollView {\n            VStack(alignment: .leading, spacing: 20) {\n                Image(systemName: \"books.vertical\")\n                    .font(.largeTitle)\n                    .accessibilityHidden(true)\n\n                if textSize.isAccessibilitySize {\n                    VStack(alignment: .leading, spacing: 16) {\n                        AdaptiveSummary(title: title)\n                        practiceButton\n                    }\n                } else {\n                    ViewThatFits(in: .horizontal) {\n                        HStack(alignment: .top, spacing: 20) {\n                            AdaptiveSummary(title: title)\n                            practiceButton\n                        }\n                        .fixedSize(horizontal: true, vertical: false)\n                        VStack(alignment: .leading, spacing: 16) {\n                            AdaptiveSummary(title: title)\n                            practiceButton\n                        }\n                    }\n                }\n\n                Toggle(\"Demo reminders\", isOn: $reminders)\n                Text(\"Practice count: \\(count)\")\n                    .accessibilityIdentifier(\"practiceCount\")\n                Text(\"No notification is scheduled by this toggle.\")\n                    .foregroundStyle(.secondary)\n            }\n            .padding()\n            .frame(maxWidth: 640, alignment: .leading)\n            .frame(maxWidth: .infinity, alignment: .center)\n        }\n    }\n}\n\n@main\nstruct AdaptiveLessonApp: App {\n    var body: some Scene {\n        WindowGroup { AdaptiveScreen(title: \"Demo learning plan\") }\n    }\n}\n\n#Preview(\"Long, large, RTL\") {\n    AdaptiveScreen(title: \"A deliberately long synthetic learning plan title\")\n        .environment(\\.dynamicTypeSize, .accessibility3)\n        .environment(\\.layoutDirection, .rightToLeft)\n        .environment(\\.locale, Locale(identifier: \"ar\"))\n}</code></pre><p>The accessibility-size branch deliberately uses a vertical arrangement, even if a wide window could fit the row. DynamicTypeSize's isAccessibilitySize describes the user's larger text categories, not an assistive-technology detection flag. A horizontal size class can also inform broad layout choices, but it does not report an exact width. Use the actual content fitting policy or geometry when a precise local dimension is necessary.</p><p>A fallback must preserve the same feature. Hiding the practice action in the narrow candidate would make the layout appear to fit while removing functionality. A changed arrangement should still expose the title, action, Toggle and count. Avoid shrinking system fonts to force an overflowing title into a screenshot. If text can be long, allow wrapping, vertical growth and scrolling where the product permits.</p>"
+        },
+        {
+          "id": "text",
+          "title": "Dynamic Type is part of the layout contract",
+          "html": "<p>System text roles such as title2 and body respond to text-size settings. A custom font needs an appropriate relative-to text style or a deliberate scaling strategy; a hard-coded point size alone does not establish Dynamic Type support. Fonts are only one input: fixed heights, icon sizes, gaps, line limits and control labels can still clip even when the font scales.</p><p>The practice action uses a minimum height rather than a fixed height, allowing its Label to expand. Forty-four points is a familiar iOS touch-target starting convention, not evidence that every resulting target is accessible. Verify the actual tappable area, spacing between neighboring controls and behavior under larger text. A frame enlarging drawing does not automatically prove hit testing for arbitrary custom gestures; semantic Button behavior is the safer starting point.</p><p>Use ScaledMetric for custom dimensions when scaling that dimension with text is appropriate, and avoid scaling every value blindly. A layout can need a structural change rather than a larger spacer. Check long text at several widths and text categories. Record truncation and unreachable controls as failures even if the ordinary fixture looks polished.</p>"
+        },
+        {
+          "id": "semantics",
+          "title": "Keep reading groups separate from actionable controls",
+          "html": "<p>AdaptiveSummary combines its title and synthetic progress caption into one accessibility element. That can reduce noisy reading for one informational unit. The Button and Toggle remain separate controls so users can activate them. Combining the entire screen into one element would hide or confuse interaction. Use grouping to express meaning, not merely to reduce the number of VoiceOver stops.</p><p>The decorative books image is hidden from accessibility because the title already carries its meaning. The practice Button has a visible Label, with a hint explaining its synthetic effect. A hint should add useful behavior information rather than repeat the label. Toggle supplies state semantics automatically. The reminder wording explicitly says no notification is scheduled, avoiding a misleading permission implication.</p><p>accessibilityIdentifier is a machine-facing identifier for UI automation. It is not the spoken accessibility label and should not replace readable visible text. The count identifier lets tests locate the value without matching every translated string. Test VoiceOver reading order, labels, states and actions on an appropriate simulator or device, then test keyboard or alternative input where relevant. A screenshot cannot show whether those interactions work.</p>"
+        },
+        {
+          "id": "locale",
+          "title": "Text direction and translation need separate fixtures",
+          "html": "<p>SwiftUI text literals commonly participate in localized-key lookup. Dynamic domain content such as a user's display name should be treated as data; Text(verbatim:) makes that intention explicit for this title. The count interpolation supports structured localization rather than building every sentence through raw concatenation. To provide translations, add appropriate String Catalog entries in the scratch project and verify the selected localization resources.</p><p>The preview installs a right-to-left layout direction and Arabic locale as an orientation and formatting fixture. It does not manufacture translations for English strings when no translated resources exist. Inspect leading/trailing alignment and symbol relationships separately from linguistic correctness. A preview showing RTL direction is therefore layout evidence for that fixture, not proof that the app is localized to Arabic.</p><p>Also check increased contrast, light/dark appearance and color distinctions. Do not communicate status only by red versus green or an unlabelled icon. VoiceOver must have meaningful information, and sighted users may need a textual status or shape distinction. Reduce Motion matters for custom animation, although this example has no custom transition. A complete real feature needs a scoped matrix rather than a claim to cover every platform setting.</p>"
+        },
+        {
+          "id": "evidence",
+          "title": "Build a reproducible adaptive and accessibility matrix",
+          "html": "<p>Start with ordinary and long titles at narrow and wide windows, then repeat at an accessibility text size. Add light/dark and RTL-layout fixtures. For interaction, verify every control remains reachable through scrolling, activation updates count, Toggle exposes its state, and reading order matches the intended grouping. Test keyboard appearance for future text fields rather than assuming ScrollView alone handles every focus problem.</p><p>The active address form supplies a verified anchor for explicit field focus and next-field configuration. It is a useful production comparison, but its source does not prove the scratch layout's accessibility behavior. No client files should be edited for this exercise. The workbench's actual files and execution checks remain its author's scope.</p><p>For each check, record configuration, actual observation and unresolved issue. Compiler success proves declarations and type relationships under that compiler/SDK, not VoiceOver correctness. Preview rendering proves one visual fixture. Simulator or device interaction supplies another layer. A clear handoff can say visual fixtures inspected, assistive checks pending, and exactly what still needs to run; honest limits make the work useful to another engineer.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why avoid a global screen-width rule?",
+          "options": [
+            "The current window and content can have different available space",
+            "All iPads are compact",
+            "SwiftUI cannot measure content"
+          ],
+          "answer": 0,
+          "explanation": "Window resizing and multitasking break device-only assumptions."
+        },
+        {
+          "question": "Does setting an Arabic locale automatically create translations?",
+          "options": [
+            "Yes, all English sentences translate",
+            "No; localized resources must exist",
+            "Only when a UUID is used"
+          ],
+          "answer": 1,
+          "explanation": "RTL layout, locale formatting and translated strings are different checks."
+        },
+        {
+          "question": "What is accessibilityIdentifier for?",
+          "options": [
+            "The primary spoken label",
+            "Disk record identity",
+            "Machine-facing UI automation lookup"
+          ],
+          "answer": 2,
+          "explanation": "Provide meaningful visible/spoken semantics independently."
+        }
+      ],
+      "exercise": {
+        "brief": "Create a small adaptive and accessibility evidence matrix for the synthetic screen.",
+        "steps": [
+          "Use the complete source and inspect ordinary and long titles.",
+          "Test narrow/wide layouts and an accessibility Dynamic Type category.",
+          "Inspect the named RTL fixture without claiming translation coverage.",
+          "Activate Button and Toggle with VoiceOver where available, recording reading order and states.",
+          "Record separate compiler, preview, simulator/device and unresolved results."
+        ],
+        "acceptance": [
+          "The fallback preserves all meaningful content and actions.",
+          "Large text remains reachable without fixed-height clipping.",
+          "Controls retain semantic roles and useful labels.",
+          "RTL layout evidence is not mislabeled as translation verification.",
+          "The handoff identifies actual tested configurations and pending assistive checks."
+        ],
+        "solution": "<p>The accessibility text branch deliberately stacks summary and action. At ordinary sizes, the ideal-width HStack is chosen only when it fits; otherwise the vertical alternative preserves both. The outer scroll view permits vertical growth, and minimum control height permits expansion. The summary combines informational text while leaving action controls individually reachable.</p><p>A worked record has rows for narrow/default, wide/default, narrow/large, dark/large and RTL/long, with observations such as title wrapped, action reachable, count updated and no observed clipping. Add separate VoiceOver observations for summary announcement, Practice activation and reminder state. If that technology was not exercised, mark it pending. The RTL fixture still uses synthetic English text unless a real catalog translation was added. Color contrast and platform-specific input checks likewise remain explicit pending work until observed. The course author supplies expected behavior and the matrix, not a universal accessibility-pass claim.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: ViewThatFits",
+          "url": "https://developer.apple.com/documentation/swiftui/viewthatfits"
+        },
+        {
+          "label": "Apple: Accessibility",
+          "url": "https://developer.apple.com/documentation/swiftui/accessibility"
+        },
+        {
+          "label": "Apple: DynamicTypeSize",
+          "url": "https://developer.apple.com/documentation/swiftui/dynamictypesize"
+        },
+        {
+          "label": "Apple: Localizing and varying text with a string catalog",
+          "url": "https://developer.apple.com/documentation/xcode/localizing-and-varying-text-with-a-string-catalog"
+        }
+      ],
+      "repo": [
+        {
+          "label": "The active form declares field focus, content types and submit progression",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/AddressForm/BookingAddressFormView.swift",
+          "line": 63,
+          "why": "The active form declares field focus, content types and submit progression."
+        }
+      ],
+      "checklist": [
+        "I can adapt to local space and Dynamic Type without losing actions.",
+        "I can preserve semantic controls and intentional reading groups.",
+        "I can distinguish localization, locale and RTL fixtures.",
+        "I can produce bounded accessibility and layout evidence."
+      ]
+    },
+    {
+      "id": "083",
+      "title": "Your first SwiftData model, container, context, query, and CRUD",
+      "summary": "Create a real record store, perform explicit save operations, and separate in-memory observation from durable success.",
+      "duration": 90,
+      "level": "Foundation",
+      "prerequisites": [
+        "082"
+      ],
+      "objectives": [
+        "Construct a SwiftData model, container and context.",
+        "Read records with Query and perform explicit CRUD saves.",
+        "Handle pending changes, save failure and whole-context rollback honestly.",
+        "Separate in-memory fixtures from disk durability and migration evidence."
+      ],
+      "sections": [
+        {
+          "id": "store",
+          "title": "Persistence adds a contract beyond observation",
+          "html": "<p>Android Room gives you a familiar reason for a database: records must outlive the screen and process. SwiftData integrates persistence and model observation with SwiftUI, but it is not a one-to-one port of Room annotations or DAO behavior. A model schema, a container, a context and a query each answer a different question. Naming those boundaries makes your first store much easier to debug than treating Model as an all-purpose ViewModel.</p><p>This complete source targets a scratch iOS 17+ app using Xcode 15 or later. SwiftData was introduced with iOS 17 and relies on macro-capable tooling. Replace the generated App and root declarations, keeping one entry. No earlier example types are needed. All records are synthetic. This is a first local store, not a migration, cloud synchronization feature, account store or implemented company-client persistence layer.</p><p>The app uses a persistent container and explicitly disables autosave for its main context so you can study save outcomes. Its preview uses a fresh in-memory container instead, keeping visual experiments away from the app's disk store. An in-memory fixture can prove CRUD behavior in a test context but cannot prove process-restart durability.</p>"
+        },
+        {
+          "id": "schema",
+          "title": "Model describes persistent fields and identity",
+          "html": "<p><code>@Model</code> is a macro on a class that generates SwiftData model support. StoredNote has an explicit UUID identity, a title and a creation Date. Attribute's unique option declares uniqueness for the identifier in this local schema. It is not a general authorization mechanism or a promise that every synchronization backend supports that constraint. The lesson does not configure CloudKit.</p><pre><code class=\"language-swift\">import Foundation\nimport SwiftData\nimport SwiftUI\n\n@Model\nfinal class StoredNote {\n    @Attribute(.unique) var id: UUID\n    var title: String\n    var createdAt: Date\n\n    init(id: UUID = UUID(), title: String, createdAt: Date = Date()) {\n        self.id = id\n        self.title = title\n        self.createdAt = createdAt\n    }\n}\n\nstruct StoredNoteRow: View {\n    @Bindable var note: StoredNote\n    var body: some View {\n        TextField(\"Synthetic title\", text: $note.title)\n    }\n}\n\n@MainActor\nstruct StoreScreen: View {\n    @Environment(\\.modelContext) private var context\n    @Query(sort: \\StoredNote.createdAt) private var notes: [StoredNote]\n    @State private var newTitle = \"\"\n    @State private var status = \"Edit, then explicitly save\"\n\n    var body: some View {\n        NavigationStack {\n            List {\n                Section(\"Add\") {\n                    TextField(\"New synthetic title\", text: $newTitle)\n                    Button(\"Add and save\") {\n                        let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)\n                        guard !title.isEmpty else { return }\n                        context.insert(StoredNote(title: title))\n                        newTitle = \"\"\n                        save()\n                    }\n                    .disabled(newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)\n                }\n                Section(\"Stored and pending notes\") {\n                    ForEach(notes) { note in StoredNoteRow(note: note) }\n                        .onDelete { offsets in\n                            let snapshot = notes\n                            for offset in offsets where snapshot.indices.contains(offset) {\n                                context.delete(snapshot[offset])\n                            }\n                            save()\n                        }\n                }\n                Section {\n                    Button(\"Save pending changes\") { save() }\n                    Button(\"Discard ALL pending changes\", role: .destructive) {\n                        context.rollback()\n                        status = \"Pending changes discarded\"\n                    }\n                    Text(status)\n                }\n            }\n            .navigationTitle(\"Synthetic store\")\n            .toolbar { EditButton() }\n        }\n    }\n\n    private func save() {\n        do {\n            try context.save()\n            status = \"Save succeeded\"\n        } catch {\n            status = \"Save failed; changes are still pending. Retry or discard.\"\n        }\n    }\n}\n\n@main\n@MainActor\nstruct StoreLessonApp: App {\n    private let container: ModelContainer?\n    private let setupFailed: Bool\n\n    init() {\n        do {\n            let value = try ModelContainer(for: StoredNote.self)\n            value.mainContext.autosaveEnabled = false\n            container = value\n            setupFailed = false\n        } catch {\n            container = nil\n            setupFailed = true\n        }\n    }\n\n    var body: some Scene {\n        WindowGroup {\n            if let container {\n                StoreScreen().modelContainer(container)\n            } else {\n                Text(setupFailed ? \"Store setup failed; no data was deleted.\"\n                                : \"Store unavailable\")\n                    .padding()\n            }\n        }\n    }\n}\n\n@MainActor\nstruct MemoryStorePreview: View {\n    private let container: ModelContainer?\n    init() {\n        do {\n            let config = ModelConfiguration(isStoredInMemoryOnly: true)\n            let value = try ModelContainer(for: StoredNote.self, configurations: config)\n            value.mainContext.autosaveEnabled = false\n            value.mainContext.insert(StoredNote(title: \"Demo fixture\"))\n            try value.mainContext.save()\n            container = value\n        } catch {\n            container = nil\n        }\n    }\n\n    var body: some View {\n        if let container {\n            StoreScreen().modelContainer(container)\n        } else {\n            Text(\"In-memory fixture setup failed\")\n        }\n    }\n}\n\n#Preview(\"Fresh in-memory store\") {\n    MemoryStorePreview()\n}</code></pre><p>The initializer fills every stored field and supplies default values for a new synthetic record. The UUID is created once for that construction. Editing a title does not generate a new record ID. The query orders by createdAt using a key path; if two records have equal timestamps, a product requiring deterministic tie order should add an appropriate secondary sort rule. Do not use changing array positions as identity.</p><p>ModelContainer holds schema and storage configuration. ModelContext tracks fetched models and pending changes, and saves them to the container's store. Query supplies view data from the installed context and responds to relevant changes. Bindable exposes controls for the model's editable title. These are related integrations, but an updated query display is not evidence that disk saving succeeded.</p>"
+        },
+        {
+          "id": "construction",
+          "title": "Install the container before asking for a context",
+          "html": "<p>The app constructs ModelContainer once at its app boundary and installs it with modelContainer on StoreScreen. That modifier supplies the context environment required by the screen and Query. Constructing a component directly in a preview without this dependency can fail or use an unintended setup. The in-memory host supplies its own container, schema and fixture insert/save explicitly.</p><p>Container construction can throw. The app catches setup failure and displays a recovery message without deleting any store. A production app needs a more useful diagnostic and recovery policy, but automatically erasing persisted data to make startup pass would be a destructive change outside this lesson. Do not replace every try with try! to hide the difference between a compile-time declaration and a fallible store operation.</p><p>MainContext is intended for the main-actor UI context in this example. Do not send its managed model objects into arbitrary background tasks or share the same context across isolation boundaries. Use an appropriate separate context or model-actor design for larger asynchronous work and transfer safe identifiers or values. Existing persistence deep dives cover those boundaries; the first CRUD app deliberately stays within one UI context.</p>"
+        },
+        {
+          "id": "crud",
+          "title": "Insert, read, update and delete with explicit save",
+          "html": "<p>Add and save trims the creation draft, guards against empty input, inserts a new model into the context, clears the input and then attempts save. Query may show that new pending model before save succeeds. The status says whether the save completed, so the screen does not equate visible insertion with durable success. On failure, changes remain pending in this teaching policy and Save pending changes provides a retry path.</p><p>Reading is Query's sorted notes array. Updating happens through StoredNoteRow's Bindable TextField and requires Save pending changes for an explicit durable commit because autosave is disabled. Those title edits are live in the context, not staged per-row transactions. Deletion maps the unfiltered displayed offsets to a snapshot of current model objects, marks those objects for deletion and attempts save. If search is later added, map through visible IDs as in lesson 077.</p><p>A context save can include all its pending changes, not just the one row whose button was pressed. That matters when several editors share it. This beginner screen exposes one small context and explicitly labels pending changes. For independently cancellable editors, stage input or isolate the transaction scope instead of assuming each TextField is a separate database transaction.</p>"
+        },
+        {
+          "id": "failure",
+          "title": "Pending UI and durable storage can disagree",
+          "html": "<p>The failed-save status tells the truth: the display can reflect unsaved inserts, edits or deletes. Retry attempts the same pending state; rollback discards all pending changes in this context. The destructive discard button is clearly labeled with that whole-context scope. Do not use rollback as an invisible per-row undo when another editor has unsaved changes in the same context.</p><p>Autosave is a separate policy that may be appropriate for another application, but it should not replace understanding fallible saves and transaction ownership. Our explicit-save baseline makes the distinction observable. A successful save supports a local persistence claim under that container; a restart experiment must still verify the actual store location and the launched product. Preview saving to memory does not create durable evidence.</p><p>Schema changes, relationships, migrations, uniqueness conflicts, multiple accounts and store protection require additional design. Do not change fields in a deployed store and assume every existing record migrates safely. No such migration is performed here. The repository has its own persistence architecture; this first SwiftData example teaches an adjacent API without claiming the client already uses it.</p>"
+        },
+        {
+          "id": "evidence",
+          "title": "Verify CRUD, retry and restart at separate layers",
+          "html": "<p>In the in-memory fixture, add a note, edit a title, explicitly save, fetch through Query, delete and save again. For tests, fetch through a new context in the same container after save to reduce dependence on one context's pending view. A disk-backed restart check uses the launched app, preserves its sandbox and confirms the saved record after relaunch. Clearing the app's data would invalidate that durability experiment.</p><p>Exercise Discard with an unsaved title edit and observe the model reverting, then explain its whole-context effect. To test failure, inject or configure a bounded failure fixture and record its actual cause; don't claim that every constraint violation always throws in the same way. The lesson supplies the failure-handling path but does not fabricate a failed disk write.</p><p>The verified address model anchor demonstrates an observable in-memory model and a computed currentAddress projection. That is a useful contrast: its annotation is Observable, not Model, and the read-only source does not establish a SwiftData store. The native companion's persistence implementation and build evidence belong to its author. Your handoff should label this snippet as conceptual/type-checked as actually verified, and reserve app-run, restart and migration claims for executed checks.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Query shows a newly inserted model. What does that prove?",
+          "options": [
+            "The context/query can show pending data; durable save still needs evidence",
+            "The disk write succeeded",
+            "Every account can read it"
+          ],
+          "answer": 0,
+          "explanation": "Visible observation and persistent commit are different."
+        },
+        {
+          "question": "What does this rollback action affect?",
+          "options": [
+            "Only the last TextField character",
+            "All pending changes in this context",
+            "All company databases"
+          ],
+          "answer": 1,
+          "explanation": "Its scope is the context, so unrelated unsaved editors can be affected."
+        },
+        {
+          "question": "Why use an in-memory preview container?",
+          "options": [
+            "It verifies process restart",
+            "It runs schema migrations automatically",
+            "It isolates synthetic preview records from the disk store"
+          ],
+          "answer": 2,
+          "explanation": "An in-memory save is not durability evidence."
+        }
+      ],
+      "exercise": {
+        "brief": "Perform first SwiftData CRUD and report pending changes separately from durable results.",
+        "steps": [
+          "Use the complete source in the scratch iOS 17+ target.",
+          "Inspect the in-memory preview and its explicit container injection.",
+          "Add, edit, Save pending changes, delete and save synthetic notes.",
+          "Try an unsaved edit then Discard, naming the whole-context scope.",
+          "If you run a disk restart check, record the product/sandbox and actual result; otherwise leave durability pending."
+        ],
+        "acceptance": [
+          "The schema, container, context and query roles are explained separately.",
+          "Creation rejects blank trimmed input.",
+          "Updates require explicit save under the disabled-autosave policy.",
+          "Save failure does not claim success or erase the store.",
+          "In-memory CRUD, disk restart and migration evidence are not conflated."
+        ],
+        "solution": "<p>The CRUD path is model construction → context.insert → context.save, Query for reads, binding mutation → explicit save for updates, and context.delete → save for removal. Before save, Query may reflect tracked changes. Save succeeded means this context's pending changes were committed by its container; Save failed leaves them pending under the stated policy. Rollback discards the full pending context state.</p><p>For a meaningful store check, save the fixture, create another ModelContext from the same container and fetch StoredNote with FetchDescriptor. Verify the expected title and ID there, then delete and save and confirm absence through a fresh fetch. That is stronger than looking at the existing row alone, but an in-memory container still cannot prove restart durability. Perform the disk check separately if available, without clearing data. The preview's host constructs a fresh memory store each time, and setup failure shows a message rather than deleting data. No migration, cloud synchronization or company store modification is included in this worked answer.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Preserving your app's model data across launches",
+          "url": "https://developer.apple.com/documentation/swiftdata/preserving-your-apps-model-data-across-launches"
+        },
+        {
+          "label": "Apple: ModelContainer",
+          "url": "https://developer.apple.com/documentation/swiftdata/modelcontainer"
+        },
+        {
+          "label": "Apple: ModelContext",
+          "url": "https://developer.apple.com/documentation/swiftdata/modelcontext"
+        },
+        {
+          "label": "Apple: Query",
+          "url": "https://developer.apple.com/documentation/swiftdata/query"
+        },
+        {
+          "label": "Apple: ModelConfiguration",
+          "url": "https://developer.apple.com/documentation/swiftdata/modelconfiguration"
+        }
+      ],
+      "repo": [
+        {
+          "label": "The active address model uses Observation; its in-memory projection does not establish SwiftData persistence",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/AddressForm/BookingAddressFormViewModel.swift",
+          "line": 20,
+          "why": "The active address model uses Observation; its in-memory projection does not establish SwiftData persistence."
+        }
+      ],
+      "checklist": [
+        "I can construct a SwiftData model, container and context.",
+        "I can read records with Query and perform explicit CRUD saves.",
+        "I can handle pending changes, save failure and whole-context rollback honestly.",
+        "I can separate in-memory fixtures from disk durability and migration evidence."
+      ]
+    },
+    {
+      "id": "084",
+      "title": "Capstone: test and debug a complete synthetic feature",
+      "summary": "Assemble a shared draft, picker, review and async fixture, then verify behavior with deterministic tests and an honest handoff.",
+      "duration": 90,
+      "level": "Foundation",
+      "prerequisites": [
+        "083"
+      ],
+      "objectives": [
+        "Assemble a complete synthetic SwiftUI workflow.",
+        "Test eligibility, cancellation outcomes and stale-result rejection.",
+        "Place source and tests in the correct products.",
+        "Write a handoff distinguishing authored examples from executed evidence."
+      ],
+      "sections": [
+        {
+          "id": "contract",
+          "title": "Finish one feature with evidence, not just a screen",
+          "html": "<p>An experienced Android engineer knows that a feature includes state, user outcomes, tests and debugging evidence. The beginner iOS capstone now combines the preceding skills into one small synthetic plan app. It has a display name, optional topic, reminder, modal picker, Review destination, Reset and an asynchronous suggestion. This is a first end-to-end workflow, not appointment booking or a production client migration.</p><p>The complete app source targets iOS 17+ with Xcode 15 or later. Create a scratch iOS App product named SwiftUICapstone and use that Swift module name for the supplied unit-test import. Replace the generated entry/root types with the app source, keeping one entry. Include a unit-test target and a UI-test target through the template or Xcode's Add Target workflow. App source belongs only to the app target; the test declarations belong only to their respective test targets.</p><p>The contract is explicit: whitespace-only names cannot Review; choosing a topic commits it; Cancel preserves the previous topic; returning from Review preserves root edits; Reset clears draft fields; only the latest name request can publish suggestion or error. The reminder is synthetic and schedules nothing. No persistence is included in this app; apply lesson 083's store only as a separately scoped extension.</p>"
+        },
+        {
+          "id": "app",
+          "title": "A complete root owns the draft and its fixture",
+          "html": "<p>PlanDraft is a MainActor observable reference model owned by root State. TopicPicker receives the same reference and commits only when a topic button is activated. Its Cancel merely dismisses. Review reads the same draft, so a return does not require copying values back. LocalSuggestion is an injected synthetic service; its protocol describes one async throwing operation. <code>any Suggesting</code> stores a conforming service behind that contract.</p><pre><code class=\"language-swift\">import Foundation\nimport Observation\nimport SwiftUI\n\nenum PracticeTopic: String, CaseIterable, Identifiable {\n    case reading = \"Demo reading\"\n    case exercises = \"Demo exercises\"\n    var id: Self { self }\n}\n\n@MainActor\nprotocol Suggesting {\n    func suggestion(for name: String) async throws -&gt; String\n}\n\n@MainActor\nstruct LocalSuggestion: Suggesting {\n    func suggestion(for name: String) async throws -&gt; String {\n        try await Task.sleep(for: .milliseconds(200))\n        return \"Synthetic suggestion for \\(name)\"\n    }\n}\n\n@MainActor\n@Observable\nfinal class PlanDraft {\n    var name = \"\" {\n        didSet { if name != oldValue { invalidate() } }\n    }\n    var topic: PracticeTopic?\n    var reminder = false\n    private(set) var token = UUID()\n    private(set) var suggestion = \"\"\n    private(set) var errorMessage: String?\n\n    var canReview: Bool {\n        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &amp;&amp; topic != nil\n    }\n\n    func invalidate() {\n        token = UUID()\n        suggestion = \"\"\n        errorMessage = nil\n    }\n\n    func reset() {\n        name = \"\"\n        topic = nil\n        reminder = false\n        invalidate()\n    }\n\n    func load(service: any Suggesting) async {\n        let expected = token\n        let input = name\n        guard !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {\n            return\n        }\n        do {\n            let value = try await service.suggestion(for: input)\n            guard token == expected, !Task.isCancelled else { return }\n            suggestion = value\n            errorMessage = nil\n        } catch {\n            guard token == expected, !Task.isCancelled else { return }\n            suggestion = \"\"\n            errorMessage = \"Synthetic suggestion failed\"\n        }\n    }\n}\n\n@MainActor\nstruct TopicPicker: View {\n    @Environment(\\.dismiss) private var dismiss\n    let draft: PlanDraft\n\n    var body: some View {\n        NavigationStack {\n            List(PracticeTopic.allCases) { topic in\n                Button(topic.rawValue) {\n                    draft.topic = topic\n                    dismiss()\n                }\n            }\n            .navigationTitle(\"Choose demo topic\")\n            .toolbar {\n                ToolbarItem(placement: .cancellationAction) {\n                    Button(\"Cancel\") { dismiss() }\n                }\n            }\n        }\n    }\n}\n\n@MainActor\nstruct PlanRoot: View {\n    @State private var draft = PlanDraft()\n    @State private var showTopics = false\n    let service: any Suggesting\n\n    var body: some View {\n        @Bindable var editable = draft\n        NavigationStack {\n            Form {\n                TextField(\"Demo name\", text: $editable.name)\n                    .accessibilityIdentifier(\"nameField\")\n                Toggle(\"Demo reminder\", isOn: $editable.reminder)\n                Button(draft.topic?.rawValue ?? \"Choose topic\") { showTopics = true }\n                NavigationLink {\n                    VStack(spacing: 16) {\n                        Text(draft.name)\n                        Text(draft.topic?.rawValue ?? \"No topic\")\n                        Text(draft.suggestion)\n                    }\n                    .padding()\n                    .navigationTitle(\"Review\")\n                } label: {\n                    Text(\"Review\")\n                }\n                .disabled(!draft.canReview)\n                .accessibilityIdentifier(\"reviewLink\")\n                Text(draft.suggestion)\n                if let message = draft.errorMessage { Text(message) }\n                Button(\"Reset\") { draft.reset() }\n                    .accessibilityIdentifier(\"resetButton\")\n            }\n            .navigationTitle(\"Synthetic plan\")\n            .sheet(isPresented: $showTopics) { TopicPicker(draft: draft) }\n        }\n        .task(id: draft.token) { await draft.load(service: service) }\n        .onDisappear { draft.invalidate() }\n    }\n}\n\n@main\n@MainActor\nstruct SwiftUICapstone: App {\n    var body: some Scene {\n        WindowGroup { PlanRoot(service: LocalSuggestion()) }\n    }\n}\n\n#Preview(\"Local fixture\") {\n    PlanRoot(service: LocalSuggestion())\n}</code></pre><p>Name changes revoke the previous token synchronously. The task awaits the model operation directly, while both success and catch branches check current token and cancellation before publishing. Reset invalidates even when name was already empty, so an older request cannot regain authority. These checks are independent of whether the fixture cooperates with cancellation.</p><p>The preview supplies the local fixture explicitly and never constructs a production client. It uses a small delay to make interaction observable, not to coordinate tests. The App's module name is a target/product setup detail: if you choose another module, change the test import accordingly. A visible file with the wrong membership cannot satisfy the testing contract.</p>"
+        },
+        {
+          "id": "unit",
+          "title": "Test invariants and controlled completion order",
+          "html": "<p>The following belongs to an iOS 17+ unit-test target whose host is the scratch app, not to the app entry source. XCTest runs assertions against the model. The first test checks meaningful eligibility and Reset. The second uses start expectations and retained continuations to release A1, B and A2 in an adversarial order. It exercises old success and old error publication, including the A → B → A case where text comparison alone would fail.</p><pre><code class=\"language-swift\">import XCTest\n@testable import SwiftUICapstone\n\n@MainActor\nfinal class ControlledSuggestion: Suggesting {\n    private var nextID = 0\n    private var pending: [Int: CheckedContinuation&lt;String, Error&gt;] = [:]\n    var onStart: ((Int) -&gt; Void)?\n\n    func suggestion(for name: String) async throws -&gt; String {\n        let id = nextID\n        nextID += 1\n        return try await withCheckedThrowingContinuation { continuation in\n            pending[id] = continuation\n            onStart?(id)\n        }\n    }\n\n    func finish(_ id: Int, with result: Result&lt;String, Error&gt;) {\n        guard let continuation = pending.removeValue(forKey: id) else {\n            XCTFail(\"Missing or already finished request\")\n            return\n        }\n        continuation.resume(with: result)\n    }\n}\n\nenum TestFailure: Error { case synthetic }\n\nfinal class PlanDraftTests: XCTestCase {\n    @MainActor\n    func testEligibilityAndReset() {\n        let draft = PlanDraft()\n        draft.name = \"   \"\n        draft.topic = .reading\n        XCTAssertFalse(draft.canReview)\n        draft.name = \"Demo Ada\"\n        draft.reminder = true\n        XCTAssertTrue(draft.canReview)\n        draft.reset()\n        XCTAssertEqual(draft.name, \"\")\n        XCTAssertNil(draft.topic)\n        XCTAssertFalse(draft.reminder)\n        XCTAssertFalse(draft.canReview)\n    }\n\n    @MainActor\n    func testOldSuccessAndErrorCannotReplaceNewA() async {\n        let draft = PlanDraft()\n        let service = ControlledSuggestion()\n        let started0 = expectation(description: \"A1 started\")\n        let started1 = expectation(description: \"B started\")\n        let started2 = expectation(description: \"A2 started\")\n        service.onStart = { id in\n            switch id {\n            case 0: started0.fulfill()\n            case 1: started1.fulfill()\n            case 2: started2.fulfill()\n            default: XCTFail(\"Unexpected extra request\")\n            }\n        }\n\n        draft.name = \"A\"\n        let a1 = Task { await draft.load(service: service) }\n        await fulfillment(of: [started0], timeout: 2)\n        draft.name = \"B\"\n        let b = Task { await draft.load(service: service) }\n        await fulfillment(of: [started1], timeout: 2)\n        draft.name = \"A\"\n        let a2 = Task { await draft.load(service: service) }\n        await fulfillment(of: [started2], timeout: 2)\n\n        service.finish(2, with: .success(\"Current A2\"))\n        await a2.value\n        XCTAssertEqual(draft.suggestion, \"Current A2\")\n        service.finish(0, with: .success(\"Old A1\"))\n        await a1.value\n        XCTAssertEqual(draft.suggestion, \"Current A2\")\n        service.finish(1, with: .failure(TestFailure.synthetic))\n        await b.value\n        XCTAssertEqual(draft.suggestion, \"Current A2\")\n        XCTAssertNil(draft.errorMessage)\n    }\n}</code></pre><p>ControlledSuggestion intentionally does not observe cancellation while waiting. That lets the test challenge freshness even when obsolete work finishes. Each started request is released and each Task is awaited on the normal test path, preventing unfinished continuations from being mistaken for cancelled producers. A robust test harness should additionally drain pending requests on unexpected setup failure or timeout. The two-second expectation timeout is a failure bound, not the schedule used to decide completion order.</p><p>These tests are authored examples, not a claim they ran. Use Product → Test with the app scheme's test action and a compatible simulator. Record failures, toolchain and destination. Add a separate invalidation-only test and old-error-for-A1 variation when extending the suite. Do not add tests merely counting body evaluations; test the behavior the user relies on.</p>"
+        },
+        {
+          "id": "ui",
+          "title": "Test interaction separately from model truth",
+          "html": "<p>The following belongs to the UI-test target. It launches the scratch app, types a synthetic name, selects a topic, opens Review, returns and resets. waitForExistence waits for a UI condition rather than assuming a fixed delay. Accessibility identifiers locate stable controls, while labels used for topic choices are fixture strings. A localized suite should use stable identifiers for those choices too.</p><pre><code class=\"language-swift\">import XCTest\n\nfinal class PlanFlowUITests: XCTestCase {\n    func testChooseReviewReturnAndReset() {\n        let app = XCUIApplication()\n        app.launch()\n        let name = app.textFields[\"nameField\"]\n        XCTAssertTrue(name.waitForExistence(timeout: 5))\n        name.tap()\n        name.typeText(\"Demo Ada\")\n        app.buttons[\"Choose topic\"].tap()\n        app.buttons[\"Demo reading\"].tap()\n        app.buttons[\"reviewLink\"].tap()\n        XCTAssertTrue(app.navigationBars[\"Review\"].waitForExistence(timeout: 5))\n        app.navigationBars[\"Review\"].buttons.element(boundBy: 0).tap()\n        app.buttons[\"resetButton\"].tap()\n        XCTAssertEqual(name.value as? String, \"Demo name\")\n        XCTAssertFalse(app.buttons[\"reviewLink\"].isEnabled)\n    }\n}</code></pre><p>The sample's back-button lookup and empty-field placeholder expectation reflect a simple English simulator fixture. Inspect the actual accessibility hierarchy and adjust those queries for the chosen runtime; do not report a passing UI test just because the source compiles. Model tests cannot prove tap routing, keyboard obstruction, modal gesture behavior or VoiceOver order. UI automation also does not replace assistive-technology inspection and adaptive layout checks.</p><p>Add a manual Cancel sequence with an existing topic and verify preservation. Test a long name, large text and a narrow window. For work lifetime, leave the relevant root scope during a controlled request and distinguish task cancellation from publication rejection. Never use real personal data to make the app look realistic.</p>"
+        },
+        {
+          "id": "debug",
+          "title": "Classify failures by their responsible boundary",
+          "html": "<p>If typing does not change eligibility, inspect binding, shared reference and derived reads. If Cancel clears topic, inspect the picker action rather than navigation. If Review is disabled after valid input, check both trimmed name and optional topic. If Reset leaves an old suggestion, inspect invalidation and both completion paths. If old errors overwrite current data, reproduce the gated schedule before changing timing.</p><p>If tests cannot import the app, check the Swift module name, test host and membership. A unit-test file compiled into the app target cannot simply import XCTest and become a test bundle. If UI queries fail, inspect runtime accessibility identifiers and hierarchy. If a preview fails, verify its explicit dependencies and compile diagnostics before assuming the app cannot launch.</p><p>The active booking demo's project manifest declares separate app, unit-test and UI-test targets, providing verified evidence for those distinct products. Its dependencies and deployment minimum are checkout facts, not requirements to copy into SwiftUICapstone. The company client remains read-only. The companion at labs/SwiftUIWorkbench provides an isolated app and widget target with inspectable source. Check its README and actual target membership before using a component in the capstone.</p>"
+        },
+        {
+          "id": "handoff",
+          "title": "Report what was authored, checked, and observed",
+          "html": "<p>Your handoff should include the behavior contract, owner map, fixture description, chosen deployment minimum, module/test membership and exact verification results. Distinguish schema or source review, compiler type checking, linked app build, simulator Run, executed unit tests, executed UI tests, manual accessibility inspection and disk restart. An unperformed check remains pending; it does not become success because a similar repository test exists.</p><p>For this capstone, the ownership map is root → one draft; picker and review → that reference; root-associated task → injected suggestion service; token → permission to publish; no store → no process-restart draft. It is intentionally bounded so the learner can explain every boundary. Advanced coordinators, bridge integration, migration and production service adapters remain the earlier core and deeper tracks.</p><p>Finish by identifying one failure you reproduced or one check still unperformed, the evidence needed next and the smallest responsible change. That makes the work useful for review and continued learning. Course attendance and a working synthetic feature do not certify exhaustive platform expertise. A clear, tested behavior contract is a practical first iOS delivery milestone.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which target should contain PlanDraftTests?",
+          "options": [
+            "The hosted unit-test target with the correct app module import",
+            "The app source target",
+            "An image asset catalog"
+          ],
+          "answer": 0,
+          "explanation": "Tests are a separate buildable product with test-host/module configuration."
+        },
+        {
+          "question": "Why deliberately let the controlled service finish obsolete requests?",
+          "options": [
+            "To prove every server stops",
+            "To exercise freshness guards independently of cancellation",
+            "To make the UI slower"
+          ],
+          "answer": 1,
+          "explanation": "An immediately cancelled fixture may never challenge obsolete publication."
+        },
+        {
+          "question": "A model test passes. What remains separate evidence?",
+          "options": [
+            "Model eligibility",
+            "The Reset field values",
+            "UI interaction, accessibility and simulator launch"
+          ],
+          "answer": 2,
+          "explanation": "Each test layer proves a bounded contract."
+        }
+      ],
+      "exercise": {
+        "brief": "Build the synthetic capstone, execute meaningful tests where available, and write a bounded engineering handoff.",
+        "steps": [
+          "Create SwiftUICapstone with app, unit-test and UI-test products and an iOS 17 minimum.",
+          "Add app source and each test block to its intended target; confirm module name.",
+          "Run model tests and inspect their gated schedules and actual outcomes.",
+          "Run or adapt UI automation after inspecting the simulator hierarchy.",
+          "Manually test Cancel preservation and adaptive/accessibility cases.",
+          "Write verified versus pending evidence and ownership/persistence limits."
+        ],
+        "acceptance": [
+          "One shared draft backs editing, picker and review.",
+          "Eligibility, Cancel, Reset and current-result rules are enforced.",
+          "Old success and error tests use actual start/completion gates.",
+          "Tests have correct membership and all normal-path gate requests finish.",
+          "The handoff never claims unexecuted tests or app interaction passed."
+        ],
+        "solution": "<p>The app and tests above form the worked reference. Start with eligibility/Reset, then run the completion-gated test: A2 publishes Current A2, old A1 success is ignored, and old B error cannot replace it. The token is independent of query text and the fixture intentionally ignores cancellation. Extend that test with explicit invalidation before any replacement request and with old A1 error to challenge the remaining schedules.</p><p>The UI sequence should end with an empty name and disabled Review under the supplied English fixture, but query details must match the actual runtime hierarchy. Cancel with an existing topic must preserve it because no cancel action assigns topic. A final note should list actual test command/action, destination, outcome and unresolved failures. If only source type checking was possible, state that; linking, Run and interaction remain pending. No persisted draft, company source change or real request is part of this capstone. Compare with the SwiftUIWorkbench companion using its actual source and recorded verification; a build result does not establish app interaction.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: XCTest",
+          "url": "https://developer.apple.com/documentation/xctest"
+        },
+        {
+          "label": "Apple: Testing your apps in Xcode",
+          "url": "https://developer.apple.com/documentation/xcode/testing-your-apps-in-xcode"
+        },
+        {
+          "label": "Apple: Asynchronous tests and expectations",
+          "url": "https://developer.apple.com/documentation/xctest/asynchronous-tests-and-expectations"
+        },
+        {
+          "label": "Apple: XCUIElement",
+          "url": "https://developer.apple.com/documentation/xcuiautomation/xcuielement"
+        }
+      ],
+      "repo": [
+        {
+          "label": "The active manifest defines separate unit-test and UI-test targets alongside the app",
+          "path": "ios-client/Projects/Apps/ZDBookingDemoApp/Project.swift",
+          "line": 45,
+          "why": "The active manifest defines separate unit-test and UI-test targets alongside the app."
+        }
+      ],
+      "checklist": [
+        "I can assemble a complete synthetic SwiftUI workflow.",
+        "I can test eligibility, cancellation outcomes and stale-result rejection.",
+        "I can place source and tests in the correct products.",
+        "I can write a handoff distinguishing authored examples from executed evidence."
+      ]
+    }
+  ]
+}

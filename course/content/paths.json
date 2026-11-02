@@ -1,0 +1,661 @@
+{
+  "version": 1,
+  "paths": [
+    {
+      "id": "swift",
+      "title": "Learn Swift from zero",
+      "summary": "A language-first sequence: run a program, predict its values, construct types and verify a complete model before importing UI frameworks.",
+      "audience": "Start here even with extensive Kotlin or Java experience. Existing session IDs remain unchanged; the reading order starts at 057.",
+      "evidence": [
+        "Run a scratch program and explain its output, including one failed prediction.",
+        "Implement collections, functions and value types without copying the answer.",
+        "Explain initialization, generic relationships, error propagation and captured lifetimes through actual calls."
+      ],
+      "stages": [
+        {
+          "title": "Run, express and transform",
+          "summary": "Learn syntax and collections before abstraction.",
+          "lessons": [
+            "057",
+            "058",
+            "059",
+            "060",
+            "061",
+            "062",
+            "063"
+          ],
+          "workshops": [
+            "swift-workbench"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Construct types and make contracts",
+          "summary": "Use initialization and generic companions after the corresponding type lesson, then attempt the integrated language lab. Async machinery belongs to the later production path.",
+          "lessons": [
+            "064",
+            "065",
+            "066",
+            "067",
+            "068",
+            "069",
+            "070"
+          ],
+          "workshops": [
+            "swift-workbench"
+          ],
+          "guides": [
+            "initialization-access",
+            "generic-contracts"
+          ]
+        },
+        {
+          "title": "Revisit the original foundations",
+          "summary": "Apply the new language foundation to the current client and retrieval tasks.",
+          "lessons": [
+            "001",
+            "002",
+            "003",
+            "004",
+            "005",
+            "006",
+            "007"
+          ],
+          "workshops": [],
+          "guides": []
+        }
+      ]
+    },
+    {
+      "id": "swiftui",
+      "title": "Learn SwiftUI from zero",
+      "summary": "Create a runnable app, compose controls, preview fixtures, share state and deliver a tested adaptive feature.",
+      "audience": "Complete the Swift bootcamp first, or demonstrate its language exercises. This path does not assume UIKit knowledge.",
+      "evidence": [
+        "Build and run a synthetic app with the documented target and runtime.",
+        "Predict which identity owns each state value and verify updates and cancellation.",
+        "Deliver a feature with accessible controls, persistence, negative cases and independent review."
+      ],
+      "stages": [
+        {
+          "title": "First app to editable collections",
+          "summary": "Start with Xcode, controls and previews before observation and lists.",
+          "lessons": [
+            "071",
+            "072",
+            "073",
+            "074",
+            "075",
+            "076",
+            "077"
+          ],
+          "workshops": [
+            "swiftui-workbench"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Dependencies to a delivered feature",
+          "summary": "Build environment/style contracts, navigation, effects, adaptive UI and a persistent capstone.",
+          "lessons": [
+            "078",
+            "079",
+            "080",
+            "081",
+            "082",
+            "083",
+            "084"
+          ],
+          "workshops": [
+            "swiftui-workbench",
+            "ui-accessibility",
+            "persistence-store"
+          ],
+          "guides": []
+        }
+      ]
+    },
+    {
+      "id": "delivery",
+      "title": "UIKit and mixed-framework delivery",
+      "summary": "Connect the beginner SwiftUI app to the UIKit/coordinator architecture used by the client.",
+      "audience": "After the language and SwiftUI tracks. Read legacy patterns accurately without assuming a repository-wide migration.",
+      "evidence": [
+        "Trace one user action through public APIs and retained owners.",
+        "Build a reusable, keyboard-safe UI with all terminal flow outcomes.",
+        "Verify selection identity, bridge updates, large text and interrupted interaction."
+      ],
+      "stages": [
+        {
+          "title": "Controllers, bridges and feature evidence",
+          "summary": "Use the original delivery lessons with the runnable companion.",
+          "lessons": [
+            "008",
+            "009",
+            "010",
+            "011",
+            "012",
+            "013",
+            "014"
+          ],
+          "workshops": [
+            "swiftui-workbench",
+            "concurrency-gates"
+          ],
+          "guides": []
+        },
+        {
+          "title": "UI engineering under change",
+          "summary": "Practice constraints, reusable lists, proposals, interaction, editing and scenes.",
+          "lessons": [
+            "029",
+            "030",
+            "031",
+            "032",
+            "033",
+            "034",
+            "035"
+          ],
+          "workshops": [
+            "ui-accessibility",
+            "swiftui-workbench"
+          ],
+          "guides": []
+        },
+        {
+          "title": "UI runtime and scene correctness",
+          "summary": "Follow responder and runtime dispatch, inspect layer animation state, implement layout invalidation, and separate app, scene and view lifetimes.",
+          "lessons": [
+            "093",
+            "094",
+            "095",
+            "096"
+          ],
+          "workshops": [
+            "ui-runtime-lab"
+          ],
+          "guides": []
+        }
+      ]
+    },
+    {
+      "id": "production",
+      "title": "Production iOS engineering",
+      "summary": "Own concurrency, account-scoped data, performance, security, build artifacts and platform services with reproducible evidence.",
+      "audience": "After delivering one bounded scratch feature. A lesson may take multiple daily blocks; device-specific claims require device evidence.",
+      "evidence": [
+        "Reject old success and error results under controlled schedules.",
+        "Retain a trace, explain a bottleneck and evaluate a correctness-preserving candidate.",
+        "Inspect the built artifact and exercise actual adapters separately from pure policy tests."
+      ],
+      "stages": [
+        {
+          "title": "Data and production contracts",
+          "summary": "Establish cancellation, storage, reliability, privacy and release boundaries.",
+          "lessons": [
+            "015",
+            "016",
+            "017",
+            "018",
+            "019",
+            "020",
+            "021",
+            "022",
+            "023",
+            "024",
+            "025",
+            "026"
+          ],
+          "workshops": [
+            "concurrency-gates",
+            "foundation-files",
+            "artifact-debugging",
+            "persistence-store"
+          ],
+          "guides": [
+            "callback-ownership"
+          ]
+        },
+        {
+          "title": "Measure the application and build",
+          "summary": "Record first investigations and turn observations into regression decisions.",
+          "lessons": [
+            "036",
+            "037",
+            "038",
+            "039",
+            "040",
+            "041",
+            "042"
+          ],
+          "workshops": [
+            "instruments-first-run",
+            "regression-decisions"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Own the dependency and artifact graph",
+          "summary": "Inspect configurations, resources, symbols, test execution and bounded changes.",
+          "lessons": [
+            "043",
+            "044",
+            "045",
+            "046",
+            "047",
+            "048",
+            "049"
+          ],
+          "workshops": [
+            "artifact-debugging"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Connect platform capabilities",
+          "summary": "Wire system entry points and persistence before claiming platform competence.",
+          "lessons": [
+            "050",
+            "051",
+            "052",
+            "053",
+            "054",
+            "055",
+            "056"
+          ],
+          "workshops": [
+            "platform-adapters",
+            "persistence-store",
+            "foundation-files"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Event loops, scheduling and synchronization",
+          "summary": "Trace RunLoop delivery, compare legacy work ownership, protect short synchronous state, and avoid blocking a cooperative executor.",
+          "lessons": [
+            "085",
+            "086",
+            "087",
+            "088"
+          ],
+          "workshops": [
+            "runtime-scheduling-lab"
+          ],
+          "guides": [
+            "callback-ownership"
+          ]
+        },
+        {
+          "title": "Modern concurrency and language boundaries",
+          "summary": "Reproduce checking/settings differences, preserve transfer contracts, test clock/context/channel behavior, and identify unsafe ownership obligations.",
+          "lessons": [
+            "089",
+            "090",
+            "091",
+            "092"
+          ],
+          "workshops": [
+            "swift6-migration-lab"
+          ],
+          "guides": [
+            "generic-contracts"
+          ]
+        },
+        {
+          "title": "Durable data, offline replay and authentication",
+          "summary": "Upgrade actual old stores where supported, reload a persistent outbox, reconcile ambiguous writes, and keep account and protected-data ownership explicit.",
+          "lessons": [
+            "097",
+            "098",
+            "099",
+            "100"
+          ],
+          "workshops": [
+            "durable-data-lab"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Instrument a workload and retain evidence",
+          "summary": "Build the instrumented scratch workload, capture real traces when a device is available, then analyze matching raw observations without inventing missing measurements.",
+          "lessons": [
+            "101",
+            "102",
+            "103",
+            "104"
+          ],
+          "workshops": [
+            "profiling-evidence-lab"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Deliver, review and sustain adoption",
+          "summary": "Inspect artifact identity and operational evidence, revise a staff delivery decision under critique, and defend a principal adoption or deprecation plan.",
+          "lessons": [
+            "105",
+            "106",
+            "107",
+            "108"
+          ],
+          "workshops": [
+            "delivery-review-lab"
+          ],
+          "guides": []
+        }
+      ]
+    },
+    {
+      "id": "staff",
+      "title": "Staff iOS engineering practice",
+      "summary": "Make sound decisions across feature boundaries: compare alternatives, own migration risk and improve the team's ability to deliver.",
+      "audience": "After repeated independently reviewed implementation. This is an evidence path, not a promotion checklist.",
+      "evidence": [
+        "A reviewed RFC includes alternatives, compatibility, risk owners and a reversible rollout.",
+        "A measured improvement preserves correctness and has an operational owner.",
+        "Another engineer can reproduce the implementation and verification; adoption feedback changes the proposal."
+      ],
+      "stages": [
+        {
+          "title": "Bounded design and delivery",
+          "summary": "Connect data, architecture and cross-framework implementation.",
+          "lessons": [
+            "020",
+            "021",
+            "035",
+            "049"
+          ],
+          "workshops": [
+            "concurrency-gates",
+            "staff-principal-decisions"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Evidence and operational accountability",
+          "summary": "Connect instrumentation, incident reasoning, privacy and delivery.",
+          "lessons": [
+            "022",
+            "023",
+            "024",
+            "025",
+            "026",
+            "042",
+            "048"
+          ],
+          "workshops": [
+            "instruments-first-run",
+            "artifact-debugging",
+            "regression-decisions"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Reviewed portfolio and influence",
+          "summary": "Submit artifacts and independent feedback, not attendance or self-scores.",
+          "lessons": [
+            "027",
+            "028",
+            "056",
+            "084"
+          ],
+          "workshops": [
+            "staff-principal-decisions"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Verified delivery and independent revision",
+          "summary": "Connect durable recovery, actual diagnostic evidence and artifact identity to a challenged staff implementation handoff.",
+          "lessons": [
+            "097",
+            "098",
+            "099",
+            "100",
+            "101",
+            "102",
+            "103",
+            "104",
+            "105",
+            "106",
+            "107"
+          ],
+          "workshops": [
+            "durable-data-lab",
+            "profiling-evidence-lab",
+            "delivery-review-lab"
+          ],
+          "guides": []
+        }
+      ]
+    },
+    {
+      "id": "principal",
+      "title": "Principal iOS platform practice",
+      "summary": "Practice multi-team platform strategy: product invariants, investment choices, compatibility portfolios, adoption and long-term operational accountability.",
+      "audience": "After sustained staff-level delivery and influence. The course provides review scenarios; principal competence requires real organizational outcomes.",
+      "evidence": [
+        "A cross-team decision compares migration, coexistence and no-change options with explicit cost and risk.",
+        "A compatibility and ownership map covers consumers, SDK/OS constraints, account/process boundaries and recovery.",
+        "A staged adoption plan includes incentives, observability, deprecation exit criteria and evidence that can reverse the strategy.",
+        "Reviewers from affected teams challenge the proposal; revised decisions and sustained outcomes form the evidence."
+      ],
+      "stages": [
+        {
+          "title": "Platform boundaries and compatibility portfolio",
+          "summary": "Identify contracts across UI, services, modules, artifacts and extension processes.",
+          "lessons": [
+            "021",
+            "034",
+            "043",
+            "044",
+            "045",
+            "048",
+            "053",
+            "056"
+          ],
+          "workshops": [
+            "platform-adapters",
+            "persistence-store",
+            "artifact-debugging"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Investment, migration and operational risk",
+          "summary": "Use measured constraints rather than a framework preference.",
+          "lessons": [
+            "024",
+            "025",
+            "026",
+            "027",
+            "041",
+            "042",
+            "049"
+          ],
+          "workshops": [
+            "instruments-first-run",
+            "regression-decisions",
+            "staff-principal-decisions"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Multi-team review and sustained impact",
+          "summary": "Defend the worked strategy, revise it under critique and state missing organizational evidence.",
+          "lessons": [
+            "028"
+          ],
+          "workshops": [
+            "staff-principal-decisions"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Runtime constraints and sustained platform outcomes",
+          "summary": "Test version/isolation and durable-transaction assumptions, then revise adoption and retirement decisions using independent evidence and exceptions.",
+          "lessons": [
+            "088",
+            "089",
+            "090",
+            "097",
+            "098",
+            "100",
+            "104",
+            "105",
+            "106",
+            "107",
+            "108"
+          ],
+          "workshops": [
+            "runtime-scheduling-lab",
+            "swift6-migration-lab",
+            "durable-data-lab",
+            "profiling-evidence-lab",
+            "delivery-review-lab"
+          ],
+          "guides": []
+        }
+      ]
+    },
+    {
+      "id": "advanced",
+      "title": "Runtime and production practice",
+      "summary": "Close the audited gaps through 24 sessions with concrete companions, explained assessment and separate host, native, device and review evidence.",
+      "audience": "After Swift, SwiftUI and the relevant core lessons; experienced Android engineers preparing to own iOS delivery.",
+      "stages": [
+        {
+          "title": "Event loops, scheduling and synchronization",
+          "summary": "Trace RunLoop delivery, compare legacy work ownership, protect short synchronous state, and avoid blocking a cooperative executor.",
+          "lessons": [
+            "085",
+            "086",
+            "087",
+            "088"
+          ],
+          "workshops": [
+            "runtime-scheduling-lab"
+          ],
+          "guides": [
+            "callback-ownership"
+          ]
+        },
+        {
+          "title": "Modern concurrency and language boundaries",
+          "summary": "Reproduce checking/settings differences, preserve transfer contracts, test clock/context/channel behavior, and identify unsafe ownership obligations.",
+          "lessons": [
+            "089",
+            "090",
+            "091",
+            "092"
+          ],
+          "workshops": [
+            "swift6-migration-lab"
+          ],
+          "guides": [
+            "generic-contracts"
+          ]
+        },
+        {
+          "title": "UI runtime and scene correctness",
+          "summary": "Follow responder and runtime dispatch, inspect layer animation state, implement layout invalidation, and separate app, scene and view lifetimes.",
+          "lessons": [
+            "093",
+            "094",
+            "095",
+            "096"
+          ],
+          "workshops": [
+            "ui-runtime-lab"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Durable data, offline replay and authentication",
+          "summary": "Upgrade actual old stores where supported, reload a persistent outbox, reconcile ambiguous writes, and keep account and protected-data ownership explicit.",
+          "lessons": [
+            "097",
+            "098",
+            "099",
+            "100"
+          ],
+          "workshops": [
+            "durable-data-lab"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Instrument a workload and retain evidence",
+          "summary": "Build the instrumented scratch workload, capture real traces when a device is available, then analyze matching raw observations without inventing missing measurements.",
+          "lessons": [
+            "101",
+            "102",
+            "103",
+            "104"
+          ],
+          "workshops": [
+            "profiling-evidence-lab"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Deliver, review and sustain adoption",
+          "summary": "Inspect artifact identity and operational evidence, revise a staff delivery decision under critique, and defend a principal adoption or deprecation plan.",
+          "lessons": [
+            "105",
+            "106",
+            "107",
+            "108"
+          ],
+          "workshops": [
+            "delivery-review-lab"
+          ],
+          "guides": []
+        }
+      ],
+      "evidence": [
+        "A traced event or task lifetime and a reproduced correctness check, with effective language and isolation settings.",
+        "An old-store or durable-replay fixture plus explicit account, failure and recovery outcomes.",
+        "An actual trace or a clearly pending capture record, followed by a revised implementation and independent critique."
+      ]
+    },
+    {
+      "id": "specialists",
+      "title": "Apple feature electives",
+      "summary": "Choose commerce, live updates, cloud documents, rich media or other Apple capabilities from product needs and platform contracts. These entry lessons do not establish mastery of every framework.",
+      "audience": "Engineers whose feature responsibility needs a specialist Apple capability after the core and production paths.",
+      "stages": [
+        {
+          "title": "Commerce and cloud lifetimes",
+          "summary": "Separate purchases and entitlements from UI updates, and durable local changes from multi-device conflict reconciliation.",
+          "lessons": [
+            "109",
+            "110"
+          ],
+          "workshops": [
+            "specialist-selection-lab"
+          ],
+          "guides": []
+        },
+        {
+          "title": "Media, text, hardware and additional platforms",
+          "summary": "Choose a bounded mechanism and measure its input, resource, lifecycle, entitlement and consent requirements.",
+          "lessons": [
+            "111",
+            "112"
+          ],
+          "workshops": [
+            "specialist-selection-lab"
+          ],
+          "guides": []
+        }
+      ],
+      "evidence": [
+        "A feature selection record explaining the required system contract and a viable simpler alternative.",
+        "A synthetic policy check or a bounded real sandbox/device exercise with environment and outcome recorded.",
+        "Explicit unsupported states, a recovery policy and the next specialist project or review owner."
+      ]
+    }
+  ]
+}

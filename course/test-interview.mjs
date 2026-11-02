@@ -11,6 +11,7 @@ vm.runInContext(await fs.readFile(path.join(root, 'interview-state.js'), 'utf8')
 const model = context.IOSInterviewState;
 const lessons = context.window.IOS_COURSE.lessons;
 const questions = [{ id: 'iq-001-a' }, { id: 'iq-001-b' }];
+const allQuestions = context.window.IOS_COURSE.interview.questions;
 let checks = 0;
 const check = (value, message) => { assert.ok(value, message); checks++; };
 const throws = (callback, message) => { assert.throws(callback, undefined, message); checks++; };
@@ -73,4 +74,19 @@ const wrongActive = { ...active, answers: { [keys[0]]: incorrect.answers[keys[0]
 throws(() => model.merge({ ...model.empty(), activeQuiz: wrongActive }, finished, questions, lessons), 'A conflicting completed result cannot silently discard a draft');
 throws(() => model.normalize({ ...model.empty(), quizzes: [quiz, quiz] }, questions, lessons), 'Repeated quiz IDs inside one backup are rejected');
 check(model.allowance(questions) > 2000000, 'Export allowance covers bounded text and history');
+const migrated = model.normalize(state, allQuestions, lessons);
+check(JSON.stringify(migrated.questions['iq-001-a']) === JSON.stringify(state.questions['iq-001-a']), 'Original attempts and drafts survive the 168-prompt expansion');
+check(!migrated.questions['iq-057-a'] && !migrated.questions['iq-084-b'], 'New prompts have no inferred practice');
+const newState = model.addAttempt(migrated, 'iq-084-b', attempt('attempt-new-capstone'), allQuestions, lessons);
+check(newState.questions['iq-084-b'].attempts.length === 1 && newState.questions['iq-001-a'].attempts.length === 3, 'New capstone rehearsal preserves original history');
+const productionExpanded = model.normalize(newState, allQuestions, lessons);
+check(JSON.stringify(productionExpanded.questions['iq-084-b']) === JSON.stringify(newState.questions['iq-084-b']) && !productionExpanded.questions['iq-085-a'] && !productionExpanded.questions['iq-112-b'], '84-session interview history survives the production expansion without inferred new attempts');
+const specialistAttempt = model.addAttempt(productionExpanded, 'iq-112-b', attempt('attempt-specialist'), allQuestions, lessons);
+check(specialistAttempt.questions['iq-112-b'].attempts.length === 1 && specialistAttempt.questions['iq-084-b'].attempts.length === 1, 'Elective interview practice remains separate from existing capstone history');
+for (const id of ['057','070','071','084','085','092','096','100','104','108','112']) {
+  const newKeys = [...index.keys()].filter(key => key.startsWith(`q-${id}-`));
+  check(newKeys.length === lessons.find(item => item.id === id).quiz.length, `Beginner quiz-bank scope ${id}`);
+  const beginnerQuiz = { ...quiz, id: `quiz-${id}`, keys: newKeys, answers: Object.fromEntries(newKeys.map(key => [key, index.get(key).answer])) };
+  check(model.grade(beginnerQuiz, lessons).correct === newKeys.length, `Actual beginner answer keys ${id}`);
+}
 console.log(`Passed ${checks} pure interview-ledger checks: history, dates, scoring, bounds, immutable failures, backup merge/conflicts, and quiz resumability. No learner data was changed.`);

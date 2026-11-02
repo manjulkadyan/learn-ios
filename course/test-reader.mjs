@@ -118,7 +118,9 @@ reader.document.dispatch('change', { target: exercise });
 check(!reader.state().lessons['001'].reviewed, 'Unchecking exercise clears review');
 reader.route('#reference');
 reader.click({ category: 'Concurrency' });
-check(reader.get('reference-count').textContent === '4 comparisons', 'Category filter');
+const concurrencyReferences = reader.env.IOS_COURSE.reference.filter(item => item.category === 'Concurrency');
+check(reader.get('reference-count').textContent === `${concurrencyReferences.length} comparisons`, 'Category filter includes registered concurrency references');
+check(concurrencyReferences.every(item => reader.get('reference-grid').innerHTML.includes(`id="ref-${item.id}"`)) && !reader.get('reference-grid').innerHTML.includes('id="ref-weak"'), 'Category filter shows matching old and new entries and excludes unrelated entries');
 const query = reader.get('reference-query'); query.id = 'reference-query'; query.value = 'weak';
 reader.document.dispatch('input', { target: query });
 check(reader.get('reference-count').textContent === '0 comparisons', 'Combined category and text filtering');
@@ -140,7 +142,48 @@ for (const guide of reader.env.IOS_COURSE.essentials) {
   check(reader.get(`g-${guide.id}-${guide.sections[0].id}`).scrolled, `Guide section navigation ${guide.id}`);
   reader.route(`#essentials/${guide.id}/exercise`);
   check(reader.get(`g-${guide.id}-exercise`).scrolled, `Guide exercise navigation ${guide.id}`);
+  reader.route(`#essentials/${guide.id}/quiz`);
+  check(reader.get(`g-${guide.id}-quiz`).scrolled && reader.html().includes(guide.quiz[0].explanation), `Supplement assessments and anchor ${guide.id}`);
 }
+reader.route('#paths');
+check(reader.html().includes('Paths with an evidence trail.') && reader.html().includes('#path/swift') && reader.html().includes('#path/principal'), 'Beginner and principal paths are discoverable');
+for (const learningPath of reader.env.IOS_COURSE.paths) {
+  const unchanged = JSON.stringify(reader.state());
+  reader.route(`#path/${learningPath.id}`);
+  check(reader.html().includes(learningPath.title) && reader.html().includes(learningPath.evidence[0]), `Complete learning path ${learningPath.id}`);
+  check(learningPath.stages.flatMap(stage => stage.lessons).every(id => reader.html().includes(`#lesson/${id}`)), `Every path lesson reachable ${learningPath.id}`);
+  check(JSON.stringify(reader.state()) === unchanged, `Path does not reset saved position or pending work ${learningPath.id}`);
+}
+reader.route('#path/missing');
+check(reader.html().includes('Learning path not found.'), 'Unknown path fallback');
+reader.route('#workshops');
+check(reader.html().includes('Practice with inspectable code.') && reader.html().includes('#workshops/swift-workbench'), 'Runnable workbench directory');
+for (const workshop of reader.env.IOS_COURSE.workshops) {
+  const unchanged = JSON.stringify(reader.state());
+  reader.route(`#workshops/${workshop.id}`);
+  check(reader.html().includes(workshop.title) && reader.html().includes(workshop.exercise.brief) && reader.html().includes(workshop.quiz[0].explanation), `Workbench explanation, practice and assessment ${workshop.id}`);
+  check(workshop.files.every(file => reader.html().includes(`#artifact/${encodeURIComponent(file.path)}`)), `All workbench files inspectable ${workshop.id}`);
+  check(JSON.stringify(reader.state()) === unchanged && !reader.html().includes('data-reviewed='), `Provided code does not imply learner completion ${workshop.id}`);
+  for (const section of [...workshop.sections.map(item => item.id), 'files','exercise','quiz','sources']) {
+    reader.route(`#workshops/${workshop.id}/${section}`);
+    check(reader.get(`w-${workshop.id}-${section}`).scrolled, `Workbench anchor ${workshop.id}/${section}`);
+  }
+}
+reader.route('#workshops/missing');
+check(reader.html().includes('Workbench not found.'), 'Unknown workbench fallback');
+for (const artifact of reader.env.IOS_COURSE.artifacts) {
+  reader.route(`#artifact/${encodeURIComponent(artifact.path)}`);
+  check(reader.html().includes(artifact.path) && reader.html().includes('Bundled offline source'.toUpperCase()), `Offline artifact route ${artifact.path}`);
+  check(reader.html().includes(artifact.source.replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]))), `Source text is escaped exactly ${artifact.path}`);
+}
+for (const id of ['missing','%ZZ','..%2Fstate.js']) {
+  reader.route(`#artifact/${id}`);
+  check(reader.html().includes('Companion file not found.'), `Invalid artifact route ${id}`);
+}
+reader.get('search-input').dispatch('input', { target: { value: 'principal' } });
+check(reader.get('search-results').innerHTML.includes('#path/principal'), 'Learning paths are searchable');
+reader.get('search-input').dispatch('input', { target: { value: 'Swift workbench' } });
+check(reader.get('search-results').innerHTML.includes('#workshops/'), 'Workbenches are searchable');
 reader.get('search-input').dispatch('input', { target: { value: 'associatedtype' } });
 check(reader.get('search-results').innerHTML.includes('#essentials/generic-contracts'), 'Supplement prose is full-text searchable');
 reader.route('#essentials/missing-guide');
@@ -150,9 +193,9 @@ check(reader.html().includes('A saved note.') && reader.html().includes('1 saved
 reader.route('#plan');
 check(reader.html().includes('45-minute') && reader.html().includes('Your next seven sessions'), 'Daily plan explains pacing');
 reader.route('#coverage');
-check(reader.html().includes('The platform, mapped.') && reader.get('coverage-count').textContent === '118 matching topics', 'Coverage map renders all audited topics');
+check(reader.html().includes('The platform, mapped.') && reader.get('coverage-count').textContent === `${reader.env.IOS_COURSE.coverage.groups.flatMap(group => group.topics).length} matching topics`, 'Coverage map renders all audited topics');
 reader.click({ coverageLevel: 'further-study' });
-check(reader.get('coverage-count').textContent === '10 matching topics', 'Specialist gaps are explicitly filterable');
+check(reader.get('coverage-count').textContent === `${reader.env.IOS_COURSE.coverage.groups.flatMap(group => group.topics).filter(topic => topic.level === 'further-study').length} matching topics`, 'Specialist gaps are explicitly filterable');
 reader.click({ coverageLevel: 'all' });
 const coverageQuery = reader.get('coverage-query'); coverageQuery.id = 'coverage-query'; coverageQuery.value = 'launch';
 reader.document.dispatch('input', { target: coverageQuery });
@@ -183,6 +226,11 @@ restored.route('#lesson/999');
 check(restored.html().includes('Session not found.'), 'Unknown lesson has useful fallback');
 const offline = start('file:'); offline.route('#lesson/001');
 check(offline.html().includes('file:') && !offline.html().includes('href="source?'), 'Direct-file source link generation');
+const offlineArtifact = reader.env.IOS_COURSE.artifacts[0];
+offline.route(`#artifact/${encodeURIComponent(offlineArtifact.path)}`);
+check(offline.html().includes(`href="${new URL(offlineArtifact.path, offline.env.location.href).href}"`), 'Offline companions use correct local-file URLs');
+offline.route('#path/swift');
+check(offline.html().includes('#lesson/057'), 'Language-first path works offline');
 const mobile = start('http:', true);
 check(mobile.get('sidebar').inert, 'Closed mobile navigation is not keyboard-focusable');
 mobile.get('menu-button').dispatch('click');
@@ -190,7 +238,7 @@ check(!mobile.get('sidebar').inert, 'Open mobile navigation is interactive');
 mobile.route('#home');
 check(mobile.get('sidebar').inert, 'Navigation route restores closed mobile state');
 reader.route('#interviews');
-check(reader.html().includes('Your interview ledger.') && reader.get('interview-count').textContent === '112 matching questions', 'Full interview ledger');
+check(reader.html().includes('Your interview ledger.') && reader.get('interview-count').textContent === `${reader.env.IOS_COURSE.interview.questions.length} matching questions`, 'Full interview ledger');
 for (const question of reader.env.IOS_COURSE.interview.questions) {
   reader.route(`#interviews/${question.id}`);
   check(reader.html().includes(question.answerHTML) && reader.html().includes('Common mistakes') && reader.html().includes('Follow-up probes'), `Explained interview route ${question.id}`);

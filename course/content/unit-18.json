@@ -1,0 +1,595 @@
+{
+  "unit": {
+    "id": "delivery-leadership",
+    "title": "Delivery evidence and technical leadership",
+    "summary": "Artifact identity, operational investigation, independent delivery review, and accountable cross-team adoption.",
+    "order": 18
+  },
+  "lessons": [
+    {
+      "id": "105",
+      "title": "Validate the installed artifact: configuration, signing, privacy, and upgrade",
+      "summary": "Connect effective settings to packaged identities and rehearse a signed install and upgrade without mistaking host consistency for distribution proof.",
+      "duration": 150,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "026",
+        "043",
+        "046",
+        "048"
+      ],
+      "objectives": [
+        "Resolve configuration inputs for the exact build action",
+        "Compare artifact identity, signed claims, symbols, and packaged resources",
+        "Design independent installation and upgrade evidence with honest pending states"
+      ],
+      "sections": [
+        {
+          "id": "effective-settings",
+          "title": "Start with an artifact contract, then resolve settings",
+          "html": "<p>An Android release engineer can compare a merged manifest, applicationId, signing configuration, and packaged resources before installing an APK. Bring that habit to iOS, but replace the assumption that a scheme is a Gradle flavor with a concrete artifact contract. Name the intended app, scheme, action, configuration, destination, environment, bundle identifier, marketing version, build string, and source revision. Lessons 026 and 043 explain these nouns; this session makes their relationships falsifiable. A target called Production can still resolve an unexpected plist or compilation flag.</p><p>Read the source manifest first, then obtain effective settings from the generated workspace using the same scheme and configuration as the intended archive. In an authorized scratch target, xcodebuild -showBuildSettings provides resolved values; retain its full command and output. Inspect PRODUCT_BUNDLE_IDENTIFIER, INFOPLIST_FILE, CODE_SIGN_ENTITLEMENTS, SWIFT_ACTIVE_COMPILATION_CONDITIONS, deployment target, and relevant resource inputs. Do not replace placeholders by guessing. Command-line overrides, configuration includes, target inheritance, and action choices can produce values different from a source-file reading.</p><p>The inspected app manifest sets dynamic plist and entitlement paths at lines 375–377. That is verified configuration intent, not proof of any emitted artifact. Likewise, Release optimization and a sandbox endpoint can coexist. A Kotlin buildType name does not prove its endpoint either. Record resolved settings as one evidence item and the installed behavior as another; disagreement is a useful diagnostic, not an excuse to rename the configuration.</p>"
+        },
+        {
+          "id": "claims",
+          "title": "Check requested, authorized, and signed claims separately",
+          "html": "<p>The entitlements source file states requested capabilities. A provisioning profile authorizes particular claims and distribution conditions. The code signature records the claims attached to the built executable. Compare those three views, plus the registered identifier, rather than treating a checked capability in Xcode as installed authority. Apple's TN2415 explains this troubleshooting chain. For a scratch device artifact, inspect the signature with codesign and decode its embedded provisioning profile with security cms; these are read-only inspection operations. Do not modify production profiles or revoke shared credentials during this exercise.</p><p>Preserve each extension's identity separately. The containing app, notification extension, widget, and App Clip need their own settings and signed claims. An app-group membership can be missing from just one participant. The application-identifier prefix is not safely inferred from the developer team identifier in every account history. Profile wildcard matching and capability-specific constraints require Apple's rules; the lab deliberately checks exact expected values only. Its dictionary comparison is not a complete signing verifier.</p><p>Keep profile expiry, device eligibility for the applicable distribution type, certificate/private-key availability, and entitlement mismatch as distinct failure branches. A development profile's device list is not a universal TestFlight requirement. Simulator ad hoc signing also differs from a device distribution identity. The checked CI comment warns that disabling signing can break its Keychain tests. That comment explains a local test-host dependency; it does not establish a production installation result.</p>"
+        },
+        {
+          "id": "packaging",
+          "title": "Inspect the package, including privacy and resource ownership",
+          "html": "<p>A successful compilation can omit a localization, font, data file, or privacy manifest. Inspect the produced bundle and its nested bundles, then compare an explicit required-resource list with the inventory. Verify that code looks in the bundle owning the resource. The active ZDAssets package processes resources in its target, while the app separately includes PrivacyInfo.xcprivacy. These are two real packaging boundaries. Adding a code dependency does not move those files into the main bundle or preserve their lookup identity automatically.</p><p>Apple's required-reason API guidance says declarations must accurately describe actual use, including SDK use at the appropriate bundle boundary. A manifest is a declaration, not a permission prompt, consent record, or blanket approval to collect data. Review imported SDK behavior, declared API reasons, collected-data declarations where relevant, usage descriptions, and runtime permission handling as separate checks. PrivacyInfo.xcprivacy existing at a source path proves none of those reviews occurred. The lab's presence check intentionally remains narrower.</p><p>Resource acceptance should include at least one real lookup in the scratch target: a known localization key under a selected language, a required data file decoded with error handling, and an asset rendered where applicable. Missing and malformed files should produce distinct recoverable diagnostics. Avoid falling back silently to production services when sandbox configuration is absent. Own the fallback decision explicitly. An Android resources merge provides a useful analogy, but iOS module bundles and Swift Package Bundle.module lookup have different packaging mechanics.</p>"
+        },
+        {
+          "id": "swift-identity",
+          "title": "Make the identity comparison executable",
+          "html": "<p>This standalone fragment uses Foundation and Swift 6 language mode; it needs no iOS SDK, signing identity, or network. The full companion executes the corresponding negative cases. Keep version and build strings as strings: their storage format is not a promise that arithmetic comparison expresses release ordering.</p><pre><code class=\"language-swift\">import Foundation\nstruct Identity: Equatable, Codable {\n    let bundleID: String\n    let build: String\n    let environment: String\n}\nenum DeliveryError: Error { case wrongIdentity }\nfunc checkIdentity(_ actual: Identity, expected: Identity) throws {\n    guard actual == expected else { throw DeliveryError.wrongIdentity }\n}</code></pre><p>Line one imports Foundation for the companion's JSON work; this equality function itself uses standard-library types. The struct declares a value with three immutable stored properties. Equatable lets Swift synthesize field-by-field equality; Codable supports synthesized encoding and decoding when a caller chooses those operations. Neither conformance consults an app bundle. The enum declares a recoverable Error value. In the function signature, the underscore removes the first external argument label, while expected remains visible at a call site. throws requires the caller to use try and handle propagation. The guard returns normally only when every field matches; otherwise it throws without trapping.</p><p>A Kotlin data class also synthesizes structural equality, but neither language's equality validates a signature. JSON decoding can fail before this function runs; preserve that decoding error instead of replacing it with wrongIdentity. These values have no reference ownership or asynchronous lifetime to cancel. If a larger task loads the file asynchronously, check cancellation before accepting its result and associate that result with the source revision. Do not make a cancelled validation look like a successful installation.</p>"
+        },
+        {
+          "id": "installation",
+          "title": "Rehearse fresh installation and upgrade as separate manual tasks",
+          "html": "<p>A signed installation or beta distribution check requires a learner-owned scratch app, an appropriate Apple account and device, and explicit authorization for that distribution action. Course authoring does not supply those permissions. Here the executable companion validates local evidence records only. Plan the manual step now: select a supported baseline build and candidate, preserve both identities, and define which settings and stored data should survive. Keep synthetic records out of the device evidence column.</p><p>Fresh installation checks launch, expected environment, bundled resources, permissions, and entitlement-dependent access. Upgrade starts with the baseline already installed and representative synthetic data created through the app, then installs the candidate through the authorized path without deleting the app. Record baseline and candidate build identities, device/OS, distribution channel, procedure, and observations. Deleting first tests fresh installation, not migration. A same-version rebuild with a different UUID is a different artifact; preserve its own symbols.</p><p>Ownership acceptance includes local databases, preferences, Keychain groups, shared app-group storage, account changes, and extension readers actually in scope. A changed bundle identifier can create a separate installation rather than an upgrade. Do not assume uninstall behavior proves Keychain cleanup. Permission states can persist across an update, so test allowed and denied paths rather than relying only on first-launch prompts. Cancellation of a permission request or aborted install is an incomplete row, not a pass. The manual report must name who resolves each failed compatibility boundary.</p>"
+        },
+        {
+          "id": "evidence-gates",
+          "title": "Use evidence states that survive independent review",
+          "html": "<p>DeliveryLab distinguishes invalid metadata, pending evidence, and consistent records. Its installation mode requires captured signed-install, upgrade, and privacy-review artifacts plus explicit manual check fields. Each evidence path must exist under the supplied root and match its SHA-256 digest. A directory digest includes relative names and file hashes. Missing paths, stale revisions, changed bytes, unsafe traversal, and symlinks are rejected. This guards against accidental attachment drift; it does not authenticate the author or prove that an arbitrary file really describes a device.</p><p>Use four review states: proposed contract, reviewed findings, revised artifact, and retested revision. An independent reviewer checks the actual input record and attachments, records blockers, and names what acceptance would close them. After revision, compute a new fingerprint and repeat the affected tests. The fixture's synthetic reviewer is illustrative, never organizational approval. A new resource requirement invalidates an earlier review even when compilation still succeeds. A cancelled test run requires a fresh complete result.</p><p>Recovery must respect installed clients. Pausing rollout does not uninstall the candidate. Selecting a compatible old feature path affects only clients containing and honoring that selection. A launch defect before configuration loads may require corrective delivery. Preserve readable data formats and an accountable service owner during the transition. Finish by stating the strongest actual claim: perhaps host metadata checks passed, while signed installation, beta behavior, and upgrade remain unverified.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "The source manifest requests a QA entitlement file. What establishes the final signed claims?",
+          "options": [
+            "The scheme name alone",
+            "Inspect effective action settings and the emitted signature/profile for each executable",
+            "A host JSON equality test"
+          ],
+          "answer": 1,
+          "explanation": "Source intent can be overridden. Artifact inspection checks resolved and emitted claims, while profile authorization is a separate comparison."
+        },
+        {
+          "question": "You delete the baseline before installing the candidate. Which evidence did you obtain?",
+          "options": [
+            "An upgrade result",
+            "A fresh-install result, with upgrade still pending",
+            "A Keychain migration proof"
+          ],
+          "answer": 1,
+          "explanation": "Upgrade requires preserving the installed baseline and relevant data. Deletion changes the tested transition and does not prove Keychain policy."
+        },
+        {
+          "question": "The lab finds PrivacyInfo.xcprivacy in a resource inventory. What can it claim?",
+          "options": [
+            "The declaration accurately covers every SDK",
+            "The required path is present in the supplied inventory",
+            "Consent and distribution approval"
+          ],
+          "answer": 1,
+          "explanation": "Presence is narrow metadata evidence. Contents, actual API use, bundle ownership, and manual package/privacy inspection still need review."
+        }
+      ],
+      "exercise": {
+        "brief": "Create a scratch artifact evidence record, diagnose the supplied identity mismatch, and write a fresh-install/upgrade protocol with explicit pending evidence.",
+        "steps": [
+          "Run the companion's host tests and validate pending.json and wrong-identity.json with the lab as evidence root",
+          "Trace the active manifest's dynamic settings read-only; record which emitted values would require a scratch target build",
+          "Revise a copied synthetic record to restore intended identity and matching symbols, retaining synthetic provenance",
+          "Have an independent reviewer record packaging and upgrade blockers against the exact record fingerprint",
+          "Define a manually authorized signed installation and upgrade procedure; leave unavailable device evidence pending"
+        ],
+        "acceptance": [
+          "Wrong environment and wrong symbol UUID are rejected independently",
+          "No synthetic fixture satisfies installation mode",
+          "Review identifies a required-resource lookup and both installation transitions",
+          "A revision invalidates stale review and requires retest",
+          "No signing, upload, client edit, or learner completion is implied"
+        ],
+        "solution": "<p>The supplied bad record claims production while its expectation says sandbox; the symbol UUID also differs for Scratch/arm64. Restore each field independently in a copied record and rerun the checks. Changing only the marketing version would repair neither mismatch. pending.json has coherent synthetic metadata but stays pending because independent review and retest are incomplete. Even a locally consistent retested fixture cannot satisfy installation mode without the required captured evidence and manual checks.</p><p>The review finding should say: prove that the selected scratch Release action resolves the sandbox plist and entitlement path, that the emitted executable carries the expected claims authorized by its profile, and that the package contains a usable localization and accurate privacy declaration. Attach actual settings output and package inventory when available. Set signatureChecked only after inspecting that candidate's signature, not after seeing a signing capability in source. The reviewer evaluates those attachments and records a revision note when the missing lookup check is added.</p><p>The upgrade protocol installs baseline 41 on a learner-owned device, creates synthetic preferences and account data, records permission and extension states, then installs candidate 42 without deleting the baseline. Confirm environment, resource lookup, stored-data readability, denied-permission behavior, and entitlement-dependent access. Capture any failed observation with its artifact identity. Fresh installation gets a separate row on a clean scratch installation. If device access or distribution authorization is unavailable, retain both rows as pending and identify the owner who can collect them. These are proposed observations, not results obtained by this lesson's author. An independent review and retest can close host blockers while leaving the device boundary honestly open.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Build settings reference",
+          "url": "https://developer.apple.com/documentation/xcode/build-settings-reference"
+        },
+        {
+          "label": "Apple TN2415: Entitlements troubleshooting",
+          "url": "https://developer.apple.com/library/archive/technotes/tn2415/_index.html"
+        },
+        {
+          "label": "Apple: Describing use of required reason API",
+          "url": "https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api"
+        },
+        {
+          "label": "Android: Configure build variants",
+          "url": "https://developer.android.com/studio/build/build-variants"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Dynamic app plist and entitlement settings",
+          "path": "ios-client/Projects/Apps/Zocdoc/Project.swift",
+          "line": 375,
+          "why": "Inspected settings use configuration variables; source intent must be compared with effective action settings and emitted claims."
+        },
+        {
+          "label": "App privacy resource membership",
+          "path": "ios-client/Projects/Apps/Zocdoc/Project.swift",
+          "line": 213,
+          "why": "Verified resource inclusion intent; emitted package presence and declaration accuracy are separate checks."
+        }
+      ],
+      "checklist": [
+        "I can compare requested, authorized, and signed claims",
+        "I can distinguish fresh installation from an upgrade",
+        "I can keep synthetic host evidence separate from captured installation results"
+      ]
+    },
+    {
+      "id": "106",
+      "title": "Investigate crashes, hangs, jetsam, and test results with matching evidence",
+      "summary": "Build a reproducible operational investigation from raw diagnostics, symbol identity, outcome cohorts, and a tested mechanism.",
+      "duration": 150,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "024",
+        "036",
+        "039",
+        "047",
+        "048",
+        "105"
+      ],
+      "objectives": [
+        "Select and preserve the actual diagnostic before forming a causal claim",
+        "Match executable architecture and UUID to retained symbols",
+        "Read MetricKit and xcresult evidence with availability and coverage limits",
+        "Separate containment, mechanism tests, and recovery outcomes"
+      ],
+      "sections": [
+        {
+          "id": "intake",
+          "title": "Turn a vague incident report into an evidence request",
+          "html": "<p>An Android incident described as 'the screen froze and then disappeared' might involve an ANR, a killed process, or a failed navigation. The same ambiguity exists on iOS. Begin with the user-visible operation, its last known state, app/build identity, device and OS, timestamp/time zone, and whether the process terminated. Ask for the raw diagnostic and any compatible timeline. Lesson 024 establishes taxonomy; this session adds a collection and decision protocol that another engineer can execute without trusting your interpretation.</p><p>Preserve the original file before transforming it. Record its source, collection time, digest, artifact identity, access restrictions, and a redacted sharing derivative if needed. Symbolication and report conversion should create new outputs, leaving the original recoverable. Logs can contain URLs, identifiers, or user content; an incident is not authorization to export everything. Keep the smallest approved dataset that can distinguish hypotheses. A course fixture is labeled synthetic even when its shape resembles an operating-system report.</p><p>Establish a missing-evidence ledger. No crash file means a crash mechanism is unverified. A dashboard spike without an eligible-attempt denominator is an alert, not a measured product failure rate. Cancellation before submission differs from cancellation after the server may have committed a write. Name the owner who can retrieve each missing artifact and the hypothesis it could test. This makes uncertainty actionable instead of replacing absent evidence with an invented stack.</p>"
+        },
+        {
+          "id": "triage",
+          "title": "Select the diagnostic by the process behavior",
+          "html": "<p>For a trap or invalid-memory-access termination, read the exception/termination fields, triggered thread, application frames, and binary images in the actual crash report. A Swift thrown Error belongs to normal control flow and will not appear merely because a do/catch handled it. For a watchdog-related termination, connect the stated reason and lifecycle context to blocked work or excessive work; do not import a fixed Android ANR timeout. A hang can occur without a process termination and needs a sampled stack or timeline covering the unresponsive interval.</p><p>For jetsam, inspect the process marked with a reason, overall pressure, resident pages, page size, state, and relevant coalition information. Apple documents that these JSON reports do not contain app thread backtraces. Being the largest process is not identical to being the jettisoned process. If another process was terminated, an app crash still needs its own explanation. Memory limits and system conditions vary; a generic megabyte threshold cannot replace the actual report.</p><p>An xcresult bundle answers a different question: what happened in a specific test/build invocation? It can preserve test identities, failures, destinations, attachments, and other results supported by that toolchain. A failing UI test may reveal a product defect, a test expectation defect, or infrastructure failure. Its bundle alone is not a field crash report. Keep the raw result bundle and extract a summary using the installed xcresulttool schema rather than relying on old scripts that assume a stable private JSON layout.</p>"
+        },
+        {
+          "id": "symbols",
+          "title": "Verify UUID and architecture before asking symbols for names",
+          "html": "<p>Locate the distributed executable and the retained dSYM from the actual archive or distribution pipeline. Use xcrun dwarfdump --uuid on each and compare the relevant binary image UUID and architecture from the report. An app build string or source commit is helpful indexing metadata but cannot substitute for this match. Each extension and embedded framework has a separate image identity. A new rebuild of old source can create different UUIDs; do not offer its symbols as proof merely because the version string agrees.</p><p>Use Xcode's supported symbolication workflow or the installed symbolication tools after matching identities. For an individual address with atos, supply the architecture, DWARF file, correct image load address, and program-counter address from the report. The load address matters because the image may be relocated. Optimized code can be inlined or deduplicated, so a source line is not necessarily a complete history of calls. Apple's current guide describes supported options; inspect installed command help before scripting a version-specific invocation.</p><p>Preserve both raw and symbolicated outputs with the selected dSYM digest and command/tool version. A frame in your mapper supports the observation that execution reached that location. It does not prove that the mapper created the earlier corruption. List rival mechanisms, such as stale state, invalid ownership, and concurrent mutation, then choose a reproducer that separates them. If symbols are incomplete, state which image lacks them and retain address-level evidence. Do not manufacture a line number to make the ticket look resolved.</p>"
+        },
+        {
+          "id": "bytes",
+          "title": "Compute units safely before interpreting jetsam",
+          "html": "<p>This function is ordinary Swift 6 and runs in the companion on the host. It performs a units conversion for synthetic inputs; it neither reads a device report nor measures memory. Page size comes from the actual report, not an assumed platform constant.</p><pre><code class=\"language-swift\">enum DeliveryError: Error { case invalidPages }\nfunc residentBytes(pages: UInt64, pageSize: UInt64) throws -&gt; UInt64 {\n    guard pageSize &gt; 0 else { throw DeliveryError.invalidPages }\n    let product = pages.multipliedReportingOverflow(by: pageSize)\n    guard !product.overflow else { throw DeliveryError.invalidPages }\n    return product.partialValue\n}</code></pre><p>The enum names a recoverable validation failure. UInt64 represents nonnegative counts; decoding a negative page count into this type should fail upstream. The two external argument labels keep count and size from being casually swapped. The first guard rejects zero page size. multipliedReportingOverflow returns both the wrapped partialValue and an overflow flag instead of trapping. The second guard prevents accepting that wrapped value as valid bytes. Only the final return exposes a validated product. For the companion's eight synthetic pages of 16,384 bytes, the arithmetic result is 131,072 bytes; those numbers are fixture input and output, not a reported device footprint.</p><p>Kotlin Long is signed, so multiplying positive values can overflow into an apparently plausible value unless you check. Java Math.multiplyExact is a useful checked-arithmetic analogy, with a different signed domain and exception contract. Neither arithmetic check explains why memory remained live. Investigate retained owners, image decode sizes, cache budgets, and repeated workflow entry with actual allocation evidence. Dropping a local reference does not prove ARC released an object while another owner still retains it.</p>"
+        },
+        {
+          "id": "metrickit",
+          "title": "Treat MetricKit as delayed system evidence with an owned subscriber",
+          "html": "<p>MetricKit supplies system-collected metric and diagnostic payloads through supported subscriber APIs. MXMetricManager was introduced on iOS 13. Apple's retrieved guidance says metric reports arrive at most once per day per metric source and can cover the previous 24 hours plus undelivered reports; diagnostics are delivered immediately on iOS 15 and later. Different metric sources may yield multiple payloads. 'Immediately' is not a promise that your backend has complete real-time coverage of every incident. Collection, app execution, upload policy, and device coverage remain relevant.</p><p>Keep the subscriber alive through an explicit application-owned service. Register and remove it deliberately. Do not create a temporary subscriber and assume a callback establishes its retention policy. Bound the work performed in callbacks, persist approved payload data safely, and arrange any expensive processing away from UI-critical work under a clear isolation contract. A callback should not mutate a main-actor view model directly merely because startup created the subscriber. Cancellation of an uploader must preserve or deliberately discard pending data according to retention policy, without counting a cancelled upload as a missing user operation.</p><p>Live documentation retrieved during this audit marks MXMetricManager for replacement by MetricManager in newer platform versions, including an iOS 27.2 deprecation entry. The local toolchain is Xcode 27.1; that future-version documentation does not establish installed SDK availability or deployment compatibility. Verify the imported SDK and use availability checks before adopting newer names. This lesson's runnable example stays platform independent. The client startup inspected here initializes Sentry, and its beforeSend branch is DEBUG-only; no MetricKit integration or production redaction behavior is claimed from that source reading.</p>"
+        },
+        {
+          "id": "result-files",
+          "title": "Require real result files for prescribed diagnostic checks",
+          "html": "<p>The installed tool accepts xcrun xcresulttool get test-results summary --path followed by the path to an existing .xcresult bundle. Capture its help or schema with the tool version when an automation consumes that output. Do not manufacture a directory with that suffix and call it a test result. For an authorized scratch test run, choose a result-bundle path under a unique temporary directory, preserve the bundle, and then run the extraction. This author checked command help only; no real result bundle or device trace was supplied.</p><p>DeliveryLab's diagnostic mode asks for a selected diagnosticKind and captured evidence of that kind. It checks file existence, path containment, digest integrity, source revision, and matching image metadata. It does not parse every Apple report format, authenticate provenance, symbolicate, or diagnose causality. A captured declaration is a learner assertion that a reviewer must inspect. An existing arbitrary text file with a plausible digest cannot prove a genuine crash. Keep that limitation visible when integrating the local gate into a larger process.</p><p>For a trace, preserve the complete trace bundle and recording setup, not only a screenshot of a selected interval. For an xcresult, retain the actual invocation, test selection, destination, failed and skipped tests, retries, and attachments relevant to the hypothesis. If the run was cancelled or timed out, record incomplete coverage; the surviving partial bundle can support investigation but not a full pass. Cache hits and reused test products need provenance that connects them to the current candidate.</p>"
+        },
+        {
+          "id": "recovery",
+          "title": "Close the loop with mechanism and outcome evidence",
+          "html": "<p>A useful investigation has three gates. First, containment names the owner and the clients it can affect. Second, a mechanism test reproduces the failure under a controlled transition and fails before the repair. Third, recovery compares the same attempted-operation cohort and observation window after the repair. These gates can progress separately: containment can reduce harm before root cause is proven, and a host reproducer can pass while field recovery remains pending.</p><p>For a stale callback hypothesis, preserve controlled schedules for cancellation followed by late success, late error, account switch, and replacement of displayed data. Check that stale state cannot commit, not just that the task receives a cancel call. Swift cancellation is cooperative; Kotlin coroutine cancellation offers a useful analogy but exception propagation and lifecycle owners are different. For memory pressure, characterize repeated ownership and representative device pressure instead of converting a single jetsam count into a universal threshold.</p><p>An independent reviewer should challenge the artifact match, competing hypotheses, repro quality, and recovery denominator. A revision changes the record fingerprint and forces review of affected checks. A repair that reduces crashes by making users abandon the operation is not successful recovery. Keep outcome and diagnostic coverage together, and state the remaining specialist work: physical-device recording, full symbolication, representative reproduction, and observed recovery cannot be obtained from this host lab.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "The binary build string matches but the arm64 dSYM UUID differs. What should happen?",
+          "options": [
+            "Symbolicate and treat line numbers as conclusive",
+            "Find the matching distributed image symbols and keep symbolication pending",
+            "Rebuild the same commit and declare equivalence"
+          ],
+          "answer": 1,
+          "explanation": "UUID and architecture identify the image for symbolication. Marketing metadata and source revision cannot replace the retained matching dSYM."
+        },
+        {
+          "question": "A jetsam report names another app as largestProcess. Is that proof your app was not jettisoned?",
+          "options": [
+            "Yes",
+            "No; inspect the process with the reason field and its state",
+            "Only if its name contains UIKit"
+          ],
+          "answer": 1,
+          "explanation": "Largest footprint and selected termination are different facts. Apple's report guidance identifies the jettisoned process through its reason field."
+        },
+        {
+          "question": "xcresulttool help succeeded. Which claim is justified?",
+          "options": [
+            "The installed command syntax was inspected",
+            "The scratch UI tests passed",
+            "A production crash was repaired"
+          ],
+          "answer": 0,
+          "explanation": "Command discovery verifies tool capability and syntax. It supplies no actual result bundle, test execution, field diagnostic, or recovery measurement."
+        }
+      ],
+      "exercise": {
+        "brief": "Produce an operational case file that separates a symbol mismatch, a jetsam hypothesis, and a failed test invocation; configure only checks supported by real attached evidence.",
+        "steps": [
+          "Run the checked-arithmetic example and overflow rejection cases",
+          "Use the wrong-identity fixture to identify missing matching symbol metadata",
+          "Write a three-case intake table naming the raw artifact needed for each hypothesis",
+          "Inspect installed xcresulttool help; run extraction only if an actual scratch result bundle exists",
+          "Ask an independent reviewer to change one hypothesis and revise the evidence/retest plan"
+        ],
+        "acceptance": [
+          "No jetsam backtrace is invented",
+          "Binary UUID and architecture are required for each symbol match",
+          "No synthetic text satisfies a captured diagnostic requirement",
+          "Cancelled and skipped tests remain visible",
+          "Mechanism proof and post-repair outcome recovery are separate"
+        ],
+        "solution": "<p>Case one has only synthetic metadata with a wrong dSYM UUID. The conclusion is an identity mismatch, not a diagnosed crash. Request the original crash file, distributed binary image identity, and retained symbols; do not replace them with a new build from the same source. Case two reports a disappearance under memory pressure but has no jetsam file. Request the actual report, find the jettisoned process, use its page size for units conversion, and then plan an ownership recording. The host arithmetic checks validate overflow handling while leaving that memory hypothesis unresolved.</p><p>Case three concerns a test job. Retain the existing xcresult bundle if one exists, record scheme/configuration/destination and test filters, and extract its summary with the installed command. Without a bundle, mark extraction pending. A reviewer might change the hypothesis from product timeout to test-run cancellation; the revised case then asks for cancellation timing, completed/skipped tests, and whether the app remained responsive. Repeat the affected scratch row rather than accepting the old green console line.</p><p>Containment belongs to the release or feature owner and states its installed-client limits. Mechanism acceptance requires a controlled reproducer and before/after result for the repaired transition. Recovery acceptance requires comparable attempted operations and diagnostic coverage in a declared cohort/window. The result file, trace, symbolication, device reproduction, and observed recovery are intentionally absent here. The honest worked answer therefore closes local arithmetic and metadata checks, identifies the next collector, and leaves operational claims pending until actual artifacts are reviewed.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Adding identifiable symbol names to a crash report",
+          "url": "https://developer.apple.com/documentation/xcode/adding-identifiable-symbol-names-to-a-crash-report"
+        },
+        {
+          "label": "Apple: Identifying high-memory use with jetsam event reports",
+          "url": "https://developer.apple.com/documentation/xcode/identifying-high-memory-use-with-jetsam-event-reports"
+        },
+        {
+          "label": "Apple: MXMetricManager availability and delivery",
+          "url": "https://developer.apple.com/documentation/metrickit/mxmetricmanager"
+        },
+        {
+          "label": "Swift: Concurrency and cooperative cancellation",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"
+        },
+        {
+          "label": "Kotlin: Cancellation and timeouts",
+          "url": "https://kotlinlang.org/docs/cancellation-and-timeouts.html"
+        },
+        {
+          "label": "Java 11: Math.multiplyExact checked signed multiplication",
+          "url": "https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/lang/Math.html#multiplyExact(long,long)"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Active Sentry startup and DEBUG callback",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/main.swift",
+          "line": 45,
+          "why": "Verified telemetry setup; its DEBUG-only beforeSend cannot establish production filtering or complete diagnostics."
+        },
+        {
+          "label": "CI result bundle path",
+          "path": "ios-client/.github/workflows/tuist_build.yml",
+          "line": 162,
+          "why": "Verified configured result path; a specific retained bundle and run outcome still need collection."
+        }
+      ],
+      "checklist": [
+        "I can preserve raw and transformed diagnostics separately",
+        "I can verify symbol UUID and architecture before trusting a source line",
+        "I can distinguish local arithmetic, test evidence, device diagnosis, and outcome recovery"
+      ]
+    },
+    {
+      "id": "107",
+      "title": "Staff delivery: implement, invite independent critique, revise, and retest",
+      "summary": "Deliver a bounded evidence-checking feature whose review findings change executable behavior and whose claims match the tested revision.",
+      "duration": 150,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "020",
+        "027",
+        "028",
+        "049",
+        "105",
+        "106"
+      ],
+      "objectives": [
+        "Translate a feature decision into executable invariants and concrete acceptance evidence",
+        "Use an independent review to expose a mechanism gap",
+        "Bind revised implementation, retest, and acceptance to the same candidate",
+        "Explain containment and verification limits without certifying organizational readiness"
+      ],
+      "sections": [
+        {
+          "id": "feature-contract",
+          "title": "Own one feature through its observable boundary",
+          "html": "<p>A senior Android engineer may already know how to add a Kotlin interface, write tests, and submit a design document. Staff delivery requires connecting those actions to an outcome another owner can trust. Our synthetic feature is a local delivery-evidence viewer: it reads a JSON record and attachments, reports inconsistent identities, and shows pending manual work instead of an unjustified release-ready badge. The executable companion supplies the validation core and command-line interface. A UIKit or SwiftUI presentation is a future consumer, not an implemented client migration.</p><p>Write the user contract before choosing architecture: a reviewer can distinguish malformed input, inconsistent artifact identity, incomplete evidence, and bounded consistency. The tool must never sign, upload, release, or certify a learner. Expected invalid records should exit predictably with explanations. A missing file cannot become 'not applicable' automatically. A cancelled read cannot publish the previous record's success for the newly selected candidate. Capture these distinctions as independent acceptance cases, not a screenshot of the happy path.</p><p>Scope ownership includes schema input, file-root boundaries, evidence hashing, diagnostic wording, revision identity, and reviewer handoff. Keep real target integration and device collection as separate owners and milestones. A useful feature seam avoids importing the company's credential, analytics, or build graph into this host exercise. The active PrivacyChoicesModule shows a real main-actor protocol boundary; it is evidence of explicit UI ownership, not an instruction to isolate every pure validator on the main actor.</p>"
+        },
+        {
+          "id": "implementation-plan",
+          "title": "Choose alternatives using the failure you need to prevent",
+          "html": "<p>Option one is a prose checklist with attached files. It has little tooling cost and can be appropriate for rare manual reviews, but a reviewer can accidentally accept a stale attachment or omit an architecture match. Option two is a small local validator with explicit pending states and digests. It catches repeatable consistency mistakes and remains inspectable. Option three is an automated release service, which introduces credential, authority, provenance, deployment, and audit requirements beyond this feature. Recommend option two only for the bounded consistency problem; do not imply it inherits option three's release authority.</p><p>Identify data flow: decode a record, validate immutable expectations, read allowlisted attachment paths beneath a chosen root, compute hashes, evaluate evidence requirements, and emit a result. The Python companion implements that flow using the standard library. The Swift snippets explain small contracts separately. Neither implementation needs a network dependency. A structured result separates errors from pending work, making an eventual UI consumer responsible for presentation rather than inferring semantics from a human message.</p><p>State failure and lifetime policy. Treat JSON syntax failure, unreadable file, wrong identity, and missing captured evidence distinctly. Read only a bounded approved evidence tree; for large result bundles, plan memory and cancellation limits before a UI integration. The supplied digest function reads file bytes eagerly and is intended for small local exercises. Its path checks reduce accidental escapes but are not a hardened untrusted-file sandbox or race-proof security boundary. That limitation belongs in review, not an unsupported 'secure' label.</p>"
+        },
+        {
+          "id": "review-request",
+          "title": "Ask for independent criticism of the mechanism",
+          "html": "<p>A review request should include the runnable candidate, a reproducer, expected outputs, attachment roots, declared limits, and a short claim table. Ask the reviewer to challenge how success can be wrong. Give them cases your own checklist may miss: duplicate images, same build string with a changed UUID, same digest with a renamed file inside a bundle, a requirement added after review, and a pending consumer mislabeled adopted. Independent means someone other than the author actually evaluates the artifact; the tool's string inequality can model that rule but cannot authenticate a person.</p><p>Record findings with identifiers, severity, evidence, proposed correction, and a closure criterion. A blocker needs a mechanism fix and its affected tests. An advisory issue can be accepted with a reason and owner, while an unresolved blocker prevents acceptance. Do not convert blockers to advisory merely to meet a date. Reviewer disagreement can expose an underspecified contract, such as whether a directory digest must bind file names as well as contents; settle that contract before fixing code.</p><p>Use the sequence proposed, reviewed, revised, retested. A reviewer can recommend a revision without approving the changed code unseen. After the author modifies the implementation or its evidence inputs, re-evaluate the affected findings against that revision. The executable record fingerprint excludes review fields so recording the review does not invalidate itself, but includes decision inputs and attachment digests. A new requirement therefore invalidates the earlier fingerprint even when the old tests remain green.</p>"
+        },
+        {
+          "id": "swift-review",
+          "title": "Encode acceptance without confusing a gate with a reviewer",
+          "html": "<p>This standalone Swift 6 contract is exercised in DeliveryExamples.swift. Its Sendable struct contains immutable value fields; that conformance permits safe transfer of those values and does not create an actor, schedule a task, or perform a review.</p><pre><code class=\"language-swift\">struct Review: Sendable {\n    let author: String\n    let reviewer: String\n    let reviewedRevision: Int\n    let testedRevision: Int\n    let blockers: Int\n}\nenum DeliveryError: Error { case unresolvedReview }\nfunc acceptReview(_ review: Review, currentRevision: Int) throws {\n    guard review.author != review.reviewer, !review.reviewer.isEmpty,\n          review.reviewedRevision == currentRevision,\n          review.testedRevision == currentRevision,\n          review.blockers == 0 else { throw DeliveryError.unresolvedReview }\n}</code></pre><p>The struct declaration introduces five stored properties, each initialized at construction. author and reviewer are illustrative identity labels. reviewedRevision identifies the version inspected; testedRevision identifies the version exercised. blockers counts findings that still prevent acceptance. The Error enum provides a typed rejection. The function's underscore makes the first call argument unlabeled, and currentRevision names the current candidate. Comma-separated guard conditions all must hold. An empty reviewer, self-review, old review, old test, or remaining blocker throws. Successful return means only these supplied values satisfy this local policy.</p><p>A Kotlin data class with a require check can express a similar shape, but require throws an unchecked argument exception and has a different caller contract from Swift throws. Neither structure proves the person's independence or result authenticity. The Swift integer gate is intentionally smaller than the Python fingerprint-and-file checks. Treat equal integers as a teaching model; the actual record also needs immutable revision identifiers and inspected attachments. An ordinary error is recoverable; fatalError, process kill, and cancelled external testing cannot be transformed into a passed gate by catch.</p>"
+        },
+        {
+          "id": "revised-evidence",
+          "title": "Make critique change a tested implementation",
+          "html": "<p>Consider a flawed first proposal that accepts any record with zero blockers. An independent critique supplies a counterexample: the author edited a required resource after review, but the old test result still says zero blockers. The implementation must now bind acceptance to current review and retest identity. The corrected Swift gate checks both revisions, while the companion binds the record fingerprint and each attachment digest. This is a changed mechanism with negative tests, not a wording change in an RFC.</p><p>Retest the counterexample and nearby failure boundaries: self-review, stale review, stale test evidence, unresolved blocker accepted for convenience, changed bytes, and architecture mismatch. Keep a before/after result if implementing the flawed proposal yourself; this course does not claim that it executed a missing historical version. The supplied tests exercise the final validator's rejection of those states. Preserve real host stdout separately from the synthetic fixture result. A synthetic file named result is not the actual executed test log.</p><p>Revision evidence also includes limits. The tool cannot verify that reviewer labels name distinct humans, that 'captured' files are genuine, or that an arbitrary blob is a valid xcresult. A reviewer must inspect the original result with the owning tools. If that independent reviewer is unavailable, state that structural tests passed while actual independent critique remains pending. The loop is complete only for the scope actually reviewed and retested, not because a fixture contains the word retested.</p>"
+        },
+        {
+          "id": "consumer-handoff",
+          "title": "Carry ownership, cancellation, and availability into integration",
+          "html": "<p>For a future UI consumer, choose a main-actor owner for presentation and keep expensive bundle hashing off UI-critical execution under a deliberate scheduling design. Swift task creation is not itself proof that blocking filesystem work moved away from the main actor. Capture the selected candidate identity before starting work; on completion, compare that identity and the current generation before updating the displayed status. Cancellation is cooperative, and a synchronous file read may finish after cancellation was requested. Protect the final commit as well as requesting cancellation.</p><p>A lifecycle-aware Android coroutine scope is a useful analogy for cancellation ownership. The boundary differs: SwiftUI task modifiers follow view identity, UIKit often has explicit controller/coordinator owners, and a single process's actor does not coordinate a widget's process. Define who retains the work, cancels it, and discards superseded results. Test navigation away followed by late success or error when implementing that UI. The current command-line companion performs no async UI work, so those integration rows remain planned.</p><p>Record compiler mode separately from API availability. The host uses Swift 6 language mode and Foundation without iOS-only calls. The active module protocol is main-actor isolated, and the feature manifest has iOS 17 deployment configuration. Neither source fact proves the scratch viewer belongs to that graph or uses the same settings. A real handoff would verify source/target membership, resource membership, consumer tests, and a representative interaction for the selected target. Preserve those as unavailable rows here.</p>"
+        },
+        {
+          "id": "delivery-decision",
+          "title": "Make the acceptance decision conditional and recoverable",
+          "html": "<p>The staff artifact should state what changed, which reviewer finding it resolves, the revised candidate identity, executed tests, unresolved risks, and recovery owners. Accept the bounded host feature when its contract and evidence pass. Defer device, installation, production, and organizational claims until the corresponding owners provide artifacts. 'Consistent' is an intentionally narrower result than release authorization. This separation makes the decision useful to the next owner without forcing them to reconstruct hidden assumptions.</p><p>Containment for this local tool is reversible: retain the previous supported validator, stop accepting new gate results if a schema defect is found, and rerun affected records against the corrected version. Preserve already issued reports with their tool version and revision rather than silently overwriting history. If a future app consumes those results, explain how installed clients handle older schemas and unknown states. A new enum case can require a tolerant decoding policy; otherwise an innocuous record addition can become an app failure.</p><p>Close with an independent critique summary and the smallest remaining observation that could overturn acceptance. For example, a representative result bundle might reveal unacceptable memory use in eager hashing; that would justify a streaming digest and explicit cancellation checkpoints with equivalence tests. Do not invent a timing improvement without measuring it. Delivery competence is demonstrated through the concrete implementation, review correction, and retest evidence, while sustained staff responsibility still depends on actual independent delivery outside this lesson.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A reviewer accepted revision 2, but requiredResources changes afterward. What must happen?",
+          "options": [
+            "The old approval remains valid because code compiles",
+            "Recompute the fingerprint, review affected findings, and retest the new record",
+            "Only change the reviewer name"
+          ],
+          "answer": 1,
+          "explanation": "Acceptance binds to the reviewed inputs. A new packaging requirement changes the decision contract even if existing implementation and tests still compile."
+        },
+        {
+          "question": "What does Sendable on the Review value establish?",
+          "options": [
+            "The review runs off the main thread",
+            "Its stored value representation supports safe concurrency transfer",
+            "The reviewer is independent and authenticated"
+          ],
+          "answer": 1,
+          "explanation": "Sendable is a transfer-safety contract. It neither schedules work nor authenticates supplied identity labels or organizational review."
+        },
+        {
+          "question": "The fixture says retested and uses a different reviewer string. Which claim remains unavailable?",
+          "options": [
+            "The structural gate can evaluate the strings",
+            "An actual independent human reviewed this implementation",
+            "The strings can be compared"
+          ],
+          "answer": 1,
+          "explanation": "A synthetic review record is instructional. Human independence, critique, and acceptance require actual review evidence beyond the local gate."
+        }
+      ],
+      "exercise": {
+        "brief": "Deliver a revised local evidence-validation feature after an independent reviewer introduces an attachment-drift counterexample.",
+        "steps": [
+          "Execute the final companion and preserve actual host results",
+          "Implement a deliberately narrow first gate in scratch space and demonstrate stale-review acceptance if desired",
+          "Ask an independent reviewer to add one mechanism-level counterexample; record a blocker and closure criterion",
+          "Revise the gate and bind current inputs, evidence digests, and retest revision",
+          "Rerun affected negative cases and write a conditional handoff with unverified UI/device rows"
+        ],
+        "acceptance": [
+          "A finding changes implementation or an executable contract",
+          "The same current revision is reviewed and retested",
+          "Old evidence and unchanged version strings cannot bypass new requirements",
+          "Actual reviewer feedback is distinguished from synthetic labels",
+          "No title, production impact, or consumer integration is automatically granted"
+        ],
+        "solution": "<p>The worked counterexample starts with a zero-blocker-only acceptance rule. Add a required localization after the reviewer inspects the record; that rule still accepts old review evidence. The revised implementation includes required resources in the fingerprint, checks file digests, and requires evidence sourceRevision to match the candidate. The Swift teaching gate additionally rejects unequal reviewedRevision and testedRevision. The correction targets stale acceptance rather than adding generic process prose.</p><p>Run the provided stale-review, changed-bytes, architecture, blocker, and self-review cases and retain actual stdout from that execution. Attach a separate review note saying which counterexample the reviewer ran, why it failed the original rule, and how the changed behavior closes it. The supplied fixture's synthetic peer is not that review note. If no independent reviewer participates, leave independent critique pending and report only the automated checks actually obtained.</p><p>The conditional decision accepts local consistency reporting within the documented small-file scope. It leaves provenance authentication, UI cancellation, target membership, signed installation, device diagnostics, and observed consumer adoption to named future checks. If a later bundle workload changes the memory constraint, propose streaming hashing and rerun digest-equivalence and cancellation tests before acceptance. Retain the baseline tool and prior reports so a defective schema can be contained by rerunning affected records. This is concrete staff delivery evidence for one bounded feature, not a fabricated organizational outcome.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Concurrency, actors, Sendable, and cancellation",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"
+        },
+        {
+          "label": "Swift: Error handling",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/errorhandling/"
+        },
+        {
+          "label": "Apple: Build settings reference",
+          "url": "https://developer.apple.com/documentation/xcode/build-settings-reference"
+        },
+        {
+          "label": "Kotlin: Cancellation and timeouts",
+          "url": "https://kotlinlang.org/docs/cancellation-and-timeouts.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Main-actor module ownership boundary",
+          "path": "ios-client/Projects/Infra/ZDModules/Sources/ZDModules/PrivacyChoicesModule.swift",
+          "line": 13,
+          "why": "Inspected public protocol establishes a real UI ownership boundary; the host validator is a separate pure/local exercise."
+        },
+        {
+          "label": "Account feature target and test ownership",
+          "path": "ios-client/Projects/Features/ZDAccount/Project.swift",
+          "line": 33,
+          "why": "Verified test target membership illustrates the consumer graph evidence a future authorized integration would need."
+        }
+      ],
+      "checklist": [
+        "I can ask for independent mechanism-level critique",
+        "I can connect a reviewer finding to revised behavior and retest evidence",
+        "I can hand off a bounded feature with explicit ownership and remaining verification"
+      ]
+    },
+    {
+      "id": "108",
+      "title": "Principal strategy: adoption evidence, exceptions, deprecation, and outcomes",
+      "summary": "Make cross-team delivery decisions executable, revise them when platform constraints change, and retain accountability for installed clients.",
+      "duration": 160,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "027",
+        "028",
+        "056",
+        "105",
+        "106",
+        "107"
+      ],
+      "objectives": [
+        "Define an eligible-consumer denominator and evidence-backed adoption",
+        "Assign decision rights, exception ownership, and funded migration incentives",
+        "Separate source deprecation from compatibility for installed binaries",
+        "Revise a strategy when an extension changes the ownership boundary",
+        "Evaluate operational outcomes without fabricating organizational adoption"
+      ],
+      "sections": [
+        {
+          "id": "strategy-artifact",
+          "title": "Extend local delivery into a decision others can execute",
+          "html": "<p>An Android platform guideline can be beautifully written and still have no consumers. Principal responsibility starts when multiple owners must maintain a contract through different schedules and installed versions. The existing staff-principal-decisions workshop already compares costed alternatives. This session adds executable decision evidence: an eligible-consumer ledger, adoption proof, exception contracts, installed-client compatibility ownership, and a removal gate. The synthetic proposal shares an evidence vocabulary across mobile teams while preserving native implementation and review authority.</p><p>Choose the smallest common contract that reduces repeated mistakes: artifact identity, pending versus invalid evidence, attempted-operation outcomes, and review/retest linkage. Keep platform-specific signing, process lifetime, concurrency, and resource packaging native. A common schema can carry comparable facts without claiming that Android and iOS execute the same scheduler or installation model. Define which schema versions a consumer supports and how it handles unknown fields or states. Compatibility matters more than a synchronized dependency bump.</p><p>Write a decision artifact that contains the problem, eligible consumers, options, constraints, owner roles, evidence requirements, exception route, adoption assistance, operational checks, and retirement rule. Each requirement must point to an artifact or observable behavior. An estimate remains a planning assumption; a proposed owner remains unconfirmed until accepted. No synthetic team labels in this lesson identify actual company maintainers, and no artifact gate claims that a real organization adopted the proposal.</p>"
+        },
+        {
+          "id": "denominator",
+          "title": "Define adoption by behavior and keep exceptions visible",
+          "html": "<p>Inventory eligible consumers by stable identity and scope: app read workflow, notification extension, widget, service response contract, and Android counterpart only if relevant. Decide eligibility before counting adoption. Removing hard consumers from the denominator after they fail produces an attractive but misleading percentage. A consumer that cannot adopt yet remains pending or has an explicit exception. A dependency appearing in a manifest is a weak leading indicator, not accepted behavior.</p><p>For each adopted consumer, require evidence of contract behavior, target/build coordinates, resource membership, relevant integration interaction, and accountable owner acceptance. The local validator requires a captured consumer-check reference for each adopted row in deprecation mode. That reference still needs independent inspection; the validator does not authenticate a team or parse all test formats. Its host fixture test cannot serve as another team's integration proof. Track supported schema and platform versions when interpreting the evidence.</p><p>Define an operational outcome window separately from the adoption count. Eligible attempted operations, confirmed successes, expected cancellations, unresolved failures, diagnostic coverage, and installed cohorts must use compatible definitions. Fewer crash events with fewer attempted operations can reflect abandonment, not improvement. MetricKit or crash reporting gaps stay visible. An adoption milestone can pass locally while outcome validation remains pending; expansion and retirement decisions should say which gate actually passed.</p>"
+        },
+        {
+          "id": "incentives",
+          "title": "Assign decision rights and make adoption feasible",
+          "html": "<p>A platform owner owns the shared contract, compatibility policy, evidence schema, and exception ledger. Consumer owners own user-visible behavior, lifecycle integration, and their accepted evidence. Release owners control authorized distribution steps; service owners preserve compatible responses for supported installed clients. An observability owner defines outcome denominators and approved data handling. State who can pause expansion, accept a compensating check, fund assistance, and authorize retirement. A long list of reviewers is not a substitute for decision rights.</p><p>Adoption incentives should address actual consumer constraints. Supply a small adapter, migration fixture, paired integration help, and an agreed support response rather than a mandate to 'standardize.' Fund the temporary dual path and removal work. A team with a near-term delivery commitment may need a supported exception or a later wave; treating schedule friction as bad faith makes adoption evidence worse. Compare the new contract's practical debugging and maintenance cost with the existing path using an explicit observation window, not invented savings.</p><p>Ask each owner what could make adoption irrational: lost capability, increased incident burden, unreadable stored state, new credential coupling, or an unsupported minimum OS. The answer can change the strategy. Kotlin coroutine cancellation and Swift cooperative cancellation can share product outcomes while retaining different native error and lifetime rules. Java interfaces and Swift protocols can describe a boundary, but an interface name cannot guarantee consistent cancellation or resource ownership. Pay for the work that proves those behaviors.</p>"
+        },
+        {
+          "id": "exceptions",
+          "title": "Treat exceptions as owned compatibility contracts",
+          "html": "<p>An exception includes the affected consumer and invariant, reason, local owner, compensating check, supported baseline, review date, and removal evidence. Record its maintenance cost and whom it protects. A review date schedules a decision; it does not automatically invalidate an installed client or permit deleting required code. The validator asks for an exception owner, reason, reviewDate, and compensatingCheck and blocks removal while that consumer remains exceptional. Calendar interpretation and human authority stay outside the local check.</p><p>Exceptions can be sound engineering. A stream consumer that emits cache then refresh cannot silently adopt a one-shot terminal-result contract. A widget sharing durable state with an app cannot rely on the app's process-local actor for interprocess serialization. A lower-deployment target may not support a newly introduced API. Prefer a narrow adapter or native implementation with the shared external outcome where appropriate, rather than weakening all invariants to make the exception disappear.</p><p>Acknowledge residual risk and escalation. If an exception preserves an unsafe unsupported baseline, name the risk owner and a constrained remediation plan rather than calling it indefinite compatibility. If no owner accepts it, expansion is blocked on that decision. The host tool can reject an empty owner field but cannot manufacture ownership. Cancelled review meetings, unavailable test devices, and inconclusive traces remain missing evidence; they are not votes for removal.</p>"
+        },
+        {
+          "id": "swift-retirement",
+          "title": "Make removal fail closed on incomplete adoption",
+          "html": "<p>The following Swift 6 example is runnable as part of the host companion. It models a minimum removal gate using immutable value records. It does not know whether the supplied adopted state is true; the full evidence record and independent review must establish that.</p><pre><code class=\"language-swift\">enum Adoption { case pending, adopted, exception }\nstruct Consumer {\n    let id: String\n    let state: Adoption\n}\nfunc canRetire(_ consumers: [Consumer], compatibilityChecked: Bool) -&gt; Bool {\n    guard !consumers.isEmpty, compatibilityChecked,\n          Set(consumers.map(\\.id)).count == consumers.count else { return false }\n    return consumers.allSatisfy {\n        if case .adopted = $0.state { return true }\n        return false\n    }\n}</code></pre><p>The enum defines three exhaustive local states. Consumer stores a stable identifier and state; it has no reference lifetime to release. The function accepts an unlabeled array and an explicitly labeled compatibility assertion. Its guard rejects an empty denominator, missing compatibility check, or duplicate IDs. map with the key path extracts IDs; Set removes duplicates, so differing counts reveal an invalid inventory. allSatisfy evaluates every remaining row. Pattern matching with if case succeeds only for adopted. Pending and exception both return false. An empty array would otherwise make allSatisfy true, which is why the earlier guard matters.</p><p>Kotlin all also returns true on an empty collection, and toSet can reveal duplicated identities, so the logical trap transfers cleanly. The stored state and compatibility Boolean are still assertions in either language. No async work or cancellation exists inside this pure gate. A cancelled evidence collector must not set compatibilityChecked true. The companion checks empty inventory, exception, and adopted synthetic cases; real cross-team retirement remains unavailable.</p>"
+        },
+        {
+          "id": "changed-constraint",
+          "title": "Revise the worked strategy when a widget joins",
+          "html": "<p>Initial proposal: app consumers share a process-local read adapter and retire the old reader once their parity checks pass. Changed constraint: a widget accesses shared durable state while the containing app may be suspended or terminated. The previous ownership model covers neither the second process nor concurrent format access. Add the widget to the eligible denominator rather than treating it as an implementation detail. Apple's extension guide describes shared-container coordination needs; an actor in the app is not an interprocess transaction manager.</p><p>Revise the recommendation to retain compatible old storage readers while a native shared-state contract is characterized. Name app, widget, and durable-data owners. The exception requires fixtures for old/new readers, interrupted writes, protected-data availability where relevant, account boundary changes, and the selected storage system's supported coordination mechanism. Do not improvise a universal file lock across every database. A read-only host validator can check the ledger's completeness but cannot prove store safety or extension lifecycle behavior.</p><p>Update adoption support and recovery. Fund the widget integration, preserve the baseline format, sequence new writers only after supported readers can handle it, and retain a repair path. Deployment and OS availability checks now cover both targets. The changed-constraint fixture represents this proposed exception and causes the deprecation gate to remain pending. No migration occurred. If future evidence demonstrates that the widget needs a materially different contract, prefer separate native adapters with common outcomes over forcing an invalid shared implementation.</p>"
+        },
+        {
+          "id": "deprecation",
+          "title": "Separate source warnings, rollout, and operational retirement",
+          "html": "<p>Swift's available attribute can mark APIs deprecated and supply a message or renamed replacement. Such compiler guidance helps future source consumers migrate; it does not rewrite binaries already installed or delete old server contracts safely. Kotlin DeprecationLevel.WARNING, ERROR, and HIDDEN concern source/API use under their own rules and are not identical to Apple's platform availability checks. Plan source deprecation, consumer migration, removal from the build graph, durable-format compatibility, and service retirement as distinct milestones.</p><p>Retirement acceptance requires a complete supported-consumer inventory, adopted proof or a deliberately retained exception path, resource draining where applicable, installed-client compatibility review, and observed outcome guardrails. A clean ledger can justify retiring a particular old adapter only when its clients no longer require it. Removing a service response field is a separate change with its own installed-client horizon. A phased release pause is containment and cannot downgrade installed apps. Remote selection cannot fix a client that fails before reading configuration.</p><p>Keep review and retest coupled to the final decision inputs. An independent reviewer adds a constraint, the owner revises the ledger and implementation plan, and the new fingerprint binds the updated evidence. Re-run affected gates and record dissent with the observation that could resolve it. Finish with a conditional decision: bounded expansion, retained exception, or deferred removal. Use actual operational outcomes if obtained; otherwise say that outcomes and organizational adoption are pending. A principal practice exercise demonstrates reasoning under shared responsibility, not an earned title or fabricated impact.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A widget now shares durable state. Why does the old app-only actor contract fail?",
+          "options": [
+            "Actors are always unsafe",
+            "Actor isolation in one process does not serialize access from another process",
+            "Widgets always use Android coroutines"
+          ],
+          "answer": 1,
+          "explanation": "The ownership boundary changed. Shared storage needs its supported interprocess/transaction coordination and compatibility evidence for both readers."
+        },
+        {
+          "question": "An exception reaches its reviewDate with no new evidence. What follows?",
+          "options": [
+            "Automatically delete the old implementation",
+            "Review the owned exception and retain required compatibility until removal criteria are met",
+            "Remove that consumer from adoption counts"
+          ],
+          "answer": 1,
+          "explanation": "A date triggers reassessment, not proof. Eligible consumers and accepted risk owners stay visible in the denominator and removal decision."
+        },
+        {
+          "question": "What does source-level deprecation accomplish?",
+          "options": [
+            "Installed apps stop calling the old API",
+            "Future source consumers receive compiler guidance under the relevant language/tool rules",
+            "The server can immediately remove compatibility"
+          ],
+          "answer": 1,
+          "explanation": "Compiler guidance and installed-binary behavior are different boundaries. Build-graph and service retirement need their own evidence and owners."
+        }
+      ],
+      "exercise": {
+        "brief": "Revise an app-only adoption proposal after a widget introduces a second process and an older supported reader.",
+        "steps": [
+          "Validate changed-constraint.json in deprecation mode",
+          "Add the widget to an explicit eligible-consumer ledger and keep its exception visible",
+          "Name decision rights and a compensating shared-state compatibility check",
+          "Revise migration assistance, writer sequencing, recovery, and source deprecation milestones",
+          "Ask an independent reviewer to challenge removal and retest the updated record"
+        ],
+        "acceptance": [
+          "An empty inventory or dependency bump cannot prove adoption",
+          "Every exception has an owner, review trigger, and compensating check",
+          "The new process boundary changes implementation and evidence requirements",
+          "Installed-client compatibility has a named owner",
+          "No synthetic consumer states become organizational adoption outcomes"
+        ],
+        "solution": "<p>The supplied fixture marks extension as an exception because a process-local actor cannot protect shared durable state. The local gate reports exception-prevents-removal and missing captured consumer/outcome evidence. Preserve that result; changing the enum to adopted would hide the unresolved contract. The revised proposal adds app and widget readers to the same denominator, gives the widget owner authority to request compatibility evidence, and keeps the existing reader supported while the durable-data owner selects and tests the storage system's coordination mechanism.</p><p>Sequence reader compatibility before new-format writers. The compensating check covers old-reader/new-writer and new-reader/old-writer combinations, interrupted writes, protected-data states where relevant, and account separation. Record scratch target/OS coordinates and actual attachments when those tests are run. Help the consumer team with fixtures and integration time, and fund maintenance of the temporary dual path. If a separate widget adapter remains necessary, preserve common external outcomes and document the narrower internal exception.</p><p>An independent reviewer changes the source-deprecation date into a review milestone because older installed clients still require the service response. Update the fingerprint, retest ledger completeness, and leave removal pending until supported readers, authentic consumer evidence, and comparable outcome windows permit it. Source warnings may begin earlier, but neither warnings nor a phased rollout pause repairs installed binaries. The worked decision therefore allows a bounded app pilot, retains the widget exception and compatible service behavior, and requests specialist durable-state evidence. It claims no customer improvement, cross-team adoption, or production retirement.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Attributes and availability/deprecation",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/attributes/"
+        },
+        {
+          "label": "Apple: App extension scenarios and shared-container coordination",
+          "url": "https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/ExtensionScenarios.html"
+        },
+        {
+          "label": "Swift: Actor isolation and concurrency",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"
+        },
+        {
+          "label": "Apple: Build settings reference",
+          "url": "https://developer.apple.com/documentation/xcode/build-settings-reference"
+        },
+        {
+          "label": "Kotlin: Deprecated annotation and deprecation levels",
+          "url": "https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-deprecated/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Medication widget is a distinct app target",
+          "path": "ios-client/Projects/Apps/Zocdoc/Project.swift",
+          "line": 165,
+          "why": "Inspected widget entitlement membership demonstrates a separate capability/build boundary; no shared-state defect or migration is asserted."
+        },
+        {
+          "label": "Account module graph remains in coexistence",
+          "path": "ios-client/Projects/Features/ZDAccount/Project.swift",
+          "line": 3,
+          "why": "Verified coexistence comment grounds the need to distinguish graph adoption from accepted consumer behavior."
+        }
+      ],
+      "checklist": [
+        "I can keep eligible consumers and exceptions in an honest denominator",
+        "I can revise ownership when a second process changes the contract",
+        "I can separate source deprecation, installed compatibility, and observed retirement outcomes"
+      ]
+    }
+  ]
+}

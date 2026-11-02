@@ -1,0 +1,219 @@
+{
+  "questions": [
+    {
+      "id": "iq-093-a",
+      "lesson": "093",
+      "level": "Senior",
+      "kind": "Explain",
+      "minutes": 7,
+      "prompt": "Explain why @Published alone does not make a Swift property observable through KVO, then draw the observation ownership and dispatch contract.",
+      "scenario": "A synthetic settings controller receives no KVO updates, and a second revision keeps updating after the controller should leave.",
+      "androidBridge": "Kotlin StateFlow and Java listeners help distinguish a value source from registration lifetime. Neither implements Objective-C selector dispatch, KVO interception, or UIKit main-thread delivery.",
+      "rubric": [
+        "Requires an NSObject subclass with @objc dynamic observable property.",
+        "Separates Swift/Combine Observation mechanisms from KVO.",
+        "Retains the observed model and the returned token deliberately.",
+        "Explains weak capture and an explicit registration retirement event.",
+        "Notes synchronous initial delivery and the absence of a main-actor scheduling guarantee."
+      ],
+      "answerHTML": "<p>KVO participates in the Objective-C object model. For the lesson's automatic Swift case, use an NSObject subclass and an @objc dynamic property. @objc exposes the property; dynamic preserves runtime dispatch compatible with observation interception. @Published supplies Combine behavior and does not independently establish that KVO contract. Selector dispatch chooses an implementation from the receiver at runtime; it is not how every Swift operation is dispatched.</p><p>The controller should keep its model and registration token for a declared scope. If its token's closure strongly captures the same controller, that ownership graph can retain the controller. A weak capture addresses that edge, while explicit invalidation addresses the registration scope. These are different fixes. Prepare all callback dependencies before registering with .initial because delivery can occur before observe returns and before the token property assignment finishes.</p><p>Do not assume KVO callbacks arrive on the main actor. The companion confines writers to UIKit's main thread; a different source needs serialization and a safe UI hop with freshness checks. Test initial/new delivery, invalidation, owner disappearance, and replacement of a nested observed object separately.</p>",
+      "followUps": [
+        "How would an initial callback safely use data initialized by the controller?",
+        "What changes if observation callbacks forward copied values into an asynchronous task?"
+      ],
+      "pitfalls": [
+        "Treating @Published, @Observable, and KVO as interchangeable registrations.",
+        "Assuming weak capture alone ends an obsolete registration or schedules UI delivery."
+      ]
+    },
+    {
+      "id": "iq-093-b",
+      "lesson": "093",
+      "level": "Senior",
+      "kind": "Debug",
+      "minutes": 10,
+      "prompt": "Diagnose a transparent overlay that steals taps and a double tap that also commits a single-tap operation. What are the separate routing fixes?",
+      "scenario": "A synthetic inspection panel overlays a button and installs single/double tap recognizers on a neighboring pad. Its Reset command uses a nil target.",
+      "androidBridge": "Android dispatchTouchEvent/interception supplies routing vocabulary. UIKit hit testing, responder-chain target-action, and recognizer failure dependencies are separate mechanisms rather than one equivalent interception callback.",
+      "rubric": [
+        "Explains local-coordinate hit testing and transparent content still winning a hit.",
+        "Proposes a view-identity pass-through policy while preserving interactive descendants.",
+        "Uses single.require(toFail: double) and explains its deliberate latency.",
+        "Avoids cyclic failure requirements and distinguishes simultaneous recognition.",
+        "Explains nil-target Reset resolution through an installed responder hierarchy.",
+        "Defines touch, keyboard, and accessibility evidence separately."
+      ],
+      "answerHTML": "<p>First inspect the overlay's eligibility and bounds. Clear drawing does not make its default hit test return nil. The lab calls super.hitTest and returns nil only when the hit is the overlay itself, preserving any real child control. Convert coordinates when delegating to another view. Do not infer empty space from private SwiftUI layer topology as a reusable platform guarantee.</p><p>The single tap should require the double tap to fail. That directed wait delays single recognition while the double remains possible; a successful double makes the single fail. The reverse edge gives the wrong precedence, and both edges create a cycle. Simultaneous recognition permission is a separate policy and does not remove the failure requirement. Check recognizer touch-cancellation behavior if controls stop receiving events.</p><p>Reset's nil target asks UIKit to locate a responder that can perform the selector. It does not repeat geometric hit testing or require a global controller reference. Keep its action signature and containing controller hierarchy valid. Verify overlay pass-through, only one double-tap commit, Reset resolution, and semantic accessible button activation on a running destination. Compilation establishes signatures, not those interactions.</p>",
+      "followUps": [
+        "What changes if an interactive child is later added to the overlay?",
+        "How would you define cancellation for a continuous drag instead of a tap?"
+      ],
+      "pitfalls": [
+        "Reversing the failure edge or adding a cycle to make priority symmetric.",
+        "Treating responder search, touch hit selection, and VoiceOver focus as one mechanism."
+      ]
+    },
+    {
+      "id": "iq-094-a",
+      "lesson": "094",
+      "level": "Senior",
+      "kind": "Code",
+      "minutes": 8,
+      "prompt": "An explicit position animation ends by snapping back. Repair its model state and describe retargeting and freeze ordering.",
+      "scenario": "A synthetic CALayer moves between two endpoints; opposite commands can arrive while it is still interpolating.",
+      "androidBridge": "Android ObjectAnimator can update a View property over time. Core Animation presentation can move while its model already holds the destination, so target-property observations are not interchangeable.",
+      "rubric": [
+        "Distinguishes model destination, optional presentation sample, and private render machinery.",
+        "Samples presentation before removing the owned animation.",
+        "Updates the model destination with implicit actions disabled.",
+        "Adds a keyed explicit animation from the copied sample to the destination.",
+        "Defines freeze versus finish and a nil-presentation fallback.",
+        "Avoids permanent fill mode as a substitute for model correctness."
+      ],
+      "answerHTML": "<p>Adding CABasicAnimation alone does not establish the lasting model destination. Set the layer's model position to the endpoint inside a transaction with implicit actions disabled, then install the explicit position animation. Once the animation disappears, the correct model endpoint remains. Action suppression prevents accidental implicit interpolation but still permits explicitly adding an animation.</p><p>For retargeting, copy presentation()?.position before removing the existing named animation. If no presentation exists, use a documented model fallback. Retire the old travel key, assign the new model destination, and add the new animation from the copied sample to that destination in the same bounded transaction. Core Animation copies the added animation; editing the local object afterward does not edit the installed copy.</p><p>Freeze and finish differ. Freeze writes the pre-removal visible sample into the model and removes travel. Finish removes travel while preserving the already-written endpoint. fillMode forwards with removal disabled can conceal an incorrect model and is not the repair. Verify interruption, resizing, leaving the view, and Reduce Motion independently. A successful build cannot prove a sampled value corresponded to a particular displayed frame.</p>",
+      "followUps": [
+        "What should freeze do before any presentation representation exists?",
+        "How would you preserve semantic progress rather than clamp position after resize?"
+      ],
+      "pitfalls": [
+        "Sampling presentation after removing the animation.",
+        "Persisting the visual endpoint only through isRemovedOnCompletion = false."
+      ]
+    },
+    {
+      "id": "iq-094-b",
+      "lesson": "094",
+      "level": "Staff",
+      "kind": "Design",
+      "minutes": 15,
+      "prompt": "A feed hitches while its loading shimmer looks smooth in isolation. Design an investigation that separates commit delay from render cost.",
+      "scenario": "A synthetic team proposes calling CATransaction.flush after every scroll event, without an actual frame trace.",
+      "androidBridge": "Android RenderThread and frame scheduling suggest independent preparation/render costs. UIKit/Core Animation do not expose the same Choreographer or SurfaceFlinger contracts, and coroutine completion is not frame presentation.",
+      "rubric": [
+        "States an observable workload and frame/destination measurement contract.",
+        "Separates main-thread preparation/commit work from rendering/composition cost.",
+        "Rejects flush as an evidence-free performance fix.",
+        "Compares alternatives and assigns investigation/rollback ownership.",
+        "Includes reduced-motion and interaction correctness gates.",
+        "Distinguishes source inspection, compilation, traces, and measured outcomes."
+      ],
+      "answerHTML": "<p>The smooth isolated shimmer only establishes one visual case. Define the failing workload: fixture list size, images, scroll path, window size, text size, destination, and warm/cold conditions. Capture representative frame hitches and relevant main-thread work rather than deriving performance from source or animation duration. App preparation and transaction submission can be delayed; render composition can also miss deadlines after a timely commit.</p><p>Compare evidence for expensive layout, invalidation, image preparation, and commit-side work with rendering costs such as masks, effects, and overdraw. A presentation-layer sample is useful for retargeting but is not a frame trace. CATransaction.flush is not a justified per-event fix and can alter batching without solving the cause.</p><p>Assign one owner for workload reproduction and another for the bounded implementation experiment. Compare alternatives such as reducing preparation work or simplifying the expensive visual effect, preserve the baseline, and specify a rollback switch. Verify cancellation, latest-command model state, Reduced Motion, and accessible activation alongside timing. Report which traces were actually captured and which remain pending. The course's inspected shimmer and compiled lab are source/API evidence; neither supplies device measurements for this feed.</p>",
+      "followUps": [
+        "Which result would justify changing the shimmer instead of image preparation?",
+        "What would you require before rolling an optimization out to several feature teams?"
+      ],
+      "pitfalls": [
+        "Presenting source-reading hypotheses as measured GPU findings.",
+        "Equating transaction completion, async completion, and actual display presentation."
+      ]
+    },
+    {
+      "id": "iq-095-a",
+      "lesson": "095",
+      "level": "Senior",
+      "kind": "Code",
+      "minutes": 10,
+      "prompt": "A wrapping Layout caches by child count and top-aligns mixed fonts. Repair its fingerprint and derive baseline and RTL placement.",
+      "scenario": "Two children measure 40×20/baseline 15 and 50×30/baseline 20. Width changes from 120 to 70 with gap 8 and row gap 12.",
+      "androidBridge": "Compose measurement and placeables help describe geometry. SwiftUI proposals are not hard constraints, and layout cache callbacks do not imply Compose measurement-cache semantics.",
+      "rubric": [
+        "Includes current dimensions, baseline, row key, width, and gaps in this logical arrangement's cache validity.",
+        "Explains updateCache versus proposal-dependent recomputation.",
+        "Derives ascent 20, descent 10, y offsets 5 and 0 for the wide row.",
+        "Calculates narrow total height 62 and preserves measurement/placement proposal consistency.",
+        "Supplies logical x unchanged because SwiftUI automatically flips RTL subview placement; avoids double reflection.",
+        "Preserves logical IDs and states container-baseline/overflow limitations."
+      ],
+      "answerHTML": "<p>Child count is insufficient: width, text measurement, font, baseline guides, break keys, and spacing can change arrangement with the same count. Clear the cache in updateCache, but also compare a proposal-dependent fingerprint on every arrangement request. The lab remeasures current proxy dimensions and caches only the pure arrangement, so it makes no unsupported promise to eliminate text measurement cost.</p><p>At width 120 the children fit with an eight-point gap. Row ascent is max(15,20) = 20 and descent is max(5,10) = 10. Place them at y = 5 and zero so both baselines reach 20. At width 70 they wrap: total height is 20 + 12 + 30 = 62. Placement should use the same capped-width, unspecified-height measurement policy, with bounds origin added afterward.</p><p>Pass logical x values zero and 48 in both directions. SwiftUI automatically flips subview x placement in RTL; manually reflecting first would double-flip it. A numeric UnitPoint anchor does not disable that behavior. Keep logical order and IDs, and verify native RTL separately. Oversize children follow the stated overflow policy. Internal row baseline alignment does not establish an explicit container first/last baseline contract; that needs separate implementation and typography tests.</p>",
+      "followUps": [
+        "How would a changed RowBreakKey invalidate the plan without replacing a child, and why is direction absent from this logical helper?",
+        "Why can proposing the measured response width during placement ask a different question?"
+      ],
+      "pitfalls": [
+        "Assuming updateCache is called for every width probe.",
+        "Manually mirroring x before SwiftUI's automatic RTL reflection, or reversing semantic identity."
+      ]
+    },
+    {
+      "id": "iq-095-b",
+      "lesson": "095",
+      "level": "Staff",
+      "kind": "Design",
+      "minutes": 14,
+      "prompt": "A nested scrolling form cannot reliably reveal its invalid field, and VoiceOver moves differently from keyboard editing focus. Define a bounded repair.",
+      "scenario": "A synthetic vertical form contains horizontal choices, a custom baseline layout, and an error inserted after validation.",
+      "androidBridge": "Compose nestedScroll exposes pre/post delta consumption; SwiftUI native scrolling does not provide the same callback surface. Android keyboard focus and accessibility focus are also distinct, but traversal rules still require platform-specific verification.",
+      "rubric": [
+        "Chooses one vertical scroll owner and a deliberate horizontal-strip policy.",
+        "Avoids blanket zero-distance/high-priority gesture fixes.",
+        "Separates FocusState editing cases from AccessibilityFocusState error requests.",
+        "Uses stable current scroll IDs and a current proxy.",
+        "Defines software/hardware keyboard, VoiceOver, large-text, and RTL tests.",
+        "Assigns ownership, compares alternatives, and declares unverified runtime gaps."
+      ],
+      "answerHTML": "<p>Begin with ownership: keep one vertical scroll owner and make the horizontal strip orthogonal unless independently scrolling vertical content is essential. Leave native arbitration intact before adding custom gestures. A broad zero-distance or high-priority drag can steal page scrolling and still fail after cancellation. If same-axis nesting is necessary, specify its viewport, handoff, and accessible alternatives rather than translating Compose nestedScroll callbacks literally.</p><p>Use a single optional Field enum for editing focus, with a unique case on each TextField. On submit, advance to the intended field and request scrolling through the current ScrollViewReader proxy and stable field ID. Validation can clear editing focus and separately request assistive focus on an installed error element. That does not guarantee a software keyboard, announcement, or hardware Tab order.</p><p>Compare a simpler stacked form with the custom container if overflow remains unclear. Assign a feature owner for focus/validation and a container owner for layout/arbitration. Verify diagonal drags, software submit/toolbar progression, Tab and Shift-Tab, VoiceOver reading/activation, large text, and RTL on named destinations. Keep drafts intact during cancellation. Compiler and host geometry checks are useful but do not certify those runtime outcomes.</p>",
+      "followUps": [
+        "How would you avoid a stale focus request after asynchronous validation?",
+        "What additional evidence is needed for same-axis nested fling handoff?"
+      ],
+      "pitfalls": [
+        "Using the same Boolean for keyboard and assistive focus.",
+        "Treating a source assignment or normal-size preview as proof of accessible traversal."
+      ]
+    },
+    {
+      "id": "iq-096-a",
+      "lesson": "096",
+      "level": "Senior",
+      "kind": "Explain",
+      "minutes": 8,
+      "prompt": "Correct a lifecycle checklist that treats every connection as a new session and every inactive transition as backgrounding, then assign resource owners.",
+      "scenario": "A synthetic app has two windows; one is interrupted while the other stays active. The checklist saves drafts only in applicationWillTerminate.",
+      "androidBridge": "Android Application/Activity/task/window concepts help enumerate owners. UIKit scene/session identity and ordinary rotation behavior do not follow Activity recreation, saved-instance-state, or task identity exactly.",
+      "rubric": [
+        "Separates process, UISceneSession, connected scene, window, controller, view, and draft identity.",
+        "Notes connection can restore/reconnect an existing session.",
+        "Distinguishes inactive, background, disconnection, and session discard.",
+        "Explains view-level scenePhase versus App-level aggregate.",
+        "Rejects termination-only durability and a universal callback sequence.",
+        "Keeps scene presentation separate from shared account services."
+      ],
+      "answerHTML": "<p>A process can own shared services while each scene owns navigation and presentation. A UISceneSession carries persistent interaction identity; a connected UIScene and its windows/controllers are live UI objects. scene(_:willConnectTo:options:) can create or restore an interface for an existing session, so it is not a new-session test. Disconnection is also different from permanently discarding that session.</p><p>Inactive can describe a temporary interruption without entering background. Reactivation therefore need not include a background-to-foreground callback. A view's scenePhase reflects its containing scene, while an App-level phase aggregates scenes and can stay active while another window is inactive. Quiet the affected visual work without indiscriminately cancelling a shared account service used elsewhere.</p><p>Controller disappearance, view reconstruction, process launch, and durable draft lifetime are separate boundaries. SwiftUI view descriptions can change while identity-associated state survives. Preserve important drafts through normal durable commits: a suspended process may terminate without applicationWillTerminate. The familiar launch/foreground/active path is illustrative rather than universal. Use WindowGroup for scene roots and one delegate adaptor for needed process-level callbacks, then verify actual routes and transitions on a destination.</p>",
+      "followUps": [
+        "Which owner should hold a focus request and which should hold an authenticated repository?",
+        "How can a scene reconnect while its durable document outlives both controller instances?"
+      ],
+      "pitfalls": [
+        "Deleting a durable draft when sceneDidDisconnect fires.",
+        "Assuming a phone interruption or rotation always restarts the full launch sequence."
+      ]
+    },
+    {
+      "id": "iq-096-b",
+      "lesson": "096",
+      "level": "Staff",
+      "kind": "Design",
+      "minutes": 16,
+      "prompt": "Design cold/warm route recovery and an expiring checkpoint that cannot overwrite a newer account or attempt.",
+      "scenario": "Stored Alpha competes with incoming Beta. A prior checkpoint expiration arrives near a replacement attempt, and the process may disappear without cleanup.",
+      "androidBridge": "Android intents, saved state, and coroutine generations help describe intent precedence and stale acceptance. They do not reproduce SceneStorage guarantees, UIKit background identifiers, or iOS scheduling duration.",
+      "rubric": [
+        "Defines valid external intent precedence over restoration and separate invalid-input policies.",
+        "Uses one parser plus scene-owned reducer for initial and later delivery.",
+        "Validates account/schema/existence after syntax and rejects late previous-account work.",
+        "Treats SceneStorage as lightweight presentation state, not durable data.",
+        "Guards completion and expiration with attempt identity; ends a matching identifier promptly.",
+        "Compares alternatives, assigns owners, and separates host policy tests from installed delivery/expiration evidence."
+      ],
+      "answerHTML": "<p>Use one strict parser for initial and later URL/activity delivery, then a scene-owned routing reducer. A valid incoming Beta should outrank stale restored Alpha. Define invalid-input behavior explicitly: this lab's cold model falls back to root, while invalid warm input preserves the current route. Restore only recognized schema and IDs, and validate the current account, authorization, and record existence before revealing protected content.</p><p>Store small presentation values in SceneStorage, but protect drafts with durable transactions and recovery. Capture an account epoch around async validation so a prior account cannot commit navigation after logout. A view's later onAppear must not overwrite an already accepted external intent with stale restoration.</p><p>Request finite background execution before protected work, handle an invalid identifier, and capture an attempt generation in expiration and completion. Retirement clears acceptance, cancels work, makes the identifier invalid, and ends the old identifier once. Old callbacks must not end a replacement. The documented five-second callback budget is not a fixed grant for arbitrary async work.</p><p>Assign routing and storage owners, compare immediate checkpoints with a separately scheduled durable job where appropriate, and define recovery after interrupted writes. Host tests establish parser/precedence logic; installed cold/warm delivery, actual expiration, two-window behavior, and durability require independent evidence.</p>",
+      "followUps": [
+        "What should happen if the external route parses but authorization fails after account change?",
+        "How would you prove recovery from a write interrupted before durable commit?"
+      ],
+      "pitfalls": [
+        "Letting callback arrival order accidentally choose between restoration and external intent.",
+        "Presenting a completed synthetic sleep or build as durable background-execution evidence."
+      ]
+    }
+  ]
+}

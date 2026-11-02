@@ -1,0 +1,69 @@
+SYNTHETIC DIAGNOSTIC EXCERPTS — invented teaching records.
+These are not output from this checkout, Xcode, a device or Instruments.
+Numbers, tool labels, paths, UUIDs and stacks exist only to exercise reasoning.
+
+CASE A: CONFIGURATION DECLARATION VERSUS EFFECTIVE SETTING
+Scheme label: Sandbox
+Run action: Debug
+Profile action: Release
+Declared scratch xcconfig: SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) COURSE_SANDBOX
+Consuming target's Release override: SWIFT_ACTIVE_COMPILATION_CONDITIONS = PROD
+Selected effective settings excerpt:
+  CONFIGURATION = Release
+  PRODUCT_BUNDLE_IDENTIFIER = example.course.workbench
+  PRODUCT_MODULE_NAME = SwiftUIWorkbench
+  SWIFT_ACTIVE_COMPILATION_CONDITIONS = PROD
+  SWIFT_OPTIMIZATION_LEVEL = -O
+  DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+Built Info.plist excerpt:
+  CFBundleIdentifier = example.course.workbench
+  CFBundleExecutable = SwiftUIWorkbench
+Question: Why does this hypothetical Sandbox profile run select production behavior?
+Expected diagnosis: the scheme label does not select an environment contract;
+inspect the selected action and resolved target override before proposing a change.
+
+CASE B: SOURCE RESOURCE VERSUS PACKAGED BUNDLE
+Manifest declaration: CourseResources target processes Resources/bootstrap.json
+Source inventory: Resources/bootstrap.json (present)
+Built app bundle: CourseResources_CourseResources.bundle (absent)
+Consumer code: Bundle.main.url(forResource: "bootstrap", withExtension: "json")
+Question: Which two independent failures could produce a nil URL?
+Expected diagnosis: the owning resource bundle must be packaged, and the consumer
+must resolve that owner rather than assuming Bundle.main. Fixing one alone is insufficient.
+
+CASE C: SYMBOL IDENTITY
+Hypothetical crash Binary Images entry:
+  0x100000000 - 0x10001ffff SwiftUIWorkbench arm64
+  <11111111-2222-3333-4444-555555555555>
+Hypothetical executable UUID check:
+  UUID: 11111111-2222-3333-4444-555555555555 (arm64) SwiftUIWorkbench
+Hypothetical candidate dSYM UUID check:
+  UUID: AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE (arm64) SwiftUIWorkbench.dSYM
+Question: Can this dSYM establish the function at the crash address?
+Expected diagnosis: no; locate the UUID/architecture-matching artifact first.
+Matching product names or app version labels do not repair the UUID mismatch.
+
+CASE D: SELECTED INTERVAL, INCLUSIVE STACK AND SELF SAMPLES
+Hypothetical MapRows signpost: selected range 2.000s through 2.160s
+Hypothetical main-thread samples inside that range: 80 total
+  captureStableMapping: inclusive 64, self 4
+    Array.contains: inclusive 60, self 12
+      String equality and comparison descendants: inclusive 48, self 48
+Other samples: 16
+Question: Does 64 samples mean the mapper was called 64 times or cost exactly 64 ms?
+Expected diagnosis: no; samples support a hotspot hypothesis within this range.
+Parent inclusive counts contain descendants and cannot be added to them.
+Confirm matched operation latency outside the heavy diagnostic capture.
+
+CASE E: ALLOCATION SURVIVAL AND RETAINING PATH
+Hypothetical route cycles: entry/exit repeated three times
+Hypothetical surviving RetentionFixture instances: 1, 2, 3
+Hypothetical Memory Graph edges for one instance:
+  RetentionFixture --strong callback--> closure context
+  closure context --strong self--> RetentionFixture
+No live route owner edge remains in the hypothetical graph.
+Question: Which observed edge contradicts the expected route lifetime?
+Expected diagnosis: the stored callback cycle survives after the route owner is removed.
+Break it through an appropriate stop/teardown contract or deliberate weak capture;
+then verify repeated route behavior, callback semantics and actual retained population.
+This excerpt is a worked ownership fixture, not a leak report for the course app.

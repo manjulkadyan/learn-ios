@@ -1,0 +1,544 @@
+{
+  "unit": {
+    "id": "runtime-scheduling",
+    "title": "Runtime scheduling and synchronization",
+    "summary": "Run-loop eligibility, dispatch readiness graphs, synchronous invariants and cooperative executor admission.",
+    "order": 13,
+    "track": "Advanced practice"
+  },
+  "lessons": [
+    {
+      "id": "085",
+      "title": "RunLoop modes, timers, sources and display-linked work",
+      "summary": "Separate event eligibility, timing and lifetime, then compare UIKit display scheduling with Android Looper and Choreographer.",
+      "duration": 110,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "038",
+        "068",
+        "081"
+      ],
+      "objectives": [
+        "Predict timer eligibility across modes and common-mode registration.",
+        "Distinguish timers, input sources, observers and display links.",
+        "Design explicit invalidation and callback ownership.",
+        "Separate host mode evidence from UIKit/device scheduling evidence."
+      ],
+      "sections": [
+        {
+          "id": "event-loop",
+          "title": "Why a UI timer can pause while a finger moves",
+          "html": "<p>An Android Handler posts work to a Looper associated with a thread. A callback runs when that thread processes its message queue; posting does not make expensive work cheap. Start there when approaching an iOS RunLoop: it coordinates events on a particular thread, usually the main thread for UI work. Unlike the simple Handler analogy, a run loop selects a mode containing eligible sources, timers and observers. A callback can be ready yet remain ineligible in the mode currently running. This distinction explains why a default-mode timer may appear to pause during a scroll without being cancelled.</p>\n<p>The system supplies a run loop associated with each thread as needed. The application frameworks drive the main loop. Creating a background DispatchQueue does not create a permanently running RunLoop for its blocks, nor does retrieving RunLoop.current start an event-processing loop. Worker-thread designs that require an event loop must deliberately install sources, manage lifetime and drive it; most application features should prefer established asynchronous APIs instead. A queue and a run loop solve different coordination problems.</p>\n<p>Session 038 already explains frame deadlines and main-thread costs. Here the new question is eligibility: which work may run during which event-processing phase? Separate three hypotheses before debugging a late callback: the timer was invalidated, the active mode excludes it, or the thread was occupied by another callback. Changing an interval does not distinguish those cases. Capture registration mode, ownership, and observed callback order before making a scheduling change.</p>"
+        },
+        {
+          "id": "modes",
+          "title": "Modes are named collections; common is a registration set",
+          "html": "<p>RunLoop.Mode.default is the ordinary event-processing mode. UIKit also uses tracking behavior during interactions. A run loop processes one selected mode at a time; work registered only in another mode need not be serviced. The common pseudo-mode represents the set of modes designated common for that run loop. Adding a timer for .common arranges monitoring in those common modes. It is not a mode that executes every possible custom source, and it is not a higher priority or guarantee against starvation.</p>\n<p>A practical choice follows from product behavior. A visual progress indicator may need updates during scrolling, whereas nonessential polling can reasonably defer during interaction. Registering everything in common modes can move work into the very interval whose responsiveness you wanted to protect. Document that decision per timer rather than applying a blanket fix. A custom mode belongs in a controlled scratch experiment, not in a production attempt to bypass UIKit's event loop.</p>\n<p>The host companion installs an already due one-shot timer in RuntimeLab.synthetic. It pumps default mode for a bounded interval and checks that no callback occurred, then pumps the custom mode and checks exactly one callback. This establishes mode eligibility for that host fixture. It does not reproduce UIKit tracking or a physical display. CFRunLoopRunInMode is a Core Foundation function that bounds this artificial probe; its final Boolean requests return after a source is handled. Timers have special treatment and need not cause that early return. Never pump nested application loops to make synchronous code wait for an async result: unrelated events can reenter your supposedly atomic flow.</p>"
+        },
+        {
+          "id": "timers",
+          "title": "A timer schedules opportunities, not exact deadlines",
+          "html": "<p>Foundation Timer works with a run loop. A scheduledTimer convenience registers on the current loop in default mode; constructing Timer directly leaves registration to you. Repeating timers use their scheduled cadence rather than simply adding an interval to each delayed actual callback. If several firings were missed, the timer does not deliver an unlimited burst to catch up. Therefore a countdown should derive remaining time from a chosen clock or deadline instead of subtracting one tick each callback. Wall-clock dates suit calendar events but can jump; elapsed durations need a monotonic clock policy.</p>\n<p>Tolerance allows some delay beyond a scheduled firing date to help coalesce wakeups. It does not authorize early firing or create a real-time guarantee. A callback delayed by a busy thread or excluded mode can be later still. Choose a tolerance from the feature's acceptable staleness and energy goals. A UI refresh every millisecond is not justified merely because the API accepts a small number.</p>\n<p>The run loop retains scheduled timers. A block timer can retain captured objects; a target-based timer retains its target. An owner that retains its timer can consequently participate in a cycle. Keep an explicit stop method and call invalidate on the installation thread at the defined lifecycle boundary. Weak capture prevents one owning edge but does not remove a recurring timer from the loop. Invalidation is the resource cleanup action; a stale asynchronous request already launched by a prior tick still needs cancellation and freshness checks. Timer callbacks cannot throw across the framework boundary: catch errors inside, record a domain outcome, and stop or retry according to policy.</p>"
+        },
+        {
+          "id": "sources-observers",
+          "title": "Sources deliver events; observers reveal transitions",
+          "html": "<p>Core Foundation distinguishes custom source-zero input from port-based source-one input. A custom source needs application signaling, and waking a sleeping loop may also be necessary. A port-based source receives kernel-assisted signaling. These are useful implementation categories, not two Swift Task kinds. Foundation APIs often hide the source details behind a higher-level adapter. A timer is its own special run-loop entity, rather than ordinary input that necessarily returns control after firing.</p>\n<p>A CFRunLoopObserver receives selected activity notifications such as entry, before timers, before sources, before waiting, after waiting and exit. It lets an instrumented scratch target observe event-loop transitions. It is not an executor, a replacement for synchronization, or proof that every frame rendered. Its callback occurs on the observed loop's thread; logging large payloads or doing network work there perturbs the loop you are trying to understand. Keep recorded events bounded and distinguish observation overhead from application cost.</p>\n<p>Ownership applies to observers and sources as well. Remove or invalidate registrations when their owning experiment or feature ends. Inspect callback captures, and do not use one registration token to imply several unrelated resources were cleaned up. Foundation RunLoop is generally not thread-safe; call its methods in the context of its thread. Core Foundation provides selected cross-thread operations, but that does not make arbitrary Foundation calls safe. A source signaling design should specify which documented operation wakes the loop and which thread performs registration and removal. The companion's same-thread, bounded probe avoids that additional contract.</p>"
+        },
+        {
+          "id": "display",
+          "title": "Display-linked work has a separate UIKit target contract",
+          "html": "<p>CADisplayLink synchronizes callbacks with display updates. It is conceptually close to Android Choreographer, not Handler.postDelayed with a guessed sixteen-millisecond interval. A callback offers timestamp and targetTimestamp; their difference describes the relevant frame interval. Device capabilities, power policy and thermal conditions can alter cadence. Neither sixty nor one hundred twenty hertz is a universal constant. Preferred frame-rate settings express preferences, and do not reserve that whole interval for your callback.</p><pre><code class=\"language-swift\">import UIKit\n@MainActor\nfinal class DisplayDriver: NSObject {\n    private var link: CADisplayLink?\n    func start() {\n        stop()\n        let next = CADisplayLink(target: self, selector: #selector(tick(_:)))\n        next.add(to: .main, forMode: .common)\n        link = next\n    }\n    @objc private func tick(_ link: CADisplayLink) {\n        let frameInterval = link.targetTimestamp - link.timestamp\n        print(frameInterval) // Teaching only; omit per-frame console I/O in a real animation.\n    }\n    func stop() { link?.invalidate(); link = nil }\n}</code></pre><p>This snippet requires an iOS UIKit target; the companion Targets/DisplayDriver.swift has the same lifecycle pattern without per-frame console output. import supplies UIKit and its display-link exposure. NSObject supports Objective-C selector dispatch. @MainActor constrains calls and state. The optional property means no link is owned initially. start first stops an older registration, constructs a link whose target is self, registers it on the main loop's common modes, then retains it. @objc exposes tick to the selector runtime; the underscore removes the external argument label. stop invalidates before clearing the reference. The owning controller must call stop: deinit alone cannot break a cycle that prevents deinitialization.</p>"
+        },
+        {
+          "id": "repo-diagnosis",
+          "title": "Use repository evidence without inventing a scheduler fault",
+          "html": "<p>The referral-info binding uses removeDuplicates, combineLatest and debounce with RunLoop.main. That inspected line establishes the selected Combine scheduler and the preceding demand-shaping operators. It does not establish that Combine's internal timer registrations match a hand-written Timer example, nor that this screen actually suffers a scrolling delay. Read the publisher lifetime and retained subscription before proposing a change. Cancellation of a subscription and invalidation of a timer are related cleanup ideas, but they are different APIs with different ownership.</p>\n<p>A useful debugging worksheet lists event, expected owner, registration mode, time basis, eligible callback and cleanup event. Compare a default-mode timer, common-mode timer and display link in an independent UIKit screen containing a scroll view. Record callback counts and timestamps during idle, dragging and deceleration. Counts alone cannot identify the reason for a gap; correlate activity and thread work in a trace. Do not manufacture a slow callback in the company client.</p>\n<p>On Android, removing Handler callbacks or Choreographer frame callbacks also matters for screen ownership. However, Android's message queue does not expose the same run-loop common-mode registration contract. Learn the iOS mechanism rather than renaming a Looper. The host probe verifies only a synthetic custom-mode contrast. UIKit tracking, observers in a live screen, variable refresh rate and energy implications remain target or device investigations, with no results claimed by this lesson.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A default-only timer stops visibly updating while the UI tracks a gesture. Which explanation should you investigate?",
+          "options": [
+            "Tracking can use a mode that does not monitor that timer.",
+            "The timer automatically cancels on every touch.",
+            "Common mode gives callbacks a hard real-time deadline."
+          ],
+          "answer": 0,
+          "explanation": "Mode membership determines eligibility. Invalidation and main-thread occupancy are separate hypotheses; common registration neither cancels nor guarantees a deadline."
+        },
+        {
+          "question": "Which countdown policy tolerates delayed or skipped timer firings?",
+          "options": [
+            "Subtract exactly one second on every callback.",
+            "Recompute remaining time from the chosen deadline and clock.",
+            "Launch a new repeating timer after every callback."
+          ],
+          "answer": 1,
+          "explanation": "A timer offers callback opportunities and can skip missed firings. The chosen clock defines the time contract; callback count is not elapsed time."
+        },
+        {
+          "question": "Why must the display driver's owner call stop explicitly?",
+          "options": [
+            "The selector compiler cannot access private methods.",
+            "The run loop and display link can retain a target, so deinit may never begin.",
+            "Setting preferredFramesPerSecond to zero invalidates a link."
+          ],
+          "answer": 1,
+          "explanation": "Invalidation removes the registration and target association. Clearing a property or relying on deinit does not reliably dismantle the owning cycle."
+        }
+      ],
+      "exercise": {
+        "brief": "Predict and run the custom-mode host probe, then design an independent UIKit timer/display-link comparison with explicit teardown.",
+        "steps": [
+          "Read checkRunLoopMode and predict both assertions before running the companion.",
+          "Follow RuntimeLab README's isolated command and record the actual host result.",
+          "In a separate iOS scratch target, install default/common timers and the supplied display driver alongside a scroll view.",
+          "Choose a lifecycle stop event and identify every retaining edge.",
+          "Specify the observation needed to distinguish excluded mode from long callback occupancy."
+        ],
+        "acceptance": [
+          "The host default-mode phase records zero custom-timer callbacks and the custom phase records one.",
+          "The proposed UIKit experiment names target requirements and keeps callbacks small.",
+          "Every timer/link has explicit same-thread invalidation at a defined event.",
+          "Evidence labels distinguish executed host checks from any unexecuted UI/device steps."
+        ],
+        "solution": "<p>The custom timer is already due, but eligibility still depends on mode. Default mode does not contain RuntimeLab.synthetic's timer, so its first count stays zero. Running the named custom mode permits delivery and produces one. Nonrepeating delivery invalidates the timer automatically; defer also supplies cleanup if an earlier assertion throws. The bounded Core Foundation calls avoid an intentionally hung process and make failure an explicit host error.</p><p>For UIKit, use one controller owning two timers and one DisplayDriver. Start on the main actor after the view enters the chosen active state; invalidate both timers and call driver.stop when that state ends. Store only small synthetic counters and timestamp samples. A timer's block should capture the controller weakly, but cleanup must still remove the registration. Build the scratch target before recording gestures. During a drag, compare the two timer traces and note the active interaction; do not promise the link's cadence or internal Combine behavior from this comparison.</p><p>If all callbacks disappear together while a synchronous decode runs, mode registration alone does not repair the blocked main thread. Move or remove the expensive work using a separate ownership design. If only the default timer stops while eligible common work continues, mode eligibility becomes a supported hypothesis. Record the platform and observed schedule; this answer defines acceptance and interpretation, and supplies no invented UIKit run or learner completion.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Run-loop management, modes, sources and observers",
+          "url": "https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Multithreading/RunLoopManagement/RunLoopManagement.html"
+        },
+        {
+          "label": "Apple: Timer firing, tolerance and invalidation",
+          "url": "https://developer.apple.com/documentation/foundation/timer"
+        },
+        {
+          "label": "Apple: CADisplayLink timing and ownership",
+          "url": "https://developer.apple.com/documentation/quartzcore/cadisplaylink"
+        },
+        {
+          "label": "Android: Looper thread/message contract",
+          "url": "https://developer.android.com/reference/android/os/Looper"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Referral validation selects RunLoop.main",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/ReferralInfo/ViewModel/ReferralInfoViewModel+ViewBindings.swift",
+          "line": 78,
+          "why": "Inspected debounce scheduler choice; does not prove internal timer mode or observed delay."
+        }
+      ],
+      "checklist": [
+        "I can distinguish ready work from mode-eligible work.",
+        "I can explain common-mode registration and timer drift policy.",
+        "I can name every callback owner and invalidation event.",
+        "I can separate a host probe from a UIKit or display trace."
+      ]
+    },
+    {
+      "id": "086",
+      "title": "Dispatch queues, QoS, sources and OperationQueue graphs",
+      "summary": "Choose queue contracts deliberately, detect wait cycles, and make operation readiness, results and cancellation separate decisions.",
+      "duration": 130,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "015",
+        "068",
+        "085"
+      ],
+      "objectives": [
+        "Distinguish serial/concurrent execution from sync/async submission.",
+        "Explain QoS without deadline or cross-queue FIFO promises.",
+        "Use groups, barriers, sources and cancellable work items with explicit ownership.",
+        "Model operation dependencies, error policy and bounded admission."
+      ],
+      "sections": [
+        {
+          "id": "dispatch-model",
+          "title": "A queue is an ordering contract, not a thread",
+          "html": "<p>An Android engineer might choose a single-thread ExecutorService to serialize a cache or a fixed pool for independent transformations. DispatchQueue offers serial or concurrent execution of submitted work, but a serial queue is not generally one permanently dedicated thread. Except for the main queue, the system chooses execution threads. Thread-local assumptions, thread-owned locks and callback affinity therefore need separate contracts. Serial execution means one queued item at a time; concurrent execution permits overlap.</p>\n<p>sync waits for its work to finish before returning. async submits work and returns without waiting for completion. These describe the caller's waiting behavior, independently of whether the destination is serial or concurrent. A serial async queue can be the right design for serialized state changes. A concurrent sync call still blocks the caller until its item finishes; it does not grant the caller extra UI responsiveness.</p>\n<p>Quality of service expresses the importance and latency character of work, with categories such as userInteractive, userInitiated, utility and background. Assign it from user need rather than escalating every operation. QoS is neither a deadline nor a FIFO rule across competing queues. A serial queue provides ordering for its own submitted items; independent producers still have a race over submission order. On a concurrent queue, do not infer completion order. This lesson extends session 015's task-lifetime model to legacy queue work: dispatch blocks have no automatically owned Swift task tree.</p>"
+        },
+        {
+          "id": "sync-deadlock",
+          "title": "Draw wait edges before adding sync",
+          "html": "<p>Calling sync on the serial queue already executing your callback creates a dependency cycle: the callback waits for an item that cannot start until the callback returns. Dispatch can diagnose some misuse, but code must not rely on a crash to prove safety. A main-thread callback synchronously submitting to the main queue has the same issue. A more indirect cycle occurs when the main thread waits for a worker and the worker synchronously asks the main queue to finish.</p>\n<p>Review every blocking edge and every callback destination. A worker's sync to a separate serial queue can be valid in a synchronous host program, provided the destination cannot depend on that worker. A Swift cooperative task should generally suspend for async work rather than block on a DispatchGroup or semaphore. The companion's bounded waits run only in synchronous host probes; none waits for the main queue. It never demonstrates deadlock by deliberately hanging.</p>\n<p>A queue-specific value or dispatchPrecondition can enforce an API's expected calling context. Neither repairs a cycle automatically. An abstraction should choose whether methods must be called off its queue, are asynchronous throughout, or expose a narrowly reviewed reentrant fast path. Recursive direct execution can violate ordering and invariants if added casually. A public callback invoked while inside queue-owned state can reenter the same cache; dispatching that callback later or copying a result before leaving the protected context often creates a clearer contract. Errors inside async blocks need explicit Result or completion handling because throwing cannot cross an escaping block that returns Void.</p>"
+        },
+        {
+          "id": "groups",
+          "title": "Join independent work without confusing completion and success",
+          "html": "<p>DispatchGroup counts outstanding work. async(group:) automatically brackets the submitted block; manually entering and leaving supports callback APIs but requires exactly one balanced leave for each enter, including error and cancellation paths. notify schedules a completion block after the count reaches zero. wait blocks its caller and can return a timeout; a timeout does not cancel the unfinished operations. Do not publish partial success merely because a timeout elapsed.</p><pre><code class=\"language-swift\">let queue = DispatchQueue(label: \"example.serial\", qos: .utility)\nlet group = DispatchGroup()\nlet values = LockedValue&lt;[Int]&gt;([])\nfor index in 0..&lt;3 {\n    queue.async(group: group) { values.update { $0.append(index) } }\n}\nguard group.wait(timeout: .now() + 5) == .success else {\n    throw LabError.failed(\"unfinished batch\")\n}\nlet output = values.snapshot()</code></pre><p>This host fragment runs inside a throwing function with Foundation/Dispatch imports and the companion's LockedValue and LabError declarations. queue is serial, group tracks its submitted blocks, and values protects observations independently. The half-open range includes zero through two. Each closure captures its iteration's immutable index. update passes protected storage inout to a synchronous closure. The guard rejects a failed bounded wait, and snapshot occurs only after completion. The expected output is [0, 1, 2]. An otherwise similar concurrent queue would require membership checks instead of assuming array order.</p><p>A group supplies no error storage or sibling cancellation. Collect Result values under a lock or serial owner and decide all-or-nothing versus partial completion separately. Java CompletableFuture.allOf has a familiar join role but has its own exceptional-completion behavior; do not import those semantics into DispatchGroup. UIKit code should prefer notification or an asynchronous bridge instead of copying this CLI wait.</p>"
+        },
+        {
+          "id": "barriers-sources",
+          "title": "Barriers protect one queue; sources observe coalesced events",
+          "html": "<p>A barrier on a custom concurrent queue waits for earlier items on that queue, runs exclusively against that queue's other items, then permits later items. Every protected read and write must go through the same ownership boundary. A barrier does not lock unrelated queues or direct field accesses; on a global concurrent queue it does not provide the private exclusivity pattern. A serial queue already serializes its items, so adding barrier flags there does not invent extra parallelism or a broader lock.</p>\n<p>The inspected Cache constructs a serial queue without the concurrent attribute, uses sync getters, and submits setters with barrier flags. That is evidence of asynchronous mutation and serialized queue ownership, not an example of concurrent readers protected by barriers. Its findOrCreate executes a caller fallback inside queue.sync: review callback reentry and expensive fallback work as potential risks, without claiming an observed failure. Understand actual queue creation before assigning meaning to a flag.</p>\n<p>DispatchSource represents event sources such as timers, readable descriptors or user data. Events can be coalesced; one callback is not necessarily one underlying event. The companion's user-data-add source checks the aggregate value, activates a newly created source once, then cancels and observes its cancellation handler. A descriptor source needs a documented descriptor owner and close policy, commonly closing in the cancellation handler after event handling has ended. Cancelling is asynchronous cleanup, not permission to free resources immediately. Source handlers can retain a source or owner; dismantle those edges after cancellation. Dispatch timers likewise do not supply exact deadlines; choose leeway and callback costs deliberately.</p>"
+        },
+        {
+          "id": "workitems",
+          "title": "Cancellation requests do not preempt running instructions",
+          "html": "<p>DispatchWorkItem wraps a unit of work and exposes cancellation and completion coordination. Cancelling before execution can prevent its body from running. Once the body has begun, cancellation does not forcibly interrupt it; long work needs an explicit cooperative stop flag or checked work-item state, and must still perform cleanup. A delayed debounce work item also needs a generation guard if obsolete execution can race publication. Ownership is separate: retain the handle if an owner must later request cancellation.</p>\n<p>The companion cancels a work item before submitting it, drains the serial queue from the external host caller, and checks that its side effect is absent. That deterministic schedule proves only pre-execution cancellation for that fixture. It does not establish in-flight stopping or deadline behavior. A cancellable closure capturing its own work item can create a retain cycle if carelessly stored; a small locked cancellation token or explicit owner often gives a simpler graph.</p>\n<p>An Operation has its own cancellation state. Neither Operation.cancel nor DispatchWorkItem.cancel automatically sets a surrounding Swift Task's flag, and Task cancellation does not automatically cancel either object. An async adapter must wire those requests explicitly if the underlying API supports stopping. Error and cancellation outcomes should not collapse into a default value. Java Future.cancel has interruption options with different guarantees, and Thread.interrupt itself is cooperative; it is not an exact spelling of any Swift cancellation API. Kotlin Job cancellation applies to its coroutine hierarchy, which a dispatch block does not acquire by being launched from Kotlin-like async code.</p>"
+        },
+        {
+          "id": "operations",
+          "title": "Dependencies establish readiness, while results establish policy",
+        "html": "<p>OperationQueue schedules Operation objects according to readiness, priority and dependencies. maxConcurrentOperationCount bounds executing operations but not queued captures or payloads. Dependencies can cross queues; add them before enqueueing, keep the graph acyclic, and express required ordering explicitly. A queue with a concurrency count of one should not replace a dependency graph when correctness depends on a particular prerequisite.</p>\n<p>In the host fixture, the consumer is submitted before the producer but depends on it. The producer stores a synthetic failure Result; the consumer observes that failure and records recovery. Dependence means the producer reached finished, not that it succeeded. Cancelling a producer also does not automatically make dependent business work fail or disappear. A cancelled operation may be finished without useful output, so design absent-output and failure branches explicitly. Dependencies wait for isFinished, not an arbitrary completion callback's downstream UI action.</p>\n<p>BlockOperation is useful for finite synchronous bodies. Starting a callback-based network request inside it and returning immediately marks the operation complete before that request ends. A genuine asynchronous Operation subclass must correctly maintain isExecuting, isFinished, readiness and KVO transitions, including cancellation before start and exactly one terminal transition. That specialist implementation is not supplied here. Queues retain unfinished operations, and closures retain captures; permanently suspended queues and dependency cycles can retain work forever. Select OperationQueue for a real readiness graph or legacy integration, not to imitate structured task cancellation. The worked exercise makes dependency order, error interpretation and cleanup observable without requiring any client modification.</p>\n<p>The full runnable companion selects Swift 6.2 tools and macOS 15 because it also includes modern executor and Mutex examples. Dispatch and OperationQueue are older APIs; that package floor is not their introduction date. Its Foundation/Dispatch host checks ran on the recorded Apple toolchain only, and establish neither Linux support nor an iOS app build.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What changes when you use async with a serial queue?",
+          "options": [
+            "The queue becomes concurrent.",
+            "The caller returns before completion while the queue still serializes items.",
+            "The block receives its own permanent thread."
+          ],
+          "answer": 1,
+          "explanation": "Caller waiting and destination concurrency are independent. Thread selection is a separate implementation concern."
+        },
+        {
+          "question": "A producer operation finishes with a failure Result. What does its dependency guarantee to a consumer?",
+          "options": [
+            "The producer succeeded.",
+            "The consumer is automatically cancelled.",
+            "The readiness prerequisite finished; the consumer still needs an error policy."
+          ],
+          "answer": 2,
+          "explanation": "Dependency readiness uses finished state, which includes cancellation and failure. Business success must be represented and inspected separately."
+        },
+        {
+          "question": "Which barrier design protects concurrent cache accesses?",
+          "options": [
+            "Barrier writes on a global queue and direct reads anywhere.",
+            "All reads and barrier writes through one owned custom concurrent queue.",
+            "Barrier flags on any queue provide an application-wide mutex."
+          ],
+          "answer": 1,
+          "explanation": "Barrier exclusivity has a queue scope. Bypassing that queue or using global-queue barriers defeats the stated ownership design."
+        }
+      ],
+      "exercise": {
+        "brief": "Extend the host dependency fixture to distinguish producer success, producer failure and cancellation before start without relying on enqueue order.",
+        "steps": [
+          "Run the shipped finite probes from the README.",
+          "Predict why submitting consumer first does not run it first.",
+          "In your own scratch copy, pass a Result-producing closure into the producer.",
+          "Add one pre-cancelled producer case and represent missing output explicitly.",
+          "Draw the wait graph for a main-queue sync misuse on paper; do not run a hanging example."
+        ],
+        "acceptance": [
+          "Success consumes the value and failure chooses a documented recovery.",
+          "A pre-cancelled producer never executes its body, and the consumer handles no result.",
+          "Ordering uses addDependency rather than FIFO or QoS.",
+          "Every manual completion signal is balanced and waits are finite/off UI executors."
+        ],
+        "solution": "<p>Keep one locked optional Result for the producer output and a separate event log. Success stores .success(17), failure stores .failure(.fixture), and cancellation before start leaves nil. The consumer's switch has three branches: apply a successful value, record the supported recovery for a failure, or record stopped prerequisite for nil. Use an immutable case value captured by the producer rather than mutating a global scenario between enqueues.</p><p>Add consumer.addDependency(producer) before either enqueue. That makes the consumer's readiness depend on finished state; the array's submission order is deliberately opposite so the fixture cannot accidentally rely on FIFO. Put the test's finite completion signal on the consumer and check the event log after that signal. A completion callback signals the host only; it is not the producer's result transport. If the cancellation fixture cancelled the consumer too, its body should not be expected to record a business event; inspect finished and side-effect absence instead.</p><p>The shipped baseline already verifies failure recovery and a separately pre-cancelled BlockOperation. The learner's three-way fixture remains an independent exercise. A source cancellation test should wait for its cancellation handler before reclaiming a descriptor, while a group timeout should report unfinished work rather than cancelling by implication. QoS stays a workload hint throughout. The main-thread-to-worker-to-main wait graph contains a cycle; explain the remedy as asynchronous result delivery, without manufacturing deadlock evidence.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: DispatchQueue execution and blocking",
+          "url": "https://developer.apple.com/documentation/dispatch/dispatchqueue"
+        },
+        {
+          "label": "Apple: DispatchWorkItem",
+          "url": "https://developer.apple.com/documentation/dispatch/dispatchworkitem"
+        },
+        {
+          "label": "Apple: Operation states, dependencies and cancellation",
+          "url": "https://developer.apple.com/documentation/foundation/operation"
+        },
+        {
+          "label": "Apple: OperationQueue scheduling",
+          "url": "https://developer.apple.com/documentation/foundation/operationqueue"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Cache queue construction and async setters",
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDCorePlusSentry/Medical Bag (Utilities)/Cache.swift",
+          "line": 30,
+          "why": "Inspected serial construction; barrier-flagged setters at line 71 and sync fallback at line 82 must be read in that context."
+        }
+      ],
+      "checklist": [
+        "I can explain sync/async separately from serial/concurrent.",
+        "I can identify wait cycles without running a deadlock.",
+        "I can keep result policy separate from group or operation completion.",
+        "I can state source and work-item cancellation ownership."
+      ]
+    },
+    {
+      "id": "087",
+      "title": "Synchronous synchronization: NSLock, Mutex and unfair locks",
+      "summary": "Protect whole invariants with short scoped critical sections and compare their ownership, availability and actor boundaries.",
+      "duration": 120,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "016",
+        "064",
+        "068",
+        "086"
+      ],
+      "objectives": [
+        "Audit all reads/writes and compound state transitions.",
+        "Use scoped locking with error cleanup and no await inside.",
+        "Choose Mutex or an allocated unfair lock with explicit availability.",
+        "Define acquisition order and resume callbacks after unlocking."
+      ],
+      "sections": [
+        {
+          "id": "invariant",
+          "title": "Begin with the whole state transition",
+          "html": "<p>Imagine two Android callbacks incrementing a shared counter. Reading an Int and writing an Int separately does not make read-modify-write atomic. Swift has the same problem: simultaneous unsynchronized accesses including a write can form a data race, regardless of whether the counter appears correct in a small run. Thread-safe access is an invariant over every access path, not an adjective bestowed on a property by storing a lock beside it.</p>\n<p>Synchronous locks are appropriate for short state transitions used from synchronous callbacks: a registration table, terminal-state flag, or snapshot cache. An actor instead declares isolation and permits callers to suspend while awaiting access. It does not reserve an entire async method across await; session 016 already explains reentrancy. Here the added skill is choosing a synchronous critical section and auditing every exit, callback and state escape.</p>\n<p>Protect the whole compound operation. Locking a getter and setter separately permits two callers to read the same old value and lose one update. Likewise, synchronizing an array mutation but returning its mutable reference elements can leave reachable state unprotected. Define the unit of protection on paper: count plus generation, or current result plus waiter list. A useful API returns a value snapshot or takes a synchronous closure operating on private storage. Kotlin's kotlinx.coroutines Mutex is a suspending lock, whereas NSLock blocks a thread; the names alone conceal that important resource distinction.</p>"
+        },
+        {
+          "id": "nslock",
+          "title": "Read a scoped NSLock wrapper line by line",
+          "html": "<p>The companion uses this wrapper in a macOS host package with Foundation. The minimum toolchain for the complete package is Swift 6.2 because its CPU helper uses @concurrent; NSLock itself is much older. This distinction separates an example's tools contract from an individual API's availability.</p><pre><code class=\"language-swift\">final class LockedValue&lt;Value: Sendable&gt;: @unchecked Sendable {\n    private let lock = NSLock()\n    private var value: Value\n    init(_ value: Value) { self.value = value }\n    func update&lt;Result&gt;(_ body: (inout Value) throws -&gt; Result) rethrows -&gt; Result {\n        lock.lock()\n        defer { lock.unlock() }\n        return try body(&amp;value)\n    }\n    func snapshot() -&gt; Value { update { $0 } }\n}</code></pre><p>final forbids subclass overrides from adding unsynchronized fields. Value is a generic parameter constrained to Sendable; that constraint does not automatically synchronize its containing variable. The lock and value are private to prevent direct bypass. init's underscore permits LockedValue(0). update accepts a synchronous throwing closure with inout access to storage; Result is its independently inferred return type. rethrows means update throws only when that closure throws. lock acquires exclusivity, defer releases it on normal return or error, and try propagates the closure's error. snapshot uses the same path and returns a value.</p><p>@unchecked Sendable is an author promise that the compiler does not prove. Its justification is the private state and complete lock coverage; adding a new field requires renewed review. This teaching wrapper is intentionally small and exposes arbitrary closure execution only inside the synthetic lab. Production public APIs should narrow callbacks or document nonreentrancy, because a body that calls snapshot on the same instance deadlocks. Sendable reference values can themselves own mutable state; returning them does not extend this wrapper's lock to that state.</p>"
+        },
+        {
+          "id": "mutex",
+          "title": "State-bearing Mutex narrows the ownership gap",
+          "html": "<p>Swift's Synchronization module includes Mutex, a nonrecursive lock containing its protected state. Apple documents introduction at iOS and iPadOS 18, macOS 15, tvOS 18, watchOS 11 and visionOS 2. The compiler must also provide the Synchronization module; a recent tools installation does not make the runtime API available on an older deployment target. Use an availability-guarded design or an established fallback rather than raising a company app's minimum merely for this lesson.</p>\n<p>A simple host declaration is let count = Mutex(0). count.withLock { $0 += 1 } mutates the contained integer synchronously, and count.withLock { $0 } reads its snapshot. let makes the lock binding stable while its protected state still changes. The closure parameter represents exclusive access during the call; do not store access to that state elsewhere. Mutex is noncopyable and carries a compiler-enforced ownership model, so teaching it as a freely copied NSLock object would miss its contract.</p>\n<p>Mutex is still a blocking primitive: contending threads wait. It is not an asynchronous queue or a suspendable kotlinx.coroutines Mutex. Its closure cannot await; a short synchronous helper called from async code can use it without spanning suspension. The benefit is state and lock colocated with a scoped access API, not an exemption from deadlock or starvation. Calling unknown code, holding multiple locks inconsistently, or doing a large parse while locked can still create failures. Prefer computing a candidate outside the lock and applying a small validated change inside, provided the validation checks assumptions that could have changed during computation.</p>"
+        },
+        {
+          "id": "unfair",
+          "title": "Use allocated unfair-lock storage rather than a raw Swift value",
+          "html": "<p>Apple's OSAllocatedUnfairLock wraps stable allocated unfair-lock storage. It is available from iOS and iPadOS 16, macOS 13, tvOS 16 and watchOS 9; consult platform annotations for other targets. Its initialState initializer colocates state with the lock, and withLock offers scoped synchronous access. The companion imports os and checks OSAllocatedUnfairLock(initialState: 0) under concurrent increments. This wrapper is the lesson's unfair-lock example; no raw pointer allocation is needed.</p>\n<p>A raw os_unfair_lock stored as a Swift value is hazardous because Swift values do not give the stable address assumed by the low-level C API. Passing an ampersand does not turn temporary exclusive access into a permanent storage guarantee. Apple's allocated wrapper avoids that pitfall. Although represented as a struct, copied wrapper instances control the same underlying lock allocation, rather than independent locks with copied state. That differs from Mutex's noncopyable ownership and from ordinary value-type copy expectations.</p>\n<p>Unfair describes the absence of a fairness guarantee; do not promise waiting callers FIFO service or deadlines. The wrapper is nonrecursive: attempting reacquisition on the owning thread is erroneous. Manual unlock must occur on the same thread that locked it. A task can suspend and resume on another thread, so do not hold this lock or NSLock across await. Even if a particular run stays on one thread, blocking an executor while holding a lock can prevent progress. Prefer withLock for a synchronous transition, then await outside and validate on return. Cancellation does not release a manually acquired lock; structured scope and defer supply synchronous cleanup.</p>"
+        },
+        {
+          "id": "ordering",
+          "title": "Critical sections need a lock graph and a callback policy",
+          "html": "<p>For two protected accounts, establish a global acquisition order such as ascending immutable account ID. Every path acquiring both must follow that order; one path taking A then B and another taking B then A creates a possible wait cycle. Order is a proof discipline, not an observed test outcome. Releasing one lock and acquiring another avoids nesting but may expose an intermediate state; choose that design only if the business transition tolerates it or can validate and retry.</p>\n<p>Do not execute network I/O, a large decode, notification delivery, delegate callbacks or continuation resumption while holding the lock unless their complete synchronous behavior is explicitly justified. The common pattern is to copy pending callbacks and mark terminal state while locked, release, then notify. This prevents callbacks from reentering an incompletely updated state and keeps lock occupancy small. If the callback needs new information afterward, provide an immutable snapshot or generation token rather than mutable borrowed storage.</p>\n<p>Errors need exactly the same coverage as success. defer in the NSLock wrapper releases on thrown closure errors. A failure branch should not skip terminal state cleanup or leave waiters parked forever. Cancellation handlers can race normal callbacks, so the lock may protect a terminal enum that decides exactly one winner and transfers out the continuation. Resume outside the critical section. This unit does not reimplement the full cancellation-aware continuation adapter from other concurrency lessons; it establishes the synchronous state-transition rule that makes such an adapter reviewable. Never use cancellation as a substitute for finishing the locked transition.</p>"
+        },
+        {
+          "id": "repo-testing",
+          "title": "Audit lock boundaries before claiming race freedom",
+          "html": "<p>The inspected SubprocessHandle in OvernightKit has separate NSLocks for buffer, exit and EOF state. recordExit updates storedExitCode and extracts exitWaiters inside exitLock.withLock, then resumes them after leaving the closure. signalEOF follows the same broad pattern. The line reader unlocks bufferLock before calling onLine and locks again afterward. These inspected boundaries support discussion of callback ownership; they do not prove the entire helper race-free or imply a runtime bug was found.</p>\n<p>The companion runs two thousand concurrent increments through NSLock, Mutex and the allocated unfair-lock wrapper, checking the exact final values. It also throws inside the classic wrapper and subsequently reads the value, testing cleanup on the error path. These are semantic checks, not fairness, throughput or contention measurements. A successful run cannot prove all schedules or correctness of every future wrapper mutation. Thread Sanitizer in an appropriate scratch target can provide additional race evidence, but no sanitizer result is claimed here.</p>\n<p>Java synchronized monitors and ReentrantLock are familiar blocking counterparts, yet monitors are reentrant and ReentrantLock can be configured for fairness. NSLock, Mutex and unfair locks here are not recursive. kotlinx.coroutines Mutex suspends waiters and has different ownership semantics, so code that holds it across a suspension is not a template for NSLock. Use actors when isolation and asynchronous waiting fit the ownership model; use a short scoped synchronous lock when immediate callback state needs atomicity. The decision should include caller context, availability, contention risk, and evidence rather than a blanket claim that actors replace every lock.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why is individually locking a counter getter and setter insufficient for increment?",
+          "options": [
+            "Swift Int cannot be stored under a lock.",
+            "The read-modify-write transition can interleave between separately protected calls.",
+            "A Sendable constraint makes the increment atomic."
+          ],
+          "answer": 1,
+          "explanation": "The invariant is the complete transition. Two readers can observe the same old value unless read and update share one critical section."
+        },
+        {
+          "question": "Which usage respects NSLock's thread ownership?",
+          "options": [
+            "lock; await network(); unlock.",
+            "Acquire and release within one short synchronous scope, then await outside.",
+            "Unlock from any callback thread after cancellation."
+          ],
+          "answer": 1,
+          "explanation": "Lock and unlock must match on the same thread. Await may suspend and resume elsewhere, and cancellation does not perform the unlock for you."
+        },
+        {
+          "question": "Why choose OSAllocatedUnfairLock over a raw os_unfair_lock Swift property?",
+          "options": [
+            "It promises FIFO fairness.",
+            "It provides stable allocated lock storage and scoped state access.",
+            "It makes expensive locked work asynchronous."
+          ],
+          "answer": 1,
+          "explanation": "Stable storage addresses the C lock's address requirement. It remains blocking, nonrecursive and without FIFO or deadline guarantees."
+        }
+      ],
+      "exercise": {
+        "brief": "Design a synchronous exactly-once terminal result box for two racing callbacks; use the host lock/error checks as a baseline.",
+        "steps": [
+          "Run the companion and read the three independent lock checks.",
+          "Define pending and finished states and one installed completion callback.",
+          "Implement finish so only the first callback owns terminal publication.",
+          "Copy the callback and result out while locked, then invoke after unlocking.",
+          "Add success/error orders and a callback that synchronously queries the box in a scratch test."
+        ],
+        "acceptance": [
+          "Two competing terminal calls yield exactly one observable completion.",
+          "Success-first and error-first schedules retain the first terminal outcome.",
+          "The completion executes after unlock and can query safely.",
+          "No thread-owned lock spans await, and the platform fallback is stated."
+        ],
+        "solution": "<p>Use a private state containing an optional terminal Result and an optional completion. A synchronous finish(result) calls update on that single state. If terminal is already set, return nil. Otherwise store result, remove the installed completion, and return the callback together with the result. The outer function invokes the returned callback after update returns. Checking terminal, assigning it, and transferring callback ownership form one atomic transition; splitting them into separately locked helpers introduces a double-publication race.</p><p>Install the completion before allowing producers to run, or define a separate registration path that immediately returns an existing result outside the lock. The second policy needs the same atomic check-and-transfer discipline because registration can race finish. A callback that queries terminal synchronously is a useful reentrancy check: it sees finished and acquires a free lock. Calling it from inside the critical section would deadlock with NSLock. Error is simply another terminal Result, not a reason to leave state pending.</p><p>The minimal synchronous state can use a small NSLock wrapper on older targets, Mutex on compatible platforms, or OSAllocatedUnfairLock with its own availability floor. Do not expose the protected callback storage directly or retain inout access. A cancellation-aware async bridge requires an additional token-registration contract and exactly-once continuation ownership; this exercise deliberately proves the synchronous terminal transition first. Record deterministic schedules and a concurrent stress run if performed, without treating either as an exhaustive proof. The shipped checks test instructor code and do not finish the learner's box.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: NSLock thread ownership and nonrecursive use",
+          "url": "https://developer.apple.com/documentation/foundation/nslock"
+        },
+        {
+          "label": "Apple: Synchronization.Mutex",
+          "url": "https://developer.apple.com/documentation/synchronization/mutex"
+        },
+        {
+          "label": "Apple: OSAllocatedUnfairLock stable storage and await warning",
+          "url": "https://developer.apple.com/documentation/os/osallocatedunfairlock"
+        },
+        {
+          "label": "Java 11: ReentrantLock fairness and reentrancy",
+          "url": "https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html"
+        },
+        {
+          "label": "Kotlin: Shared mutable state and concurrency",
+          "url": "https://kotlinlang.org/docs/shared-mutable-state-and-concurrency.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Exit state transfers waiters under lock and resumes afterward",
+          "path": "ios-client/Projects/Infra/Overnight/Sources/OvernightKit/SubprocessRunner.swift",
+          "line": 163,
+          "why": "Verified lock-protected state extraction followed by continuation resumption at line 169; buffer callback boundary also inspected."
+        }
+      ],
+      "checklist": [
+        "I can identify the full protected invariant.",
+        "I can justify an unchecked wrapper's complete access coverage.",
+        "I can compare the three locks' availability and storage.",
+        "I can explain lock ordering and callback-after-unlock policy."
+      ]
+    },
+    {
+      "id": "088",
+      "title": "Cooperative executor scheduling, CPU work and blocking I/O",
+      "summary": "Design admission and executor boundaries that preserve forward progress, cancellation ownership and visible-work policy.",
+      "duration": 130,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "015",
+        "016",
+        "040",
+        "086",
+        "087"
+      ],
+      "objectives": [
+        "Identify thread-blocking work and forward-progress cycles.",
+        "Use an explicit concurrent CPU helper with cooperative cancellation.",
+        "Bound task admission and preserve indexed results.",
+        "Bridge blocking legacy I/O without overstating cancellation or priority guarantees."
+      ],
+      "sections": [
+        {
+          "id": "executor",
+          "title": "Async work shares a resource; suspension releases it",
+          "html": "<p>On Android you distinguish Dispatchers.Default for CPU work from Dispatchers.IO for blocking calls. Swift's cooperative executor likewise needs a resource policy, but there is no universal one-line translation from either dispatcher. A Swift task is not a private thread. At a suspension point its continuation can wait without occupying the executing thread, allowing other runnable work to progress. A synchronous semaphore wait, file read or long loop instead occupies that thread until it returns.</p>\n<p>The cooperative runtime depends on forward progress. If all available workers block while waiting for tasks that need those workers, the dependency can starve or deadlock. Raising priority cannot create the missing progress guarantee. Even without a hard cycle, many large CPU jobs can delay visible results and cancellation handling. State the resource demand and wait graph before changing Task syntax.</p>\n<p>Session 015 explains structured task lifetime, session 040 bounds network batches, and session 038 warns against main-actor CPU work. This lesson adds a concrete scheduling decision: how many jobs are admitted, where blocking work executes, and how cancellation frees ownership. An actor serializes isolated segments but is not a dedicated background thread. A Task created on MainActor can inherit that isolation. Detached work does not inherit the same actor or task-local context, and still uses cooperative execution rather than an unlimited blocking pool.</p>"
+        },
+        {
+          "id": "cpu",
+          "title": "A CPU helper needs an explicit executor and cancellation contract",
+          "html": "<p>The companion package requires Swift 6.2 tools or newer and runs on macOS 15 or newer. The modern @concurrent annotation explicitly selects concurrent execution for this asynchronous helper. It is a compiler feature, distinct from Foundation or OS API deployment availability. The installed author compiler was Swift 6.4; the oldest supported compiler and OS were not executed. This is a focused executor example, not a new Swift 6 migration chapter.</p><pre><code class=\"language-swift\">@concurrent\nfunc checksum(_ input: [Int]) async throws -&gt; Int {\n    var total = 0\n    for (index, value) in input.enumerated() {\n        if index.isMultiple(of: 256) { try Task.checkCancellation() }\n        total += value\n    }\n    try Task.checkCancellation()\n    return total\n}</code></pre><p>The underscore removes the external input label. [Int] is an array value that can cross this boundary safely; the loop's total is local to the task. enumerated supplies an offset and element, not a dictionary key. Checking at index zero observes already requested cancellation; checking every 256 values limits additional work between checks for this synthetic algorithm. The final check prevents returning an accepted result after the final loop segment if cancellation has become visible. throws propagates CancellationError. Small fixtures avoid Int overflow; a general numeric API needs a checked arithmetic policy.</p><p>Marking a function async does not split its loop into concurrent pieces. Cancellation checks inspect state without necessarily suspending. Task.yield can voluntarily offer a scheduling opportunity, but it does not guarantee another task runs, reserve fairness, or move actor-isolated work elsewhere. Choose chunk boundaries from correctness and measured response needs. Do not claim this fixture established a cancellation-latency budget; it establishes values and a pre-cancelled outcome.</p>"
+        },
+        {
+          "id": "admission",
+          "title": "Bound created work and retained work, not just running threads",
+          "html": "<p>A producer admitting thousands of tasks that wait on one permit can bound active operations while still retaining thousands of payloads and continuations. OperationQueue.maxConcurrentOperationCount has the same backlog limitation: it limits executing operations rather than the number added. A complete policy names active slots, queued item limit, payload size, duplicate work, prioritization and overflow action. Rejecting, replacing an obsolete request, or suspending the producer are different product choices.</p>\n<p>The host windowedChecksums creates at most width children initially and admits one replacement after group.next returns a completion. Each child returns an input index and value; only the parent writes the output array. Task-group completion order can differ from input order, so indexing restores the presentation contract without shared child mutation. A width of two is a synthetic policy, not a measured optimum or CPU-count formula. An empty input returns an empty array; a nonpositive width is an unsupported programmer input rejected by precondition.</p>\n<p>Materializing batches as an array still retains the entire input collection. The helper bounds child admission, not total fixture memory. For a stream or a large archive, add a bounded producer interface and a byte budget instead of presenting this helper as full backpressure. Check cancellation before admitting initial and replacement children, and preserve errors so the group cancels and joins unfinished children when its scope fails. An unresponsive synchronous child can delay that join; cancellation is cooperative. Completion, freshness and resource limits remain independent obligations.</p>"
+        },
+        {
+          "id": "blocking",
+          "title": "Put genuine blocking I/O behind a bounded synchronous adapter",
+          "html": "<p>A legacy Data(contentsOf:) call is synchronous and can block while reading. The companion uses an OperationQueue with a limit of two to perform that call, then resumes a checked continuation. The async caller suspends while the operation executes. In the supplied fixture there is only one read at a time, and the queue limit is additional protection. If used by an unbounded producer, this bridge alone would still permit an unbounded queued backlog.</p><pre><code class=\"language-swift\">func read(_ url: URL) async throws -&gt; Data {\n    try Task.checkCancellation()\n    let data: Data = try await withCheckedThrowingContinuation { continuation in\n        queue.addOperation {\n            do { continuation.resume(returning: try Data(contentsOf: url)) }\n            catch { continuation.resume(throwing: error) }\n        }\n    }\n    try Task.checkCancellation()\n    return data\n}</code></pre><p>This method belongs to the companion's BlockingFileReader class, whose private queue is configured during initialization. The initial check avoids an already cancelled read. withCheckedThrowingContinuation parks the task; the operation has exactly one success or error resumption. Data is returned as a value. The final check discards a completed read if cancellation was requested meanwhile. There is deliberately no cancellation handler claiming to interrupt Data(contentsOf:): cancellation can wait until an in-flight read returns. A thrown file error propagates rather than becoming empty data.</p><p>A more capable legacy API may expose a cancellable handle. Bridging it requires synchronized registration, cancellation-before-registration behavior and exactly-once terminal resumption. Cancelling a queued BlockOperation without resuming its continuation would strand the caller. Conversely, resuming early while releasing resources still used by a running read can violate ownership. Define cancellation latency and cleanup honestly. Prefer an already asynchronous API for network transport; this isolated adapter demonstrates a boundary for unavoidable legacy blocking work.</p>"
+        },
+        {
+          "id": "priorities",
+          "title": "Priority does not implement admission, deadlines or fairness",
+          "html": "<p>Task priority and dispatch QoS communicate scheduling importance. They are not deadlines, guarantees of FIFO service, or preemption commands that interrupt a running synchronous callback. Priority relationships can affect scheduling and may be escalated by waits, but design correctness cannot depend on one high-priority task always overtaking every low-priority task. Actors also do not guarantee FIFO execution of complete async requests.</p>\n<p>Priority inversion occurs when visible work waits for a resource held by less urgent work. Avoid long critical sections, reserve capacity for visible demand, replace obsolete speculative jobs, and stop admitting prefetches when foreground needs the resource. Separate queues alone do not make a shared disk, lock or memory bandwidth independent. A burst of userInitiated tasks can still consume the resource needed by the UI. Escalating all work erases useful distinctions and may increase energy cost.</p>\n<p>Use application-level ordering where the requirement is a deadline or fairness policy. An admission owner can select visible jobs before prefetches, age waiting jobs to prevent starvation, and record an explicit maximum backlog. Do not claim OS scheduling implemented that policy because a priority enum was passed. Kotlin withContext also switches execution context without inventing request-rate limits or a fair product queue. Java fixed pools bound worker count but can retain unbounded queues unless configured otherwise. The boundary is resource ownership, not the similarity of APIs named task or executor.</p>"
+        },
+        {
+          "id": "repo-evidence",
+          "title": "Review actual detached work with an evidence plan",
+          "html": "<p>The inspected timeslots provider creates Task.detached(priority: .userInitiated), performs a synchronous reduction over remaining IDs, then awaits combined.async and fulfills or rejects a PromiseKit seal. Source confirms where a detached task and priority were chosen, and where synchronous aggregation precedes suspension. It does not prove the work is CPU-heavy, that cancellation propagates, or that this feature causes starvation. Those require call-site ownership, effective annotations, representative workloads and execution evidence.</p>\n<p>A defensible review asks who owns the detached handle, how a superseded query stops admission, how many IDs and retained values occur, and which error becomes visible. Then instrument the operation boundary in a separate approved performance investigation. Compare foreground response distributions, cancellation latency, queue depth and bytes retained under identical fixtures and device conditions. The host checks here do not provide those measurements. Moving reduction to an actor would change serialization without necessarily adding cancellation or backlog control.</p>\n<p>The companion checks small indexed checksum values, a gated cancellation requested before CPU execution, and one file-read success plus one real missing-file error. The gate is always released; it never deliberately exhausts executor workers or runs a deadlock demonstration. These tests establish useful semantics while leaving in-flight I/O cancellation, overload policy under load, physical-device starvation traces and energy tradeoffs as explicit further investigations. A learner should carry forward an admission and lifetime design, with the verified boundary stated, rather than treat a passing CLI as production scheduler certification.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Does Task.detached create an unlimited blocking-I/O thread pool?",
+          "options": [
+            "Yes, one dedicated thread per detached task.",
+            "No; it is unstructured work using cooperative execution, with separate ownership obligations.",
+            "Only when priority is background."
+          ],
+          "answer": 1,
+          "explanation": "Detached changes inherited context and structure, not the forward-progress requirement. Blocking work still needs a bounded adapter or async API."
+        },
+        {
+          "question": "What does the windowed task-group helper bound?",
+          "options": [
+            "All input memory and requests per second.",
+            "The initially created/in-flight child window; the input array is still retained.",
+            "A hard cancellation latency deadline."
+          ],
+          "answer": 1,
+          "explanation": "Admission bounds child count. Byte budgets, streaming input, request rate and latency require independent policies and evidence."
+        },
+        {
+          "question": "Why does BlockingFileReader check cancellation after its continuation returns?",
+          "options": [
+            "It forcibly interrupts the completed read.",
+            "It prevents returning accepted data after cancellation while honestly waiting for an in-flight legacy call.",
+            "It changes an Operation into a structured child task."
+          ],
+          "answer": 1,
+          "explanation": "The legacy synchronous call is not interrupted. Post-read checking enforces the chosen result policy; operation cancellation and lifetime remain separately wired."
+        }
+      ],
+      "exercise": {
+        "brief": "Extend the bounded checksum fixture and design a visible-demand admission policy for a legacy file workload.",
+        "steps": [
+          "Predict output for [[7], [], [2, 3], [4]] with width two, then add it in a scratch copy.",
+          "Keep an input index in every child result and ensure the parent alone mutates output.",
+          "State separate limits for active jobs, queued jobs and bytes retained.",
+          "Specify how cancellation before enqueue and during a noninterruptible read terminate.",
+          "Write an evidence plan comparing foreground jobs against prefetch under representative load."
+        ],
+        "acceptance": [
+          "The new ordered checksum output is [7, 0, 5, 4] without shared child mutation.",
+          "Width is validated and cancellation stops further admission.",
+          "The design bounds queued payloads as well as executing operations.",
+          "No semaphore wait inside a cooperative task or thread-owned lock across await is introduced.",
+          "The report separates host semantics from unexecuted load/device measurements."
+        ],
+        "solution": "<p>Keep the existing parent-owned output and indexed child tuple. Seed two children, await one completion, write its result to that index, and only then admit one replacement. The values are seven, zero, five and four regardless of completion order. Checking cancellation before seeding and replacement prevents unnecessary new admission after the parent observes cancellation. Preserve a throwing child error so the structured scope joins its remaining children rather than returning an apparently successful partial array.</p><p>For visible reads plus prefetch, define an admission owner with a maximum active count of two, a small explicit pending-item count, and a synthetic byte budget. Reserve one active opportunity for visible demand or let visible work take the next released slot. Replace older prefetch requests for the same identity instead of accumulating them. These are design parameters to validate, not recommended device measurements. The owner keeps tokens so cancellation can remove pending work and resume its waiter with CancellationError exactly once.</p><p>Once a noninterruptible read begins, retain its resources until completion. Mark cancelled ownership, then discard or reject its result according to the policy; do not close a descriptor it still uses. The supplied bridge waits for completion and checks cancellation afterward, which is a simpler valid policy for this fixture. Measure backlog, retained bytes and foreground latency only in an appropriate workload experiment. Neither higher QoS nor a detached Task replaces these policies. The instructor's passing checks support the mechanics but do not supply the learner's extended fixture or an operational rollout.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Concurrency tasks, cancellation and actors",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"
+        },
+        {
+          "label": "Swift evolution SE-0461: explicit concurrent async functions",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0461-async-function-isolation.md"
+        },
+        {
+          "label": "Apple: Swift concurrency, behind the scenes",
+          "url": "https://developer.apple.com/videos/play/wwdc2021/10254/"
+        },
+        {
+          "label": "Apple: OperationQueue and operation admission",
+          "url": "https://developer.apple.com/documentation/foundation/operationqueue"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Timeslot aggregation precedes suspension in detached work",
+          "path": "ios-client/Projects/Features/ZDAvailability/Sources/ZDAvailability/TimeslotsProviderProvider+Extensions.swift",
+          "line": 54,
+          "why": "Inspected explicit priority, synchronous reduction, await and fulfill/reject paths; no starvation or cancellation evidence claimed."
+        }
+      ],
+      "checklist": [
+        "I can draw a blocking dependency graph.",
+        "I can separate CPU cancellation checks from suspension.",
+        "I can bound created work and state retained input limits.",
+        "I can describe noninterruptible I/O cancellation honestly.",
+        "I can keep scheduling hints separate from product admission policy."
+      ]
+    }
+  ]
+}

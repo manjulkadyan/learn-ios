@@ -1,0 +1,212 @@
+{
+  "questions": [
+    {
+      "id": "iq-109-a",
+      "lesson": "109",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Explain why purchase success, verified evidence, finished delivery and current entitlement are four different facts.",
+      "scenario": "A synthetic permanent theme was unlocked, then refunded on another device while this installation was offline.",
+      "minutes": 8,
+      "androidBridge": "Compare Play Billing purchase processing and acknowledgment, but distinguish StoreKit VerificationResult, finish, and entitlement sequences rather than equating APIs.",
+      "rubric": [
+        "Names verified versus unverified evidence and refuses an unverified grant.",
+        "Separates durable delivery before finish from UI success.",
+        "Explains same-transaction revocation and current entitlement reconciliation.",
+        "States offline authenticity versus remote freshness explicitly.",
+        "Distinguishes permanent, consumable and subscription policies."
+      ],
+      "answerHTML": "<p>Purchase success includes a verification result; the application must inspect that result before granting a right. Finishing means the transaction no longer needs delivery processing, so the recoverable fulfillment effect should exist before finish. Current entitlement is a product-specific projection of verified evidence, not a permanent Boolean copied from the purchase screen. A refund can change facts relevant to the same transaction identity, so a seen-ID filter must not discard all subsequent revocation evidence.\n\nFor the permanent theme, reconcile known verified, non-revoked transactions and listen for updates under a long-lived owner. Offline signed evidence can authenticate a known purchase while failing to reveal a refund that happened remotely after disconnection. Define that freshness policy and explain it to support. A consumable requires an independently durable credit ledger; a subscription needs status and expiration/grace policy. Android acknowledgment experience helps with replay discipline, but is not an exact substitute for StoreKit's verification, finish and entitlement contracts. The synthetic model injects verification and proves none of the actual signature or sandbox behavior.</p>",
+      "followUps": [
+        "Where should the update listener live, and how is it canceled on owner change?",
+        "How would your policy change for a consumable or subscription in billing retry?"
+      ],
+      "pitfalls": [
+        "Treating refund submission success as approved revocation.",
+        "Using one permanent purchased Boolean or dropping every known transaction ID."
+      ]
+    },
+    {
+      "id": "iq-109-b",
+      "lesson": "109",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design recovery when a parcel Live Activity displays stale state after logout and a delayed push tries to update it.",
+      "scenario": "The parcel event is still active, the surface becomes stale, then is dismissed; an old account update arrives later.",
+      "minutes": 12,
+      "androidBridge": "Use Android widget/ongoing-notification ownership as an analogy; ActivityKit has distinct system surfaces, lifetime and push update semantics.",
+      "rubric": [
+        "Separates domain event, entitlement and presentation ownership.",
+        "Defines owner generation and app-domain update revision checks.",
+        "Explains stale, ended and dismissed without conflating them.",
+        "Includes relaunch reconciliation and disabled/dismissed activity behavior.",
+        "Names APNs/device evidence, a simpler alternative, and a recovery owner."
+      ],
+      "answerHTML": "<p>Keep the parcel record authoritative and derive a redacted surface projection from it. Logout rotates the app owner generation and prevents old completions from publishing. A domain revision can reject older parcel facts, but it cannot force APNs delivery order or resurrect an activity the system ended or the person dismissed. Stale content means the estimate is old; it does not mean the parcel completed. Ending supplies a final state with an explicit dismissal policy.\n\nOn relaunch, reconcile currently tracked activities and current domain ownership rather than assuming a saved activity identifier still represents an active surface. If Live Activities are disabled or the activity was dismissed, preserve the ordinary in-app parcel task. Compare a regular widget or in-app status for use cases without a meaningful bounded event. Assign mobile surface recovery and server push/token ownership separately. Host policy checks cover owner and lifetime rejection; simulator rendering, device dismissal and APNs token/update behavior remain distinct evidence. Document what is still pending instead of inferring successful integration from an immutable state model.</p>",
+      "followUps": [
+        "What useful final content is safe on a visible surface after logout?",
+        "Which evidence would distinguish stale server data from delayed push delivery?"
+      ],
+      "pitfalls": [
+        "Promising an always-running extension or exact update timing.",
+        "Coupling paid rights or event completion to the visible Live Activity."
+      ]
+    },
+    {
+      "id": "iq-110-a",
+      "lesson": "110",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Resolve a serverRecordChanged error without discarding either device's offline work.",
+      "scenario": "Base is title Draft/note Blue; local edits title to A and server edits note to Green. A second scenario changes title to B on the server.",
+      "minutes": 10,
+      "androidBridge": "Room gives local transaction consistency; CloudKit change tags and base/local/server conflict policy add remote concurrency that Room alone does not solve.",
+      "rubric": [
+        "Uses the tag as opaque version evidence and chooses conditional save semantics.",
+        "Produces A/Green for the disjoint case.",
+        "Returns an unresolved title conflict for A versus B.",
+        "Retains base and local candidate while rebasing onto current server system fields.",
+        "Bounds retries and leaves the draft recoverable."
+      ],
+      "answerHTML": "<p>The stale tag correctly prevented an overwrite. Retain the attempted local record, fetch or use the error's current server record, and compare both against the synchronized base. In the first scenario, only local title changed and only server note changed, so the resolved proposal is title A and note Green. Build the next save using the current server version and system fields rather than a guessed tag.\n\nIn the second scenario, local A and server B both differ from Draft. That is an unresolved title conflict; preserve both candidates and the base for a user or declared domain decision. A later device clock is not adequate evidence to discard an edit. Another writer may change the server again before retry, so bound retry and retain the local draft on failure. Missing fields and deletion need separate semantic rules. Room's transaction boundary is a useful local analogy, but does not provide this remote conflict policy or establish that a real CloudKit container was tested.</p>",
+      "followUps": [
+        "How would delete-versus-edit change the field merge?",
+        "What must be persisted before acknowledging local offline success?"
+      ],
+      "pitfalls": [
+        "Treating the change tag as a sortable timestamp.",
+        "Recreating a record from business fields while losing server system fields."
+      ]
+    },
+    {
+      "id": "iq-110-b",
+      "lesson": "110",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Choose between a coordinated local document and CloudKit record sync for a small cross-device draft feature.",
+      "scenario": "The team wants offline edits, external document-provider access, older client compatibility and retry after lost acknowledgments.",
+      "minutes": 15,
+      "androidBridge": "Compare a Room/outbox plus Android document-provider workflow; Apple's document coordination, iCloud identity and schema evolution are separate mechanisms.",
+      "rubric": [
+        "Separates whole-document access coordination from business-field conflict resolution.",
+        "Defines stable operation/record identity and recoverable effect/receipt boundary.",
+        "Includes missed-notification fetch and atomic checkpoint application.",
+        "Addresses account generation and production additive schema compatibility.",
+        "Names alternatives, evidence owners, rollback and unverified service behavior."
+      ],
+      "answerHTML": "<p>Start with whether users exchange a document or expect continuously synchronized structured fields. A coordinated local document can provide external access and offline editing without promising cloud collaboration; coordination serializes cooperating access but does not choose which stale edit wins. CloudKit records can provide conditional server saves, with explicit base/local/server merge and account scope. Core Data mirroring is another option when that store owns the model.\n\nFor either choice, preserve drafts and retry identity. A stable record replacement differs from an exactly-once increment; effect and receipt need the authoritative atomic boundary. Treat subscriptions as fetch hints, recover after missed notifications, and checkpoint applied changes with their token. Rotate local owner generation on identity changes. Production CloudKit schema evolution needs older-client compatibility and additive field/index planning. Assign document-provider testing and two-installation cloud conflict testing to separate owners, with a manual export alternative and reversal path. Host reconstruction verifies policy only; it does not prove disk crash safety, signed container access or production schema behavior.</p>",
+      "followUps": [
+        "Which user requirement would make local export the preferred first delivery?",
+        "How would you recover from token expiry without erasing pending edits?"
+      ],
+      "pitfalls": [
+        "Calling atomic replacement a merge or interprocess transaction.",
+        "Adding a second custom sync engine over already mirrored Core Data objects without ownership."
+      ]
+    },
+    {
+      "id": "iq-111-a",
+      "lesson": "111",
+      "level": "Senior",
+      "kind": "Code",
+      "prompt": "Explain a safe selected-replacement command for A👩🏽‍💻éB, including range conversion and undo.",
+      "scenario": "The user selects the emoji; an asynchronous validation result arrives while an IME composition is active.",
+      "minutes": 10,
+      "androidBridge": "Kotlin/Java String length uses UTF-16; Swift String indices and Character iteration have different semantics, while both platforms require composition-aware editing.",
+      "rubric": [
+        "Constructs or converts the range in the correct UTF-16 representation.",
+        "Separately validates whole-Character boundaries and current revision.",
+        "Defers whole-buffer normalization during marked text.",
+        "Preserves before/after selection and registers exactly one semantic undo/redo.",
+        "Rejects obsolete asynchronous validation before UI mutation."
+      ],
+      "answerHTML": "<p>Construct the selected emoji range from the current Swift Character indices and convert it with NSRange(_:in:). For a custom whole-Character command, convert the incoming range back and verify both endpoints are Character boundaries; conversion alone does not express that policy. Replace the entire selection with X, leaving the combining accent attached to its adjacent e. A range from an older document revision can be valid yet semantically wrong, so validate revision before applying it.\n\nCapture before and after text plus selection. For this literal replacement, the resulting caret offset is the validated UTF-16 start plus the replacement's UTF-16 length. Register one semantic reversal and its redo, avoiding duplicate registration for an edit already owned by UITextView. While markedTextRange exists, do not rewrite provisional input as committed text. Discard the outdated validator result before attribute or selection mutation. Host Foundation checks can test ranges; they do not prove IME, VoiceOver or native undo interaction. Java/Kotlin UTF-16 knowledge helps, but integer offsets are not Swift String subscripts.</p>",
+      "followUps": [
+        "What changes when normalization modifies text before the selected range?",
+        "How can a legacy layoutManager read affect a TextKit 2 text view?"
+      ],
+      "pitfalls": [
+        "Assuming Swift Character count equals NSRange length.",
+        "Reassigning the full buffer during every SwiftUI bridge update."
+      ]
+    },
+    {
+      "id": "iq-111-b",
+      "lesson": "111",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Select a performance investigation branch for an editor that shows an animated classifier result beside a bundled clip.",
+      "scenario": "The team proposes Metal immediately, but no trace separates layout, media preparation, inference and composition.",
+      "minutes": 15,
+      "androidBridge": "Media3 and Android render-thread experience suggest pipeline boundaries; Apple AVFoundation, Core Animation, Metal and Core ML still require their own evidence.",
+      "rubric": [
+        "Defines end-to-end intervals and a named bottleneck hypothesis.",
+        "Separates media load/decode, layout/composition and ML preprocessing/prediction.",
+        "Requires correctness/selection/accuracy oracles before speed claims.",
+        "Explains bounded work and why main-thread GPU waits remove overlap.",
+        "Provides a simpler alternative, evidence owner and rollback condition."
+      ],
+      "answerHTML": "<p>Do not select a renderer from the existence of animation. Establish a reproducible interaction, representative device and intervals for clip loading/readiness, text editing/layout, preprocessing, prediction, postprocessing and visible result. Preserve selection, expected clip behavior and classifier output as correctness oracles. A measured decode delay points toward media preparation; a composition hitch points toward layer/layout work; a validated GPU workload may justify Metal.\n\nCore Animation can express ordinary geometry and opacity without a custom renderer. Metal introduces pipelines, command buffers, resource lifetime and numerical/visual validation; waitUntilCompleted in a UI frame blocks the intended CPU/GPU overlap. Core ML compute-unit configuration also does not guarantee every operation runs on a particular accelerator. Bound preparation and predictions so obsolete work cannot flood memory or publish old results. Assign the selected interval investigation to an owner and keep simpler playback/layer behavior as a rollback. Source inspection creates hypotheses; physical-device traces and unchanged correctness are required before claiming an optimization. Audio DSP, shader correctness and model evaluation remain separate specialist work.</p>",
+      "followUps": [
+        "How would cold model load alter the experiment?",
+        "What must an audio render callback avoid, and why is moving work to any queue insufficient?"
+      ],
+      "pitfalls": [
+        "Presenting a source review as a measured speedup.",
+        "Increasing prediction concurrency without checking memory, accuracy or stale publication."
+      ]
+    },
+    {
+      "id": "iq-112-a",
+      "lesson": "112",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Why cannot a shared granted Boolean represent watch transport, Bluetooth readiness and HealthKit reading?",
+      "scenario": "The watch is unreachable, Bluetooth is powered off, and a health query returns an empty collection after a successful request callback.",
+      "minutes": 8,
+      "androidBridge": "Android/Wear permission and transport concepts are useful analogies; HealthKit intentionally hides read grants and WCSession reachability is not authorization.",
+      "rubric": [
+        "Separates availability, user opt-in, system authorization, execution and readiness.",
+        "Explains unreachable watch queue/error recovery versus snapshot replacement.",
+        "Distinguishes Bluetooth power, discovery, connection and valid payload.",
+        "Preserves HealthKit read ambiguity and identifies saving-status semantics.",
+        "Offers usable fallback without repeated coercive prompts."
+      ],
+      "answerHTML": "<p>These values describe different mechanisms. A watch counterpart can be installed and activated yet unreachable for an immediate message; a queued command with stable identity can remain pending, while latest-state context uses replacement semantics. Bluetooth authorization can coexist with powered-off hardware, and a connected peripheral still needs discovered characteristics and validated payloads before its reading is useful.\n\nHealthKit adds a deliberate privacy boundary. Authorization request success does not mean all requested types were granted, and empty read results do not reveal denial. authorizationStatus(for:) describes saving authorization. Present no visible data with a manual path rather than inventing a read-denied state. Product opt-in is yet another input, distinct from system grants. A shared wrapper may expose service-specific values, but must preserve these distinctions instead of flattening them into granted. Host feature selection injects the facts and invokes none of the native services. Wear OS and Android permission experience helps ask the questions, but cannot override Apple's read-visibility or transport semantics.</p>",
+      "followUps": [
+        "How should old-account Bluetooth notifications be rejected?",
+        "What should the UI say when health data is empty for an unknown reason?"
+      ],
+      "pitfalls": [
+        "Treating health request completion as a read grant.",
+        "Treating Bluetooth permission as proof of powered-on hardware or authenticated data."
+      ]
+    },
+    {
+      "id": "iq-112-b",
+      "lesson": "112",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Recommend one watch, spatial, accessory or health branch for a synthetic checklist and define adoption and reversal.",
+      "scenario": "A small team can support one elective platform feature; the product must remain usable when capability, consent or execution disappears.",
+      "minutes": 15,
+      "androidBridge": "Wear OS feature selection and optional Android capabilities inform the decision; Apple targets, system spatial input and background limits are independently validated.",
+      "rubric": [
+        "Chooses one concrete user task and compares a simpler alternative.",
+        "Names owner, data authority, input/transport contract and fallback.",
+        "Separates simulator layout from paired-device/hardware/comfort evidence.",
+        "Defines account/replay/privacy recovery and staged adoption.",
+        "Specifies observable stop or reversal criteria without fabricated benefits."
+      ],
+      "answerHTML": "<p>A defensible choice could be a watch Mark packed action for a frequent wrist-friendly task. Compare it with the existing phone checklist, then define latest snapshot context separately from queued commands. The authoritative store applies operation identity and account generation atomically with a receipt; watch UI owns pending state and recovery after a lost reply. Unsupported or opted-out users retain the phone task.\n\nName the phone/watch protocol owner and the support owner, and require paired-device delivery/failure observations before promoting adoption. A simulator can check layout but not transport budgets. If choosing visionOS instead, begin with a window and system controls, which support indirect selection without exposing raw gaze; hardware comfort is separate evidence. Bluetooth needs protocol/device validation, and HealthKit needs type-scoped purpose plus ambiguous-read UX. Stage the feature behind a product decision and define a reversal condition such as unresolved pending-action confusion or unacceptable support burden. No assumed benefit, course attendance or host success establishes user adoption or a full platform integration.</p>",
+      "followUps": [
+        "What evidence would cause you to keep the simpler phone-only feature?",
+        "How do you prevent a shared package from introducing unsupported platform APIs?"
+      ],
+      "pitfalls": [
+        "Shipping every named framework to claim platform breadth.",
+        "Treating background modes, workout sessions or immersive entry as permanent execution permission."
+      ]
+    }
+  ]
+}

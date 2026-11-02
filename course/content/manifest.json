@@ -1,13 +1,196 @@
 {
   "version": 1,
   "units": [
-    { "file": "unit-01.json", "order": 1, "first": 1, "count": 7, "track": "Core" },
-    { "file": "unit-02.json", "order": 2, "first": 8, "count": 7, "track": "Core" },
-    { "file": "unit-03.json", "order": 3, "first": 15, "count": 7, "track": "Core" },
-    { "file": "unit-04.json", "order": 4, "first": 22, "count": 7, "track": "Core" },
-    { "file": "unit-05.json", "order": 5, "first": 29, "count": 7, "track": "Deep dive" },
-    { "file": "unit-06.json", "order": 6, "first": 36, "count": 7, "track": "Deep dive" },
-    { "file": "unit-07.json", "order": 7, "first": 43, "count": 7, "track": "Deep dive" },
-    { "file": "unit-08.json", "order": 8, "first": 50, "count": 7, "track": "Deep dive" }
+    {
+      "file": "unit-01.json",
+      "order": 1,
+      "first": 1,
+      "count": 7,
+      "track": "Core"
+    },
+    {
+      "file": "unit-02.json",
+      "order": 2,
+      "first": 8,
+      "count": 7,
+      "track": "Core"
+    },
+    {
+      "file": "unit-03.json",
+      "order": 3,
+      "first": 15,
+      "count": 7,
+      "track": "Core"
+    },
+    {
+      "file": "unit-04.json",
+      "order": 4,
+      "first": 22,
+      "count": 7,
+      "track": "Core"
+    },
+    {
+      "file": "unit-05.json",
+      "order": 5,
+      "first": 29,
+      "count": 7,
+      "track": "Deep dive"
+    },
+    {
+      "file": "unit-06.json",
+      "order": 6,
+      "first": 36,
+      "count": 7,
+      "track": "Deep dive"
+    },
+    {
+      "file": "unit-07.json",
+      "order": 7,
+      "first": 43,
+      "count": 7,
+      "track": "Deep dive"
+    },
+    {
+      "file": "unit-08.json",
+      "order": 8,
+      "first": 50,
+      "count": 7,
+      "track": "Deep dive"
+    },
+    {
+      "file": "unit-09.json",
+      "order": 9,
+      "first": 57,
+      "count": 7,
+      "track": "Swift bootcamp"
+    },
+    {
+      "file": "unit-10.json",
+      "order": 10,
+      "first": 64,
+      "count": 7,
+      "track": "Swift bootcamp"
+    },
+    {
+      "file": "unit-11.json",
+      "order": 11,
+      "first": 71,
+      "count": 7,
+      "track": "SwiftUI bootcamp"
+    },
+    {
+      "file": "unit-12.json",
+      "order": 12,
+      "first": 78,
+      "count": 7,
+      "track": "SwiftUI bootcamp"
+    },
+    {
+      "file": "unit-13.json",
+      "order": 13,
+      "first": 85,
+      "count": 4,
+      "track": "Advanced practice"
+    },
+    {
+      "file": "unit-14.json",
+      "order": 14,
+      "first": 89,
+      "count": 4,
+      "track": "Advanced practice"
+    },
+    {
+      "file": "unit-15.json",
+      "order": 15,
+      "first": 93,
+      "count": 4,
+      "track": "Advanced practice"
+    },
+    {
+      "file": "unit-16.json",
+      "order": 16,
+      "first": 97,
+      "count": 4,
+      "track": "Advanced practice"
+    },
+    {
+      "file": "unit-17.json",
+      "order": 17,
+      "first": 101,
+      "count": 4,
+      "track": "Advanced practice"
+    },
+    {
+      "file": "unit-18.json",
+      "order": 18,
+      "first": 105,
+      "count": 4,
+      "track": "Advanced practice"
+    },
+    {
+      "file": "unit-19.json",
+      "order": 19,
+      "first": 109,
+      "count": 4,
+      "track": "Specialist electives"
+    }
+  ],
+  "interviewBanks": [
+    {
+      "file": "interview-core.json",
+      "count": 56
+    },
+    {
+      "file": "interview-deep.json",
+      "count": 56
+    },
+    {
+      "file": "interview-foundations.json",
+      "count": 28
+    },
+    {
+      "file": "interview-swiftui.json",
+      "count": 28
+    },
+    {
+      "file": "interview-runtime.json",
+      "count": 8
+    },
+    {
+      "file": "interview-concurrency.json",
+      "count": 8
+    },
+    {
+      "file": "interview-ui-runtime.json",
+      "count": 8
+    },
+    {
+      "file": "interview-durable-data.json",
+      "count": 8
+    },
+    {
+      "file": "interview-profiling.json",
+      "count": 8
+    },
+    {
+      "file": "interview-delivery.json",
+      "count": 8
+    },
+    {
+      "file": "interview-specialists.json",
+      "count": 8
+    }
+  ],
+  "practiceBanks": [
+    "practice-host.json",
+    "practice-native.json",
+    "practice-tools.json",
+    "practice-runtime.json",
+    "practice-concurrency.json",
+    "practice-ui-runtime.json",
+    "practice-durable-data.json",
+    "practice-profiling.json",
+    "practice-delivery.json",
+    "practice-specialists.json"
   ]
 }

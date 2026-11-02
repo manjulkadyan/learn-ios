@@ -7,7 +7,7 @@ import { buildCatalogue } from './inventory.mjs';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const workspace = path.resolve(root, '../..');
 const port = Number(process.env.IOS_COURSE_PORT || 4173);
-const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.swift': 'text/plain; charset=utf-8' };
+const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.swift': 'text/plain; charset=utf-8', '.mjs': 'text/plain; charset=utf-8', '.py': 'text/plain; charset=utf-8', '.sh': 'text/plain; charset=utf-8', '.pbxproj': 'text/plain; charset=utf-8', '.xcscheme': 'text/plain; charset=utf-8', '.plist': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.yml': 'text/plain; charset=utf-8', '.xcprivacy': 'text/plain; charset=utf-8' };
 const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 // Expose only repository files deliberately linked by the course, not the entire checkout.
 const sourcePaths = new Set();
@@ -19,6 +19,15 @@ for (const unit of manifest.units) {
   } catch { /* An unbuilt/incomplete unit exposes no source files. */ }
 }
 const courseFiles = new Set(['index.html', 'styles.css', 'app.js', 'state.js', 'interview-state.js', 'interview.js', 'data.js', 'README.md']);
+for (const file of manifest.practiceBanks || []) {
+  if (typeof file !== 'string' || !/^practice-[a-z][a-z0-9-]*\.json$/.test(file)) continue;
+  try {
+    const content = JSON.parse(await fs.readFile(path.join(root, 'content', file), 'utf8'));
+    for (const workshop of content.workshops || []) for (const artifact of workshop.files || []) {
+      if (typeof artifact.path === 'string' && /^labs\/[A-Za-z0-9][A-Za-z0-9_./ -]*$/.test(artifact.path) && !artifact.path.split('/').some(part => !part || part.startsWith('.'))) courseFiles.add(artifact.path);
+    }
+  } catch { /* Incomplete practice authorship never expands the server's allowlist. */ }
+}
 for (const source of (await buildCatalogue(workspace)).sources) sourcePaths.add(source.path);
 export async function handleRequest(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -45,6 +54,11 @@ export async function handleRequest(req, res) {
     const target = path.resolve(root, '.' + relative);
     const real = await fs.realpath(target);
     if (!real.startsWith(root + path.sep) || relative.split('/').some(part => part.startsWith('.'))) throw new Error('Invalid course path');
+    if (relative.startsWith('/labs/')) {
+      const labRoot = await fs.realpath(path.join(root, 'labs'));
+      const stats = await fs.stat(real);
+      if (!real.startsWith(labRoot + path.sep) || !stats.isFile() || stats.size > 500_000) throw new Error('Invalid lab artifact');
+    }
     const extension = path.extname(real); if (!mime[extension]) throw new Error('Unsupported file');
     const content = await fs.readFile(real);
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'");

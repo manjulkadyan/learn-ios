@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "author": "synthetic-author",
+  "artifact": {
+    "bundleID": "example.delivery.scratch",
+    "version": "1.0",
+    "build": "42",
+    "environment": "sandbox",
+    "configuration": "Release",
+    "sourceRevision": "synthetic-revision-2",
+    "binaryImages": [
+      {
+        "name": "Scratch",
+        "architecture": "arm64",
+        "uuid": "abcdef01-2345-4678-9abc-def012345678"
+      }
+    ]
+  },
+  "expected": {
+    "bundleID": "example.delivery.scratch",
+    "version": "1.0",
+    "build": "42",
+    "environment": "sandbox",
+    "configuration": "Release",
+    "sourceRevision": "synthetic-revision-2"
+  },
+  "symbolImages": [
+    {
+      "name": "Scratch",
+      "architecture": "arm64",
+      "uuid": "abcdef01-2345-4678-9abc-def012345678"
+    }
+  ],
+  "resources": [
+    "PrivacyInfo.xcprivacy",
+    "en.lproj"
+  ],
+  "requiredResources": [
+    "PrivacyInfo.xcprivacy",
+    "en.lproj"
+  ],
+  "expectedEntitlements": {
+    "application-identifier": "SYNTHETIC.example.delivery.scratch",
+    "aps-environment": "development"
+  },
+  "observedEntitlements": {
+    "application-identifier": "SYNTHETIC.example.delivery.scratch",
+    "aps-environment": "development"
+  },
+  "effectiveSettingsChecked": false,
+  "signatureChecked": false,
+  "profileChecked": false,
+  "packagingChecked": false,
+  "diagnosticKind": "crash",
+  "evidence": [
+    {
+      "id": "fixture-tests",
+      "kind": "host-test",
+      "path": "fixtures/synthetic-result.txt",
+      "sha256": "8ce59cc281d9eb07c3df148631e6195bda2ba87afd9395a3f22b43c77c506801",
+      "provenance": "synthetic",
+      "revision": "synthetic-revision-2"
+    }
+  ],
+  "review": {
+    "state": "proposed",
+    "reviewer": "",
+    "reviewedFingerprint": "",
+    "revisionNote": "",
+    "findings": []
+  },
+  "consumers": [
+    {
+      "id": "extension",
+      "owner": "synthetic-extension-owner",
+      "decisionRight": "Accept consumer parity or request exception",
+      "state": "exception",
+      "evidenceID": "",
+      "exception": {
+        "owner": "synthetic-extension-owner",
+        "reason": "A widget reads shared durable state; a process-local actor does not serialize both processes.",
+        "reviewDate": "2027-01-10",
+        "compensatingCheck": "Retain old compatible store reader; require interprocess migration evidence before removing it."
+      }
+    }
+  ],
+  "installedCompatibilityOwner": "synthetic-service-owner"
+}

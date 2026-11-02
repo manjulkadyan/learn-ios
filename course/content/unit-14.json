@@ -1,0 +1,558 @@
+{
+  "unit": {
+    "id": "concurrency-migration",
+    "title": "Swift concurrency migration and ownership",
+    "summary": "Audit compiler settings, prove transfer and context contracts, and practice bounded ownership at C boundaries.",
+    "order": 14
+  },
+  "lessons": [
+    {
+      "id": "089",
+      "title": "Swift 5 to Swift 6: migrate checking and execution settings separately",
+      "summary": "Build an executable diagnostic matrix before adopting strict checking, MainActor defaults, or caller-isolated async execution.",
+      "duration": 150,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "016",
+        "043",
+        "048"
+      ],
+      "objectives": [
+        "Separate compiler, language, package, isolation-default and runtime requirements.",
+        "Reproduce a warning-to-error migration and a caller-isolation change.",
+        "Review responsiveness, cancellation and API ownership before changing execution defaults."
+      ],
+      "sections": [
+        {
+          "id": "migration-contract",
+          "title": "A migration begins with an observable contract",
+          "html": "<p>An Android team upgrading Kotlin commonly stages compiler diagnostics separately from changing coroutine dispatchers. Apply that discipline here. Swift 6 language mode makes data-race safety checking part of the language contract; installing a new Swift compiler does not necessarily enable that mode for every target. Separately, Swift 6.2 introduced options that change inferred isolation and the execution of nonisolated asynchronous functions. Mixing these changes into one unexplained switch makes a successful compilation hard to interpret.</p><p>Sessions 015 and 016 already establish task ownership, actor reentrancy and Sendable. This lesson adds a repeatable experiment: the same bounded source is compiled under several explicit settings, with an expected diagnostic category. A warning under Swift 5 and an error under Swift 6 are distinct observations. Neither proves a race occurred in a running process. They show which contract the compiler enforces. A settings-only change can also alter where synchronous work executes, so migration review must include responsiveness and cancellation behavior.</p><p>Use synthetic names and scratch files. The lab never compiles the company application. Before changing any real module, name its owner, callers, dependent modules, supported compiler and test destinations. A module that publishes general-purpose APIs has different isolation needs from a UI-only executable. There is no universal instruction to mark all declarations MainActor or to convert every warning into an unchecked conformance.</p>"
+        },
+        {
+          "id": "five-settings",
+          "title": "Keep five independently meaningful inputs",
+          "html": "<p>The compiler version determines which syntax and flags exist. The language mode, selected with swiftc -swift-version 5 or 6, selects language compatibility and checking rules. A SwiftPM tools-version header chooses manifest API availability and minimum tools support; it is not the same input as a target's language mode. The package in this lab requires tools 6.2 and explicitly selects swiftLanguageModes: [.v6]. Finally, a target's default isolation and upcoming feature flags select additional behaviors. Record all these values with each result.</p><p>Runtime and SDK availability remain separate. Recognizing @concurrent with a sufficiently new compiler does not make every framework API in its body available on an older phone. The companion ManualClock uses Synchronization.Mutex and a macOS 15 minimum; that is a host-library requirement, not a claim that the syntax needs iOS 18. The production helper inspected at line 20 supplies SWIFT_VERSION: \"6\" to selected package targets. It does not establish that all app targets use Swift 6, that default isolation is MainActor, or that the caller-execution feature is enabled.</p><p>Android's languageVersion, Gradle plugin, compileSdk and minSdk provide a useful checklist of independent dimensions. Their values do not map numerically to Swift or iOS versions. Read the consuming target's resolved compile command before asserting effective settings. This course inspects declared settings only; generated-client builds and resolved Xcode settings remain unverified.</p>"
+        },
+        {
+          "id": "warnings-errors",
+          "title": "Reproduce the warning-to-error boundary",
+          "html": "<pre><code class=\"language-swift\">var counter = 0\nfunc increment() { counter += 1 }\n// Compile as a library, never run this diagnostic fixture.\n// swiftc -parse-as-library -c -swift-version 5 \\\n//   -strict-concurrency=complete MutableGlobal.swift -o /private/tmp/global.o\n// Repeat with -swift-version 6.</code></pre><p>Line one declares mutable module-level storage with no isolation owner. Line two performs a read-modify-write from a callable function. This is deliberately invalid as a shared-state contract. Compiling as a library avoids the special main-actor treatment of executable top-level code. Under the tested Swift 5 mode with complete checking, compilation succeeds with a concurrency warning. Under Swift 6 mode it fails. The diagnostic script keeps object files and logs in a unique temporary directory and verifies both the exit status and the diagnostic category.</p><p>Repair according to actual use. A UI-owned counter can live under MainActor; an account-owned counter can belong to an actor; a constant can become immutable if it truly never changes. Suppressing the warning does not invent synchronization. Swift 5 complete checking lets a team classify and fix boundaries incrementally before enforcing Swift 6 errors. Swift 6 complete checking is enforced regardless of reducing the old strict-concurrency setting. An error budget must therefore track unresolved ownership decisions rather than recommending targeted checking as a Swift 6 escape.</p><p>A Java volatile field does not make a compound increment atomic, and a Kotlin val containing a mutable object does not make its internals safe. These familiar mistakes explain why a migration should ask who can mutate the storage, not merely whether its declaration looks immutable.</p>"
+        },
+        {
+          "id": "settings-matrix",
+          "title": "Run a settings matrix instead of assuming one modern default",
+          "html": "<p>SE-0466 defines -default-isolation MainActor and nonisolated. With no explicit choice, the compiler default remains nonisolated; particular project templates can opt in. MainActor inference applies within the compiled module, subject to the proposal's inference exceptions. It does not rewrite imported libraries. Explicit isolation, actor declarations and SendableMetatype-related rules matter, so the useful first experiment is a simple unannotated free function rather than an intricate generic hierarchy.</p><pre><code class=\"language-swift\">func uiValue() -&gt; Int { 1 }\nnonisolated func outside() -&gt; Int { uiValue() }</code></pre><p>The first function returns an integer without suspension. The second explicitly opts out of actor isolation and calls the first synchronously. With default-isolation nonisolated this compiles. With default-isolation MainActor the first function becomes isolated and the call is rejected. The body is trivial, but the changed API contract is real. Adding await would also require an asynchronous caller and a deliberate cross-actor access design.</p><table><thead><tr><th>Input</th><th>Meaning</th><th>Companion observation</th></tr></thead><tbody><tr><td>Swift 5, complete checking</td><td>Stage stricter checking</td><td>Mutable-global warning</td></tr><tr><td>Swift 6</td><td>Enforce race-safety errors</td><td>Mutable-global rejection</td></tr><tr><td>Default nonisolated / MainActor</td><td>Choose module inference</td><td>Outside call passes / fails</td></tr><tr><td>NonisolatedNonsendingByDefault off / on</td><td>Choose ordinary nonisolated async execution</td><td>Actor-held worker call fails / passes</td></tr><tr><td>@concurrent with feature on</td><td>Explicitly leave caller actor</td><td>Unsafe worker call still fails</td></tr></tbody></table><p>SwiftPM 6.2 exposes .defaultIsolation(MainActor.self) or .defaultIsolation(nil), plus .enableUpcomingFeature(\"NonisolatedNonsendingByDefault\"). Apply settings to each intended target, including tests. This table describes language/compiler cases verified with Swift 6.4, not an effective-setting audit of any Xcode app.</p>"
+        },
+        {
+          "id": "caller-execution",
+          "title": "Caller execution and @concurrent change different risks",
+          "html": "<pre><code class=\"language-swift\">final class Worker {\n    var count = 0\n    nonisolated func step() async { count += 1 }\n}\nactor Owner {\n    let worker = Worker()\n    func run() async { await worker.step() }\n}</code></pre><p>Worker is a mutable reference and does not conform to Sendable. Count is instance state. Step is asynchronous but has no suspension inside its body. Owner holds the reference inside its isolation domain. Run calls step. Under legacy nonisolated-async semantics the call leaves Owner's executor, allowing another actor job to access that same worker while step runs; the fixture is rejected. Enabling NonisolatedNonsendingByDefault keeps this call on the caller's actor and the tested fixture compiles. This is execution inheritance, not an implicit global Sendable conformance.</p><p>Swift 6.2 also permits explicit nonisolated(nonsending) for caller execution and @concurrent for execution away from the caller's actor. Replacing step's annotation with @concurrent makes the unsafe cross-domain call fail even when the upcoming feature is enabled. The annotation does not create a new task, guarantee a dedicated thread, make data safe, or parallelize an algorithm. A Sendable input/output pure computation is a better candidate.</p><p>Kotlin withContext(Dispatchers.Default) is an analogy for deliberately moving expensive work away from a UI dispatcher, but @concurrent specifies Swift actor-execution behavior rather than selecting a named Kotlin dispatcher or thread pool. Caller-isolated parsing can now occupy MainActor until it suspends. A request API that mostly waits for I/O may fit caller execution; large synchronous decoding needs a measured execution policy and safe snapshots. A changed setting can preserve race safety while worsening rendering.</p>"
+        },
+        {
+          "id": "rollout-evidence",
+          "title": "Design review includes errors, cancellation and recovery",
+          "html": "<p>Neither actor isolation nor @concurrent checks cancellation automatically. Preserve throwing errors through a migrated boundary, distinguish CancellationError from ordinary failures, and check between meaningful computation chunks. A canceled request can still finish in a legacy service, so keep the generation checks taught in session 016. Migration must retain these tests; this lab adds different contracts rather than replacing the earlier stale-result harness.</p><p>For each diagnostic choose one owner and an API strategy: isolated mutation, immutable snapshot, verified transfer, or a bounded legacy adapter. Review public actor annotations as caller-visible changes. If a module defaults to MainActor, explicitly identify its APIs intended for unrestricted callers; moving a type into that module can change inference without a source annotation. Validate both consuming and producing modules on supported compilers. A green scratch matrix cannot establish binary compatibility, production performance or successful deployment.</p><p>A staged rollout first enables complete checking in Swift 5, resolves ownership errors, then enables Swift 6 in a small dependency leaf. Treat default MainActor and caller execution as separately reviewable changes with independent rollback settings. Keep before/after logs, compiler identity and deterministic cancellation tests. For responsiveness, define a target/device recording plan; do not fill its results from host timings. This lesson supplies executable language evidence while leaving organizational approval and real application adoption pending.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A Swift 6.4 compiler builds a target in Swift 5 mode. What follows?",
+          "options": [
+            "Swift 6 race-safety errors are automatically enforced everywhere.",
+            "Compiler capability and target language mode are separate.",
+            "The target must deploy only to iOS 26."
+          ],
+          "answer": 1,
+          "explanation": "A new compiler can retain Swift 5 compatibility. Complete checking can stage warnings; language mode selects enforcement. Deployment requirements depend on APIs, not the compiler's version number."
+        },
+        {
+          "question": "With caller execution enabled, why can @concurrent still reject an actor-held mutable worker?",
+          "options": [
+            "It explicitly leaves the caller actor and the reference is not safe to share.",
+            "It cancels the owner actor.",
+            "It creates an isolated copy of the worker."
+          ],
+          "answer": 0,
+          "explanation": "The explicit execution boundary exposes potential concurrent access. It provides neither copying nor cancellation and does not imply Sendable."
+        },
+        {
+          "question": "What does default-isolation MainActor change?",
+          "options": [
+            "All imported modules.",
+            "Every actor into the same actor.",
+            "Eligible unannotated declarations within the compiled module."
+          ],
+          "answer": 2,
+          "explanation": "Default inference is module-local and has documented exceptions. Explicit actor isolation and imported API contracts remain meaningful."
+        }
+      ],
+      "exercise": {
+        "brief": "Produce a bounded migration evidence ledger from the companion fixtures, then recommend a staged UI-module migration.",
+        "steps": [
+          "Run the diagnostic verifier with a Swift 6.2+ compiler; preserve its unique evidence path.",
+          "Predict each row before inspecting its log.",
+          "Explain two ownership repairs and separately assess synchronous parsing under caller execution.",
+          "Write one rollback choice for language checking and another for execution defaults."
+        ],
+        "acceptance": [
+          "The ledger lists compiler, mode, default isolation, feature flag and expected diagnostic category.",
+          "Swift 5 warning and Swift 6 error are distinguished.",
+          "The feature-on worker passes while the @concurrent worker fails.",
+          "No client migration or target responsiveness is claimed from scratch results."
+        ],
+        "solution": "<p>A worked ledger records Apple Swift 6.4 as the compiler, Swift 5 with complete checking for the mutable-global warning, and Swift 6 for the corresponding rejection. DefaultIsolation.swift passes under nonisolated inference and fails under MainActor inference. CallerIsolation.swift fails without the feature, passes with it, and ConcurrentBoundary.swift remains rejected with the feature. The verifier saves full logs and object outputs only in temporary directories; invalid fixtures are never run.</p><p>For the counter, choose MainActor only if every legitimate mutation belongs to UI state. Otherwise move it into an actor whose lifetime matches the feature or account. For Worker, retaining caller execution is suitable only if actor ownership is the intended contract and the synchronous work has an acceptable budget. A general-purpose parser should accept Sendable values and use an explicit @concurrent implementation when leaving the UI actor is intentional. Do not solve either error with a blanket unchecked marker.</p><p>The rollout answer keeps three review items separate: Swift 5 complete checking, Swift 6 enforcement, and the newer execution/inference settings. Rollback of the feature restores legacy nonisolated-async execution; it does not resolve the warnings that motivated language migration. A companion compiler check demonstrates the changed static boundary, while a representative target recording would test responsiveness. Keep cancellation and stale-result tests from existing lessons, then add settings-contract tests for the new source boundaries. The learner must produce independent logs and decisions; this worked answer is not a completed exercise.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift migration guide — complete concurrency checking",
+          "url": "https://www.swift.org/documentation/concurrency/"
+        },
+        {
+          "label": "Swift SE-0461 — caller execution and @concurrent",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0461-async-function-isolation.md"
+        },
+        {
+          "label": "Swift SE-0466 — module default isolation",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0466-control-default-actor-isolation.md"
+        },
+        {
+          "label": "Kotlin — shared mutable state and confinement",
+          "url": "https://kotlinlang.org/docs/shared-mutable-state-and-concurrency.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Selective Swift 6 target configuration",
+          "path": "ios-client/Tuist/ProjectDescriptionHelpers/PackageTargetSettings.swift",
+          "line": 20,
+          "why": "The inspected helper sets Swift 6 only for targets selected by its caller; it does not prove app-wide migration or new isolation flags."
+        }
+      ],
+      "checklist": [
+        "I can reproduce a warning-to-error boundary.",
+        "I can explain caller execution without a thread guarantee.",
+        "I can separate declared settings from effective-client evidence."
+      ]
+    },
+    {
+      "id": "090",
+      "title": "Transfer, sharing and isolated API contracts",
+      "summary": "Choose sending, Sendable, isolated parameters and isolated conformances according to ownership, then adapt legacy boundaries deliberately.",
+      "duration": 145,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "016",
+        "069",
+        "089"
+      ],
+      "objectives": [
+        "Explain a disconnected transfer without claiming general shared safety.",
+        "Use isolated parameters and global-actor-isolated conformances.",
+        "Define a bounded legacy adapter with explicit lifetime, error and cancellation policy."
+      ],
+      "sections": [
+        {
+          "id": "ownership-choice",
+          "title": "Choose transfer or sharing before choosing an annotation",
+          "html": "<p>Imagine an Android repository receiving a mutable draft from a screen. If both screen and repository retain it, val does not prevent either side changing the same object. You either copy a snapshot, confine all access to one owner, or explicitly hand responsibility to the repository. Swift distinguishes these contracts more directly. Sendable describes values safe across concurrency domains; sending describes a transfer at a particular parameter or result boundary. Neither spelling means a deep copy.</p><p>Session 016 already teaches why actors serialize protected state but remain reentrant. Here the important addition is region-based reasoning: a non-Sendable value can sometimes cross a boundary when the compiler can prove its reachable mutable state is disconnected from concurrently accessible state and the source does not use that region afterward. The region can contain several aliases. A promise about one variable name is insufficient if another alias still reaches the same mutable object.</p><p>Do not assume that successful transfer makes the type generally safe to share. A Draft handed once to an actor can remain a plain mutable class. The actor controls subsequent mutation and returns immutable snapshots. If the screen still needs its draft, construct a separate value snapshot or copy before transferring, with a defined policy for referenced children. The choice is about API meaning, not making a diagnostic disappear.</p>"
+        },
+        {
+          "id": "sending-example",
+          "title": "Read a sending parameter line by line",
+          "html": "<pre><code class=\"language-swift\">final class Draft {\n    var text: String\n    init(_ text: String) { self.text = text }\n}\nactor Inbox {\n    private var draft: Draft?\n    func install(_ draft: sending Draft) { self.draft = draft }\n    func snapshot() -&gt; String? { draft?.text }\n}\nfunc deliver(to inbox: Inbox) async -&gt; String? {\n    let draft = Draft(\"fixture\")\n    await inbox.install(draft)\n    return await inbox.snapshot()\n}</code></pre><p>Draft is final, but final only prevents subclassing; it does not remove mutable state. Text is a mutable stored string. The initializer gives each new instance a starting value. Inbox is an actor, and its optional draft starts empty. The install parameter's local name is draft and its external label is omitted with an underscore. Sending says the caller must provide a region safe to hand over. Assigning the parameter into actor state gives that region a new isolation owner.</p><p>Snapshot reads the actor-owned object and returns an optional String, a Sendable value. Deliver creates a fresh local instance, awaits installation, then asks only for that snapshot. It never accesses the transferred reference again. These declarations compile standalone in Swift 6 language mode and are represented by the package's DraftInbox check. Diagnostics/Transfer.swift adds an INVALID branch that reads the original payload after sending; the diagnostic verifier confirms rejection without running unsafe code.</p><p>Sending also applies to result values, for example a factory returning a fresh disconnected reference. That is still a transfer contract at the return boundary. It does not say the returned class has value semantics. Sending is distinct from consuming, covered in lesson 092: consuming specifies ownership conventions and use of an owned value, while sending specifies isolation-region transfer. Conflating them obscures both aliases and lifetimes.</p>"
+        },
+        {
+          "id": "sendable-contract",
+          "title": "Sendable allows safe crossing without revoking the original value",
+        "html": "<p>An immutable value snapshot whose stored members are all Sendable is the simplest shared contract. Copyable value semantics allow the original array of strings to remain usable after crossing an actor boundary. A reference type can also be Sendable when its semantics are safe, such as an actor or a carefully designed immutable final class. A mutable class containing unsynchronized state needs a separate owner or verified synchronization. Its let reference property is not evidence that its contents are immutable.</p><pre><code class=\"language-swift\">struct DraftSnapshot: Sendable {\n    let text: String\n    let revision: Int\n}\ntypealias Loader = @Sendable (String) async throws -&gt; DraftSnapshot</code></pre><p>The struct's fields are Sendable values. The typealias names a closure contract, not a class. @Sendable constrains captures and concurrent use of the closure; async permits suspension; throws preserves failure; and the result has an explicit cross-domain shape. A loader can capture an actor reference that owns its mutable cache. It should not capture a mutable test counter without an ownership policy. This declaration snippet requires a Swift concurrency-capable compiler; no networking actually runs.</p><p>Kotlin immutable data classes and Java 11 classes with final fields are useful snapshot analogies, with a critical boundary: neither automatically proves deep immutability or Swift-style checked cross-domain access. A Kotlin data class holding MutableList remains mutable through that list. Swift similarly examines stored members and isolation. @unchecked Sendable is a programmer assertion bypassing compiler verification, not a conversion into safe data. If used in a legacy adapter, its documented invariant must cover every access, including teardown and callbacks.</p>"
+        },
+        {
+          "id": "isolated-parameter",
+          "title": "An isolated parameter borrows an actor's execution domain",
+          "html": "<pre><code class=\"language-swift\">actor Ledger {\n    private(set) var total = 0\n    func add(_ amount: Int) { total += amount }\n}\nfunc batch(_ ledger: isolated Ledger) -&gt; Int {\n    ledger.add(2)\n    ledger.add(3)\n    return ledger.total\n}\nfunc sample() async -&gt; Int { await batch(Ledger()) }</code></pre><p>Ledger owns total. Private(set) makes its setter private while allowing an appropriate read; actor isolation remains a separate access rule. Add is synchronous. Batch's isolated parameter means its body executes in that particular ledger's isolation domain. The two add calls and property read therefore need no await inside batch. Sample must await entry from outside. The companion verifies a result of five, without relying on thread identifiers or actor scheduling order.</p><p>Because this batch is synchronous, it has no reentrant suspension between its updates. Adding an await inside a redesigned batch would permit interleaving again; isolated is not a transaction lock held across arbitrary asynchronous work. Ordinary isolated actor parameters select one actor domain; they do not provide a convenient way to hold several independent actors simultaneously. Design cross-actor operations around snapshots, reservations and explicit recovery instead.</p><p>For caller-selected isolation, modern APIs can accept isolation: isolated (any Actor)? = #isolation. The default captures the caller's isolation where available; the body must still respect type and region rules. This is a language mechanism, unlike Kotlin Receiver syntax, which changes available member names without itself proving actor confinement. Use the small concrete Ledger example first, then study generic isolation only when the API needs it.</p>"
+        },
+        {
+          "id": "isolated-conformance",
+          "title": "A conformance can have an isolation domain",
+          "html": "<pre><code class=\"language-swift\">protocol Caption { func caption() -&gt; String }\n@MainActor struct Row: @MainActor Caption {\n    let name: String\n    func caption() -&gt; String { name }\n}\n@MainActor func display(_ row: Row) -&gt; String { row.caption() }</code></pre><p>Caption's synchronous requirement is ordinarily nonisolated. Row's @MainActor annotation owns its operations. The second @MainActor, before Caption in the conformance list, says use of this conformance is restricted to MainActor. The method can satisfy the requirement within that domain. Display is explicitly in that domain. This Swift 6.2+ syntax is verified by Conformance.swift on the installed 6.4 compiler. It is not appropriate syntax for an older compiler simply because the app's deployment target is new.</p><p>An isolated conformance cannot freely satisfy a use requiring a nonisolated conformance, such as sending a generic Caption and Sendable value to an @concurrent renderer. The INVALID fixture checks that rejection. @MainActor reference safety does not grant unrestricted access to every protocol witness. Alternatively, expose a Sendable CaptionSnapshot with a pure nonisolated conformance; this changes the model deliberately rather than using assumeIsolated to conceal a caller mismatch.</p><p>The active OwnedViewModel declaration uses @MainActor DynamicProperty in its conformance list. That inspected source is a useful modern contract anchor, not evidence that all protocols in the client have been migrated. The analogous Android concern is satisfying a synchronous interface from UI-confined state. @UiThread documentation or dispatcher conventions do not give Java 11 the same isolated-conformance checking. Keep the comparison about requirements and callers rather than inventing equivalent annotations.</p>"
+        },
+        {
+          "id": "legacy-adaptation",
+          "title": "Adapt legacy APIs with a narrowly owned bridge",
+          "html": "<p>A legacy Objective-C or Swift library can have missing Sendable annotations, callbacks on undocumented queues, and cancellation represented as a different error. @preconcurrency import stages compatibility with imported declarations; it can reduce certain Sendable diagnostics while auditing that library. It does not synchronize callbacks, revoke aliases, validate lifetime, or prove that a referenced object is safe. Track the dependency owner, annotation assumptions and intended removal of the compatibility import.</p><p>Prefer constructing the legacy object inside its actor owner and returning Sendable results. If it truly requires a particular queue, wrapping it in an ordinary actor is not proof of that queue affinity. Document that requirement and use an appropriate adapter. If a callback hands over mutable data, copy the required fields before exposing them. A checked continuation is useful for one terminal result, but retain the existing exactly-once and cancellation tests rather than rebuilding their foundations here.</p><p>Define failures separately: transport failure remains an error, cancellation remains recognizable to the caller, and shutdown resolves pending work exactly once. Transfer does not automatically cancel or destroy an object. A receiving actor may retain it until explicit reset. A source task canceled after installation cannot safely take its alias back. For uncertain cancellation-versus-installation schedules, select an acceptance point and use request identity to decide whether the receiver should commit. State ownership and operation acknowledgment are separate contracts.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What can sending permit for a non-Sendable class?",
+          "options": [
+            "Unrestricted concurrent mutation by all aliases.",
+            "A checked transfer of a disconnected region across a boundary.",
+            "Automatic deep copying of every referenced child."
+          ],
+          "answer": 1,
+          "explanation": "Sending permits a transfer when region rules are satisfied. It neither proves general sharing safety nor performs a deep copy; post-transfer aliases matter."
+        },
+        {
+          "question": "Why do Ledger calls inside batch need no await?",
+          "options": [
+            "The isolated parameter puts the body in that ledger's domain.",
+            "All actors share MainActor.",
+            "Private setters disable suspension."
+          ],
+          "answer": 0,
+          "explanation": "The concrete actor parameter selects isolation. The synchronous batch has no suspension; unrelated actors still have separate domains."
+        },
+        {
+          "question": "Does a MainActor-isolated Caption conformance satisfy every Sendable generic renderer?",
+          "options": [
+            "Yes, because Sendable erases witness isolation.",
+            "Yes, after adding let.",
+            "No; the conformance's allowed use domain is independently checked."
+          ],
+          "answer": 2,
+          "explanation": "Safely carrying a value or reference and freely invoking a conformance are different capabilities. The diagnostic fixture rejects the cross-domain conformance use."
+        }
+      ],
+      "exercise": {
+        "brief": "Design a one-way mutable-draft handoff and a read-only caption snapshot for an unrestricted renderer.",
+        "steps": [
+          "Run transfer and conformance positive/negative fixture cases.",
+          "Implement an actor-owned handoff with no source alias access afterward.",
+          "Return a Sendable value snapshot for UI and renderer callers.",
+          "Explain cancellation before versus after the receiver accepts the draft."
+        ],
+        "acceptance": [
+          "Fresh draft transfer compiles; use after transfer is rejected.",
+          "The actor returns a String or Sendable struct rather than its mutable reference.",
+          "The unrestricted renderer uses a nonisolated value conformance.",
+          "The cancellation contract names an acceptance point and one owner for cleanup."
+        ],
+        "solution": "<p>The worked handoff follows DraftInbox in Contracts.swift: a fresh Draft is passed to install(_:) as sending, retained only under the actor, and observed through snapshot(). If the sender needs continued editing, first construct a separate DraftSnapshot containing text and revision. A shallow wrapper around the same mutable reference fails this design even if its property is let. The INVALID fixture is useful evidence because a source read after the transfer would allow access alongside the receiving actor.</p><pre><code class=\"language-swift\">struct CaptionSnapshot: Sendable, Caption {\n    let name: String\n    func caption() -&gt; String { name }\n}\n// This declaration requires Caption from the section's complete protocol snippet.\n// Keep Row's isolated conformance for UI callers; create a snapshot for other domains.</code></pre><p>CaptionSnapshot supplies a pure witness using Sendable storage. In a module using default MainActor inference, declare the intended nonisolated type contract explicitly where needed and verify its consuming compiler settings. Do not assume that a main-actor conformance becomes unrestricted merely by passing an instance through a generic function. The conformance fixture supplies both a valid same-domain call and a rejected concurrent generic call.</p><p>For cancellation, installation is the acceptance point. Before that point a cooperating sender can stop and keep its own local value. After the actor owns the value, canceling the original task cannot reauthorize source mutation. An account-reset operation can discard actor state or a generation check can reject obsolete acceptance according to the service contract. Transfer and isolated-batch host tests prove the bounded language examples; legacy vendor callbacks, queue affinity, imported annotations and production cancellation remain separate audits.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift SE-0430 — sending parameters and results",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0430-transferring-parameters-and-results.md"
+        },
+        {
+          "label": "Swift SE-0313 — isolated parameters",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md"
+        },
+        {
+          "label": "Swift SE-0470 — isolated conformances",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md"
+        },
+        {
+          "label": "Swift SE-0337 — incremental concurrency adoption",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0337-support-incremental-migration-to-concurrency-checking.md"
+        },
+        {
+          "label": "Kotlin — shared mutable state",
+          "url": "https://kotlinlang.org/docs/shared-mutable-state-and-concurrency.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "MainActor-isolated DynamicProperty conformance",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDUI/Helpers/OwnedViewModel.swift",
+          "line": 106,
+          "why": "The inspected wrapper explicitly restricts its DynamicProperty conformance to MainActor and stores an isolated input-update closure."
+        }
+      ],
+      "checklist": [
+        "I can distinguish transfer from safe sharing and consumption.",
+        "I can explain isolated-parameter batching without transaction claims.",
+        "I can audit a legacy compatibility marker as an unresolved responsibility."
+      ]
+    },
+    {
+      "id": "091",
+      "title": "Inject clocks, carry task context and bound channel demand",
+      "summary": "Test deadlines and context without wall-clock guesses, then implement a deliberately small cancellation-aware rendezvous channel.",
+      "duration": 160,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "015",
+        "017",
+        "040",
+        "089",
+        "090"
+      ],
+      "objectives": [
+        "Inject Clock and Duration with deterministic deadline acceptance.",
+        "Explain task-local inheritance independently from structured cancellation.",
+        "Distinguish AsyncChannel receipt from processing acknowledgment.",
+        "Test a zero-buffer channel's cancellation and shutdown state transitions."
+      ],
+      "sections": [
+        {
+          "id": "time-contract",
+          "title": "Replace elapsed-time guesses with an injected time contract",
+          "html": "<p>Android coroutine tests often replace delay with a virtual scheduler and advance it deliberately. Swift's Clock protocol provides a related dependency boundary: a clock has an Instant, a Duration type, a current instant and a suspending sleep operation. It does not replace every scheduler or automatically control networking. Inject the same clock into the timing code you want to test; unrelated Task.sleep calls still use their own timing source.</p><p>Duration represents an elapsed amount with typed arithmetic rather than a naked integer of uncertain units. A deadline is an instant advanced by that amount. Neither is a calendar date. Use Foundation Date and Calendar for civil-time concerns such as appointment display, and use a monotonic clock for elapsed deadlines. ContinuousClock advances across system sleep; SuspendingClock pauses while the system is suspended. Suspending means system suspension, not an individual task awaiting a request.</p><p>Clock, Duration and these concrete clock types were introduced by Swift 5.7; Apple deployment availability for the concrete APIs must be checked for the target, commonly iOS 16/macOS 13. The companion's manual implementation additionally uses Synchronization on macOS 15. This is a host test requirement. A supported compiler can still reject a target API because its deployment minimum is too old. A wrapper needs either a compatible abstraction or an explicit availability-gated implementation.</p>"
+        },
+        {
+          "id": "clock-example",
+          "title": "Read a generic deadline function and its test",
+          "html": "<pre><code class=\"language-swift\">func delayed&lt;C: Clock&gt;(using clock: C, delay: C.Duration) async throws -&gt; String {\n    try Task.checkCancellation()\n    let deadline = clock.now.advanced(by: delay)\n    try await clock.sleep(until: deadline, tolerance: nil)\n    try Task.checkCancellation()\n    return \"ready\"\n}</code></pre><p>C is the concrete clock type, retained through generics rather than erased into an unrelated instant. Using is the call-site label; clock is the local name. C.Duration ensures the delay has that clock's expected duration type. The first cancellation check avoids starting a canceled operation. Now captures an instant and advanced(by:) constructs a deadline. Sleep can suspend and throw; nil tolerance leaves the implementation's default tolerance policy in effect. The final check handles cancellation after the wakeup but before committing the result.</p><p>In the companion test, a task calls delayed with five virtual seconds. waitForSleeper establishes that registration happened. Advancing four seconds leaves one pending sleep; advancing the remaining second lets the task return ready. Another sleep is canceled after registration, joined as CancellationError, and removed. Advancing afterward must not resume that continuation again. These observations test deadline arithmetic and cleanup without depending on a millisecond wall-clock delay or Task.yield accidentally scheduling the desired task.</p><p>ManualClock's now requirement is synchronous, so its small storage helper uses a Mutex, releases it before resuming continuations, and never holds it across await. Its fake time starts at zero and moves only forward. It ignores tolerance because deterministic tests select exact deadlines; it is not a model of hardware scheduling jitter or a production clock. Clock injection makes a timing policy testable but does not prove timer punctuality, background execution allowance or real request latency.</p>"
+        },
+        {
+          "id": "task-context",
+          "title": "Task-local values follow tasks, not threads",
+          "html": "<pre><code class=\"language-swift\">enum RequestContext {\n    @TaskLocal static var trace: String?\n}\nfunc contextExample() async -&gt; [String?] {\n    await RequestContext.$trace.withValue(\"synthetic-trace\") {\n        async let child = readTrace()\n        let inherited = Task { RequestContext.trace }\n        let detached = Task.detached { RequestContext.trace }\n        return await [child, inherited.value, detached.value]\n    }\n}\nfunc readTrace() async -&gt; String? { RequestContext.trace }</code></pre><p>The property wrapper declares task-local storage with an optional default of nil. The dollar-prefixed projection exposes withValue, which binds a value for a scope and restores the previous binding afterward. The async closure permits suspension without losing the binding. Async let creates a structured child that inherits it. Task creates an unstructured task that also inherits task-local values at creation. Detached does not inherit them. All three handles are joined so this example leaves no independent work running.</p><p>The expected array is synthetic-trace, synthetic-trace and nil. The companion additionally nests a different binding and verifies restoration, then verifies nil outside the original scope. An inherited binding in an unstructured task can outlive the lexical binding scope if its owner lets that task continue. Inheritance is therefore separate from structured lifetime and parent cancellation. Task-local storage is not a hidden cancellation token.</p><p>A Kotlin CoroutineContext element is a useful analogy for carrying request metadata through suspension; Java ThreadLocal alone does not follow work across thread changes. The exact inheritance APIs differ. TaskLocal's value should be Sendable immutable metadata, such as a synthetic trace label, not a globally shared mutable session object or real account secret. For independent detached work, capture a permitted value explicitly and bind it inside the new scope if that correlation is intentional.</p>"
+        },
+        {
+          "id": "algorithm-channel",
+          "title": "Read AsyncAlgorithms semantics before choosing a channel",
+          "html": "<p>Swift AsyncAlgorithms is an Apple open-source package, not a module automatically available merely because Foundation imports. A real dependency must pin a version and verify its tools and platform constraints. Its AsyncChannel is an asynchronous sequence with a suspending send operation for backpressure. The official channel guide describes sends waiting for iteration consumption. That acknowledgment concerns the iterator obtaining the element; it does not wait for a consumer to finish its subsequent database write or image decode.</p><p>AsyncChannel.send is nonthrowing. Cancellation or finish can unblock it, so a returned send is not unconditional proof of delivery. Cancellation of one pending operation does not automatically cancel other tasks. Finish resumes pending operations and terminates iteration; a throwing channel additionally supports terminal failure. Follow the pinned API's behavior for termination and canceled iteration rather than translating it into a homegrown exception policy. Multiple producers and consumers do not make it a broadcast source or prove fairness.</p><p>Backpressure also does not guarantee a global memory bound if callers create an unbounded number of producer tasks, each retaining an element while awaiting send. Bound producers and payload sizes as well as buffered elements. AsyncStream bufferingNewest(1), already covered in session 017, instead drops older buffered values and does not suspend a callback producer. Kotlin Channel.RENDEZVOUS is a useful demand analogy, but Kotlin's canceled send exceptions and channel closing rules are not identical to AsyncChannel's nonthrowing send.</p><p>This lab deliberately has no remote package dependency. Its DemandChannel is a narrower teaching implementation with throwing send and next methods, zero accepted buffer, one pending sender and one pending receiver. It is not a reimplementation of every AsyncAlgorithms feature, an AsyncSequence conformance, or a production recommendation. The official package remains the reference for its own API.</p>"
+        },
+        {
+          "id": "state-machine",
+          "title": "Make the demand bound and acceptance point explicit",
+          "html": "<p>DemandChannel starts open. A send encountering a pending receiver removes that receiver and resumes it with the element; the sender returns. A next encountering a pending sender removes that sender, returns its element and acknowledges receipt. Otherwise an operation registers exactly one continuation. A second blocked sender or receiver is rejected with an overlapping-call error. The queue holds no accepted buffered elements, although one pending sender necessarily retains its proposed element.</p><p>Each operation receives a unique serial identifier before its cancellation handler is installed. The handler schedules a short actor message to remove only the matching pending operation. Registration also checks Task.isCancelled to cover cancellation before that actor message arrives. The actor serializes match, cancel and finish decisions; each takes the pending continuation out of state before resuming it. Removal is the terminal decision. A late cancellation message finds no matching continuation and does nothing.</p><p>If matching wins before cancellation, delivery is accepted and cannot be retracted. Cancellation may still be visible to downstream processing, which has its own commit policy. If cancellation wins, a blocked sender's element disappears and a replacement send is deliverable; a canceled receiver does not consume a future value. Finish is idempotent, rejects the pending sender with closed, resumes a pending receiver with nil, and prevents new sends. This is the local teaching contract, deliberately different from AsyncChannel.send returning normally on termination.</p><p>The harness observation methods are event barriers, not production APIs. They must be used only when the test arranges the corresponding future registration. Calling waitForPendingSend after finish could wait forever. Keeping that limitation visible prevents a test helper from becoming an undocumented lifecycle abstraction.</p>"
+        },
+        {
+          "id": "ownership-errors",
+          "title": "Own shutdown, upstream failure and processing acknowledgments",
+          "html": "<p>A consumer that leaves a loop early must tell the producer owner what happened. Merely dropping a channel reference or a task handle does not reliably resolve pending work. This lab uses explicit finish followed by joining stored task handles. A synchronous defer cannot await an actor's finish operation, so an asynchronous owner should arrange shutdown in its normal and error paths rather than pretend that defer performs suspending cleanup.</p><p>An upstream operation can throw while producing elements. Decide whether the owner records that error separately, adds a throwing terminal-result protocol, or uses AsyncThrowingChannel in a pinned package. DemandChannel.closed is a local shutdown condition, not evidence of successful upstream completion. Cancellation, ordinary failure and intentional end-of-input deserve different user-facing policies. A swallowed error followed by nil silently changes the contract.</p><p>If receipt is insufficient, send a command carrying a request identity and a separately owned acknowledgment mechanism, or use a request/response actor API. Bound outstanding acknowledgments and resolve them on consumer failure. Preserve generation checks for account or query changes after await. The new channel tests extend the existing course's continuation and stale-result tests by proving demand and registration cleanup; they do not replace business-level acceptance tests.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does a channel send acknowledgment normally establish?",
+          "options": [
+            "The consumer completed all later work.",
+            "The iterator accepted the element, subject to that API's termination/cancellation rules.",
+            "The element was broadcast to every subscriber."
+          ],
+          "answer": 1,
+          "explanation": "Receipt and processing completion are separate contracts. AsyncChannel's nonthrowing send may also unblock on termination or cancellation; the local channel uses explicit errors."
+        },
+        {
+          "question": "Which task inherits the binding in contextExample?",
+          "options": [
+            "Only detached.",
+            "Neither Task nor async let.",
+            "Both async let and Task, while detached sees the default."
+          ],
+          "answer": 2,
+          "explanation": "Structured children and ordinary unstructured Task creation inherit task-local values. That does not give the unstructured task automatic parent cancellation or structured lifetime."
+        },
+        {
+          "question": "Why waitForSleeper before advancing fake time?",
+          "options": [
+            "It establishes registration instead of guessing a scheduling delay.",
+            "It measures physical-device timer precision.",
+            "It converts the clock into Calendar."
+          ],
+          "answer": 0,
+          "explanation": "The event barrier makes the interleaving deterministic. It provides no device timing evidence and uses elapsed-time instants, not civil dates."
+        }
+      ],
+      "exercise": {
+        "brief": "Prove clock, context and channel policies with one normal schedule, two cancellation schedules and one shutdown schedule.",
+        "steps": [
+          "Predict the context array and nested restoration result.",
+          "Run the registered virtual deadline and cancellation checks.",
+          "Demonstrate canceled sender replacement and canceled receiver replacement.",
+          "Document receipt versus processing completion and explicitly finish/join on early exit."
+        ],
+        "acceptance": [
+          "Advancing four of five seconds leaves one pending sleep; the fifth returns ready.",
+          "Nested TaskLocal scope restores the outer value, and detached sees nil.",
+          "Canceled pending operations are removed without delivering stale values.",
+          "Finish resolves pending work exactly once and a post-finish send fails.",
+          "No wall-clock timing or AsyncAlgorithms runtime validation is claimed."
+        ],
+        "solution": "<p>The worked schedule begins with a producer proposing one integer. waitForPendingSend confirms registration; next returns that integer and the producer is joined. A cancellation schedule instead cancels the registered producer, joins CancellationError, then registers a replacement value. Only the replacement is received. Mirror the arrangement for a receiver: cancel and join the old waiter before sending another value. These tests exercise two distinct retained resources, so one does not substitute for the other.</p><p>For time, use delayed with ManualClock and five seconds, await waitForSleeper, advance four seconds, inspect pendingSleeps, then advance one. The ordinary result is ready. Cancel a subsequent sleep, verify no pending sleeper, then advance past its old deadline. A duplicate resume would violate continuation correctness; the helper removes registrations before any resume. The task-context answer binds a synthetic label, joins child and Task observations, joins a detached default observation, and verifies nested and final restoration.</p><p>Shutdown explicitly calls await channel.finish() and then joins the retained task handle. The finish tests separately cover a blocked producer and a blocked consumer, idempotent close, and rejection of new sends. Matching already completed before a later cancellation remains accepted. A processing acknowledgment would need an additional bounded contract; it cannot be inferred from sender.value. The source is complete for the host package, while native lifecycle cleanup and a pinned AsyncAlgorithms integration remain intentionally separate verification work.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift SE-0329 — Clock, Instant and Duration",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0329-clock-instant-duration.md"
+        },
+        {
+          "label": "Swift SE-0311 — task-local values",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0311-task-locals.md"
+        },
+        {
+          "label": "Apple Swift AsyncAlgorithms — channel semantics",
+          "url": "https://github.com/apple/swift-async-algorithms/blob/main/Sources/AsyncAlgorithms/AsyncAlgorithms.docc/Guides/Channel.md"
+        },
+        {
+          "label": "Apple — ContinuousClock availability and operations",
+          "url": "https://developer.apple.com/documentation/swift/continuousclock"
+        },
+        {
+          "label": "Kotlin coroutines — channels",
+          "url": "https://kotlinlang.org/docs/channels.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Task-local navigation-style test override",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDMezzanineBase/Foundation/Navigation/NavBarButtonStyle.swift",
+          "line": 46,
+          "why": "The inspected DEBUG-only task-local override supplies a concrete scoped testing use; production apply/restore remain MainActor-owned separately."
+        }
+      ],
+      "checklist": [
+        "I can test deadlines using registration barriers.",
+        "I can separate context inheritance from task ownership.",
+        "I can explain the channel's acceptance and shutdown decisions."
+      ]
+    },
+    {
+      "id": "092",
+      "title": "Ownership, exclusivity and safe boundaries to C",
+      "summary": "Practice scoped unsafe storage and explicit retain contracts, then use borrowing and consuming in a bounded noncopyable elective.",
+      "duration": 165,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "004",
+        "039",
+        "064",
+        "089",
+        "090"
+      ],
+      "objectives": [
+        "Separate ARC lifetime, exclusive mutation and isolation transfer.",
+        "Pair initialized pointer storage and C ownership with the correct cleanup.",
+        "Explain Unmanaged's retain balance without escaping borrowed context.",
+        "Compile and test a small noncopyable owner with borrowing and consuming."
+      ],
+      "sections": [
+        {
+          "id": "bounded-elective",
+          "title": "Start from a resource contract, not an optimization promise",
+          "html": "<p>An Android engineer calling JNI already distinguishes a managed object, a native buffer and a resource requiring explicit release. Swift's ARC, unsafe pointers and ownership modifiers similarly answer different questions. ARC manages strong references to class objects. Exclusive access limits conflicting reads and mutations of Swift storage. Sendable and sending govern concurrency boundaries. None is a blanket guarantee that an arbitrary C pointer stays valid. Before choosing syntax, draw who owns each resource, who can access it, and what ends its lifetime.</p><p>Sessions 004 and 039 cover retain cycles, copy-on-write and allocation evidence; session 064 covers basic inout exclusivity. This lesson extends those foundations with a compiler-negative exclusivity fixture, scoped allocation, a small Unmanaged retain balance and a noncopyable owner. It is a bounded elective. It does not teach every foreign ABI, Core Foundation ownership exception, or unsafe performance technique. Those require their own documentation and specialist review.</p><p>Do not adopt unsafe storage merely because a struct is copied or ARC appears in a profile. Establish a measured problem first. The examples here use synthetic integers and release all owned storage within a known scope. No dangling-pointer, double-free or data-race demonstration is executed. Rejected programs stay compiler fixtures, so a learning failure does not become an unsafe host run.</p>"
+        },
+        {
+          "id": "exclusivity",
+          "title": "Exclusive mutation applies within one thread too",
+          "html": "<pre><code class=\"language-swift\">func exchange(_ first: inout Int, _ second: inout Int) {\n    let saved = first\n    first = second\n    second = saved\n}\nfunc valid() -&gt; (Int, Int) {\n    var first = 1\n    var second = 2\n    exchange(&amp;first, &amp;second)\n    return (first, second)\n}\n// Diagnostic-only alternative: exchange(&amp;first, &amp;first)</code></pre><p>Inout grants a writable access for the call's duration. The ampersand at the call site marks that access; it is not permission to retain a pointer into the variable. Saved preserves the first value while two independent variables are exchanged. The valid result is two and one. The alternative sends the same storage through both mutable parameters, so their accesses overlap. The companion Exclusivity.swift is compiled only and is rejected with an inout-aliasing diagnostic on the tested compiler.</p><p>This rule is independent of multithreading. A program can violate exclusivity through a nested read while one mutation remains active. Some conflicts are diagnosed statically, and others require runtime enforcement. A passing compile is therefore not a proof that every dynamically selected access is disjoint. For array element exchanges, prefer the collection's swapAt operation rather than constructing potentially overlapping inout subscripts.</p><p>Java references and Kotlin mutable receivers lack this exact language access model. Their ability to alias two parameters does not predict Swift's behavior. Unsafe pointers can bypass some checked accesses, but that moves the proof obligation to the author. Borrowing a value, mutating it through inout, and consuming its ownership are different operations. They cannot be freely overlapped just because the code remains on one actor.</p>"
+        },
+        {
+          "id": "typed-storage",
+          "title": "Storage has allocation, initialization and destruction phases",
+          "html": "<pre><code class=\"language-swift\">func scopedSum() -&gt; Int {\n    let pointer = UnsafeMutablePointer&lt;Int&gt;.allocate(capacity: 2)\n    pointer.initialize(repeating: 4, count: 2)\n    defer {\n        pointer.deinitialize(count: 2)\n        pointer.deallocate()\n    }\n    return pointer[0] + pointer[1]\n}</code></pre><p>Allocate reserves typed capacity and returns uninitialized storage. Initialize begins the lifetime of two Int values; writing an existing initialized value would instead use assignment. The defer registers synchronous cleanup for every normal or throwing exit after initialization. Deinitialize ends those value lifetimes, and deallocate releases storage. The final line reads within the initialized range and returns an ordinary Int before cleanup runs. The companion executes this exact bounded function and checks eight.</p><p>With nontrivial element types, skipping deinitialization can leak their retained objects. Deinitializing uninitialized slots or reading beyond capacity is invalid. If initialization can partially succeed, track the initialized count and destroy only those elements. If allocation belongs to a C API, use its documented destructor rather than Swift's deallocate. Matching allocator families matters: storage from malloc belongs to free, and getifaddrs results belong to freeifaddrs. A Swift typed allocation is not interchangeable with either.</p><p>MemoryLayout size, stride and alignment are separate concepts. Typed allocation handles its element alignment; raw byte storage and binding require a correct type, count and lifetime proof. Do not rebind arbitrary bytes into a class object or assume a packet's layout matches a Swift struct. C length and status results must be checked before constructing Swift values. Empty buffers can have a nil base address; a valid zero count does not imply a nonnil pointer.</p>"
+        },
+        {
+          "id": "scoped-borrows",
+          "title": "withUnsafe closures delimit temporary access",
+          "html": "<pre><code class=\"language-swift\">func byteCount(_ values: [UInt8]) -&gt; Int {\n    values.withUnsafeBufferPointer { buffer in\n        // Read only inside this closure; never store buffer.baseAddress.\n        buffer.count\n    }\n}</code></pre><p>Values is a Swift array whose representation is controlled by the standard library. withUnsafeBufferPointer temporarily makes contiguous typed storage available. Buffer is a borrowed view of that storage, not a new owner. The body returns only its count, so no pointer escapes. This complete standalone function is safe for an empty array and requires no Foundation import. The API does not authorize retaining baseAddress for a later callback.</p><p>The same constraint applies to withUnsafePointer(to:) and Data.withUnsafeBytes: their closure delimits the promised validity. If a C function stores the pointer after it returns, a temporary Swift borrow is the wrong adapter. Use stable owned storage with an explicit release path, or choose an API that copies the input. Do not suspend or move a borrowed pointer into an independent task and assume ARC pins the bytes. A retained Array binding alone does not establish all representation and mutation guarantees for an escaped temporary pointer.</p><p>The inspected client Data extension reads an IPv4 buffer within withUnsafeBytes and returns a String; its IPv6 branch also allocates output C characters and deallocates them after constructing a String. These are concrete boundaries to trace, not runtime evidence of every status or input path. The separate UIDevice extension obtains a C interface list and later calls freeifaddrs. Client source stays unchanged. A future audit should check all C status returns, lengths, early exits and ownership annotations, independently from this host exercise.</p>"
+        },
+        {
+          "id": "unmanaged",
+          "title": "Unmanaged exposes a retain obligation; it does not manage callbacks",
+          "html": "<pre><code class=\"language-swift\">final class CallbackBox {\n    let value: Int\n    init(_ value: Int) { self.value = value }\n}\nfunc retainedRoundTrip(_ box: CallbackBox) -&gt; Int {\n    let context = Unmanaged.passRetained(box).toOpaque()\n    let recovered = Unmanaged&lt;CallbackBox&gt;.fromOpaque(context).takeRetainedValue()\n    return recovered.value\n}</code></pre><p>CallbackBox is an ARC-managed reference. PassRetained creates an extra owned strong reference, conventionally described as +1. ToOpaque turns its representation into a raw context token without changing that ownership. FromOpaque reconstructs the typed Unmanaged view; it must use the correct original object type. TakeRetainedValue consumes the outstanding +1 and hands it to Swift's managed reference lifetime. Recovered remains usable through the return expression, then ordinary ARC releases it when its ownership ends.</p><p>This function simulates a synchronous C API returning one owned context exactly once. It is not an asynchronous callback adapter. The companion holds only a weak observation after the caller's scope and confirms the box is released; that detects an extra retain left by this particular path. It does not prove that an unrelated vendor callback fires exactly once.</p><p>PassUnretained provides no extra lifetime. TakeUnretainedValue does not balance an owned +1. Those operations are appropriate only when another documented owner keeps the object alive for the access. For a repeating callback, the registration may own one retained context until unregister and callback quiescence; each callback should borrow that context, not consume its only retain. For a one-shot callback, completion and cancellation must agree on which path consumes or releases the +1. If C can call back after cancellation, releasing immediately can leave it with an invalid pointer. Capture shutdown acknowledgment and ownership rather than guessing from a canceled Swift task.</p>"
+        },
+        {
+          "id": "noncopyable",
+          "title": "A noncopyable owner makes duplicate responsibility harder to express",
+          "html": "<pre><code class=\"language-swift\">struct OwnedInt: ~Copyable {\n    private let storage: UnsafeMutablePointer&lt;Int&gt;\n    init(_ value: Int) {\n        storage = .allocate(capacity: 1)\n        storage.initialize(to: value)\n    }\n    borrowing func read() -&gt; Int { storage.pointee }\n    consuming func extract() -&gt; Int { storage.pointee }\n    deinit {\n        storage.deinitialize(count: 1)\n        storage.deallocate()\n    }\n}</code></pre><p>The tilde in ~Copyable suppresses the normal Copyable requirement; it is not bitwise negation. The struct owns one allocation. Private keeps its pointer from escaping through this API. Initialization reserves one slot and constructs its value. Borrowing read accesses the owner without consuming it. Consuming extract takes ownership of self and returns a copied integer, after which the consumed owner is destroyed and its deinitializer releases the initialized storage. A subsequent read of the same consumed binding is rejected.</p><p>Swift 5.9 introduced noncopyable structs/enums and explicit borrowing/consuming modifiers. Later compilers expanded their generic and protocol support; the course package requires 6.2 rather than promising every modern pattern on 5.9. Ordinary generics traditionally assume Copyable; lifting that constraint with ~Copyable is an additional capability to learn deliberately. This example stays within a small concrete type and runs under the local Swift 6.4 toolchain.</p><p>Noncopyable is not Sendable, and a unique owner does not automatically make its unsafe pointer safe to access from another executor. It also does not verify the implementation of deinit or every C call. A Java AutoCloseable or Kotlin use block offers scope cleanup but generally permits aliasing or calling close twice. Swift's consumed-value rule prevents some duplicate-owner programs at compilation. That difference is useful, but neither makes all native code safe by construction.</p>"
+        },
+        {
+          "id": "failure-policy",
+          "title": "Cancellation and throwing exits need the same ownership ledger",
+          "html": "<p>A Swift task's cancellation flag does not deallocate arbitrary storage immediately. Cleanup runs when the relevant owner exits or is destroyed. Check cancellation before allocation when practical, then keep the resource in a scoped owner while later work can throw. Synchronous deinitialization and defer can release local memory; neither can await a remote unregister handshake. An asynchronous foreign resource needs an explicit shutdown method whose successful acknowledgment precedes final release.</p><p>In a review, list allocation source, initialized count, retained context count, borrower scopes, callback repetition, accepted cancellation and final release. Require exactly one owner for each terminal path and no return of borrowed addresses. The host checks values and one weak lifetime observation, while compiler fixtures verify consumed-value and aliasing rejection. Sanitizer runs, native callback stress schedules, C ABI auditing and production memory traces remain further practice. Do not convert those pending checks into claimed evidence just because the small package passes.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which cleanup pairs with initialized Swift typed allocation?",
+          "options": [
+            "free regardless of allocator.",
+            "Deinitialize the initialized elements, then deallocate.",
+            "takeUnretainedValue on the pointer."
+          ],
+          "answer": 1,
+          "explanation": "Typed storage and element lifetimes require matching operations. C allocators have their own destructors; Unmanaged applies to object references, not raw typed allocations."
+        },
+        {
+          "question": "What does passRetained followed by takeRetainedValue establish?",
+          "options": [
+            "An owned +1 is handed back to managed Swift ownership.",
+            "The callback can repeat without limit.",
+            "The raw pointer became Sendable."
+          ],
+          "answer": 0,
+          "explanation": "The pair balances one retain obligation on this path. Callback cardinality, cancellation quiescence and cross-domain safety need independent contracts."
+        },
+        {
+          "question": "Why cannot read follow extract on the same noncopyable owner?",
+          "options": [
+            "Int values cannot be read twice.",
+            "Every read deallocates storage.",
+            "extract consumes self, ending the caller's ownership."
+          ],
+          "answer": 2,
+          "explanation": "Borrowing read preserves the owner; consuming extract transfers its ownership and the consumed binding cannot be reused. The compiler rejects that fixture."
+        }
+      ],
+      "exercise": {
+        "brief": "Audit one safe typed allocation, one retain-context path and one noncopyable owner's consumed-value boundary.",
+        "steps": [
+          "Run the ownership and exclusivity diagnostic cases without executing invalid fixtures.",
+          "Explain every allocation/initialization/deinitialization/release operation in Contracts.swift.",
+          "Check borrowed reads before consumption and value extraction once.",
+          "Describe a repeating C callback's cancellation shutdown contract in prose; do not create an unsafe callback run."
+        ],
+        "acceptance": [
+          "The scoped allocation returns eight and exposes no address.",
+          "OwnedInt reads and extracts forty-two; reuse after consuming is rejected.",
+          "The synchronous retained context returns its value and the weak observation is nil after scope.",
+          "C callback notes distinguish borrowed access from registration ownership and require quiescence before release.",
+          "Verification identifies compiler/host scope and leaves native ABI/sanitizer evidence pending."
+        ],
+        "solution": "<p>The allocation answer starts with two uninitialized slots, initializes both to four, reads their sum and registers defer after initialization. Cleanup deinitializes exactly two slots and uses deallocate because the storage came from Swift's typed allocator. An error introduced after registration follows the same cleanup path. An error before full initialization would require an initialized-count ledger rather than blindly destroying the full capacity.</p><p>The owner answer uses OwnedInt(42), calls borrowing read once or several times, and calls consuming extract once. The returned Int is independent of the allocation and can outlive its destruction. Diagnostics/Ownership.swift compiles the valid path and rejects its INVALID reuse branch. The test does not claim that noncopyability verifies all unsafe implementations; it proves the exposed use boundary and the sample's result. Exclusivity.swift separately rejects two simultaneous inout accesses to the same local variable.</p><p>The context answer uses one passRetained and one takeRetainedValue in a synchronous round trip. The weak observation detects a leaked extra retain on that path. For repeating callbacks, instead keep one registration-owned retain, borrow on every callback, stop registration, obtain a guarantee that callbacks have ceased, then release exactly once. Canceling a Swift task is insufficient unless the foreign API documents that quiescence. Native callback adapters, platform-specific status paths and sanitizer coverage are pending specialist checks. This worked audit is a reference; the learner supplies independent predictions and evidence.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift language guide — memory safety and exclusive access",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/memorysafety/"
+        },
+        {
+          "label": "Swift SE-0390 — noncopyable structs and enums",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0390-noncopyable-structs-and-enums.md"
+        },
+        {
+          "label": "Swift SE-0377 — borrowing and consuming",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0377-parameter-ownership-modifiers.md"
+        },
+        {
+          "label": "Apple — UnsafeMutablePointer storage lifecycle",
+          "url": "https://developer.apple.com/documentation/swift/unsafemutablepointer"
+        },
+        {
+          "label": "Apple — Unmanaged retain operations",
+          "url": "https://developer.apple.com/documentation/swift/unmanaged"
+        },
+        {
+          "label": "Java 11 — AutoCloseable ownership boundary",
+          "url": "https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/lang/AutoCloseable.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Scoped Data bytes and allocated IPv6 output buffer",
+          "path": "ios-client/Projects/Infra/ZDCore/Sources/ZDCoreBase/Extensions/Ssl+Extensions.swift",
+          "line": 29,
+          "why": "The inspected conversion uses borrowed Data bytes and separately allocated C-character output; source reading establishes ownership structure, not status-path runtime verification."
+        },
+        {
+          "label": "C interface list and matching release",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Utility/UIDevice+Extensions.swift",
+          "line": 28,
+          "why": "The active utility obtains getifaddrs storage and later frees it with freeifaddrs, illustrating the C allocator-family boundary."
+        }
+      ],
+      "checklist": [
+        "I can separate exclusivity, transfer and ownership conventions.",
+        "I can prove a scoped pointer's initialized range and cleanup.",
+        "I can explain callback quiescence before releasing context.",
+        "I can use a noncopyable owner without claiming general pointer safety."
+      ]
+    }
+  ]
+}

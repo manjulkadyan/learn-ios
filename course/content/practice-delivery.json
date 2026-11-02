@@ -1,0 +1,156 @@
+{
+  "workshops": [
+    {
+      "id": "delivery-review-lab",
+      "title": "Delivery review lab: identities, evidence drift, and changed constraints",
+      "summary": "Run a local JSON gate, diagnose controlled mismatches, revise after independent critique, and keep unavailable installation, diagnostic, and adoption evidence pending.",
+      "kind": "Design review",
+      "sessions": [
+        "105",
+        "106",
+        "107",
+        "108"
+      ],
+      "sections": [
+        {
+          "id": "scope",
+          "title": "Understand the artifact boundary before running the gate",
+          "html": "<p>This workshop adds executable evidence checks to the course's existing costed leadership decisions. It does not repeat a generic RFC or estimate hypothetical customer savings. DeliveryLab is a standard-library Python validator with synthetic JSON records, negative tests, and a standalone Swift contract example. It reads local files and emits consistency results; it never signs an app, uploads a build, changes a client, or claims that a learner completed delivery. Use synthetic inputs until an authorized scratch-target task supplies actual artifacts.</p><p>The tool requires Python 3.10 or later for pathlib containment checks. The companion examples use Swift 6 language mode and Foundation and run on the host with no iOS-only API. The recorded author verification used Python 3.14.5 and Apple Swift 6.4; consult the README for exact observations and commands rather than assuming those versions are required everywhere. Keep compilation, host execution, installed Apple command help, target interaction, device recording, and distribution evidence in separate rows.</p><p>Start from pending.json. It declares coherent synthetic metadata and one synthetic result file, but no real independent review or manual artifact checks. wrong-identity.json changes environment and symbol UUID independently. changed-constraint.json keeps a widget exception visible. These fixtures are examples of records, not release records or organizational approvals.</p>"
+        },
+        {
+          "id": "first-run",
+          "title": "Run the small checks and interpret their exit states",
+          "html": "<p>Run the README's unittest command with bytecode caches under your own temporary directory. The tests create isolated roots under /private/tmp and exercise path containment, attachment hashes, image identity, stale evidence, review state, and removal rules. Compile DeliveryExamples.swift with an explicit Swift 6 language mode and a unique module-cache path, then run the emitted executable. Its preconditions and typed-error cases evaluate synthetic values, not device measurements.</p><p>Invoke validate.py with a fixture path, --root pointing at DeliveryLab, and a selected mode. Exit zero means the supplied record is consistent within that scope; exit one means invalid metadata or unreadable/changed attachments; exit two means required evidence or review remains pending. The starting proposal therefore returns two even though its identity facts agree. The bad fixture returns one. Do not suppress nonzero statuses to make a course exercise look completed.</p><p>Installation mode additionally requires captured signed-install, upgrade, and privacy-review evidence and manual check fields. Diagnostic mode requires a selected captured diagnostic kind. Deprecation mode requires captured consumer and outcome evidence, valid owner/decision-right rows, and no unresolved adoption exception. A host-test fixture cannot satisfy those modes. Captured is a supplied provenance assertion, so an independent reviewer must still inspect the file with the owning tools.</p>"
+        },
+        {
+          "id": "attachment-contract",
+          "title": "Bind attachment bytes and review inputs, then introduce drift",
+          "html": "<p>Evidence paths are relative to the explicit root. The validator rejects absolute paths, parent traversal, symlink evidence, missing files, stale revisions, and changed hashes. For a directory, its digest binds sorted relative file names and each file's hash. A rename can therefore change the directory digest even if contents stay identical. This is useful for copied result bundles, where naming and membership are part of the evidence contract. It is a bounded consistency mechanism, not a hardened sandbox for hostile filesystem races.</p><p>Copy a fixture into your own scratch directory and preserve the copied attachment layout. Change one byte of synthetic-result.txt while retaining the recorded hash. Validation must reject changed-evidence. Restore the bytes, then add a required localization to the record. The packaging requirement now fails unless the inventory includes it; even after inventory correction, an old review fingerprint must fail. Record which counterexample changes implementation and which changes only supplied evidence.</p><p>The review fingerprint covers all decision inputs except the review object. Review fields are excluded so attaching a review does not recursively invalidate itself. Evidence bytes are represented through their digests, which are checked independently. This cannot prove that a sourceRevision label identifies authentic source or that a reviewer label identifies a distinct person. Preserve original reports and actual host stdout, and have a human reviewer evaluate those limits.</p>"
+        },
+        {
+          "id": "independent-loop",
+          "title": "Perform the state, review, revision, and retest loop",
+          "html": "<p>Write a proposed claim table: metadata is synthetic; local negative cases were executed; device and organizational rows are pending. Ask someone other than the author to inspect the candidate and try a counterexample. A useful finding targets a mechanism, such as omitted architecture matching or stale review acceptance, and names a closure criterion. The supplied fixture's invented reviewer string is not that independent participation. If nobody is available, keep independent review pending while still completing the authorized local checks.</p><p>Record reviewed findings with blocking or advisory severity. Revise the implementation or acceptance contract and explain the correction. Retest the changed revision and inspect the new result, then bind the reviewed fingerprint to its final inputs. An unresolved blocker cannot be closed by merely marking it accepted. An advisory issue can have a documented owner and reason. The local tests verify these structural rules; actual criticism and acceptance require the external review note.</p><p>For a future UI, add execution and cancellation ownership explicitly. Synchronous hashing is eager and does not become background work merely because a task was created. Capture candidate/generation identity and reject late commits after navigation or replacement. Those UI schedules and representative bundle recordings remain target-required practice. Kotlin lifecycle scopes offer an ownership analogy, but Swift actor inheritance, structured task lifetime, and iOS extension processes have their own boundaries.</p>"
+        },
+        {
+          "id": "real-artifacts",
+          "title": "Configure diagnostic and installation checks only when files exist",
+          "html": "<p>For an actual authorized scratch test invocation, preserve its .xcresult bundle and tool coordinates, then run the installed xcresulttool test-results summary command from the README against that path. For a trace, retain the complete recording, selected interval definition, and workload context. For a crash, preserve raw report and matching image UUID/architecture symbols. For jetsam, read the selected process and pageSize from the report; there is no app thread backtrace to invent.</p><p>The validator only checks evidence consistency and declared kind; it does not parse every Apple format, symbolicate, or prove causality. Do not relabel the synthetic text as captured or create a directory ending in .xcresult and call it real evidence. No raw trace, result bundle, device report, or signed installation was available during author verification. Command help was inspected, which is a tool capability check rather than a diagnostic result.</p><p>The manual installation protocol must use a learner-owned scratch target with separately authorized signing or beta steps. Test fresh installation and a preserved-baseline upgrade separately, recording identity, environment, resources, permission states, account storage, and relevant extensions. Failed or cancelled tasks keep their rows open. Course authoring grants no production distribution authority, and a local gate pass supplies none.</p>"
+        },
+        {
+          "id": "changed-constraint",
+          "title": "Change the decision when a second process requires compatibility",
+          "html": "<p>Run changed-constraint.json in deprecation mode. Its widget exception names an owner, reason, review date, and compensating check, but removal stays pending. The changed constraint is operational: a widget reads shared durable state while the app's process-local actor may not exist. Add that consumer to the eligible denominator and require the storage system's supported coordination and old/new-reader evidence. A dependency bump or source warning cannot supply those observations.</p><p>Revise incentives and decision rights together with architecture. Fund consumer integration and the temporary supported reader, give the widget owner authority to challenge compatibility, and name the service owner responsible for installed-client responses. Sequence compatible readers before new-format writers. Treat the exception date as a review trigger, and define what observation would close it. If a separate native adapter is required, retain shared external outcomes without pretending the implementations are identical.</p><p>Retest the revised ledger and preserve a conditional decision: a bounded app pilot may continue while widget adoption, device evidence, and removal remain pending. Source deprecation can guide future code before service retirement, but installed clients continue executing old binaries. Record actual outcome windows only when collected. No invented teams, adoption percentages, maintenance savings, or customer improvements should appear in the final report.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Run the evidence gate, obtain independent critique when available, revise a copied record or bounded implementation, and retest under a widget compatibility constraint.",
+        "steps": [
+          "Execute Python tests and Swift host checks using unique temporary caches/output; preserve actual stdout",
+          "Validate all three fixtures and interpret invalid versus pending without relabeling provenance",
+          "Introduce attachment drift and stale review in a copied fixture; record the rejected counterexamples",
+          "Ask an independent reviewer for a blocking mechanism finding and its closure criterion, or keep that review pending",
+          "Revise and retest the current input; evaluate the widget exception in deprecation mode",
+          "Write separate host, target/device, installation, diagnostic, and organizational evidence rows"
+        ],
+        "acceptance": [
+          "Actual host output is separate from synthetic-result.txt",
+          "Wrong environment, mismatched symbols, and attachment drift are rejected",
+          "A new decision input invalidates stale review",
+          "Independent feedback is real or explicitly unavailable",
+          "Exception and missing captured evidence prevent removal",
+          "No signing, publication, client changes, measurements, or learner completion are implied"
+        ],
+        "solution": "<p>The starting proposal yields pending because independent review and retest are incomplete. The bad fixture yields invalid because artifact.environment differs from expectation and the arm64 symbol UUID differs from the binary. The changed-constraint fixture yields pending in deprecation mode because the widget remains exceptional and captured consumer/outcome evidence is missing. These are expected controlled results, not failed course integration.</p><p>A substantial revision uses the reviewer counterexample 'change required resources after approval.' Add a localization requirement to a copied record. The first failure is missing-resource. After inventory correction, the old reviewed fingerprint is stale, so review and retest must bind the final inputs. A complementary attachment-byte mutation produces changed-evidence even when version and sourceRevision strings remain unchanged. Preserve actual test stdout and a genuine review note; a synthetic peer label cannot replace either artifact.</p><p>When the reviewer adds shared widget storage, keep the old reader and assign widget/durable-data compatibility owners. The compensating task covers old/new reader-writer combinations, interruption, account separation, and protected-data states where relevant. The local ledger can check ownership completeness, but actual storage coordination and target interactions remain unverified. A review date requests reassessment instead of authorizing deletion.</p><p>The final decision accepts only bounded host consistency behavior supported by executed tests. If an independent person did not review, that gate remains pending. Actual crash symbolication, xcresult extraction, trace investigation, signed fresh installation/upgrade, consumer adoption, and operational recovery also remain pending until their own artifacts exist. List the next collector and required file for each gap. This report is a reviewable delivery artifact with explicit limits, never an automatic release or completion certificate.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Build settings reference",
+          "url": "https://developer.apple.com/documentation/xcode/build-settings-reference"
+        },
+        {
+          "label": "Apple: Symbolication and image identity",
+          "url": "https://developer.apple.com/documentation/xcode/adding-identifiable-symbol-names-to-a-crash-report"
+        },
+        {
+          "label": "Apple: App extension shared data scenarios",
+          "url": "https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/ExtensionScenarios.html"
+        },
+        {
+          "label": "Swift: Error handling",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/errorhandling/"
+        }
+      ],
+      "files": [
+        {
+          "label": "Validator",
+          "path": "labs/DeliveryLab/validate.py"
+        },
+        {
+          "label": "Negative contract tests",
+          "path": "labs/DeliveryLab/test_validate.py"
+        },
+        {
+          "label": "Runnable Swift contracts",
+          "path": "labs/DeliveryLab/DeliveryExamples.swift"
+        },
+        {
+          "label": "Starting proposal fixture",
+          "path": "labs/DeliveryLab/fixtures/pending.json"
+        },
+        {
+          "label": "Wrong identity fixture",
+          "path": "labs/DeliveryLab/fixtures/wrong-identity.json"
+        },
+        {
+          "label": "Widget exception fixture",
+          "path": "labs/DeliveryLab/fixtures/changed-constraint.json"
+        },
+        {
+          "label": "Clearly synthetic result",
+          "path": "labs/DeliveryLab/fixtures/synthetic-result.txt"
+        },
+        {
+          "label": "Commands, observed results, and limits",
+          "path": "labs/DeliveryLab/README.md"
+        },
+        {
+          "label": "Assigned-file schema and teaching audit",
+          "path": "labs/DeliveryLab/check_content.py"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "The attachment hash matches. What still requires review?",
+          "options": [
+            "Whether the supplied captured artifact is genuine and supports the claimed behavior",
+            "Whether bytes can be hashed",
+            "Whether file names exist in a string"
+          ],
+          "answer": 0,
+          "explanation": "Integrity checks detect drift. They do not authenticate provenance, parse every format, establish causality, or confirm human review."
+        },
+        {
+          "question": "A widget exception has a complete owner and date. What does the deprecation gate do?",
+          "options": [
+            "Automatically approve removal",
+            "Keep removal pending until compatibility and adoption criteria are satisfied",
+            "Remove the widget from eligibility"
+          ],
+          "answer": 1,
+          "explanation": "Complete exception metadata supports accountability. It does not close the exception or prove the old reader can be removed."
+        },
+        {
+          "question": "What is justified by these author checks?",
+          "options": [
+            "Production release readiness",
+            "Executed local contract checks and inspected command syntax, with device/organizational rows pending",
+            "Observed adoption by every team"
+          ],
+          "answer": 1,
+          "explanation": "The actual scope is host validation and tool discovery. No signing, real diagnostic extraction, device measurement, or organizational adoption was obtained."
+        }
+      ]
+    }
+  ]
+}

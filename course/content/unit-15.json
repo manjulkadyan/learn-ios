@@ -1,0 +1,612 @@
+{
+  "unit": {
+    "id": "ui-runtime-lifecycle",
+    "title": "UI runtime and lifecycle",
+    "summary": "Audited dispatch, animation, custom layout, input, and lifecycle practice beyond the existing UI foundations.",
+    "order": 15
+  },
+  "lessons": [
+    {
+      "id": "093",
+      "title": "Objective-C dispatch, KVO ownership, and input routing",
+      "summary": "Trace selector dispatch, own observation tokens, separate hit testing from action routing, and build directed gesture-failure dependencies.",
+      "duration": 150,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "004",
+        "008",
+        "032",
+        "047",
+        "068"
+      ],
+      "objectives": [
+        "Distinguish Objective-C selector dispatch from Swift dispatch and observation systems.",
+        "Keep an observed object, token, and callback owner alive for a deliberate scope.",
+        "Explain local-coordinate hit testing, responder-chain actions, and accessibility boundaries.",
+        "Implement a single-tap/double-tap failure relationship without cycles.",
+        "Separate macOS KVO checks, iOS compilation, and pending interaction evidence."
+      ],
+      "sections": [
+        {
+          "id": "dispatch",
+          "title": "Selectors identify operations; receivers choose implementations",
+          "html": "<p>An Android View.OnClickListener gives you an explicit callback object. UIKit also supports closures, but much of its input machinery uses Objective-C selectors and target-action. Understanding that mechanism explains why an action can travel through responders and why a Swift property needs more than a published wrapper to participate in KVO. Sessions 004 and 047 already introduced ARC and interoperability; this lesson follows actual dispatch and registration lifetimes rather than repeating those foundations.</p><p>An Objective-C message carries a receiver, a selector, and arguments. A selector identifies a method name including its argument positions, not an instance or the method's machine address. The runtime looks up an implementation using the receiver's class, with superclass lookup and runtime caching. If normal lookup cannot supply an implementation, dynamic resolution or forwarding may participate; an ultimately unrecognized selector is an error, not a harmless optional callback. The archived runtime guide describes the message-send mechanism. Do not call objc_msgSend manually from ordinary Swift teaching code: ABI-sensitive casting is unnecessary here.</p><p>Swift has several dispatch mechanisms. Value-type operations can be statically dispatched, class overrides can use a virtual table, and protocol requirements can use witness tables. Optimization can specialize or devirtualize eligible calls. Exposing a member with @objc supplies Objective-C interoperability; dynamic requests runtime dispatch. Therefore neither 'all Swift calls use objc_msgSend' nor 'all class calls are static' is correct. Java virtual dispatch is a useful analogy for choosing an override from the receiver, but Java reflection, interface invocation, and Kotlin extension functions do not reproduce Objective-C selector lookup or forwarding.</p><p>In the lab, #selector(resetCount(_:)) is compiler-checked against an @objc method. The underscore means the argument is unlabeled at the call site; the colon represented by the selector is still significant. A selector does not keep the intended feature owner alive as a business contract. Keep the controller in its normal containment hierarchy and make the method's signature match the control action. Avoid inventing selectors from strings when the compiler can verify them.</p>"
+        },
+        {
+          "id": "kvo",
+          "title": "Construct a real KVO source and inspect each notification",
+          "html": "<p>Apple's Swift KVO guide requires an NSObject subclass and marks observable properties with @objc dynamic. NSObject brings the Cocoa object model; @objc exposes the property to Objective-C; dynamic keeps access compatible with runtime interception. Automatic KVO is implemented through runtime mechanisms, commonly an observing subclass and changed isa. That is an implementation explanation, not permission to hard-code the object's runtime class or swizzle framework objects. Swift Observation, Combine's @Published, and Kotlin StateFlow are different mechanisms. Adding one does not make a property KVO compliant.</p><pre><code class=\"language-swift\">import Foundation\n\nfinal class CounterRecord: NSObject {\n    @objc dynamic var count = 0\n}\n\nlet record = CounterRecord()\nvar changes: [Int] = []\nlet token = record.observe(\\.count, options: [.initial, .new]) { _, change in\n    if let value = change.newValue { changes.append(value) }\n}\nrecord.count = 2\ntoken.invalidate()\nrecord.count = 3\nprecondition(changes == [0, 2])</code></pre><p>This is a runnable macOS main.swift example with Objective-C interoperability, not portable Linux Swift. The native app and host KVO check share the actual CounterRecord declaration. import Foundation supplies NSObject and observation APIs. final prevents further Swift subclassing of this model. count starts at zero. record strongly owns the model in this lexical scope; changes stores copied integer values. The backslash key path names the property in a typed form rather than a misspelled string.</p><p>The observe call returns a registration token. .initial requests a callback during registration, before observe returns; .new requests the new value in change metadata. The first closure parameter is unused, so underscore discards it. Optional binding handles absent metadata rather than force-unwrapping it. Assigning two invokes the handler synchronously for this main-thread writer. invalidate removes the registration; assigning three should add nothing. The precondition checks exactly the initial and subsequent values. No scheduler or debounce was introduced. In the companion check these assertions actually ran on macOS; that does not establish UIKit interaction behavior.</p>"
+        },
+        {
+          "id": "ownership",
+          "title": "A registration needs an owner, a teardown event, and a writer contract",
+          "html": "<p>A controller can own both its model and an NSKeyValueObservation? property. Assign the returned token to that property; a temporary registration that is immediately discarded cannot provide the intended ongoing observation. The token manages registration lifetime, but do not infer a complete ownership graph from its existence. Keep the observed object deliberately alive for the feature's needs. If the token's closure strongly captures the controller that owns it, the graph can retain that controller. The lab's closure uses [weak self] and unwraps self only while applying the callback.</p><p>Initial delivery makes initialization order important. Create the label and initialize any data needed by the closure before registering. Do not have the initial callback depend on reading the very token property being assigned, because the returned token has not yet been stored. For nested observation, replacing an account object means retiring the previous account's token and registering on the new account; keeping only the outer registration is insufficient. The inspected settings model retains three tokens, invalidates them in deinit, and explicitly replaces its inner lastUpdated observation when the account changes.</p><p>KVO does not move writes or callbacks to the main actor. The lab permits only UIKit main-thread actions to mutate count and asserts that its callback is on that thread. This is a scoped contract, not a general thread-safety claim about NSObject. If a production source changes on another queue, serialize mutation at its owner and cross to the UI with copied, appropriately Sendable values. Protect freshness after any asynchronous hop: an old callback should not update a different account or detached controller. A Task created by a callback needs its own cancellation and acceptance policy.</p><p>DispatchController re-registers in viewWillAppear and invalidates in viewDidDisappear. That chosen visibility scope allows it to catch the current value through .initial when it returns. A disappear event is not deallocation; a controller may stay on a navigation stack. For an owner intended to observe throughout its whole lifetime, deinit cleanup and a longer token scope are reasonable alternatives. KVO invalidation stops future registration delivery; it does not undo copied work already queued elsewhere. Old manual string-based registrations have different add/remove responsibilities and should not be mixed blindly with token-based observation.</p>"
+        },
+        {
+          "id": "hit-testing",
+          "title": "Hit testing chooses a view in local coordinates, not an action",
+          "html": "<p>UIKit asks a window's view hierarchy which view should receive a touch. hitTest(_:with:) expects the point in that receiver's local coordinates and returns the frontmost eligible descendant containing it. Default traversal uses point(inside:with:) and skips hidden views, disabled interaction, and sufficiently transparent views. Transparent drawing does not imply touch transparency: a clear overlay with ordinary bounds can still win the hit. A visible child outside a parent's bounds is normally excluded when the parent rejects that branch, even if clipping is disabled.</p><p>Convert coordinates before asking another view about the point. convert(point, to: child) expresses a geometric transformation, including hierarchy placement; subtracting frame.origin manually fails with transforms and more complex ancestry. Avoid changing observable state, adding marker views, or starting network work while selecting a hit. The framework can ask more than once. Expanded hit regions must still respect ancestor gating and should preserve semantic control activation.</p><p>The lab's decorative overlay calls super.hitTest first. If the result is the overlay itself, it returns nil, allowing the window's broader search to consider content behind it. If a future actual child control is hit, it returns that child. This deliberately simple policy is based on view identity, not the alpha of individual pixels. It changes touch routing only; an accessibility element in an overlay needs its own accessibility policy.</p><pre><code class=\"language-swift\">override func hitTest(_ point: CGPoint, with event: UIEvent?) -&gt; UIView? {\n    let hit = super.hitTest(point, with: event)\n    return hit === self ? nil : hit\n}</code></pre><p>This override requires the PassThroughOverlay UIView subclass in the iOS target. UIView? means a view or absence. super preserves UIKit's eligibility checks. The identity operator === compares reference identity, not layout equality. The conditional expression returns nil only for this wrapper's empty region. The inspected PassthroughHostingController uses a different layer-based heuristic for its specific SwiftUI host. Read it as checkout behavior; internal SwiftUI layer topology is not a stable public promise to copy into every overlay.</p>"
+        },
+        {
+          "id": "responders",
+          "title": "Responder-chain search is a second routing mechanism",
+          "html": "<p>Once a touch has a view, responders can handle event methods. A UIResponder exposes next, forming a chain through views, their owning controller where appropriate, windows, and application-level responders. Touch handling and control target-action are related but separate. A UIButton with an explicit target can invoke that target's action. With a nil target, UIKit searches the responder chain for an object that can perform the selector. A menu or keyboard action also uses responder capabilities. This is not the same as hit-testing the nearest ancestor rectangle.</p><p>The lab's Reset button installs a nil target and an @objc resetCount(_:) action implemented by the controller. The button supplies its sender argument; the controller is reachable because it owns the installed view hierarchy. canPerformAction(_:withSender:) can control whether an action is currently available. Do not return true for every selector, and do not force a global controller to become the first responder merely to make a command visible.</p><p>Android dispatchTouchEvent and onInterceptTouchEvent help you think about routing through a hierarchy, but Android interception can transfer a gesture away from a child with cancellation. UIKit responder chains, gesture recognizers, and target-action follow separate contracts. Kotlin's lexical receiver is also unrelated to UIResponder.next. Keyboard editing focus, touch target selection, and VoiceOver focus can point at different objects. Offer semantic controls and label them so accessible activation has a supported route even if a touch override changes the geometric route.</p>"
+        },
+        {
+          "id": "failure-graph",
+          "title": "Gesture dependencies are directed waits with a cost",
+          "html": "<p>Two recognizers attached to the same demonstration pad compete for a single tap and a double tap. If both recognize the first tap immediately, the double-tap interaction could also commit the single-tap operation. A failure requirement delays the dependent recognizer until the preferred recognizer fails. The direction is important: single.require(toFail: double) means the single waits for the double. Reversing that relationship gives the wrong priority.</p><pre><code class=\"language-swift\">let single = UITapGestureRecognizer(target: self, action: #selector(singleTap))\nlet double = UITapGestureRecognizer(target: self, action: #selector(doubleTap))\ndouble.numberOfTapsRequired = 2\nsingle.require(toFail: double)\npad.addGestureRecognizer(single)\npad.addGestureRecognizer(double)</code></pre><p>This code lives in DispatchController.viewDidLoad and needs its @objc action methods. Each initializer supplies an explicit target and compiler-checked selector. The double's property changes its recognition requirement to two taps. require creates a directed relationship while both recognizers are stable, owned instances. The final two lines install them on the pad. When the double recognizes, the single fails; when the double fails, the single can proceed. The delay for distinguishing a double tap is a real product tradeoff, not a malfunction to remove with a timer.</p><p>Do not construct a cycle of failure requirements. Delegate methods support dependencies decided dynamically when recognizers come from different hierarchies. Simultaneous recognition permission answers a different question from failure ordering; returning true does not erase a required failure. cancelsTouchesInView and touch-delay properties affect delivery to views and controls, so inspect them when a button stops responding inside a gesture area. A continuous recognizer's .cancelled and .failed outcomes are not a successful .ended commit. Keep transient manipulation separate from saved state and supply a button alternative for any essential operation. The lab's tap pad is a diagnostic surface, not a replacement for its semantic Increment button.</p>"
+        },
+        {
+          "id": "evidence",
+          "title": "Use source anchors and evidence at their real boundary",
+          "html": "<p>The settings-model anchor verifies retained tokens, weak capture, and inner-token replacement in the active checkout. The hosting-controller anchor verifies that an overlay interception policy exists. Neither proves the model's writer queue, absence of leaks, or reliable hit behavior on every OS. Those require inspecting upstream mutation and executing relevant paths. The companion KVO check establishes synchronous metadata and invalidation on macOS. The iOS build checks selector spelling, API use, and containment source compilation.</p><p>Record a runtime notebook for one single tap, one double tap, the Reset responder action, overlay pass-through, leave/return registration, and accessibility activation. Expected counts are synthetic deterministic outcomes, not already observed UI results. Include how cancellation and owner disappearance are handled. No swizzling experiment, private SwiftUI topology guarantee, physical-device trace, or production migration is claimed. The next exercise adds ownership assertions and action-level evidence without modifying the company client.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which failure requirement gives the double tap priority?",
+          "options": [
+            "double.require(toFail: single)",
+            "single.require(toFail: double)",
+            "Both directions, to make recognition symmetric"
+          ],
+          "answer": 1,
+          "explanation": "The single waits for the double to fail. Requiring both directions creates an invalid dependency cycle; reversing the edge prioritizes the single."
+        },
+        {
+          "question": "Why can a clear decorative UIView block a button underneath?",
+          "options": [
+            "Default hit testing considers eligibility and bounds, not whether the pixel is painted",
+            "A clear view automatically becomes first responder",
+            "KVO changes the button's selector"
+          ],
+          "answer": 0,
+          "explanation": "Transparency of content does not make a view touch-transparent. A deliberate pass-through hit policy or disabled interaction is needed, while preserving intended interactive descendants."
+        },
+        {
+          "question": "What is unsafe about an initial KVO callback reading its owner's just-assigned token?",
+          "options": [
+            ".initial always delivers on a worker thread",
+            "The token has already been invalidated",
+            "The callback can run before observe returns and before the property assignment finishes"
+          ],
+          "answer": 2,
+          "explanation": "Initial delivery occurs during registration. Initialize callback dependencies first and do not rely on the returned token already being stored."
+        }
+      ],
+      "exercise": {
+        "brief": "Extend only a scratch copy of UIRuntimeLab with a replaceable CounterRecord and prove old-registration retirement without changing the client.",
+        "steps": [
+          "Read DispatchLab.swift and CounterRecord.swift; document which object owns each token and writer.",
+          "Add a replace-model action that invalidates the old token, swaps the strongly owned record, and registers on the new record.",
+          "Hold the old record in a diagnostic fixture and mutate it after replacement.",
+          "On a functioning iOS destination, record single/double gestures, nil-target Reset, overlay pass-through, and leave/return behavior.",
+          "Run the host KVO check and keep its result separate from UI interaction."
+        ],
+        "acceptance": [
+          "The initial current-model value appears once per deliberate registration.",
+          "Mutating the retired record never changes the visible current-model count.",
+          "Single and double gestures never both commit for the same successful double tap.",
+          "Returning to the screen catches the current value without duplicating registrations.",
+          "The evidence record names the destination, exact actions, and unexecuted checks."
+        ],
+        "solution": "<p>Make the record property mutable and centralize observation setup in a registerCurrentRecord method. Before replacement call observation?.invalidate(), clear the stored token, assign the new record, and only then register. Use [weak self] in the closure and capture the observed record's identity if callbacks are later forwarded asynchronously. In this synchronous, main-thread lab, an identity check can compare the callback object with the current record. Invalidation is the registration boundary; identity or generation rejection is the extra acceptance boundary for queued work.</p><p>The old fixture starts at zero. Registration produces zero immediately. Incrementing the current object to one produces one. Replace it with a new object whose count is ten; the new registration produces ten. Increment the old object to two and assert the display remains ten. Increment the new object to eleven and assert eleven. This sequence tests object replacement, whereas repeatedly mutating a single record only tests delivery. Keep those observations as separate assertions; a weak capture alone does not retire an old registration.</p><p>For the gesture part, a successful double tap should run only doubleTap and add ten. A completed single tap should add one after the double recognizer has failed. Do not sleep for a guessed system recognition interval to declare the test passed; log which action actually fired. Reset should resolve to the containing controller's resetCount(_:) without a global target reference. Tapping through the empty overlay should still activate the actual button. Test VoiceOver activation of Increment and Reset separately because touch hit testing does not define accessibility focus.</p><p>The supplied host check already exercises initial/new delivery and idempotent token invalidation using the shared model on macOS. The replace-model UI extension and runtime interaction notebook remain learner work. If asynchronous callbacks are introduced, add a controlled stale-delivery fixture and reject an earlier registration generation on both success and error. Avoid presenting KVO cancellation as cancellation of arbitrary Task work. This solution supplies a precise ownership design and expected values, not a record that the learner completed it.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Using Key-Value Observing in Swift",
+          "url": "https://developer.apple.com/documentation/swift/using-key-value-observing-in-swift"
+        },
+        {
+          "label": "Apple Objective-C Runtime Programming Guide: Messaging",
+          "url": "https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtHowMessagingWorks.html"
+        },
+        {
+          "label": "Apple UIView hitTest(_:with:)",
+          "url": "https://developer.apple.com/documentation/uikit/uiview/hittest(_:with:)"
+        },
+        {
+          "label": "Apple UIGestureRecognizer require(toFail:)",
+          "url": "https://developer.apple.com/documentation/uikit/uigesturerecognizer/require(tofail:)"
+        },
+        {
+          "label": "Java 11 Language Specification: dynamic method lookup",
+          "url": "https://docs.oracle.com/javase/specs/jls/se11/html/jls-15.html#jls-15.12.4.4"
+        },
+        {
+          "label": "Android ViewGroup onInterceptTouchEvent and cancellation",
+          "url": "https://developer.android.com/reference/android/view/ViewGroup#onInterceptTouchEvent(android.view.MotionEvent)"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Settings model owns and replaces KVO registrations",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Controllers/Tabs/My Account/Views/SettingsRedesignView.swift",
+          "line": 280,
+          "why": "Inspected retained token properties, deinit invalidation, weak closures, and replacing the nested account observation."
+        },
+        {
+          "label": "Specific hosted-overlay hit policy",
+          "path": "ios-client/Projects/Features/ZDSearch/Sources/ZDAISearch/PassthroughHostingController.swift",
+          "line": 44,
+          "why": "Inspected view/layer hit heuristic; source evidence only, not a public SwiftUI layer topology contract."
+        }
+      ],
+      "checklist": [
+        "I can draw selector lookup and explain where Swift dispatch differs.",
+        "I can retire a registration without assuming queued work disappeared.",
+        "I can distinguish hit selection, responder actions, and gesture dependencies.",
+        "I can state which checks ran on macOS and which still require an iOS runtime."
+      ]
+    },
+    {
+      "id": "094",
+      "title": "Core Animation trees, transactions, and interruption",
+      "summary": "Implement retargeting and freeze policies while separating model state, presentation samples, transaction commit, and rendered frames.",
+      "duration": 150,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "008",
+        "023",
+        "032",
+        "038",
+        "093"
+      ],
+      "objectives": [
+        "Explain model, presentation, and private render trees without treating a sample as a frame capture.",
+        "Persist the destination in the model while explicitly animating from a current presentation sample.",
+        "Scope disabled implicit actions with CATransaction and distinguish UIView animation behavior.",
+        "Choose cancellation, retargeting, resize, and reduced-motion policies.",
+        "Separate compilation and calculated expectations from measured rendering evidence."
+      ],
+      "sections": [
+        {
+          "id": "three-trees",
+          "title": "The model already knows the destination while pixels are moving",
+          "html": "<p>On Android, an ObjectAnimator can repeatedly set a property of a View as time advances. A plain Core Animation property animation can instead interpolate a rendered value while the application's model layer already holds its destination. This difference explains the classic snap-back bug: a developer adds an animation to x = 200, never updates the model, and sees the layer return to its original position when the animation is removed. Sessions 032 and 038 explained animation transactions and hitches; here the task is to build the actual layer mechanism and its interruption contract.</p><p>The model layer tree is the collection of CALayer objects your application configures. A UIView owns a backing layer, and you can add standalone sublayers for decorative content. Layer properties include geometry, transforms, colors, contents, and masks. The model is the source of intended lasting values, not a recording of every intermediate frame. Updating a model property is synchronous application work; its appearance is mediated by transaction processing and rendering.</p><p>The presentation tree exposes in-flight values corresponding to animations. presentation() returns an optional layer sample; nil is possible before the layer has a presentation representation. Read it, but never mutate it. A sample is useful for retargeting from a currently displayed position. It is not a synchronized camera capture of the panel and does not certify that a particular pixel reached the display at the exact instant your Swift line executed.</p><p>Core Animation's render tree is private machinery used to animate and compose content. An application does not obtain a supported mutable render tree or a guarantee about its processes from CALayer. The archived official guide names the three trees; use that distinction to reason about state without promising a fixed GPU implementation. A drawn layer is also not a UIKit control: a CALayer has no UIResponder chain and does not automatically supply keyboard or accessibility activation.</p>"
+        },
+        {
+          "id": "transactions",
+          "title": "CATransaction groups changes; implicit actions are conditional",
+          "html": "<p>Core Animation collects layer changes into transactions. A transaction groups changes and supplies animation parameters such as duration, timing, and whether implicit actions are disabled. Without an explicit transaction, Core Animation can create an implicit transaction and commit it through normal run-loop processing. Explicit CATransaction.begin and commit allow a bounded synchronous scope. Nested transactions are possible, so each begin needs its matching commit on every path. A transaction is not an actor lock or a durable database transaction.</p><p>When an animatable property changes, the layer can look for an action through its delegate, actions dictionary, style, and default behavior. A standalone layer often supplies an implicit animation for an eligible property. UIView-backed layers participate in UIKit's action policy, and ordinary property changes outside a UIView animation block are commonly not animated. Therefore 'every CALayer assignment animates' is false, and 'no layer assignment animates without UIView.animate' is also false. Use the framework abstraction that owns the property.</p><p>setDisableActions(true) suppresses implicit actions within the transaction. It does not forbid deliberately adding a CAAnimation with add(_:forKey:). That distinction is useful when the model must jump to the final state while a separate explicit animation controls presentation. The lab disables actions around both geometry initialization and interrupted position changes, so an unplanned default animation does not run alongside the named explicit animation.</p><p>The inspected signature view uses a transaction with disabled actions when replacing accumulated image contents and clearing the temporary stroke path. That is a real checkout example of committing visual model changes together. Reading the source proves the intended action suppression, not the number of rendered frames, GPU work, or a measured absence of hitches. The lab uses the same API with synthetic circle geometry and no production drawing data.</p>"
+        },
+        {
+          "id": "explicit",
+          "title": "Retarget an explicit position animation, line by line",
+          "html": "<p>The following method is from MovingLayerView in the standalone iOS 17 target. marker is an owned CALayer already added to the view's backing layer. fraction is zero for the left endpoint and one for the right; those are the only callers in this demo. The method is UIKit main-thread work. It requires UIKit and QuartzCore through the iOS SDK, not a Foundation-only script.</p><pre><code class=\"language-swift\">func move(to fraction: CGFloat) {\n    layoutIfNeeded()\n    let start = marker.presentation()?.position ?? marker.position\n    let end = CGPoint(x: 14 + max(0, bounds.width - 28) * fraction, y: bounds.midY)\n    CATransaction.begin()\n    CATransaction.setDisableActions(true)\n    marker.removeAnimation(forKey: \"travel\")\n    marker.position = end\n    if !UIAccessibility.isReduceMotionEnabled {\n        let animation = CABasicAnimation(keyPath: \"position\")\n        animation.fromValue = NSValue(cgPoint: start)\n        animation.toValue = NSValue(cgPoint: end)\n        animation.duration = 1.5\n        animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)\n        marker.add(animation, forKey: \"travel\")\n    }\n    CATransaction.commit()\n}</code></pre><p>layoutIfNeeded establishes the available canvas geometry before calculating endpoints. The optional chain reads the current presentation position; nil coalescing falls back to the model if presentation is unavailable. end includes the marker's fourteen-point radius, leaving room for its twenty-eight-point diameter. max avoids a negative travel range in a very narrow canvas. These values are synthetic layout constants, not measured physical-device sizes.</p><p>begin opens the transaction and setDisableActions prevents accidental implicit movement. removeAnimation retires only the owned travel key, preserving unrelated animations. marker.position = end establishes the destination that should remain after interpolation. The reduced-motion branch leaves that destination immediate. CABasicAnimation identifies position by a Core Animation key-path string; this string is not the typed Swift key path used by KVO. NSValue wraps the CGPoint endpoints for the Objective-C value interface.</p><p>duration chooses the demonstration interval, and the timing function requests easing. add installs the animation under the stable ownership key; Core Animation copies an added animation, so subsequently changing your local animation object is not an update to the installed copy. commit closes the transaction. No business operation waits for one and a half seconds, and no timer guesses when the pixels have arrived. Rapid opposite-button presses retire the earlier visual interpolation and start from a presentation sample toward the latest model destination.</p>"
+        },
+        {
+          "id": "interruptions",
+          "title": "Freeze, finish, cancel, and remove are different policies",
+          "html": "<p>Removing an animation exposes the model value. In this lab the model already stores the destination, so simply removing travel jumps to that endpoint. If Cancel should instead hold the visible position, first capture the presentation position, write that value into the model with implicit actions disabled, then remove the animation. The ordering matters: sampling after removal may only recover the destination you just exposed.</p><pre><code class=\"language-swift\">func freeze() {\n    let visible = marker.presentation()?.position ?? marker.position\n    CATransaction.begin()\n    CATransaction.setDisableActions(true)\n    marker.position = visible\n    marker.removeAnimation(forKey: \"travel\")\n    CATransaction.commit()\n}</code></pre><p>visible is a value copy, not a retained presentation-layer object. begin and setDisableActions make this a bounded no-implicit-animation update. Assigning position changes the lasting model to the copied sample. removeAnimation withdraws the owned visual effect. commit submits that coherent state. If presentation was unavailable, freeze uses the model destination; the diagnostic label reports unavailable rather than inventing a sample. The operation cancels visual work, not an associated network request.</p><p>fillMode = .forwards together with isRemovedOnCompletion = false can keep an animation's visual result around, but it is not a substitute for updating the model. Persistent animations can leave later hit testing, geometry queries, and state reconstruction reasoning about the wrong destination. Reserve these controls for a deliberately understood visual lifetime. If a CAAnimationDelegate reports completion, the finished flag distinguishes a natural end from interruption. Keep any delegate alive for its intended scope and do not use a visual completion as proof that a domain transaction succeeded.</p><p>MovingLayerView handles a changed width by freezing, clamping the model position to the resized canvas, and updating the vertical center without actions. LayerController freezes when leaving its surface. Other products may choose to finish at the endpoint or recompute progress proportionally after resize; define that policy before testing. The native layer itself is owned by the view, and its named animation is short lived. No global display-link timer or retained completion closure is needed for this bounded sample.</p>"
+        },
+        {
+          "id": "commit-render",
+          "title": "A successful commit is not a successful displayed frame",
+          "html": "<p>Application-side layout, display preparation, encoding, and transaction submission are different from render-side composition and display deadlines. Expensive main-thread work can delay committing changes, even if the eventual layer interpolation is cheap. Expensive images, masks, effects, or offscreen operations can challenge rendering after an efficient commit. A smooth scalar animation cannot prove that a scrolling screen meets its frame budget. The app and render work can overlap, so there is no useful universal rule that every update executes one strictly ordered CPU-then-GPU sequence.</p><p>setNeedsLayout schedules geometry work; layoutIfNeeded can perform required layout synchronously. setNeedsDisplay marks content for drawing; displayIfNeeded can update dirty layer content. None is a guarantee that a monitor has scanned out your changes when the method returns. CATransaction.flush is not a performance fix and should not be used to force every event into a frame. A transaction completion block describes transaction-associated animation completion, not a supported timestamp for panel presentation.</p><p>Android's hardware-accelerated drawing and RenderThread offer a useful commit-versus-render analogy, but UIKit/Core Animation do not expose exactly Android's View invalidation, Choreographer, or SurfaceFlinger contracts. Kotlin coroutine completion is also unrelated to render completion. Separate measurements for main-thread preparation, submitted content, and actual frame hitches. Use Instruments and representative destinations for timing; this assignment did not collect frame traces, thermal data, or GPU counters.</p><p>Accessibility behavior needs a separate owner. The demo circle is decorative and its semantic controls have normal labels. Reduced Motion changes the visual policy while leaving all controls and endpoint meaning available. A product with an animated interactive control should verify its hit region and accessible state independently from the presentation sample. Do not build its authoritative tappable geometry by treating a decorative layer's interpolated position as the only application state.</p>"
+        },
+        {
+          "id": "verification",
+          "title": "Inspect the actual animation pattern and bound the evidence",
+          "html": "<p>The booking shimmer anchor creates a CABasicAnimation for transform.translation.x, supplies from/to values, duration, repeating behavior, and a stable shimmer key. It restarts from layoutSubviews and didMoveToWindow. That repeating decorative contract differs from the lab's finite position movement. Inspect view visibility and removal paths before proposing an energy improvement; a reference to removeAllAnimations in source does not establish energy savings.</p><p>The lab build establishes that its methods and SDK use compile into a simulator application product. The presentation diagnostic is an on-demand read, not a recording tool. Pending interaction checks include rapid retargeting, freeze during movement, resize, leaving/returning, and Reduce Motion. A future acceptance note should say whether presentation was available and whether the final model matches the latest command. No simulator launch, display capture, or production performance result is supplied by this authoring run.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why can an explicit animation snap back after completion?",
+          "options": [
+            "The lasting model property never reached the destination",
+            "The animation duration was too short for Swift ARC",
+            "presentation() always rewrites the model"
+          ],
+          "answer": 0,
+          "explanation": "An explicit CAAnimation changes presentation behavior. When it disappears, the model is shown. Updating the model independently is necessary for the lasting result."
+        },
+        {
+          "question": "What does setDisableActions(true) suppress?",
+          "options": [
+            "Every explicit animation added in that scope",
+            "Implicit actions arising from property changes",
+            "All future animation on every layer"
+          ],
+          "answer": 1,
+          "explanation": "The transaction flag prevents implicit actions in its scope. Deliberately adding an explicit animation still works, which the retargeting implementation relies on."
+        },
+        {
+          "question": "What is the correct freeze policy?",
+          "options": [
+            "Remove the animation, then read presentation and persist it",
+            "Keep fillMode forever without changing the model",
+            "Read presentation first, persist that sample without implicit actions, and remove the owned animation"
+          ],
+          "answer": 2,
+          "explanation": "After removal the model destination can be exposed. Capturing the sample first and writing it into the model preserves the intended visible-position cancellation policy."
+        }
+      ],
+      "exercise": {
+        "brief": "Add a Finish-at-destination action beside Freeze and write a bounded interruption notebook for the synthetic layer.",
+        "steps": [
+          "Build only UIRuntimeLab with the README command.",
+          "Add an action that removes travel while preserving the model endpoint.",
+          "Compare Finish with Freeze while moving between opposite endpoints.",
+          "Resize the canvas and enable Reduce Motion on a functioning destination.",
+          "Record model position, presentation availability, latest command, and actual visual observations separately."
+        ],
+        "acceptance": [
+          "Normal completion leaves the model at the latest destination.",
+          "Freeze persists a pre-removal presentation sample when one is available.",
+          "Finish removes travel and leaves the destination model unchanged.",
+          "Resize has a documented clamp or proportional-position policy.",
+          "Reduced Motion preserves endpoint semantics, and unexecuted frame measurements remain marked pending."
+        ],
+        "solution": "<p>Finish-at-destination can be a method that begins a transaction, disables implicit actions, removes the travel animation, and commits without assigning marker.position. Unlike Freeze it retains the model endpoint already established by move. Give the action a normal UIButton target and selector in LayerController. Do not add a Task.sleep matching duration: a delay would not establish animation completion or account for interruption.</p><p>For a synthetic eighty-point start and two-hundred-point destination, suppose a presentation sample reports one hundred and twenty during the transition. Freeze should set the model to that sampled value and remove travel. Finish should leave the model at two hundred and remove travel. These numbers explain the two contracts; they are calculated hypothetical observations, not measurements from this run. Rapidly retargeting left then right should leave the latest endpoint in the model, with a new fromValue sampled before retiring the old animation.</p><p>During resizing, this lab first freezes and then clamps its center into the new fourteen-point endpoint margins. That is a geometry policy, not a promise that the same fractional progress survives. If fractional preservation is required, store semantic progress independently and recompute the model for the new width. Keep the radius and minimum-width behavior explicit. A content-size change can occur without a device-orientation event, so the view's actual bounds are the appropriate input.</p><p>Run on a functioning simulator or device before signing off the visual interaction. Inspect whether cancellation causes a jump, whether a nil presentation sample is explained, and whether leaving the tab retires visual work. With Reduce Motion enabled, the move action should immediately update the model and add no travel animation. The successful app build is useful API evidence; it does not certify these outcomes. Frame deadlines, real shimmer energy cost, rasterization tradeoffs, and GPU traces remain separate specialist measurements.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple Core Animation Guide: layer trees and animation basics",
+          "url": "https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/CoreAnimation_guide/CoreAnimationBasics/CoreAnimationBasics.html"
+        },
+        {
+          "label": "Apple Core Animation Guide: animating layer content",
+          "url": "https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/CoreAnimation_guide/CreatingBasicAnimations/CreatingBasicAnimations.html"
+        },
+        {
+          "label": "Apple CATransaction",
+          "url": "https://developer.apple.com/documentation/quartzcore/catransaction"
+        },
+        {
+          "label": "Apple CALayer presentation()",
+          "url": "https://developer.apple.com/documentation/quartzcore/calayer/presentation()"
+        },
+        {
+          "label": "Android hardware-accelerated View drawing model",
+          "url": "https://developer.android.com/develop/ui/views/graphics/hardware-accel"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Signature contents update disables implicit actions",
+          "path": "ios-client/Projects/Features/ZDIntake/Sources/ZDSignature/Views/SignatureDrawingView.swift",
+          "line": 276,
+          "why": "Inspected begin, setDisableActions, image/path assignments, and commit; no drawing runtime or timing was measured."
+        },
+        {
+          "label": "Booking explicit repeating shimmer",
+          "path": "ios-client/Projects/Features/ZDBooking/Sources/ZDBooking/PrefillMemberId/Views/PrefillableView.swift",
+          "line": 317,
+          "why": "Inspected removal, explicit animation values, duration, repeat behavior, and named add; decorative repeating behavior differs from interruptible position state."
+        }
+      ],
+      "checklist": [
+        "I can explain why explicit animation alone does not persist its destination.",
+        "I can choose freeze versus finish and implement their different model updates.",
+        "I can distinguish implicit action suppression from explicit animation installation.",
+        "I can explain which evidence would separate commit delays from rendering hitches."
+      ]
+    },
+    {
+      "id": "095",
+      "title": "Baseline and RTL Layout, cache validity, scroll and focus arbitration",
+      "summary": "Use an implemented wrapping Layout with measurement fingerprints, baseline rows, framework-owned RTL placement, layout-value keys, and independent keyboard/accessibility focus.",
+      "duration": 180,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "022",
+        "031",
+        "032",
+        "033",
+        "075",
+        "082"
+      ],
+      "objectives": [
+        "Measure and place the same child proposal while handling finite, unspecified, empty, and oversize inputs.",
+        "Invalidate arrangement caches using current dimensions, baseline, break keys, width, and spacing.",
+        "Derive baseline ascent/descent and supply logical coordinates while SwiftUI performs RTL reflection.",
+        "Keep native scroll arbitration and provide explicit keyboard traversal and validation focus.",
+        "Explain which algorithm checks ran and which text, scroll, and assistive behaviors need a runtime."
+      ],
+      "sections": [
+        {
+          "id": "contract",
+          "title": "Extend the earlier Layout instead of rebuilding SwiftUI basics",
+          "html": "<p>Compose custom layouts teach an Android engineer to separate measurement from placement. Session 031 already taught that SwiftUI proposals are suggestions, not Compose hard constraints, and supplied a simple column. It explicitly deferred baseline alignment, RTL, layout-value keys, and cache optimization. This lesson fills those gaps with BaselineFlow and FlowMath, two parts of an actual scratch target. It does not introduce another general state or modifier tutorial.</p><p>BaselineFlow requires SwiftUI Layout, available from iOS 16; the lab chooses an iOS 17 deployment target for its complete set of APIs. The Layout receives subview proxies, not mutable UIView objects. Its Swift struct can be recomputed while identity-associated cache storage is supplied by the framework. It must answer repeated size probes without publishing app state, launching tasks, or assuming the first probe will become the final placement.</p><p>The policy fills a finite proposed width, uses the total ideal width when width is unspecified or infinite, and grows vertically as rows require. Empty content reports zero. Each child is measured with width capped to the lesser of its ideal width and the available width, with unspecified height. Text may therefore wrap rather than always keeping its ideal unbounded line. A child that refuses the proposal can overflow; the layout does not silently drop it or pretend that reported content became narrower.</p><p>Height is deliberately content-driven, even if an ancestor proposes a smaller height. Put long content in an appropriate scroll container or choose another layout at a product boundary. A zero-width probe still yields finite height under this policy. The model assumes valid finite child responses and rejects nonfinite geometry in its pure helper rather than returning infinity as a concrete view size. This is a narrow reusable contract, not an exact replacement for every HStack or FlowRow behavior.</p>"
+        },
+        {
+          "id": "baseline",
+          "title": "Align baselines with row ascent and descent",
+          "html": "<p>Top-aligning two labels of different fonts often looks wrong because their glyph baselines differ. A baseline is a vertical alignment coordinate reported by the child, measured from its own top. It is not font size, half the row height, or a pixel guessed from a screenshot. Obtain ViewDimensions using dimensions(in:) and read .firstTextBaseline. Nontext views have alignment behavior too, so define whether their reported guide participates or a wrapper provides a product-specific override.</p><p>For a row, calculate ascent as the largest baseline coordinate, bounded at zero, and descent as the largest height minus baseline, also bounded at zero. The row's height is ascent plus descent. Place child i at rowY + ascent - baseline_i. Every first baseline then lies at rowY + ascent. Alignment guides can exist outside a child's ordinary bounds; using ascent and descent extents handles that case instead of blindly clamping the guide into the height.</p><p>The shared helper's synthetic children are forty by twenty with baseline fifteen and fifty by thirty with baseline twenty. Their row ascent is twenty and descent ten. The first origin is y = five; the second is y = zero; both baselines land at twenty. A forced next-row child with height ten and baseline eight begins after a twelve-point row gap, at y = forty-two. The total height is fifty-two. These are exact fixture calculations, and the host check actually asserts their origins and extent.</p><p>Internal row baseline alignment does not by itself define an explicit first or last baseline guide for the entire wrapping container when it is placed in another baseline-aligned stack. This implementation relies on SwiftUI's default container guide behavior. If the product needs an outer explicit guide, implement Layout.explicitAlignment with a documented first-row or last-row contract and test it separately. Likewise, aligning a multiline label's first baseline does not align its last baseline. State those limits so a successful algorithm fixture is not mistaken for every typography scenario.</p>"
+        },
+        {
+          "id": "keys-rtl",
+          "title": "A layout-value key changes arrangement without replacing identity",
+          "html": "<p>RowBreakKey is a LayoutValueKey whose defaultValue is false. A child opts into a row break with .layoutValue(key:value:), and its direct layout proxy reads subview[RowBreakKey.self]. This is a value supplied to the custom container, not global environment state, a preference propagated to distant ancestors, or an instruction to insert an extra view. Its effect belongs in the arrangement fingerprint because toggling the value changes where the same child is placed.</p><pre><code class=\"language-swift\">struct RowBreakKey: LayoutValueKey {\n    static let defaultValue = false\n}\n\n// In the iOS target's Layout content:\nText(\"Forced next row\")\n    .layoutValue(key: RowBreakKey.self, value: true)</code></pre><p>The key declaration defines the associated value type through its Boolean default. RowBreakKey.self supplies the key's metatype, allowing typed indexing. The modifier sets the direct child's value; it preserves the Text's meaning and identity. FlowMath breaks only if the current row already contains a child, so a leading break flag does not produce an empty row. Break policy and widths both control row membership.</p><p>SwiftUI's LayoutSubviews.layoutDirection describes the direction inherited by the container. Apple's documentation explicitly says SwiftUI horizontally flips each subview's x position within its parent when direction switches. In most custom layouts no manual RTL adjustment is required. FlowMath therefore supplies logical, increasing x origins, and BaselineFlow passes them unchanged to place. Applying width - x - childWidth in this helper would reflect a position that SwiftUI then reflects again.</p><p>The forty-point and fifty-point children in the wide fixture retain logical x origins zero and forty-eight. Those are the values verified by the host helper. SwiftUI owns their eventual RTL placement, so a host assertion about manually reflected physical x would test the wrong contract. The first-baseline offsets remain five and zero. The native fixture changes the container environment with .environment(\\.layoutDirection, ...), allowing the framework's reflection and actual text measurement to be inspected on a running destination.</p><p>Placement uses UnitPoint(x: 0, y: 0) and adds bounds.minX and bounds.minY to the logical origins. A numeric anchor does not disable SwiftUI's automatic RTL placement behavior. Keep the source array and stable IDs in logical order instead of reversing them. The toggle uses the same environment for the container and children. Actual native RTL placement remains unobserved here, as do Arabic localization, bidirectional text, and assistive traversal. An explicit direction-dependent product policy would need its own cache input; this direction-independent arrangement does not.</p>"
+        },
+        {
+          "id": "cache",
+          "title": "Cache an arrangement only when its measured inputs still match",
+          "html": "<p>A cache is correct only relative to its inputs. makeCache creates an empty Cache. updateCache clears it when SwiftUI tells the layout or subviews changed. That hook is useful, but a parent can probe several widths between such updates. A cache keyed only by child count would incorrectly reuse one-hundred-twenty-point placement at seventy points. Text, font, Dynamic Type, localization, alignment-guide overrides, row keys, and spacing can change results without changing count. An environment direction change may alter child measurements, which are re-read; the arrangement itself stays in logical coordinates.</p><p>BaselineFlow remeasures current child dimensions and creates a Signature containing width, the ordered FlowMetric values, and gaps. Each metric includes measured width, height, first baseline, and breakBefore. Equatable comparison determines whether the existing plan describes the current arrangement. If the signature changes, FlowMath runs again. It caches the arrangement, not the cost of text measurement. That conservative choice makes correctness auditable before profiling motivates more aggressive measurement caching.</p><pre><code class=\"language-swift\">struct Signature: Equatable {\n    let width: CGFloat\n    let items: [FlowMetric]\n    let gap: CGFloat\n    let rowGap: CGFloat\n}\nstruct Cache {\n    var signature: Signature?\n    var plan: FlowPlan?\n}\nfunc makeCache(subviews: Subviews) -&gt; Cache { Cache() }\nfunc updateCache(_ cache: inout Cache, subviews: Subviews) { cache = Cache() }</code></pre><p>width names the normalized finite budget. items retains copied geometry values, not subview references. gap and rowGap cover configuration changes. Optional signature and plan represent an empty cache. makeCache receives proxies but deliberately does not store them. updateCache replaces both fields with their empty values. In the full source, inequality triggers a new arrangement before plan is read; its force unwrap follows that established invariant rather than accepting arbitrary external data.</p><p>Placement computes a fresh plan for bounds.width, which may differ from an earlier proposal. It reuses the measurement width policy when calling each child's place method and adds the assigned bounds origin. Passing the measured response width as a new proposal can accidentally ask a child a different question, so the implementation reconstructs the original capped-width, unspecified-height proposal. No origin belongs in the cached local plan: a changed container origin is an offset applied at placement. Failure means fixing the cache inputs, not mutating @State from sizeThatFits to force another pass.</p>"
+        },
+        {
+          "id": "scroll",
+          "title": "Choose a scroll owner before changing gesture priority",
+          "html": "<p>A vertical ScrollView containing a horizontal fixture strip provides a concrete orthogonal nested-scroll example. The lab leaves arbitration to native scroll behavior and adds no blanket zero-distance drag gesture. A diagonal drag may still be ambiguous at runtime; state the desired vertical-page versus horizontal-strip interaction and verify it. simultaneousGesture and highPriorityGesture are gesture-composition tools, not guarantees that every nested scroll has the intended directional locking.</p><p>Same-axis nested scrolling requires a stronger product decision. Prefer one vertical scroll owner unless independent inner scrolling is essential. A bounded inner scroller needs an explicit viewport and an accessible path to content outside it. Disabling every ancestor scroll while a finger is down can strand the interface after cancellation. UIKit bridging can supply recognizer-delegate policy when public SwiftUI composition is insufficient, but changing undocumented internal UIScrollView recognizers is not an appropriate dependency for this course.</p><p>Android NestedScrollingParent and Compose nestedScroll expose pre/post consumption of scroll deltas and fling coordination. SwiftUI's built-in containers do not expose exactly that callback contract. An analogy about consumption therefore helps specify ownership but cannot be translated method-for-method. The lab's horizontal choices are also normal Buttons, giving keyboard and accessibility activation alternatives to dragging. Selection writes a synthetic note string; it does not initiate asynchronous work.</p><p>Interactive keyboard dismissal belongs to the scrolling form's behavior and does not mean the draft was cancelled. The lab uses scrollDismissesKeyboard(.interactively), available from iOS 16. Programmatic scroll requests use current field IDs and the current ScrollViewReader proxy, so they remain local to the visible hierarchy. A request may need a layout-ready retry policy in a more complex screen; arbitrary sleep is not evidence of readiness. No claim is made that source compilation settled the diagonal-drag or floating-keyboard cases.</p>"
+        },
+        {
+          "id": "focus",
+          "title": "Editing focus, accessible focus, and traversal each need a contract",
+          "html": "<p>LayoutPanel defines a Hashable Field enum with name and note cases, and one optional @FocusState value. Each TextField binds a distinct case. The Name submit action moves editing focus to Note and asks the current proxy to reveal it; Note submit clears editing focus. Previous, Next, and Done controls in the keyboard toolbar provide an explicit alternative path. This is a usable software-keyboard progression policy, not proof that hardware Tab or Shift-Tab order is correct on every OS.</p><p>An independent @AccessibilityFocusState Boolean, using the iOS 15-and-later API, attaches to the visible error text. If validation fails, the lab clears editing focus and requests assistive focus on the error rather than assigning both to the same Boolean. Accessible focus can be affected by whether the new element is installed and by the active assistive technology. The fixture therefore requires a runtime check that the error becomes reachable and is announced; setting the wrapper in source is not evidence that announcement occurred.</p><p>Default accessibility order depends on semantic structure and framework behavior, not just mirrored x positions. Avoid accessibilitySortPriority as a universal patch for geometry mistakes. A custom container may need grouping or carefully defined order, but reading logical child order, activating every essential control, and returning from validation should be tested with VoiceOver and keyboard input independently. Large text can change heights and scroll reachability without changing view identity.</p><p>All this UI state belongs to the local view identity. Layout cache holds geometry; it does not own focus or navigation. No asynchronous task is launched by measurement or by these focus actions. If a future focus request depends on async loading, cancel obsolete requests and validate the current field and scene before applying them. The repository FlowLayout anchor establishes existing ideal-size measurement and pure arrange logic; it has top/center/bottom item alignment, not the lab's baseline or RTL contract. The new implementation is an adjacent learning artifact, not a client replacement.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What must invalidate a cached arrangement when child count stays the same?",
+          "options": [
+            "Only an explicit user refresh",
+            "Changed measured dimensions, baselines, width, row keys, or spacing",
+            "Nothing; Layout caches are automatically proposal-specific"
+          ],
+          "answer": 1,
+          "explanation": "updateCache is a lifecycle hook, not a key for every width probe. The current geometry and layout inputs must match the cached plan."
+        },
+        {
+          "question": "A child has logical x = 48 in an RTL SwiftUI Layout. Which x should this direction-independent custom layout pass to place before adding bounds origin?",
+          "options": [
+            "48, leaving reflection to SwiftUI",
+            "22, manually reflecting before SwiftUI places it",
+            "72, subtracting only x from width"
+          ],
+          "answer": 0,
+          "explanation": "SwiftUI Layout automatically flips subview x placement in RTL. Supplying the logical x unchanged avoids double reflection; a numeric UnitPoint anchor does not opt out."
+        },
+        {
+          "question": "Does moving @AccessibilityFocusState to an error guarantee the software keyboard edits that error?",
+          "options": [
+            "Yes, both wrappers describe the same responder",
+            "Yes, if the error is in a ScrollView",
+            "No; assistive focus and editing focus are distinct requests"
+          ],
+          "answer": 2,
+          "explanation": "The error can be read by assistive technology while editing focus is nil. Verify announcement and field editing separately."
+        }
+      ],
+      "exercise": {
+        "brief": "Extend the baseline fixture with a dynamic row-break toggle and record layout and traversal behavior without changing the client.",
+        "steps": [
+          "Run HostChecks against the shared FlowMath and LabRoute sources.",
+          "Add a toggle that changes one existing child's RowBreakKey value without changing its ID.",
+          "Compare wide/narrow and RTL/LTR placement with mixed fonts and accessibility text sizes.",
+          "Exercise the nested horizontal strip, vertical scroll, validation error, submit progression, and keyboard toolbar.",
+          "Document the layout's outer-baseline limitation and all pending runtime checks."
+        ],
+        "acceptance": [
+          "The same child identity moves rows when its key changes.",
+          "A narrower width recalculates row membership and height.",
+          "Every first baseline within a row agrees under the declared metric policy.",
+          "Logical coordinates preserve child order and nonzero bounds offsets; native RTL reflection is verified separately.",
+          "Editing progression and assistive error focus are recorded independently on an identified destination."
+        ],
+        "solution": "<p>Add @State private var forceBreak = false in the fixture view and a semantic Toggle. Apply .layoutValue(key: RowBreakKey.self, value: forceBreak) to a child with a stable declaration. The signature already contains breakBefore, so changing the key recomputes arrangement even when dimensions and count remain identical. Do not insert a zero-height Spacer as an indirect break marker; that would change the child set and obscure the key contract.</p><p>For the existing shared metrics, the forty-by-twenty and fifty-by-thirty children fit in width one hundred twenty with an eight-point gap. Their baseline-aligned row height is thirty. At width seventy they occupy separate rows, so the total height becomes twenty plus twelve plus thirty, or sixty-two. The host checks assert those values. The wide logical x origins remain zero and forty-eight; their y offsets are five and zero. SwiftUI performs the RTL reflection at placement, which these host tests do not exercise. The host suite also toggles the second child's break flag at the same wide width and verifies a new row without changing dimensions.</p><p>Use actual Text dimensions for the next stage. Increase Dynamic Type and change the label to a long localized string; the remeasured fingerprint should change as needed. Record clipping, line breaks, and scroll reachability. If a child returns a width wider than its proposal, the helper preserves its logical origin and allows width overflow; a product may instead require an adaptive stacked alternative. Do not claim the helper repaired an uncooperative child's measurement.</p><p>For interaction, verify both axis-specific scrolls and diagonal gestures, then edit Name, submit to Note, use Previous/Next/Done, and submit an empty name. Record software keyboard visibility and hardware traversal separately from VoiceOver's announcement of the error. The app already supplies these affordances, but their runtime results remain pending here. Container-level explicit baseline guides, same-axis nested fling transfer, complex rich-text layout, and assistive-technology user testing are separate specialist extensions. The worked answer defines expected contracts without completing the learner's acceptance notebook.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple SwiftUI Layout protocol",
+          "url": "https://developer.apple.com/documentation/swiftui/layout"
+        },
+        {
+          "label": "Apple Layout updateCache(_:subviews:)",
+          "url": "https://developer.apple.com/documentation/swiftui/layout/updatecache(_:subviews:)"
+        },
+        {
+          "label": "Apple LayoutValueKey",
+          "url": "https://developer.apple.com/documentation/swiftui/layoutvaluekey"
+        },
+        {
+          "label": "Apple AccessibilityFocusState",
+          "url": "https://developer.apple.com/documentation/swiftui/accessibilityfocusstate"
+        },
+        {
+          "label": "Android Compose nested-scroll phases and consumption",
+          "url": "https://developer.android.com/develop/ui/compose/touch-input/scroll/nested-scroll-modifiers"
+        },
+        {
+          "label": "Apple LayoutSubviews.layoutDirection: automatic subview x flipping",
+          "url": "https://developer.apple.com/documentation/swiftui/layoutsubviews/layoutdirection"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Existing flow layout proposal and placement boundary",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDMezzanine/Views/SwiftUI/FlowLayout.swift",
+          "line": 75,
+          "why": "Inspected ideal subview measurement, Void cache, bounds-width rearrangement, pure math, and top/center/bottom alignment; baseline/RTL support is not inferred."
+        }
+      ],
+      "checklist": [
+        "I can derive a row's height from ascent and descent.",
+        "I can identify every input to an arrangement cache and preserve the measurement proposal during placement.",
+        "I can leave RTL reflection to SwiftUI while preserving logical coordinates and identity.",
+        "I can test nested scrolling, editing progression, and accessible traversal as separate contracts."
+      ]
+    },
+    {
+      "id": "096",
+      "title": "Process and scene identity, corrected lifecycle, and route recovery",
+      "summary": "Separate launch, scene connection, window/controller/view lifetimes, SwiftUI integration, restoration precedence, and expiring background attempts.",
+      "duration": 180,
+      "level": "Advanced practice",
+      "prerequisites": [
+        "008",
+        "034",
+        "050",
+        "051",
+        "075",
+        "081",
+        "093"
+      ],
+      "objectives": [
+        "Assign services, navigation, controller resources, and transient view work to the correct identity.",
+        "Correct inaccurate universal lifecycle sequences and termination/new-session assumptions.",
+        "Use App, WindowGroup, scenePhase, and one UIApplicationDelegateAdaptor deliberately.",
+        "Validate restoration and cold/warm routes with explicit precedence and account boundaries.",
+        "Implement a cancellable, expiring background attempt without promising durable execution."
+      ],
+      "sections": [
+        {
+          "id": "identity",
+          "title": "Draw identity boundaries before enumerating callbacks",
+          "html": "<p>Android separates an Application, Activity instances, tasks, windows, and View instances. iOS also has distinct owners, but an Activity is not a direct synonym for a UIScene. An app process contains application-level services and a UIApplication. A UISceneSession represents a system-managed interaction session with a persistent identifier and configuration. A connected UIScene is the live UI instance associated with that session. A UIWindowScene manages one or more windows. A UIWindow hosts a root-controller hierarchy and routes events; it is not a second process.</p><p>A UIViewController can own a view hierarchy and remain alive while its screen is offscreen. viewDidLoad concerns a loaded view, viewWillAppear and viewDidAppear concern presentation, and viewDidDisappear is not proof that the controller was deallocated or the process terminated. A view's attachment to a window can change without replacing the document it presents. Rotation and window resizing usually update the existing UIKit hierarchy; do not apply Android Activity recreation assumptions to every iOS size change.</p><p>SwiftUI View values are descriptions that can be constructed repeatedly. Identity-associated @State storage can survive those descriptions while its logical identity survives. App is a declaration of the application's scenes, not a UIViewController. A WindowGroup describes a family of windows; each root can have independent navigation and focus. A UIKit hosting controller inside one window is a containment boundary, not another scene by default.</p><p>Choose process ownership for shared services, account ownership for sensitive repositories, scene ownership for navigation and presentation, draft ownership for editable domain state, and view ownership for transient focus or layout work. A scene persistent identifier helps reconnect an interaction but is not a domain document ID. Two scenes showing one draft need a deliberate shared-edit or conflict policy. The lab keeps only synthetic selected-route strings per scene; it does not implement durable documents or account authentication.</p>"
+        },
+        {
+          "id": "sequences",
+          "title": "Correct the attachment's universal sequence and termination claims",
+          "html": "<p>The supplied lifecycle download was read only through its first 236 lines and remains unchanged. Its list is useful vocabulary, but several statements need qualification. UIKit's application delegate still has process-launch responsibilities in scene-based apps. UISceneDelegate handles adopted scene UI lifecycle events. The OS version alone does not magically migrate a legacy target or move every callback; inspect the target's scene configuration and the responsibility actually being handled.</p><p>For a typical foreground process launch, application launch methods prepare process services, then scene connection establishes UI and the scene can enter foreground and active states. This is an illustrative path, not a universal total ordering for every launch reason. Background-only launch, later scene creation in a running process, reconnecting a session, and an interruption each have different relevant paths. A temporary inactive-to-active transition after an interruption need not re-enter the foreground from background.</p><p>applicationWillEnterForeground is not a compulsory extra step after every didFinishLaunching or after every phone interruption. sceneWillEnterForeground represents a scene's foreground transition, while sceneDidBecomeActive represents activation. sceneWillResignActive can occur without the scene entering background. Treat callbacks as observations of transitions rather than a numbered script every app must execute. The lab logs scene phase initially and on changes; its logs are not fabricated evidence of any particular observed sequence.</p><p>applicationWillTerminate is not a reliable final-save hook. A suspended process can be removed without a last cleanup callback. Apple's method documentation qualifies when termination notification can occur; it does not promise every purge delivers it. Preserve important data through ordinary durable commits and bounded checkpoints. The launch callback's Boolean should follow that method's documented contract; it is not a universal yes/no test that all launch options can be routed. UI routes may belong to a scene's connection options or later scene callbacks.</p>"
+        },
+        {
+          "id": "session",
+          "title": "Connection, disconnection, and session discard are different",
+          "html": "<p>scene(_:willConnectTo:options:) can be called when an interface is created or restored. The received session does not necessarily represent a newly created session. A session can survive a prior live scene object being disconnected and later be reconnected with fresh UI objects. Inspect persistentIdentifier and restoration state rather than treating every connection as a first-run onboarding event.</p><p>Use sceneDidDisconnect to release recreatable resources associated with the live scene; it is not a guarantee that the process died or that UIKit permanently discarded the session. application(_:didDiscardSceneSessions:) concerns discarded sessions and can support session-associated cleanup. Disconnection also does not mean the application should delete a durable draft. Restorable presentation state and durable domain data have different retention rules.</p><p>The inspected App Clip SceneDelegate explicitly comments that connection does not imply a new session. It obtains the provided UIWindowScene, creates a window attached to it, and examines connectionOptions.userActivities before falling back to its default screen. The same file also notes that a disconnected session can reconnect. These are verified source anchors, not evidence that App Clip cold links or session restoration were run by this author.</p><p>Never present by selecting the first connected scene or an arbitrary global key window. Route through the originating scene/controller. Its keyboard, modal stack, and focus belong there even if a shared process service supplies data. When one scene becomes inactive, quiet its visual activity; do not automatically cancel shared account work required by another active scene. A process-level aggregate phase and a single scene phase answer different questions.</p>"
+        },
+        {
+          "id": "swiftui",
+          "title": "Use SwiftUI lifecycle integration at the intended scope",
+          "html": "<p>The target declares exactly one @main App and exactly one UIApplicationDelegateAdaptor. The adaptor asks SwiftUI to instantiate a ProcessDelegate implementing UIApplicationDelegate. It supplies process-launch logging here; it does not manually create a window or replace SwiftUI's root hierarchy. Apple documents declaring this adaptor only once in the App. App and WindowGroup are available from iOS 14; this complete lab uses iOS 17. The installed SDK version and compiler version do not change its deployment minimum.</p><pre><code class=\"language-swift\">@main\nstruct UIRuntimeApp: App {\n    @UIApplicationDelegateAdaptor(ProcessDelegate.self) private var delegate\n    var body: some Scene {\n        WindowGroup { RuntimeSceneRoot() }\n    }\n}</code></pre><p>@main identifies the target's entry declaration; it is not an extra main.swift script. The generic adaptor argument is the concrete delegate class. The private stored property keeps the integration declared at application scope. body returns some Scene, meaning an opaque concrete scene composition. WindowGroup constructs a RuntimeSceneRoot for its scene windows. That root's state is scene-local; moving its selected route into an App singleton would change the ownership contract.</p><p>RuntimeSceneRoot reads @Environment(\\.scenePhase) inside the view hierarchy. Apple's ScenePhase documentation says a view read reflects its containing scene, whereas an App-level read aggregates the app's scenes and is active when any scene is active. The iOS 17 onChange overload with initial: true records the initial phase too. It is not a place to perform unlimited blocking IO or to promise a termination callback.</p><p>SwiftUI .onAppear and .onDisappear describe view participation; neither is process launch/termination and neither guarantees exactly one business session. task(id:) cancellation follows view/task identity and remains cooperative, as session 081 taught. Changes in inactive phase can include temporary interruptions, so a feature should distinguish pausing drawing from abandoning a draft. The UIKit dispatch surface observes only while visible, while the scene's bounded checkpoint owner survives a tab switch; these are intentional different scopes.</p>"
+        },
+        {
+          "id": "routing",
+          "title": "Unify cold and warm parsing without losing precedence",
+          "html": "<p>A cold URL launch and a warm URL delivery should converge on one parser and one scene routing policy. UIKit scene-based connection options carry URL contexts or user activities on connection; later scene(_:openURLContexts:) and scene(_:continue:) can deliver warm events. SwiftUI offers onOpenURL and onContinueUserActivity. Exact callback delivery needs an installed app runtime, and universal links require association configuration; a custom URL scheme does not establish universal-link support.</p><p>LabRoute.parse accepts only uiruntime://item/alpha and uiruntime://item/beta. It uses URLComponents and rejects credentials, ports, query, fragments, extra path components, encoded aliases, and unknown identifiers. A route contains a synthetic ID, not a controller pointer. In production, parsing is only the syntactic boundary: check authorization, current account, existence, and schema before revealing protected content.</p><p>RouteState defines a cold-start policy: if an incoming URL is provided, its valid route wins over stored restoration. An explicitly invalid incoming URL goes to a safe root in that cold-start model rather than resurrecting an unrelated stored detail. With no incoming URL, a recognized stored ID can restore. For an already running scene, receive rejects an invalid URL without replacing the current selection. Those are deliberate different invalid-input policies, both covered by host fixtures.</p><pre><code class=\"language-swift\">init(restored: String?, incoming: URL?) {\n    if let incoming {\n        selected = LabRoute.parse(incoming)\n    } else {\n        selected = restored.flatMap(LabRoute.init(rawValue:))\n    }\n}</code></pre><p>This initializer belongs to the shared RouteState struct and is runnable in its host-check executable. restored is an optional string; incoming is an optional URL. Optional binding distinguishes absence of an external intent from an actual intent that fails validation. The parser returns an optional LabRoute. flatMap unwraps the stored string and applies the failable raw-value initializer, flattening the optional result so unknown stored values become nil.</p><p>The app uses a SceneStorage route key and a typed NavigationStack binding. Its onOpenURL handler validates with the same receive method, then writes the accepted ID. It does not later run an onAppear restoration assignment that overwrites the external route. SwiftUI controls initial URL delivery order, so the host cold initializer establishes precedence logic while installed cold delivery still needs a runtime test. SceneStorage restores lightweight presentation state opportunistically; it is not a durable journal or a security boundary. Logout must invalidate account-bound routes and late completions in every applicable scene in a real app.</p>"
+        },
+        {
+          "id": "background",
+          "title": "Correct the five-second claim and retire expiring attempts",
+          "html": "<p>Apple's background-execution article describes five seconds for the applicationDidEnterBackground callback to perform work and return. That is a callback budget in the documented context, not a guarantee that every scene delegate, Swift Task, network request, or final save receives five usable seconds. Do not remove the factual callback qualification or turn it into 'iOS always grants five seconds before death.' Background scheduling, suspension, expiration, and termination are distinct events.</p><p>beginBackgroundTask(withName:expirationHandler:) requests a finite extension for completing critical work. It can return .invalid. The caller must retain the identifier, end it when done, and stop promptly on expiration. This is not BGTaskScheduler, a scheduled job, or a timer granting a fixed duration. Request the extension before beginning the protected work, and do not try to claim all background modes to keep an arbitrary task alive.</p><p>The lab's main-actor CheckpointRunner starts a two-second synthetic sleep under a background-task identifier. It does not write a durable file. Each start retires the prior attempt, creates a UUID generation, and guards expiration and completion against that generation. finish clears the generation, cancels work, swaps the identifier to .invalid, ends the old identifier once if valid, and updates status. UIKit delivers the expiration handler on the main thread; the sample's synchronous finish path keeps that callback bounded.</p><p>Cancellation of Task.sleep throws and returns without claiming completion. A late completion is also rejected if it is cancelled or belongs to an earlier generation. Ending a background identifier does not roll back side effects already committed by a future real persistence operation; that operation needs atomicity, recovery, and an explicit retry policy. Quieting one scene is not permission to end another scene's attempt. The supplied sample demonstrates ownership and retirement but cannot force expiration or prove durable recovery without runtime and storage fixtures.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does scene(_:willConnectTo:options:) imply about the session?",
+          "options": [
+            "Its persistent session must have been newly created",
+            "An interface is connecting; the session may be created or restored",
+            "The app process was definitely just launched"
+          ],
+          "answer": 1,
+          "explanation": "Connection may rebuild an interface for an existing session in a running or relaunched process. It is not a first-session or process-launch identity test."
+        },
+        {
+          "question": "Which final-save assumption is valid?",
+          "options": [
+            "Persist important edits normally; termination callback delivery is not guaranteed",
+            "applicationWillTerminate always runs before a suspended process is removed",
+            "SceneStorage commits every draft edit durably"
+          ],
+          "answer": 0,
+          "explanation": "Durable data needs an ordinary commit strategy. Termination and scene restoration are unreliable substitutes for a data journal."
+        },
+        {
+          "question": "What should a background-task expiration handler do?",
+          "options": [
+            "Start a replacement unbounded async loop",
+            "Wait until the original operation finishes regardless of deadline",
+            "Cancel or retire the matching attempt, end its identifier promptly, and leave recovery to a durable contract"
+          ],
+          "answer": 2,
+          "explanation": "The extension is finite and can expire. Matching generation and identifier retirement prevent an old callback from ending a newer attempt; durable recovery is separate."
+        }
+      ],
+      "exercise": {
+        "brief": "Build a route/lifecycle acceptance matrix for the lab and extend only its scratch copy with a versioned restoration envelope.",
+        "steps": [
+          "Run the shared host route fixtures and identify cold/warm invalid-input policies.",
+          "Add a versioned synthetic restoration value that rejects unknown versions and removed IDs.",
+          "On a functioning runtime, launch a cold custom URL, then deliver a different warm URL.",
+          "Open two windows where supported, verify scene-local selection, and move one scene through inactive/background states.",
+          "Start/cancel/replace the synthetic checkpoint and document whether actual expiration was observed."
+        ],
+        "acceptance": [
+          "Valid incoming external intent wins over stale restoration.",
+          "Unknown restored version or ID falls back safely; malformed warm input preserves the current route.",
+          "Two supported windows do not accidentally share navigation selection.",
+          "Disconnection is not logged as guaranteed process termination or new-session creation.",
+          "Checkpoint replacement and expiration retire only the matching attempt, with no fabricated durability result."
+        ],
+        "solution": "<p>Represent restoration with a small Codable envelope containing version = 1 and a synthetic selected ID. Decode failure, unknown version, and a missing ID yield a safe root. Do not encode patient data, credentials, keyboard geometry, or controller references. In the production design add an account epoch and current authorization checks before adopting a restored route; this lab intentionally has no authentication service or protected records.</p><p>The cold matrix contains stored alpha plus incoming beta, which should choose beta; stored beta with no external intent should choose beta; an unknown stored ID with no intent should choose root. The supplied RouteState fixtures assert those cases. They also reject nine URL forms and show that invalid warm delivery leaves the current beta selection unchanged. Do not conflate those host outcomes with OS-installed URL delivery or restored SceneStorage behavior.</p><p>The SwiftUI handler already updates the route from validated incoming input without a later unconditional restoration assignment. For UIKit, gather initial connection options and session restoration into one scene-owned reducer, then send later URL and activity callbacks to the same reducer. External intent and restoration precedence should be explicit rather than determined by whichever callback happens last. Keep account validation asynchronous if needed, with attempt and account generations preventing obsolete navigation.</p><p>For background work, retire any previous generation before starting another. Capture the new generation in both the expiration callback and the async operation. Before committing status or data after suspension, verify that it still matches. finish should make the identifier invalid before ending it, so repeated terminal paths do not end it twice. Durable writes require their own transaction and recovery behavior; a completed two-second sleep is only a synthetic checkpoint outcome.</p><p>Finally record process-launch, scene connection or phase, route receipt, and controller/view events with their separate identities on an actual destination. A phone interruption may only produce inactive then active, while a background launch may not show the familiar foreground sequence. If CoreSimulator is unavailable, mark that matrix pending. Background expiration, multiwindow restoration, installed cold links, and protected-data recovery remain intentionally unverified in this authoring run.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Managing your app's life cycle",
+          "url": "https://developer.apple.com/documentation/uikit/managing-your-app-s-life-cycle"
+        },
+        {
+          "label": "Apple scene(_:willConnectTo:options:) creation and restoration",
+          "url": "https://developer.apple.com/documentation/uikit/uiscenedelegate/scene(_:willconnectto:options:)"
+        },
+        {
+          "label": "Apple UIApplicationDelegateAdaptor",
+          "url": "https://developer.apple.com/documentation/swiftui/uiapplicationdelegateadaptor"
+        },
+        {
+          "label": "Apple ScenePhase scope and aggregation",
+          "url": "https://developer.apple.com/documentation/swiftui/scenephase"
+        },
+        {
+          "label": "Apple: Extending your app's background execution time",
+          "url": "https://developer.apple.com/documentation/uikit/extending-your-app-s-background-execution-time"
+        },
+        {
+          "label": "Apple applicationWillTerminate(_:)",
+          "url": "https://developer.apple.com/documentation/uikit/uiapplicationdelegate/applicationwillterminate(_:)"
+        },
+        {
+          "label": "The Swift Programming Language: cooperative task cancellation",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"
+        },
+        {
+          "label": "Kotlin coroutine cancellation and cooperation",
+          "url": "https://kotlinlang.org/docs/coroutines-cancellation.html"
+        }
+      ],
+      "repo": [
+        {
+          "label": "App Clip scene connection and initial activity",
+          "path": "ios-client/Projects/Apps/ZocdocAppClip/SceneDelegate.swift",
+          "line": 119,
+          "why": "Inspected supplied UIWindowScene, window attachment, initial activity routing, and comments distinguishing restored sessions."
+        },
+        {
+          "label": "SwiftUI demo window declaration and URL handling",
+          "path": "ios-client/Projects/Apps/ZDMezzanineApp/ZDMezzanineApp/App.swift",
+          "line": 15,
+          "why": "Inspected WindowGroup and onOpenURL; its App-level URL state illustrates an ownership choice and is not assumed scene-local."
+        }
+      ],
+      "checklist": [
+        "I can identify process, session, scene, window, controller, view, and draft identities.",
+        "I can correct the attachment without inventing a universal callback order.",
+        "I can state external-intent/restoration precedence and reject stale account work.",
+        "I can distinguish a callback budget, a finite execution extension, and durable recovery."
+      ]
+    }
+  ]
+}

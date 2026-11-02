@@ -1,0 +1,349 @@
+{
+  "schemaVersion": 1,
+  "provenance": "synthetic teaching fixture; invented records, not device measurements",
+  "metric": {
+    "id": "map-rows-v1",
+    "start": "immediately before synchronous map",
+    "end": "after mapped value is returned",
+    "unit": "ms",
+    "direction": "lower"
+  },
+  "policy": {
+    "owner": "synthetic measurement reviewer",
+    "minSamples": 20,
+    "warmupCount": 1,
+    "maxP95Ms": 130,
+    "maxRelativeIncrease": 0.1,
+    "maxFailureRate": 0.05,
+    "maxFailureRateIncrease": 0.02,
+    "maxPreparationFailureRate": 0.05
+  },
+  "baseline": {
+    "revision": "synthetic-baseline",
+    "cohort": {
+      "device": "synthetic-host-cohort",
+      "os": "synthetic-os-v1",
+      "toolchain": "synthetic-toolchain-v1",
+      "configuration": "Release",
+      "fixture": "ordered-mapping-v1",
+      "preparation": "one-declared-warmup-then-frozen-fixture",
+      "cache": "rebuild-input-outside-interval",
+      "instrumentation": "minimal-synthetic-records",
+      "metric": "map-rows-v1"
+    },
+    "correctness": "pass",
+    "runs": [
+      {
+        "id": "base-warmup",
+        "phase": "warmup",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 200
+      },
+      {
+        "id": "base-1",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 100
+      },
+      {
+        "id": "base-2",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 101
+      },
+      {
+        "id": "base-3",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 102
+      },
+      {
+        "id": "base-4",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 103
+      },
+      {
+        "id": "base-5",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 104
+      },
+      {
+        "id": "base-6",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 105
+      },
+      {
+        "id": "base-7",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 106
+      },
+      {
+        "id": "base-8",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 107
+      },
+      {
+        "id": "base-9",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 108
+      },
+      {
+        "id": "base-10",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 109
+      },
+      {
+        "id": "base-11",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 110
+      },
+      {
+        "id": "base-12",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 111
+      },
+      {
+        "id": "base-13",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 112
+      },
+      {
+        "id": "base-14",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 113
+      },
+      {
+        "id": "base-15",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 114
+      },
+      {
+        "id": "base-16",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 115
+      },
+      {
+        "id": "base-17",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 116
+      },
+      {
+        "id": "base-18",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 117
+      },
+      {
+        "id": "base-19",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 118
+      },
+      {
+        "id": "base-20",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 119
+      }
+    ]
+  },
+  "candidate": {
+    "revision": "synthetic-candidate",
+    "cohort": {
+      "device": "synthetic-host-cohort",
+      "os": "synthetic-os-v1",
+      "toolchain": "synthetic-toolchain-v1",
+      "configuration": "Release",
+      "fixture": "ordered-mapping-v1",
+      "preparation": "one-declared-warmup-then-frozen-fixture",
+      "cache": "rebuild-input-outside-interval",
+      "instrumentation": "minimal-synthetic-records",
+      "metric": "map-rows-v1"
+    },
+    "correctness": "pass",
+    "runs": [
+      {
+        "id": "candidate-warmup",
+        "phase": "warmup",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 200
+      },
+      {
+        "id": "candidate-1",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 90
+      },
+      {
+        "id": "candidate-2",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 91
+      },
+      {
+        "id": "candidate-3",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 92
+      },
+      {
+        "id": "candidate-4",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 93
+      },
+      {
+        "id": "candidate-5",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 94
+      },
+      {
+        "id": "candidate-6",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 95
+      },
+      {
+        "id": "candidate-7",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 96
+      },
+      {
+        "id": "candidate-8",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 97
+      },
+      {
+        "id": "candidate-9",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 98
+      },
+      {
+        "id": "candidate-10",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 99
+      },
+      {
+        "id": "candidate-11",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 100
+      },
+      {
+        "id": "candidate-12",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 101
+      },
+      {
+        "id": "candidate-13",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 102
+      },
+      {
+        "id": "candidate-14",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 103
+      },
+      {
+        "id": "candidate-15",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 104
+      },
+      {
+        "id": "candidate-16",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 105
+      },
+      {
+        "id": "candidate-17",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 106
+      },
+      {
+        "id": "candidate-18",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 107
+      },
+      {
+        "id": "candidate-19",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 108
+      },
+      {
+        "id": "candidate-20",
+        "phase": "measurement",
+        "prepared": true,
+        "outcome": "completed",
+        "milliseconds": 109
+      }
+    ]
+  }
+}

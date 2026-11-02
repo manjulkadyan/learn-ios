@@ -1,0 +1,42 @@
+READ-ONLY COMMAND MENU. Nothing in this file is executed automatically.
+Use only the isolated SwiftUIWorkbench artifacts and synthetic diagnostic inputs.
+Resolve actual project, scheme, target, product and destination names first.
+Quoted placeholders below need replacement with inspected scratch paths; do not
+run them as literal commands against company projects or broad directories.
+
+1. Installed tool identity and available scratch schemes:
+   xcodebuild -version
+   xcrun swift --version
+   xcodebuild -list -project <scratch-project.xcodeproj>
+
+2. Selected effective settings (no build; a generator/package may still resolve):
+   xcodebuild -showBuildSettings -project <scratch-project.xcodeproj> -scheme <verified-scheme> -configuration Release -destination <verified-destination>
+   Inspect only CONFIGURATION, PRODUCT_BUNDLE_IDENTIFIER, PRODUCT_MODULE_NAME,
+   SWIFT_ACTIVE_COMPILATION_CONDITIONS, SWIFT_OPTIMIZATION_LEVEL,
+   DEBUG_INFORMATION_FORMAT, FULL_PRODUCT_NAME and TARGET_BUILD_DIR for the
+   relevant scratch target. Do not paste the unfiltered settings into a report.
+   If package resolution or generation is required, record that limitation;
+   these instructions do not authorize mutation of company configurations.
+
+3. Already built scratch artifact identity (commands do not create a build):
+   plutil -extract CFBundleIdentifier raw -o - <scratch-app>/Info.plist
+   plutil -extract CFBundleExecutable raw -o - <scratch-app>/Info.plist
+   ls <verified-owning-resource-bundle>
+   xcrun dwarfdump --uuid <verified-scratch-executable>
+   xcrun dwarfdump --uuid <verified-scratch-dSYM>
+   Record UUID and architecture for both plus the crash's image entry.
+
+4. LLDB, only when an authorized scratch process is stopped:
+   thread backtrace
+   frame variable count
+   image list -o -f
+   Inspect stop reason, selected thread/frame and image identity. Source mappings
+   and frame values can be unavailable in optimized code. Do not use expression
+   to call application methods as if it were read-only stored-value inspection.
+
+5. Host policy evaluation, from the course directory:
+   node --test labs/MeasurementLab/test-evaluate.mjs
+   node labs/MeasurementLab/evaluate.mjs labs/MeasurementLab/fixtures/pass.json
+   Repeat with regression, invalid-preparation and missing-data fixtures.
+   Exit codes: pass 0, regression 1, invalid preparation 2, missing data 3,
+   incompatible cohort 4, correctness failure 5, invalid data or I/O/JSON failure 6.
