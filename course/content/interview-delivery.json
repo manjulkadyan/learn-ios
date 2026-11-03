@@ -5,25 +5,25 @@
       "lesson": "105",
       "level": "Senior",
       "kind": "Explain",
-      "prompt": "Explain how you establish that a scratch artifact has the intended environment, capabilities, and resources.",
-      "scenario": "The scheme is named Sandbox, but the source manifest resolves plist and entitlement paths through configuration variables.",
+      "prompt": "How would you verify the environment, capabilities and resources of the scratch artifact actually produced?",
+      "scenario": "The scheme is called Sandbox. The source manifest selects plist and entitlement paths through configuration variables, so the name alone does not show their resolved values.",
       "minutes": 8,
       "androidBridge": "Compare Android merged-manifest/signing inspection with iOS effective settings, profiles, signed claims, and nested bundles; scheme names are not product flavors.",
       "rubric": [
-        "Names exact action/configuration/destination coordinates",
-        "Obtains effective settings rather than trusting source placeholders",
-        "Separates requested, profile-authorized, and signed entitlements",
-        "Checks per-executable identity and resource ownership",
-        "States that local metadata consistency cannot authenticate signing"
+        "Records the exact action, configuration and destination.",
+        "Obtains resolved effective settings rather than trusting source placeholders.",
+        "Separates requested entitlements, profile authorization and signed claims.",
+        "Checks each executable’s identity and the bundle that owns each resource.",
+        "Explains that matching local metadata does not authenticate signing."
       ],
-      "answerHTML": "<p>I first write the intended bundle ID, environment, version/build, action, configuration, destination, and source revision. I retain effective settings from that selected action, including resolved plist and entitlement paths and compilation conditions. The scheme name is a label, not evidence of its endpoint or capabilities.</p><p>I then inspect the emitted executable's signed claims and the applicable provisioning profile, checking the identifier and capability-specific authorization for each app or extension. Requested entitlements alone cannot prove the final claims. The application identifier prefix should come from actual account/profile evidence rather than a universal team-ID assumption.</p><p>Finally I inventory packaged resources and perform representative lookups from the owning bundles. Privacy manifest presence is separate from accurate declared use. A local JSON gate can compare these supplied facts and attachments, but actual signature inspection, privacy review, installation, and environment behavior remain manual evidence boundaries.</p>",
+      "answerHTML": "<p>Write down exactly which product is intended: bundle ID, environment, version and build, action, configuration, destination and source revision. Those coordinates identify the build being checked. I retain effective settings from that selected action, including resolved plist and entitlement paths and compilation conditions. The scheme name is a label, not evidence of its endpoint or capabilities.</p><p>Inspect the produced executable’s signed entitlements, its claims to capabilities. Compare them with the applicable provisioning profile’s authorization for each app or extension. Requested entitlements alone cannot prove the final claims. The application identifier prefix should come from actual account/profile evidence rather than a universal team-ID assumption.</p><p>List the packaged resources and try representative lookups from the bundle that owns each one. Privacy manifest presence is separate from accurate declared use. A local JSON gate can compare these supplied facts and attachments, but actual signature inspection, privacy review, installation, and environment behavior remain manual evidence boundaries.</p>",
       "followUps": [
-        "How would a widget change the identity inventory?",
-        "What result changes if source intent and effective settings disagree?"
+        "Which extra executable and bundle identities must be checked when a widget is included?",
+        "What should happen when source intent and resolved effective settings disagree?"
       ],
       "pitfalls": [
-        "Trusting Release or Sandbox names as runtime configuration",
-        "Treating a privacy file or exact dictionary comparison as complete authorization"
+        "Treating Release or Sandbox as proof of the runtime environment.",
+        "Treating a privacy file or matching entitlement dictionary as complete authorization."
       ]
     },
     {
@@ -31,26 +31,26 @@
       "lesson": "105",
       "level": "Staff",
       "kind": "Debug",
-      "prompt": "Design the smallest investigation and revision plan for a candidate that installs fresh but fails after an update.",
-      "scenario": "A tester deleted baseline 41 before installing candidate 42. Another tester reports lost shared settings after a real update.",
+      "prompt": "A candidate installs fresh but fails after updating an existing app. What is the smallest investigation and repair plan?",
+      "scenario": "One tester deletes baseline 41 before installing candidate 42. Another preserves the baseline and reports lost shared settings after a real update.",
       "minutes": 12,
       "androidBridge": "Android update tests also require a preserved baseline, but iOS Keychain groups, app groups, provisioning, and nested executable identities have distinct rules.",
       "rubric": [
-        "Rejects deletion as upgrade evidence",
-        "Captures baseline/candidate/device/channel identities",
-        "Identifies relevant durable and entitlement ownership boundaries",
-        "Separates observed failure from proposed cause",
-        "Assigns repair and compatibility owners",
-        "Requires independent review and affected-transition retest"
+        "Calls the deleted-baseline run fresh-install evidence rather than upgrade evidence.",
+        "Records baseline, candidate, device and distribution-channel identities.",
+        "Checks the relevant durable-store and entitlement owners.",
+        "Separates the observed loss of access from a proposed cause.",
+        "Names repair and compatibility owners.",
+        "Requires independent review and retests the affected upgrade transition."
       ],
-      "answerHTML": "<p>The first tester obtained fresh-install evidence, so the upgrade row remains pending. I request the second tester's baseline and candidate identities, device/OS, channel, preserved data setup, and exact observation. I retain raw artifacts before proposing a cause.</p><p>I compare bundle identifiers, signed access groups, relevant app-group membership, resource lookup, and the intended storage migration. A changed identity may create a separate installation or change access rather than erase data. I do not infer Keychain cleanup from uninstall behavior or assume a profile contains every requested claim.</p><p>I reproduce the preserved-baseline transition in an authorized scratch target using synthetic data. The owner of the affected store or entitlement boundary supplies a narrow repair and compatibility plan. Independent review checks the revised artifact and acceptance conditions; retest covers upgrade and fresh installation separately. Missing device or signing evidence stays pending. A rollout pause limits expansion but does not downgrade installed clients.</p>",
+      "answerHTML": "<p>Deleting baseline 41 removed the state needed for an upgrade test. That run checks fresh installation; upgrade verification is still pending. I request the second tester's baseline and candidate identities, device/OS, channel, preserved data setup, and exact observation. I retain raw artifacts before proposing a cause.</p><p>Compare the two artifacts’ bundle IDs, signed access groups, app-group membership, resource lookup and planned storage migration. These decide which installation and shared data each executable can access. A changed identity may create a separate installation or change access rather than erase data. I do not infer Keychain cleanup from uninstall behavior or assume a profile contains every requested claim.</p><p>I reproduce the preserved-baseline transition in an authorized scratch target using synthetic data. The owner of the affected store or entitlement boundary supplies a narrow repair and compatibility plan. Independent review checks the revised artifact and acceptance conditions; retest covers upgrade and fresh installation separately. Missing device or signing evidence stays pending. Pausing rollout stops expansion. It does not undo updates already installed.</p>",
       "followUps": [
-        "What if only the extension loses access?",
-        "How would you recover data without promising an App Store downgrade?"
+        "What shared identity and access checks change if only the extension loses access?",
+        "How could recovery restore data without promising an App Store downgrade?"
       ],
       "pitfalls": [
-        "Deleting the baseline to make the test pass",
-        "Rotating shared credentials before locating the failed boundary"
+        "Deleting the baseline to make the upgrade test pass.",
+        "Rotating shared credentials before identifying which access or storage boundary failed."
       ]
     },
     {
@@ -58,25 +58,25 @@
       "lesson": "106",
       "level": "Senior",
       "kind": "Debug",
-      "prompt": "Choose raw artifacts and explain what each can establish for crash, hang, jetsam, and test failure.",
-      "scenario": "Support reports an unresponsive confirmation screen; CI also has a red test job, but no files have been attached.",
+      "prompt": "Which raw artifacts distinguish a crash, hang, jetsam termination and test failure? What can each artifact prove?",
+      "scenario": "Support reports an unresponsive confirmation screen. CI separately shows a red test job. Neither report includes attached diagnostic files.",
       "minutes": 10,
       "androidBridge": "Android crashes, ANRs, and low-memory kills are familiar categories, but iOS termination reasons, jetsam structure, and xcresult evidence require their own interpretation.",
       "rubric": [
-        "Requests process behavior and exact build/OS/time coordinates",
-        "Distinguishes crash reports, hang timelines, jetsam reports, and xcresult",
-        "Matches symbol UUID and architecture before using line names",
-        "Explains jetsam has no app thread backtraces",
-        "Separates intake hypotheses from causal proof"
+        "Requests whether the process ended and the exact build, OS and time.",
+        "Separates crash reports, hang timelines, jetsam reports and xcresult bundles.",
+        "Matches image UUID and architecture before trusting symbolicated line names.",
+        "Explains that jetsam does not include app thread backtraces.",
+        "Keeps intake hypotheses separate from proof of a cause."
       ],
-      "answerHTML": "<p>I first establish whether the process terminated, the operation state, build identity, device/OS, and time. A raw crash report supports exception or termination analysis and thread stacks. A hang needs sampled stacks or a timeline covering the unresponsive interval. A jetsam report describes memory pressure and process selection without app thread backtraces.</p><p>The CI failure needs its real xcresult bundle plus invocation, destination, selected tests, retries, and cancellation or skip status. That bundle cannot substitute for a field crash diagnostic. Before trusting application symbol names, I compare image UUID and architecture with retained executable and dSYM evidence.</p><p>With no files attached, these remain collection requests and competing hypotheses. I name each collector, preserve original bytes, and select a reproducer that could separate mechanisms. A red job and an unresponsive screen may be unrelated. Command help or a synthetic fixture proves neither runtime diagnosis nor operational recovery.</p>",
+      "answerHTML": "<p>Ask whether the process ended or stayed alive but unresponsive. Record the operation state, exact build, device, OS and time. A raw crash report supports exception or termination analysis and thread stacks. A hang needs sampled stacks or a timeline covering the unresponsive interval. Jetsam is a memory-pressure termination. Its report describes memory pressure and process selection; it does not provide app thread backtraces.</p><p>For CI, collect the actual xcresult test-result bundle. Keep its invocation, destination, selected tests, retries and cancellation or skip status with it. That bundle cannot substitute for a field crash diagnostic. Before trusting application symbol names, I compare image UUID and architecture with retained executable and dSYM evidence.</p><p>Without the files, these are requests for evidence and possible explanations. They are not a diagnosis. I name each collector, preserve original bytes, and select a reproducer that could separate mechanisms. A red job and an unresponsive screen may be unrelated. Command help or a synthetic fixture proves neither runtime diagnosis nor operational recovery.</p>",
       "followUps": [
-        "How would partial symbolication change your claim?",
-        "Which observation distinguishes watchdog termination from a nonterminating hang?"
+        "Which claims must stay limited if only some application frames can be symbolicated?",
+        "What observation would distinguish watchdog termination from a hang where the process remains alive?"
       ],
       "pitfalls": [
-        "Inventing a stack from an error message",
-        "Treating all disappearing screens as catchable Swift errors"
+        "Inventing a stack trace from an error message.",
+        "Treating every disappearing screen as a catchable Swift error."
       ]
     },
     {
@@ -84,26 +84,26 @@
       "lesson": "106",
       "level": "Staff",
       "kind": "Design",
-      "prompt": "Review a proposed incident closure based on a lower crash count and a rebuilt dSYM.",
-      "scenario": "The source commit matches, MetricKit uploads are delayed, and attempted operations fell during the mitigation window.",
+      "prompt": "Can a lower crash count and a dSYM rebuilt from the same commit justify closing the incident? What evidence is still needed?",
+      "scenario": "The source commit matches, but MetricKit uploads are delayed. Fewer operations were attempted during the mitigation window.",
       "minutes": 12,
       "androidBridge": "Android crash-free dashboards also need denominators and matching symbols; MetricKit delivery and iOS installed-client containment differ from Android telemetry assumptions.",
       "rubric": [
-        "Rejects commit identity as a substitute for image UUID",
-        "Preserves raw reports and distribution symbols",
-        "Defines comparable attempted-operation cohorts",
-        "Accounts for missing/delayed diagnostics",
-        "Separates containment, mechanism test, and recovery",
-        "Assigns owners and evidence required for closure"
+        "Requires matching image UUID rather than only commit identity.",
+        "Preserves raw reports and symbols from the distributed binary.",
+        "Compares the same eligible attempted-operation cohorts.",
+        "Accounts for absent and delayed diagnostics.",
+        "Separates containment, a mechanism test and operational recovery.",
+        "Names owners and the evidence needed before closure."
       ],
-      "answerHTML": "<p>I would keep closure pending. A rebuilt dSYM from the same commit may have a different image UUID, so I request the retained symbols matching the distributed binary and architecture. A lower raw crash count with fewer attempted operations cannot establish better reliability; mitigation may have caused abandonment.</p><p>I define the same eligible-attempt cohort, confirmed-success outcome, cancellation policy, build/OS window, and diagnostic coverage before comparing recovery. MetricKit's metric delivery is periodic and coverage is not a complete synchronous incident stream. Uploaded payload delay needs a separate collection note.</p><p>Containment may still be justified while diagnosis remains open, but its owner must state installed-client limits. Closure needs a controlled mechanism test for the repair and comparable post-repair operational evidence. A reviewer should challenge competing explanations and missing artifacts. If those observations are unavailable, report successful containment or local regression checks only, leaving cause and recovery unverified.</p>",
+      "answerHTML": "<p>Keep closure pending until the symbols and recovery evidence match the distributed artifact. A rebuilt dSYM from the same commit may have a different image UUID, so I request the retained symbols matching the distributed binary and architecture. Fewer crashes can simply follow fewer attempts. Compare rates and outcomes for the same eligible attempts; mitigation might instead have caused people to abandon the operation.</p><p>Before comparing recovery, define which attempts are eligible, what counts as confirmed success, how cancellation is counted, the build and OS window, and diagnostic coverage. MetricKit's metric delivery is periodic and coverage is not a complete synchronous incident stream. Uploaded payload delay needs a separate collection note.</p><p>Containment can still help while diagnosis is open. Its owner must say which already installed clients it can and cannot affect. Closure needs a controlled mechanism test for the repair and comparable post-repair operational evidence. A reviewer should challenge competing explanations and missing artifacts. If those observations are unavailable, report successful containment or local regression checks only, leaving cause and recovery unverified.</p>",
       "followUps": [
-        "What if the crash rate falls but confirmed success also falls?",
-        "What can a remote flag fail to contain before startup configuration loads?"
+        "What does recovery mean if crash rate falls but confirmed success also falls?",
+        "Which startup failures can occur before a remote containment flag loads?"
       ],
       "pitfalls": [
-        "Using marketing version or commit to guarantee symbolication",
-        "Turning missing telemetry into proof of health"
+        "Using a marketing version or source commit as a guarantee that symbols match.",
+        "Treating missing telemetry as proof that the system is healthy."
       ]
     },
     {
@@ -111,26 +111,26 @@
       "lesson": "107",
       "level": "Staff",
       "kind": "Code",
-      "prompt": "Explain the invariants an acceptance gate must check after independent review changes a requirement.",
-      "scenario": "An initial validator accepts zero blockers. A reviewer adds a localization requirement, but the old test result remains attached.",
+      "prompt": "A reviewer adds a localization requirement. Which rules must the acceptance gate enforce before it can accept the revised artifact?",
+      "scenario": "The first validator accepts zero blockers. Independent review adds a localization requirement, but the packet still attaches the old test result.",
       "minutes": 10,
       "androidBridge": "A Kotlin data class and pure predicate can model the same review values, but Swift throws, Sendable, and actor/lifetime contracts are separate mechanisms.",
       "rubric": [
-        "Requires independent reviewer rather than author self-approval",
-        "Binds review and retest to current decision inputs",
-        "Checks attachment integrity and source revision",
-        "Keeps unresolved blockers pending",
-        "Distinguishes structural gate checks from authenticated human review",
-        "Explains negative tests that target stale acceptance"
+        "Requires a reviewer independent of the author.",
+        "Binds review and retest to the current requirements and decision inputs.",
+        "Checks attachment bytes, paths and the source revision.",
+        "Leaves unresolved blockers pending.",
+        "Separates structural checks from authenticated human review.",
+        "Tests changed inputs that must invalidate stale acceptance."
       ],
-      "answerHTML": "<p>Zero blockers is insufficient because it describes a potentially old record. The revised gate must bind required resources, artifact identity, evidence paths and digests, and other decision inputs to the reviewed fingerprint. Evidence must name the current source revision, and retest must exercise the affected new requirement.</p><p>The Swift teaching model compares currentRevision with reviewedRevision and testedRevision, rejects an empty or identical reviewer, and throws when blockers remain. Sendable on immutable review values permits safe transfer; it neither schedules work nor authenticates the reviewer. The Python companion adds actual path and digest consistency checks.</p><p>I add negative cases for a changed requirement, stale review, changed attachment bytes, self-review, and a blocker accepted merely to meet a deadline. The independent reviewer inspects the revised artifact and closure evidence. If no person participated, automated structural checks can pass while actual independent critique remains pending. Fixture labels cannot fill that gap.</p>",
+      "answerHTML": "<p>Zero blockers may describe an old review. A new requirement changes what must be accepted, like a checklist gaining another required item. The revised gate must bind required resources, artifact identity, evidence paths and content digests to the reviewed fingerprint. A digest summarizes bytes; the fingerprint identifies the decision inputs that were reviewed. Evidence must name the current source revision, and retest must exercise the affected new requirement.</p><p>The Swift model requires currentRevision, reviewedRevision and testedRevision to match. It rejects an empty reviewer or the author as reviewer, and throws if blockers remain. Sendable on immutable review values permits safe transfer; it neither schedules work nor authenticates the reviewer. The Python companion adds actual path and digest consistency checks.</p><p>Test cases that must fail: a changed requirement, old review, changed attachment bytes, self-review and a blocker accepted merely to meet a deadline. The independent reviewer inspects the revised artifact and closure evidence. If no person participated, automated structural checks can pass while actual independent critique remains pending. Fixture labels cannot fill that gap.</p>",
       "followUps": [
-        "Why exclude review fields from the record fingerprint?",
-        "Which inputs must change when a result bundle is replaced?"
+        "Why should review fields be excluded from the fingerprint of the record being reviewed?",
+        "Which inputs become stale when the result bundle is replaced?"
       ],
       "pitfalls": [
-        "Counting different reviewer strings as authenticated independence",
-        "Keeping old tests after the acceptance contract changes"
+        "Treating two different reviewer strings as proof of authenticated independence.",
+        "Keeping old test acceptance after the requirement changes."
       ]
     },
     {
@@ -138,26 +138,26 @@
       "lesson": "107",
       "level": "Staff",
       "kind": "Design",
-      "prompt": "Revise the evidence viewer when a representative bundle violates its small-file assumption.",
-      "scenario": "The host validator reads file bytes eagerly. A future UI integration must remain responsive and discard stale results after navigation.",
+      "prompt": "The evidence viewer receives a bundle too large for its small-file assumption. How would you bound work and prevent old results from updating a departed screen?",
+      "scenario": "The host validator eagerly reads whole files into memory. A future UI integration must stay responsive and discard results made obsolete by navigation.",
       "minutes": 15,
       "androidBridge": "Android lifecycle scopes suggest cancellation ownership, but Swift actor inheritance and synchronous filesystem calls do not automatically move work off the main actor.",
       "rubric": [
-        "Names the changed workload and preserves original scope claims",
-        "Chooses bounded or streaming work with explicit execution ownership",
-        "Protects final UI commit using candidate/generation identity",
-        "Handles cooperative cancellation and late outcomes",
-        "Defines digest-equivalence and affected integration checks",
-        "Keeps unavailable device/performance observations pending"
+        "States the larger workload while preserving the original small-file acceptance scope.",
+        "Chooses bounded or streaming work with an explicit execution owner.",
+        "Checks candidate and generation identity at the final UI commit.",
+        "Handles cooperative cancellation and late outcomes.",
+        "Tests equivalent digests and the affected integration behavior.",
+        "Leaves unavailable device and performance observations pending."
       ],
-      "answerHTML": "<p>The current acceptance was for small local evidence files, so I preserve that scope and revise the UI integration proposal. I would characterize representative bundle size and responsiveness before claiming a performance defect or improvement. A streaming digest can reduce peak buffered bytes while preserving the declared directory-name and file-content hashing contract.</p><p>Execution ownership must be deliberate: creating a Swift task from main-actor code does not prove blocking file reads moved away from UI-critical execution. The consumer captures candidate identity and a generation, requests cancellation on navigation or replacement, and checks both before committing status. Cooperative cancellation may arrive after a synchronous read finishes.</p><p>I retest digest equivalence, changed-file detection, cancellation checkpoints, and late success/error rejection, then obtain relevant target interaction and recording evidence. Independent review checks the revised mechanism and limits. Without a device recording, I can report functional host checks and a proposed execution design, not measured responsiveness or production benefit.</p>",
+      "answerHTML": "<p>The current check was accepted for small local files. A large bundle changes that workload, so revise the UI design without expanding the old evidence claim. I would characterize representative bundle size and responsiveness before claiming a performance defect or improvement. A streaming digest reads chunks instead of holding the whole file. Keep the same declared rules for hashing directory names and file contents. Reduced buffering is a design property; actual memory benefit still needs evidence.</p><p>Decide explicitly where the work executes: creating a Swift task from main-actor code does not prove blocking file reads moved away from UI-critical execution. The consumer captures candidate identity and a generation, requests cancellation on navigation or replacement, and checks both before committing status. Cooperative cancellation may arrive after a synchronous read finishes.</p><p>Check equal digests for equal inputs, detection of changed files, cancellation checkpoints and rejection of late success and error. Then obtain the actual target interaction and recording evidence. Independent review checks the revised mechanism and limits. Without a device recording, I can report functional host checks and a proposed execution design, not measured responsiveness or production benefit.</p>",
       "followUps": [
-        "How would a mutation during hashing affect evidence consistency?",
-        "What requires a new fingerprint and retest after this revision?"
+        "What consistency policy is needed if a file changes while it is being hashed?",
+        "Which changed inputs require a new fingerprint, review and retest?"
       ],
       "pitfalls": [
-        "Assuming Task creation guarantees background execution",
-        "Reporting invented memory or latency savings"
+        "Assuming creating Task moves blocking work off MainActor.",
+        "Reporting memory or latency savings that were never measured."
       ]
     },
     {
@@ -165,26 +165,26 @@
       "lesson": "108",
       "level": "Staff",
       "kind": "Design",
-      "prompt": "Define an executable adoption and deprecation contract across app, widget, service, and Android owners.",
-      "scenario": "A shared evidence schema is proposed, and several teams have added its dependency without accepted consumer checks.",
+      "prompt": "What would count as real adoption of the shared schema across app, widget, service and Android teams? Define support, exceptions and removal rules.",
+      "scenario": "Several teams have added the proposed evidence-schema dependency. None has yet provided accepted consumer behavior checks.",
       "minutes": 15,
       "androidBridge": "Java interfaces and Kotlin adapters can share product outcomes with Swift protocols, but native scheduling, signing, and installed-client compatibility stay platform specific.",
       "rubric": [
-        "Defines eligible consumers before computing adoption",
-        "Requires behavior evidence rather than dependency presence",
-        "Assigns decision rights and funded integration assistance",
-        "Keeps exceptions visible with owners and compensating checks",
-        "Separates source deprecation from installed compatibility",
-        "Requires observed outcome evidence without inventing adoption"
+        "Defines eligible consumers before calculating adoption.",
+        "Requires checked behavior rather than dependency presence alone.",
+        "Names decision rights and funds integration help.",
+        "Keeps exceptions visible with an owner and compensating checks.",
+        "Separates source deprecation from compatibility for installed clients.",
+        "Requires observed outcomes without inventing adoption."
       ],
-      "answerHTML": "<p>I inventory eligible consumers with stable identities and explicit scope before counting adoption. An adopted row needs accepted behavior checks, build/target coordinates, relevant resources and interactions, and owner acceptance. Adding a dependency is a leading indicator, not consumer proof. Pending consumers and exceptions remain visible in the denominator.</p><p>The platform owner owns the schema and exception policy; consumer owners own native behavior; service and release owners preserve installed-client compatibility. I fund fixtures, adapter support, integration help, and temporary dual-path maintenance so adoption has practical incentives rather than only a mandate.</p><p>An exception records its reason, owner, compensating check, baseline, and review trigger. Source deprecation warnings can start before removal, but compiler guidance does not change installed binaries. Retirement requires supported consumer evidence, compatibility review, and comparable operational outcomes. The local gate checks record completeness and attachment consistency; authentic cross-team acceptance and customer outcomes remain external evidence, never synthetic fixture achievements.</p>",
+      "answerHTML": "<p>List which consumers are eligible and give each a stable ID before counting adoption. Otherwise the denominator can change to hide difficult integrations. An adopted row needs accepted behavior checks, build/target coordinates, relevant resources and interactions, and owner acceptance. Adding a dependency is a leading indicator, not consumer proof. Pending consumers and exceptions remain visible in the denominator.</p><p>Name separate responsibilities. The platform owner owns the schema and exception policy. Consumer owners own native behavior. Service and release owners preserve compatibility for installed clients. I fund fixtures, adapter support, integration help, and temporary dual-path maintenance so adoption has practical incentives rather than only a mandate.</p><p>An exception needs a reason, an owner, a baseline, an extra check to cover its risk and a trigger for review. Source deprecation warnings can start before removal, but compiler guidance does not change installed binaries. Retirement requires supported consumer evidence, compatibility review, and comparable operational outcomes. The local gate checks record completeness and attachment consistency; authentic cross-team acceptance and customer outcomes remain external evidence, never synthetic fixture achievements.</p>",
       "followUps": [
-        "What makes a consumer ineligible rather than exceptional?",
-        "Who can accept residual compatibility risk and pause expansion?"
+        "Which scope rule makes a consumer ineligible rather than an eligible exception?",
+        "Who can accept residual compatibility risk or pause expansion?"
       ],
       "pitfalls": [
-        "Removing difficult consumers from the denominator",
-        "Equating published guidelines with organizational adoption"
+        "Removing difficult consumers from the adoption denominator.",
+        "Counting published guidance as proof that teams adopted it."
       ]
     },
     {
@@ -192,26 +192,26 @@
       "lesson": "108",
       "level": "Staff",
       "kind": "Design",
-      "prompt": "Change the strategy when a widget shares durable state and an older installed reader remains supported.",
-      "scenario": "An app-only actor adapter was ready for removal of the old reader. The widget owner cannot adopt this quarter.",
+      "prompt": "How must adoption and removal change when a widget shares durable data and an older installed reader must remain supported?",
+      "scenario": "The app-only actor adapter was ready to remove the old reader. The widget uses shared durable state and cannot adopt this quarter.",
       "minutes": 18,
       "androidBridge": "Android process and durable-store boundaries also need explicit coordination; an iOS actor protects its own isolation domain rather than interprocess storage transactions.",
       "rubric": [
-        "Recognizes the new process/reader compatibility boundary",
-        "Adds the widget to the eligible ledger",
-        "Creates an owned time-reviewed exception",
-        "Sequences reader compatibility before new writers",
-        "Revises adoption funding and native coordination checks",
-        "Separates bounded pilot from removal and actual operational outcomes"
+        "Recognizes the additional process and old-reader compatibility boundary.",
+        "Adds the widget to the eligible-consumer ledger.",
+        "Creates an owned exception with a review date.",
+        "Makes supported readers compatible before new-format writers run.",
+        "Revises integration funding and native coordination checks.",
+        "Separates a bounded app pilot from removal and observed operational outcomes."
       ],
-      "answerHTML": "<p>The changed constraint invalidates the app-only ownership assumption. An actor in the containing app cannot serialize the widget process's durable-state access. I add the widget to the eligible ledger and retain a supported old reader through an exception owned by the widget and durable-data leads.</p><p>The exception's compensating checks cover old/new reader-writer combinations, interrupted writes, account separation, and protected-data availability where relevant. The storage system's supported transaction or coordination mechanism must be chosen and tested; a generic actor or file lock is not a universal answer. New-format writers wait until supported readers are compatible.</p><p>I revise funding and timing to provide integration help and maintain the temporary path. An independent reviewer checks the changed ledger, recovery plan, and evidence; the updated fingerprint requires retest. The app pilot may continue within compatible bounds while removal remains pending. A review date schedules reassessment, not deletion. No fabricated adoption or outcome improvement follows from changing an exception row.</p>",
+      "answerHTML": "<p>The widget runs in another process. That changes the ownership boundary the app-only plan assumed. An actor in the containing app cannot serialize the widget process's durable-state access. I add the widget to the eligible ledger and retain a supported old reader through an exception owned by the widget and durable-data leads.</p><p>The exception needs extra checks for old and new reader-writer combinations, interrupted writes, account separation and protected-data availability where relevant. The storage system's supported transaction or coordination mechanism must be chosen and tested; a generic actor or file lock is not a universal answer. New-format writers wait until supported readers are compatible.</p><p>Adjust funding and timing so the widget gets integration help and the temporary compatible path is maintained. An independent reviewer checks the changed ledger, recovery plan, and evidence; the updated fingerprint requires retest. The app pilot may continue within compatible bounds while removal remains pending. A review date schedules reassessment, not deletion. No fabricated adoption or outcome improvement follows from changing an exception row.</p>",
       "followUps": [
-        "What if the widget needs a permanently different native adapter?",
-        "How does service response retirement differ from local source deprecation?"
+        "What if the widget permanently needs a different native adapter?",
+        "How do retiring service responses and deprecating local source differ for installed clients?"
       ],
       "pitfalls": [
-        "Deleting the baseline because the exception date elapsed",
-        "Claiming process-local isolation solves shared-store compatibility"
+        "Deleting compatibility support merely because the exception’s review date passed.",
+        "Expecting a process-local actor to solve shared-store compatibility."
       ]
     }
   ]

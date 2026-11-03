@@ -5,24 +5,24 @@
       "lesson": "101",
       "level": "Senior",
       "kind": "Explain",
-      "prompt": "Explain what Work, ModelApplied and ShellConstruction prove, then choose the boundary for accepted-tap-to-usable-results latency.",
-      "scenario": "The scratch app exports short Work durations and emits ModelApplied before a table reload. A reviewer calls this a launch and first-frame improvement.",
+      "prompt": "What do Work, ModelApplied and ShellConstruction actually mark? Which extra boundary would measure an accepted tap to usable results?",
+      "scenario": "The scratch app exports short Work durations and emits ModelApplied before reloading the table. The reviewer calls this improved launch and first-frame timing.",
       "minutes": 7,
       "androidBridge": "Android repository trace sections, Activity callbacks and frame presentation also differ, but UIKit and Instruments define their own execution and presentation boundaries.",
       "rubric": [
-        "Names Work as worker-entry-to-model-ready and lists included phases.",
-        "Excludes queue waiting, main delivery and presentation from Work.",
-        "Identifies ModelApplied as an event and ShellConstruction as a delegate subphase.",
-        "Defines usable interaction evidence and an additional outer interval with failure outcomes."
+        "Defines Work as worker entry to model-ready and names its included phases.",
+        "Excludes queue wait, main delivery and frame presentation from Work.",
+        "Defines ModelApplied as an event and ShellConstruction as a delegate setup interval.",
+        "Defines observable usable interaction and an outer interval with every terminal outcome."
       ],
-      "answerHTML": "<p>Work begins after queue admission and includes row construction, projection, decoding, file round-trip verification and image wrapping. It ends before main-queue delivery. ModelApplied is an event before reloadData; neither proves that a frame was presented or that the intended row could receive an interaction. ShellConstruction surrounds delegate-owned root/window setup and excludes earlier process preparation and later presentation.</p><p>For accepted-tap latency I would retain these diagnostic boundaries and add an outer interval in a learner copy. Its start is the accepted action after validation; its end must reflect an explicitly defined usable result and a supported presentation or interaction observation. It needs terminal outcomes for error, cancellation and obsolete delivery. The export's worker success can coexist with later suppressed UI delivery because they are different contracts. I would first test complete output and attempt accounting, then save an attributable diagnostic trace and a matched confirmation batch. A successful build establishes the target artifact; it does not establish any measured launch improvement.</p>",
+      "answerHTML": "<p>Work measures the worker after it starts running, not the time waiting in the queue. It includes making rows, deriving their values, decoding, checking a file round trip and wrapping the image. It ends before main-queue delivery. ModelApplied marks a moment before reloadData; neither proves that a frame was presented or that the intended row could receive an interaction. ShellConstruction surrounds delegate-owned root/window setup and excludes earlier process preparation and later presentation.</p><p>To measure from an accepted tap to usable results, keep these inner markers and add an outer interval in a learner copy. Think of timing an order from acceptance to a usable meal, not only its preparation step. Its start is the accepted action after validation; its end must reflect an explicitly defined usable result and a supported presentation or interaction observation. It needs terminal outcomes for error, cancellation and obsolete delivery. The export's worker success can coexist with later suppressed UI delivery because they are different contracts. I would first test complete output and attempt accounting, then save a diagnostic trace tied to the slow work and a confirmation batch collected under matching conditions. A successful build establishes the target artifact; it does not establish any measured launch improvement.</p>",
       "followUps": [
-        "How would you include queue wait without changing the inner Work contract?",
-        "What would falsify a projection-only explanation for a slow accepted tap?"
+        "Where would an outer interval start to include queue wait while keeping Work unchanged?",
+        "Which trace finding would rule out projection alone as the cause of a slow accepted tap?"
       ],
       "pitfalls": [
-        "Calling a model assignment a presented frame.",
-        "Adding independent phase p95 values to estimate operation p95."
+        "Calling model assignment proof that a frame was displayed.",
+        "Adding separate phase p95 values as if they were the operation’s p95."
       ]
     },
     {
@@ -30,24 +30,24 @@
       "lesson": "101",
       "level": "Senior",
       "kind": "Debug",
-      "prompt": "Four attempts are accepted, then queued operations are cancelled. Why can pending remain nonzero, and how would you fix the harness while preserving the ledger?",
-      "scenario": "A simplified variant calls Operation.cancel on every queued item and decrements pending only inside each operation's main action.",
+      "prompt": "Four accepted attempts are cancelled while queued, but pending never reaches zero. Where should exactly-once terminal accounting live?",
+      "scenario": "This variant calls Operation.cancel on each queued item. It decrements pending only inside the operation’s main action.",
       "minutes": 9,
       "androidBridge": "Future.cancel and coroutine cancellation also require terminal ownership/accounting, but neither guarantees that a queued Operation's main method runs.",
       "rubric": [
-        "Explains that pre-start cancellation can skip Operation.main.",
-        "Separates accepted-attempt accounting from CPU cancellation.",
-        "Proposes a lock-protected cooperative flag or independent exactly-once terminal owner.",
-        "Tests a suspended-queue cancellation schedule and suppresses late UI publication."
+        "Explains why cancellation before start can skip Operation.main.",
+        "Keeps the accepted-attempt ledger separate from stopping CPU work.",
+        "Uses a cooperative request flag or an independent exactly-once terminal owner.",
+        "Tests cancellation with a suspended queue and rejects late UI publication."
       ],
-      "answerHTML": "<p>The missing callbacks are a harness ownership error. OperationQueue may skip main for an operation cancelled before execution, so bookkeeping located only there never runs. Decrementing pending optimistically in the cancel button risks a second decrement if an executing operation later completes. I would choose one terminal-accounting owner and prove exactly-once completion.</p><p>ProfilingLab uses a lock-protected request flag instead of Operation.cancel for accepted attempts. Queued actions still execute, immediately observe the flag, close their intervals and report cancelled. Executing projection loops poll cooperatively, with checks around synchronous decoding and file calls. Those calls are not forcibly interrupted. A weak main-queue completion checks the request again before publishing UI. The host test suspends admission, accepts four operations, requests cancellation and resumes the queue, asserting that all four terminal callbacks drain without sleeps. The raw worker boundary may finish successfully before a later cancellation suppresses delivery, so a screen-level recorder needs a separate delivery classification. @unchecked Sendable documents the manual audit; the lock supplies synchronization.</p>",
+      "answerHTML": "<p>Each accepted attempt needs exactly one final ledger entry. Here cancellation can skip the only code that records that entry. OperationQueue may skip main for an operation cancelled before execution, so bookkeeping located only there never runs. Decrementing pending optimistically in the cancel button risks a second decrement if an executing operation later completes. Give one owner responsibility for recording the final outcome exactly once.</p><p>For accepted attempts, ProfilingLab records a stop request in a flag protected by a lock. It does not call Operation.cancel to skip their actions. Queued actions still execute, immediately observe the flag, close their intervals and report cancelled. Executing projection loops poll cooperatively, with checks around synchronous decoding and file calls. Those calls are not forcibly interrupted. A weak main-queue completion checks the request again before publishing UI. The host test suspends admission, accepts four operations, requests cancellation and resumes the queue, asserting that all four terminal callbacks drain without sleeps. A worker can finish successfully before cancellation later blocks UI delivery. A screen-level recorder must classify that delivery separately. @unchecked Sendable documents the manual audit; the lock supplies synchronization.</p>",
       "followUps": [
-        "How would an independent completion owner handle cancellation racing with success?",
-        "What changes if the recorder must survive controller deallocation?"
+        "How would an independent completion owner choose one ledger outcome when cancellation races success?",
+        "Who should retain the recorder if accounting must survive controller deallocation?"
       ],
       "pitfalls": [
-        "Counting cancellation twice through two competing completion paths.",
-        "Assuming cancellation interrupts a synchronous ImageIO call."
+        "Decrementing pending through two competing completion paths.",
+        "Expecting cancellation to forcibly interrupt a synchronous ImageIO call."
       ]
     },
     {
@@ -55,24 +55,24 @@
       "lesson": "102",
       "level": "Senior",
       "kind": "Debug",
-      "prompt": "Explain two different reasons memory can remain after a batch and give an intervention check for each.",
-      "scenario": "Four decoded images remain in the controller. Separately, a RetentionProbe survives after Release owner; its stored callback captures self.",
+      "prompt": "Why might memory remain after a batch without being a leak? How would you distinguish retained images from a callback cycle?",
+      "scenario": "The controller still owns four decoded images. Separately, RetentionProbe survives Release owner because its stored callback captures self strongly.",
       "minutes": 8,
       "androidBridge": "Java/Kotlin collectors can collect many unreachable cycles; Swift ARC requires an explicit strong-edge change. Image buffers still need bounded lifecycle ownership on both platforms.",
       "rubric": [
-        "Distinguishes intentional images-array ownership from a closure cycle.",
-        "Names the probe-to-callback-to-probe retaining path and weak witness semantics.",
-        "Uses allocation generations for population and Memory Graph for ownership.",
-        "Checks clear-payload and stop behavior independently from allocator footprint."
+        "Separates intentional images-array retention from a strong-reference cycle.",
+        "Draws probe-to-callback-to-probe ownership and explains the weak witness.",
+        "Uses allocation generations to track populations and Memory Graph to find owners.",
+        "Checks Clear payload and stop separately from the process’s allocator footprint."
       ],
-      "answerHTML": "<p>The images array intentionally retains every successful batch UIImage while the table displays only the first. That is a strong owner, not proof of a leak. After the batch drains, Clear displayed payload removes the array's images, rows and captions. Allocation generations can show whether the corresponding application population stops surviving. Process footprint need not immediately fall because allocator pages or framework caches may remain.</p><p>The probe is different: it owns a callback whose capture context strongly owns the probe. Clearing the controller's probe property removes only the external owner; the callback cycle remains. The weak witness can observe survival but does not retain the object. A stopped Memory Graph should follow incoming strong edges through the stored closure. Calling stop clears callback, breaking the cycle; the host weak-observer test verifies release when no other root exists. Neither an autorelease pool nor downsampling removes this ownership edge. I would separately inspect transient decode peak during overlap, because a small post-clear population cannot prove a safe peak on a phone.</p>",
+      "answerHTML": "<p>The controller’s images Array still owns all successful batch UIImages, even though the table displays only the first. An owner keeping data alive is not automatically a leak. After the batch drains, Clear displayed payload removes the array's images, rows and captions. Allocation generations group allocations by a chosen interval. They can show whether those application objects stop surviving after Clear. Process footprint need not immediately fall because allocator pages or framework caches may remain.</p><p>The probe has a cycle: it keeps its callback, and the callback’s strong capture keeps the probe. Clearing only the controller’s reference leaves that loop alive. Clearing the controller's probe property removes only the external owner; the callback cycle remains. The weak witness can observe survival but does not retain the object. A stopped Memory Graph should follow incoming strong edges through the stored closure. Calling stop clears callback, breaking the cycle; the host weak-observer test verifies release when no other root exists. Neither an autorelease pool nor downsampling removes this ownership edge. I would separately inspect transient decode peak during overlap, because a small post-clear population cannot prove a safe peak on a phone.</p>",
       "followUps": [
-        "What evidence would show another owner remains after stop?",
-        "Why can a smaller decoded image still coincide with a higher transient peak?"
+        "Which retaining path would explain survival even after stop clears the callback?",
+        "How could smaller decoded output still have a higher temporary allocation peak?"
       ],
       "pitfalls": [
-        "Treating every retained object as a leak.",
-        "Equating released Swift owners with immediate OS footprint reduction."
+        "Calling every retained object a leak.",
+        "Expecting released Swift owners to immediately reduce OS-reported process footprint."
       ]
     },
     {
@@ -80,24 +80,24 @@
       "lesson": "102",
       "level": "Staff",
       "kind": "Design",
-      "prompt": "Design a controlled response to a claim that caption caching and thumbnails together improved launch, scrolling and memory.",
-      "scenario": "A synthetic app switches three controls at once and reports a shorter worker interval. No presented-frame, gesture or allocation artifact exists.",
+      "prompt": "Caching captions and making thumbnails changed at once. How would you test the separate launch, scrolling and memory claims?",
+      "scenario": "The app changes three controls together and reports a shorter worker interval. It has no frame-presentation, gesture or allocation artifact.",
       "minutes": 12,
       "androidBridge": "RecyclerView bind timing and Android image downsampling suggest hypotheses, but Apple launch, hitch tracks and Core Foundation image ownership require separate verification.",
       "rubric": [
-        "Rejects attribution from three simultaneous changes.",
-        "Designs separate launch, caption and decode experiments.",
-        "Preserves row text/identity, image geometry/orientation and failure/cancellation behavior.",
-        "Names evidence owners, relevant device artifacts and rollback/uncertainty conditions."
+        "Rejects causal attribution from three simultaneous changes.",
+        "Defines separate launch, caption and decode experiments.",
+        "Preserves row text and IDs, image dimensions and orientation, and failure and cancellation behavior.",
+        "Names evidence owners, actual device artifacts and rollback or uncertainty conditions."
       ],
-      "answerHTML": "<p>I would split the claim into three bounded experiments with independent guardrails. Launch needs process-start recording, a declared installation/process/cache preparation and a usability endpoint. ShellConstruction and Work cannot supply presented-frame evidence. For captions, freeze Indexed, Thumb and worker count, populate the same rows and compare repeated versus cached identical text under a fixed gesture. Use a common hitch/responsiveness track, then inspect a selected missed-deadline interval for main-thread Caption attribution.</p><p>For images, freeze the other axes and compare Full with Thumb using the same prepared source and eighty-point square contract. Verify dimensions, appearance and orientation, then record transient allocation and post-clear ownership separately. Host checks can establish dimensions, corrupt-source rejection and the probe ARC schedule, while phone quality and peak remain pending. Each experiment retains failures and cancellations and uses a matched confirmation batch. I would name the reviewer for readiness, the memory budget owner and a rollback for each isolated change. Without those artifacts the result remains a hypothesis and executable test setup, not an improvement claim.</p>",
+      "answerHTML": "<p>Run three separate experiments. Change one thing at a time and state which correctness and performance limits each experiment must preserve. Launch needs a recording from process start to a defined usable endpoint. Record how installation, process state and caches were prepared. ShellConstruction and Work cannot supply presented-frame evidence. For captions, freeze Indexed, Thumb and worker count, populate the same rows and compare repeated versus cached identical text under a fixed gesture. Use a common hitch/responsiveness track, then inspect a selected missed-deadline interval for main-thread Caption attribution.</p><p>For images, keep the other controls fixed. Compare Full and Thumb using the same prepared source and the same eighty-point square display requirement. Verify dimensions, appearance and orientation, then record transient allocation and post-clear ownership separately. Host checks can establish dimensions, corrupt-source rejection and the probe ARC schedule, while phone quality and peak remain pending. Keep failures and cancellations in every experiment’s ledger. Collect a confirmation batch under matching conditions. I would name the reviewer for readiness, the memory budget owner and a rollback for each isolated change. Without those artifacts the result remains a hypothesis and executable test setup, not an improvement claim.</p>",
       "followUps": [
-        "How would a wide panorama change the thumbnail acceptance contract?",
-        "What if Caption CPU decreases but render-server hitches remain unchanged?"
+        "How would a wide panorama change the required thumbnail geometry and quality checks?",
+        "What if Caption CPU time drops but render-server hitches do not change?"
       ],
       "pitfalls": [
-        "Using worker latency as total launch time.",
-        "Calling theoretical pixel arithmetic a measured footprint reduction."
+        "Using worker duration as total launch time.",
+        "Calling calculated pixel storage a measured footprint reduction."
       ]
     },
     {
@@ -105,24 +105,24 @@
       "lesson": "103",
       "level": "Senior",
       "kind": "Explain",
-      "prompt": "Explain the difference between queue capacity, accepted backlog and pressure response in ProfilingLab.",
-      "scenario": "A reviewer assumes four workers means four cores and that lowering concurrency at serious pressure immediately stops three decoders.",
+      "prompt": "How do worker capacity, accepted backlog and pressure response differ? Does four workers mean four cores, and does lowering the limit stop running decoders?",
+      "scenario": "The reviewer assumes four workers use four cores. They also assume lowering concurrency under serious pressure instantly stops three decoders.",
       "minutes": 7,
       "androidBridge": "Java ExecutorService and Kotlin dispatchers also have executor-specific limits; their thread, interruption and elasticity contracts do not match OperationQueue automatically.",
       "rubric": [
-        "Names four-attempt backlog and per-queue active capacity independently.",
-        "Explains lack of guaranteed physical-core parallelism or whole-process cap.",
-        "States that lowering concurrency does not affect already executing operations.",
-        "Distinguishes required versus speculative admission and pressure history limitations."
+        "Separates the fixed four-attempt accepted batch from this queue’s active-operation limit.",
+        "Rejects guaranteed physical-core parallelism or a whole-process limit.",
+        "Explains that a lower concurrency setting applies to later starts rather than running work.",
+        "Separates required and speculative admission and states limits of endpoint-only pressure history."
       ],
-      "answerHTML": "<p>The accepted backlog is a fixed four attempts, with another batch refused until pending reaches zero. maxConcurrentOperationCount limits executing operations on this queue only. It does not guarantee four cores or bound other queues, UIKit work, decoder internals or total retained output. Lowering the property changes subsequent admission and does not revoke operations already executing, as Apple's reference explicitly states.</p><p>The policy caps fair pressure at two and required work at one under serious, critical or Low Power Mode conditions. Its separate speculative branch returns zero, but the native batch is required work and uses speculative false. There is no implemented prefetch producer. Thermal observation has a controller-owned token and weak callback; Low Power Mode is read at admission in this minimal app. Endpoint pressure fields and the initial worker policy cannot establish that no intermediate condition change occurred. I would retain a policy history or externally annotate drift before relying on a sustained comparison. Active overlap and cancellation responsiveness require separate observations; source limits alone cannot prove lower energy or safe peak memory.</p>",
+      "answerHTML": "<p>The app accepts four attempts in a batch. It refuses another batch until all four have terminal outcomes and pending reaches zero. maxConcurrentOperationCount limits executing operations on this queue only. It does not guarantee four cores or bound other queues, UIKit work, decoder internals or total retained output. Lowering the property changes subsequent admission and does not revoke operations already executing, as Apple's reference explicitly states.</p><p>The policy allows at most two workers when thermal pressure is fair. It allows required work one worker under serious or critical pressure, or Low Power Mode. Its separate speculative branch returns zero, but the native batch is required work and uses speculative false. There is no implemented prefetch producer. Thermal observation has a controller-owned token and weak callback; Low Power Mode is read at admission in this minimal app. Pressure values recorded only at the endpoints cannot show every change during the run. The initial worker setting also cannot supply that history. I would retain a policy history or externally annotate drift before relying on a sustained comparison. Active overlap and cancellation responsiveness require separate observations; source limits alone cannot prove lower energy or safe peak memory.</p>",
       "followUps": [
-        "How would you bound bytes as well as task count?",
-        "What must change for recovery to avoid a burst of deferred speculative work?"
+        "What additional accounting would bound retained bytes as well as job count?",
+        "How should recovery avoid admitting a burst of deferred speculative work?"
       ],
       "pitfalls": [
-        "Calling an off-main API automatically nonblocking.",
-        "Confusing a pressure policy unit test with real thermal response evidence."
+        "Assuming an off-main API never blocks its executing thread.",
+        "Treating a pressure-policy unit test as measured real-device thermal response."
       ]
     },
     {
@@ -130,24 +130,24 @@
       "lesson": "103",
       "level": "Staff",
       "kind": "Design",
-      "prompt": "Propose an accountable concurrency policy change when four workers finish batches sooner but responsiveness and energy evidence are incomplete.",
-      "scenario": "The team has host correctness checks and one CPU trace. No supported device energy observation or representative peak-allocation batch has been obtained.",
+      "prompt": "Four workers finish a batch sooner, but UI responsiveness and energy are unmeasured. What policy change, evidence and recovery would you recommend?",
+      "scenario": "The team has host correctness checks and one CPU trace. It lacks supported device energy observations and representative peak-allocation batches.",
       "minutes": 12,
       "androidBridge": "Android thermal and power APIs support similar policy questions but expose different signals and device behavior; neither platform can derive battery savings from a stopwatch.",
       "rubric": [
-        "Separates worker, batch, queue and interaction metrics.",
-        "Keeps correctness, cancellation and unique-file ownership invariant.",
-        "Requires representative memory/pressure and supported device energy evidence for those claims.",
-        "Names owner, conservative admission, bounded follow-up and recovery criteria."
+        "Separates worker duration, batch duration, queue wait and interaction delay.",
+        "Preserves correct output, cancellation and unique-file ownership.",
+        "Requires representative device memory and pressure evidence and supported energy observations.",
+        "Names an owner, conservative admission, bounded follow-up and recovery criteria."
       ],
-      "answerHTML": "<p>I would preserve the conservative admission policy until the decision's missing guardrails are resolved. A shorter batch is useful only if it improves the intended outcome without unacceptable interaction delay, memory peak or sustained pressure. Freeze projection, decode, caption and preparation, then compare matched one-worker and four-worker batches on representative hardware. Retain worker durations, actual overlap, batch elapsed, main-thread interaction, pressure history and decoded-image peak separately.</p><p>The host already checks ordered output, corruption, unique-file round-trip/cleanup and cooperative cancellation; it cannot establish device energy. A supported power or energy observation must retain actual units, tool version, workload window, display and charging conditions. This local workload has no radio traffic, so radio-saving claims are out of scope. I would name the performance owner and product budget reviewer, predeclare bounded reruns and choose recovery by restoring queue admission while preserving cancellation and file contracts. If results remain inconclusive, the proposed policy remains conditional with a specific missing artifact, rather than retrying until a favorable percentile appears or inventing battery savings.</p>",
+      "answerHTML": "<p>Keep the conservative admission limit while the required responsiveness, memory and energy evidence is missing. Finishing sooner alone is not enough. A shorter batch is useful only if it improves the intended outcome without unacceptable interaction delay, memory peak or sustained pressure. Keep projection, decode, caption and preparation fixed, then compare matched one-worker and four-worker batches on representative hardware. Retain worker durations, actual overlap, batch elapsed, main-thread interaction, pressure history and decoded-image peak separately.</p><p>Host checks cover ordered output, corruption, unique-file round trips and cleanup, and cooperative cancellation. They do not measure device energy. A supported power or energy observation must retain actual units, tool version, workload window, display and charging conditions. This local workload has no radio traffic, so radio-saving claims are out of scope. I would name the performance owner and product budget reviewer, predeclare bounded reruns and recover by restoring the previous queue-admission limit while keeping cancellation and file-ownership rules intact. If results remain inconclusive, the proposed policy remains conditional with a specific missing artifact, rather than retrying until a favorable percentile appears or inventing battery savings.</p>",
       "followUps": [
-        "What if throughput improves but a constrained device's peak becomes unsafe?",
-        "How would adding network work change the energy observation contract?"
+        "What decision follows if throughput improves but a constrained device’s memory peak becomes unsafe?",
+        "What extra energy conditions must be recorded when networking is added?"
       ],
       "pitfalls": [
-        "Treating elapsed time as energy.",
-        "Shipping a wider pool based only on the fastest device or one trace."
+        "Treating elapsed time as an energy measurement.",
+        "Widening the pool based only on the fastest device or one CPU trace."
       ]
     },
     {
@@ -155,24 +155,24 @@
       "lesson": "104",
       "level": "Senior",
       "kind": "Code",
-      "prompt": "Describe the validation and summary behavior for a timeout, incorrect output and missing success duration.",
-      "scenario": "One synthetic baseline has twenty successes. A record is changed independently to timeout/null, incorrect/false, or success with no elapsed value.",
+      "prompt": "How does the validator classify a timeout, incorrect output and a successful record missing its duration? What happens to the summary?",
+      "scenario": "Start each independent mutation from twenty synthetic baseline successes. Change one record to timeout/null, incorrect/false or success without elapsed duration.",
       "minutes": 8,
       "androidBridge": "The data contract resembles benchmark event serialization on Android, while each runtime's clock, completion and cancellation semantics remain separately verified.",
       "rubric": [
-        "Keeps failed attempts in total counts and raw admission/completion order.",
-        "Excludes timeout from success latency and recognizes nineteen remaining successes.",
-        "Rejects incorrect behavior before regression comparison.",
-        "Classifies missing successful duration as invalid capture and identifies nearest-rank arithmetic."
+        "Keeps every attempted outcome in counts and the original admission and completion order.",
+        "Excludes the timeout from success latency, leaving nineteen successes.",
+        "Rejects incorrect output before comparing performance.",
+        "Classifies missing successful duration as invalid capture and explains nearest-rank arithmetic."
       ],
-      "answerHTML": "<p>I would restore the original fixture before applying each mutation, so the result tests one rule. A timeout with null correctness and duration remains an attempted outcome and increments timeout count. It is excluded from success latency, leaving nineteen successful baseline values and insufficient_samples under this lab's minimum. It is not replaced with zero or removed from the raw array.</p><p>An incorrect outcome with correct false yields correctness_failure even if its elapsed value is short. A success with no elapsed duration yields invalid_capture because a successful latency record must contain a finite nonnegative duration and assert correct true. The validator retains cohort summaries and issues without granting release approval. The unmodified fictional twenty-value baseline eighty through ninety-nine has median 89.5 and nearest-rank p95 98; candidate seventy through eighty-nine yields 79.5 and 88. Those values test arithmetic only. I would also verify unique identities, one revision per variant and complete observed provenance before comparing real samples, keeping cancellation and preparation counts visible beside failure rate.</p>",
+      "answerHTML": "<p>Start from the original fixture for each change. That way each result tests one rule rather than several accumulated changes. A timeout with null correctness and duration remains an attempted outcome and increments timeout count. It is excluded from success latency. Nineteen successes remain, below the lab’s minimum, so the result is insufficient_samples. It is not replaced with zero or removed from the raw array.</p><p>A fast wrong answer is still wrong. An incorrect outcome with correct false yields correctness_failure. A success with no elapsed duration yields invalid_capture because a successful latency record must contain a finite nonnegative duration and assert correct true. The validator retains cohort summaries and issues without granting release approval. The unmodified fictional twenty-value baseline eighty through ninety-nine has median 89.5 and nearest-rank p95 98, found by sorting and selecting the rank at or above 95 percent of the sample count,; candidate seventy through eighty-nine yields 79.5 and 88. Those values test arithmetic only. I would also verify unique identities, one revision per variant and complete observed provenance before comparing real samples, keeping cancellation and preparation counts visible beside failure rate.</p>",
       "followUps": [
-        "Why does changing worker count create a separate cohort?",
-        "How would a predeclared timeout deadline affect the interpretation of latency and failures?"
+        "Why must a changed worker count be analyzed as a separate cohort?",
+        "How would a timeout deadline declared before collection affect latency and failure interpretation?"
       ],
       "pitfalls": [
-        "Discarding a timeout to preserve twenty successful samples.",
-        "Interpreting review_required as a device regression pass."
+        "Discarding a timeout to pretend twenty attempts all succeeded.",
+        "Treating review_required as a measured device-regression pass."
       ]
     },
     {
@@ -180,24 +180,24 @@
       "lesson": "104",
       "level": "Staff",
       "kind": "Design",
-      "prompt": "Review a proposed regression approval that combines synthetic p95 arithmetic, a client benchmark source comment and an unsigned simulator build.",
-      "scenario": "The packet has no annotated device records, selected trace intervals or actual benchmark result bundle, but the author proposes production rollout.",
+      "prompt": "Would synthetic p95 calculations, a benchmark source comment and an unsigned simulator build justify rollout? Review what the packet proves and what it lacks.",
+      "scenario": "The packet lacks annotated device records, selected trace intervals and an actual benchmark result bundle. Its author still proposes production rollout.",
       "minutes": 12,
       "androidBridge": "Gradle artifact builds and Android benchmark source also establish different evidence from runtime execution; platform-specific symbols, clocks and runner configuration still require inspection.",
       "rubric": [
-        "Separates synthetic, source, compiler, runtime and production claims.",
-        "Requires raw cohort provenance, correctness and attempted-outcome guardrails.",
-        "Declares budget, owner, diagnostic attribution and bounded confirmation before decision.",
-        "Provides recovery or pending status without fabricated completion or measurements."
+        "Separates synthetic arithmetic, inspected source, compiler output, runtime evidence and production claims.",
+        "Requires raw cohort provenance, correctness and counts for every attempted outcome.",
+        "Declares budgets, owners, diagnostic attribution and bounded confirmation before deciding.",
+        "Defines recovery or pending status without inventing measurements or completion."
       ],
-      "answerHTML": "<p>The packet supports companion arithmetic, inspected source and a compiled simulator artifact. It does not support device latency, the client's actual benchmark outcome or production rollout. A source threshold comment is a proposal, not an established budget. The discarded XCTWaiter result in the inspected benchmark is a question to investigate with execution evidence, not proof that a timeout occurred.</p><p>I would retain the packet and request the concrete missing artifacts: original and annotated raw attempts, actual device/OS/configuration/revision, preparation protocol, complete output checks, cancellation/failure counts, matching symbols and a selected diagnostic interval. Confirmation must use a declared cohort and absolute/relative budget owned before collection. Launch usability, scrolling and memory or energy guardrails remain distinct. The validator's review_required output is merely readiness for that review. If a real comparable regression is established, the isolated candidate is reverted or contained under an owned recovery policy. If evidence is unavailable or noisy, approval stays pending with a bounded next experiment. No synthetic percentile, source audit or build can substitute for learner execution or operational accountability.</p>",
+      "answerHTML": "<p>The packet shows the sample arithmetic, the source that was inspected and a simulator artifact that compiled. Each is useful, but none measures the proposed device outcome. It does not support device latency, the client's actual benchmark outcome or production rollout. A source threshold comment is a proposal, not an established budget. The discarded XCTWaiter result in the inspected benchmark is a question to investigate with execution evidence, not proof that a timeout occurred.</p><p>Keep the packet and list its missing artifacts: original and annotated raw attempts, actual device/OS/configuration/revision, preparation protocol, complete output checks, cancellation/failure counts, matching symbols and a selected diagnostic interval. Before collection, name the comparable cohort, its absolute and relative budgets, and who owns them. Use those agreed inputs for confirmation. Launch usability, scrolling and memory or energy guardrails remain distinct. The validator's review_required output is merely readiness for that review. If a real comparable regression is established, the isolated candidate is reverted or contained under an owned recovery policy. If evidence is unavailable or noisy, approval stays pending with a bounded next experiment. A synthetic percentile, source audit or build cannot establish learner execution or a responsible production decision.</p>",
       "followUps": [
-        "What would distinguish runner disturbance from a candidate regression?",
-        "Who may update a baseline budget after an OS or fixture change?"
+        "Which repeated and diagnostic evidence would distinguish runner disturbance from a candidate regression?",
+        "Who owns baseline-budget changes after the OS or fixture changes?"
       ],
       "pitfalls": [
-        "Claiming benchmark execution from checked-in source.",
-        "Relaxing thresholds after seeing the candidate's results."
+        "Claiming the benchmark ran because its source is checked in.",
+        "Relaxing thresholds after seeing the candidate’s results."
       ]
     }
   ]

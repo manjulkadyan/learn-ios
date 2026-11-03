@@ -6,23 +6,23 @@
       "level": "Foundation",
       "kind": "Explain",
       "minutes": 5,
-      "prompt": "Explain what swift First.swift and swiftc First.swift -o First establish, then predict when a caption reads a counter.",
-      "scenario": "A scratch file declares var counter = 1, constructs a caption from it, updates counter to 2, then prints the caption.",
+      "prompt": "What do swift First.swift and swiftc First.swift -o First do? Which counter value will the caption print?",
+      "scenario": "The file starts with var counter = 1. It makes a caption from counter, changes counter to 2, then prints that caption.",
       "androidBridge": "A Kotlin script and compiled artifact provide a workflow analogy. Swift host execution does not establish an Android/iOS app build, and Swift interpolation uses \\(...), not Kotlin dollar syntax.",
       "rubric": [
-        "Separates editable source from generated executable.",
-        "Explains compile-and-run versus explicit compile then execution.",
-        "Predicts the caption retains counter one.",
-        "Limits verification to the recorded host/toolchain."
+        "Names the source as editable text and the executable as generated output.",
+        "Explains running through swift versus compiling with swiftc and launching separately.",
+        "Predicts that the existing caption still contains one.",
+        "States which host and toolchain the recorded run checked."
       ],
-      "answerHTML": "<p>The source is editable Swift text. Running <code>swift First.swift</code> uses the driver to compile and execute that file. <code>swiftc First.swift -o First</code> produces an executable that is subsequently launched separately. Record the selected toolchain, command and output; neither route verifies the company iOS target or simulator integration.</p><p>Interpolation constructs a String when its expression is evaluated. The caption therefore contains one, even though the later counter value is two. Printing the already constructed String does not reevaluate its earlier expression or create reactive state. Move construction after the update when the intended caption should describe the updated value. A successful toolchain version command alone proves tool selection, not behavior. A missing source path and a Swift type-checking diagnostic belong to different failure categories and need different next checks.</p>",
+      "answerHTML": "<p>A source file is the text you edit. An executable is the program the compiler makes from it. Running <code>swift First.swift</code> uses the driver to compile and execute that file. <code>swiftc First.swift -o First</code> produces an executable that is subsequently launched separately. Record the selected toolchain, command and output; neither route verifies the company iOS target or simulator integration.</p><p>String interpolation puts the current value into new text. It is like writing one on a card: changing the counter later does not rewrite the card. The caption therefore contains one, even though the later counter value is two. Printing the already constructed String does not reevaluate its earlier expression or create reactive state. Move construction after the update when the intended caption should describe the updated value. A successful toolchain version command alone proves tool selection, not behavior. If the file is missing, check its path. If Swift rejects a type, read the compiler diagnostic. These failures need different next steps.</p>",
       "followUps": [
-        "How would the evidence change if the file imported UIKit?",
-        "Which command selects an output filename, and what remains editable?"
+        "What extra build requirements appear if the file imports UIKit?",
+        "Which command names the executable, and which file do you keep editing?"
       ],
       "pitfalls": [
-        "Calling a toolchain version report a passing program.",
-        "Treating interpolation as a live binding."
+        "Treating a toolchain version report as a successful program run.",
+        "Expecting an existing caption to update whenever the counter changes."
       ]
     },
     {
@@ -31,23 +31,23 @@
       "level": "Foundation",
       "kind": "Debug",
       "minutes": 7,
-      "prompt": "Classify a let reassignment failure and a stale caption, then propose the smallest correction for each.",
-      "scenario": "A learner changes a let name and gets a compiler error. After replacing everything with var, the program compiles but prints an old attempt number.",
+      "prompt": "A let value cannot be reassigned, and a caption shows an old number. Explain each problem and make the smallest useful fix.",
+      "scenario": "Changing a let name causes a compiler error. Making every binding var lets the program compile, but its caption still shows an old attempt number.",
       "androidBridge": "Kotlin val/var helps orient binding permission, but Swift value/reference mutation has additional rules. A string template in either language records construction-time values.",
       "rubric": [
-        "Identifies reassignment as a compiler rejection.",
-        "Uses var only for intentionally reassigned bindings.",
-        "Identifies early String construction as a behavior/order error.",
-        "Retests a changed fixture and states verification scope."
+        "Identifies the let reassignment as a compiler error before execution.",
+        "Uses var only where reassignment is intended.",
+        "Finds that the caption was made before the counter changed.",
+        "Checks a changed input and limits the claim to the behavior tested."
       ],
-      "answerHTML": "<p>Changing a let binding requests an operation its contract prohibits, so the compiler rejects the program before execution. Keep let for the unchanged synthetic name, or use var for that binding if reassignment is a real requirement. Converting every declaration to var removes useful constraints without explaining the bug.</p><p>The stale caption is a different problem. It may compile correctly because it constructed a String before the attempt counter changed. Construct the caption after the intended update, then predict and compare the printed result. Do not claim var makes text reactive: it only permits reassignment. Preserve the failing scratch copy or its diagnostic separately from the working program. Record the source, command and expected/observed output so the correction is reviewable. These two checks establish local binding and evaluation rules, not app lifecycle, thread safety or deployment correctness.</p>",
+      "answerHTML": "<p>Let means this binding cannot be reassigned. Trying to give it another value is a compiler error, so that version never runs. Keep let for the unchanged synthetic name, or use var for that binding if reassignment is a real requirement. Converting every declaration to var removes useful constraints without explaining the bug.</p><p>The old caption is a separate problem. It is like a card saying attempt one after the counter has moved to two. It may compile correctly because it constructed a String before the attempt counter changed. Construct the caption after the intended update, then predict and compare the printed result. Do not claim var makes text reactive: it only permits reassignment. Keep the failing source or its error message alongside the working result. Record the source, command and expected/observed output so the correction is reviewable. These two checks establish local binding and evaluation rules, not app lifecycle, thread safety or deployment correctness.</p>",
       "followUps": [
-        "What prediction would distinguish source order from interpolation syntax errors?",
-        "When should a name remain let even though the counter changes?"
+        "What output would show the caption was made too early rather than written with wrong interpolation syntax?",
+        "Why can the name stay let while the attempt counter needs var?"
       ],
       "pitfalls": [
-        "Suppressing all constraints through var.",
-        "Treating every failure as a runtime exception."
+        "Changing every binding to var without finding the problem.",
+        "Calling a compiler rejection a runtime exception."
       ]
     },
     {
@@ -56,23 +56,23 @@
       "level": "Foundation",
       "kind": "Code",
       "minutes": 6,
-      "prompt": "Compute seven divided by two as both an integer and fractional average, then explain the width of a translated Long identifier.",
-      "scenario": "The summary needs a fractional average, while an unrelated wire identifier must preserve a signed 64-bit contract.",
+      "prompt": "Calculate 7 divided by 2 as a whole number and with a fraction. Which Swift type preserves a signed 64-bit Long identifier?",
+      "scenario": "The average must keep its fractional part. A separate network identifier must preserve an exact signed 64-bit value.",
       "androidBridge": "Kotlin explicit numeric conversion is a useful analogy. Kotlin Int is fixed 32-bit, Swift Int is platform-sized, and ordinary Swift integer overflow traps rather than adopting JVM wrapping.",
       "rubric": [
-        "Predicts integer quotient three.",
-        "Converts operands before dividing for 3.5.",
-        "Explains Double(total / count) loses the fraction.",
-        "Chooses Int64 for an explicit signed 64-bit wire contract."
+        "Predicts the integer result as three.",
+        "Converts the operands before division to get 3.5.",
+        "Explains why Double(total / count) gives 3.0.",
+        "Chooses Int64 for the signed 64-bit network contract."
       ],
-      "answerHTML": "<p>With Int operands, <code>7 / 2</code> yields three. Convert each operand before division, as in <code>Double(total) / Double(count)</code>, to obtain 3.5. Converting the already truncated quotient produces 3.0 and cannot recover the discarded fraction. Validate a potentially zero divisor before using either arithmetic path.</p><p>Use Int64 when the wire contract explicitly requires a signed 64-bit integer. Swift Int is convenient for local counts and is 64-bit on the current Apple host, but its definition follows platform width. A literal can adopt a type from context; an existing Int variable does not implicitly become Double in mixed arithmetic. Double can lose exactness for large integers, so it is not an identifier-storage fix. State arithmetic bounds separately: a chosen type does not validate domain input, and ordinary integer overflow is a trap rather than a thrown error handled by catch.</p>",
+      "answerHTML": "<p>Integer division keeps the whole-number quotient. With Int operands, <code>7 / 2</code> yields three. Convert each operand before division, as in <code>Double(total) / Double(count)</code>, to obtain 3.5. Converting the already truncated quotient produces 3.0 and cannot recover the discarded fraction. Validate a potentially zero divisor before using either arithmetic path.</p><p>Use Int64 when the network format requires a signed 64-bit integer. That width is part of the agreement between sender and receiver. Swift Int is convenient for local counts and is 64-bit on the current Apple host, but its definition follows platform width. A literal can adopt a type from context; an existing Int variable does not implicitly become Double in mixed arithmetic. Double can lose exactness for large integers, so it is not an identifier-storage fix. Check arithmetic bounds separately: choosing a type does not validate the input, and ordinary integer overflow is a trap rather than a thrown error handled by catch.</p>",
       "followUps": [
-        "What changes if count may be zero?",
-        "Why is Double an inappropriate general replacement for large integer IDs?"
+        "What check is needed when count can be zero?",
+        "Why could storing a large identifier as Double change its value?"
       ],
       "pitfalls": [
-        "Converting after integer division.",
-        "Equating Swift Int with Kotlin Int width."
+        "Converting to Double after integer division has discarded the fraction.",
+        "Assuming Swift Int has Kotlin Int’s fixed width."
       ]
     },
     {
@@ -81,23 +81,23 @@
       "level": "Foundation",
       "kind": "Debug",
       "minutes": 6,
-      "prompt": "Explain why a blank optional label does not use its fallback, and why an exact narrowing conversion can return nil.",
-      "scenario": "String? fixtures are nil, empty and Ada; Int8(exactly:) receives 127 and 128.",
+      "prompt": "Why does an empty optional String keep showing blank instead of its fallback? What does Int8(exactly:) return for 127 and 128?",
+      "scenario": "Test String? with nil, an empty String and Ada. Separately, try exact Int8 conversions of 127 and 128.",
       "androidBridge": "Kotlin nullable/Elvis intent resembles optional/coalescing intent, but Swift uses explicit binding and preserves its own numeric-width and Unicode rules.",
       "rubric": [
-        "Distinguishes nil, empty and nonempty values.",
-        "Explains ?? handles only absence.",
-        "Predicts exact conversion success at 127 and nil at 128.",
-        "Separates display fallback from stored-domain substitution."
+        "Keeps nil, empty text and Ada as different inputs.",
+        "Explains that ?? supplies a fallback only for nil.",
+        "Predicts success for 127 and nil for 128.",
+        "Keeps a display fallback separate from replacing stored domain data."
       ],
-      "answerHTML": "<p>An optional String either contains a String or is nil. The empty String is still present, so <code>blank ?? \"Unknown\"</code> returns empty content. Nil selects Unknown and Ada remains Ada. If the product rejects empty or whitespace-only text, add a separate content policy instead of treating coalescing as validation.</p><p><code>Int8(exactly: 127)</code> succeeds because the value is representable in signed eight-bit storage; 128 yields nil. That optional result communicates a representation failure without forcing an unsafe conversion. Handle it through binding or an explicit domain failure rather than force unwrapping. A display fallback should not overwrite a missing identifier with zero, because later code may mistake the sentinel for real data. The fixtures check absence and representation boundaries; they do not verify localization or every numeric input. Keep the rejected input visible when a user needs a reason.</p>",
+      "answerHTML": "<p>An optional String either contains text or is absent, called nil. Empty text is like a blank card; nil means there is no card. The empty String is still present, so <code>blank ?? \"Unknown\"</code> returns empty content. Nil selects Unknown and Ada remains Ada. If the product rejects empty or whitespace-only text, add a separate content policy instead of treating coalescing as validation.</p><p><code>Int8(exactly: 127)</code> succeeds because the value is representable in signed eight-bit storage; 128 yields nil. Nil tells you the number does not fit. It avoids forcing a conversion that cannot preserve the value. Handle it through binding or an explicit domain failure rather than force unwrapping. A display fallback should not overwrite a missing identifier with zero, because later code may mistake the sentinel for real data. These test inputs check absence and the limits of the numeric type; they do not verify localization or every numeric input. Keep the rejected input visible when a user needs a reason.</p>",
       "followUps": [
-        "How would whitespace-only validation differ from isEmpty?",
-        "What information would be lost by coalescing a failed conversion to zero?"
+        "How would you check whitespace-only text as well as an empty String?",
+        "What distinction disappears if a failed conversion is replaced with zero?"
       ],
       "pitfalls": [
-        "Claiming ?? replaces blank content.",
-        "Force unwrapping because one fixture succeeds."
+        "Expecting ?? to replace an empty but present String.",
+        "Force unwrapping every conversion because 127 succeeded."
       ]
     },
     {
@@ -106,23 +106,23 @@
       "level": "Foundation",
       "kind": "Explain",
       "minutes": 6,
-      "prompt": "Predict iteration for zero and three slots using half-open ranges, and explain optional-binding scope.",
-      "scenario": "A slot generator uses 0..<count. A caption branch uses if let name = input.",
+      "prompt": "Which values does 0..<count visit when count is zero or three? Where can you use the name from if let name = input?",
+      "scenario": "A generator visits slots using 0..<count. A separate caption branch unwraps its optional input with if let name = input.",
       "androidBridge": "Kotlin until and inclusive ranges are useful endpoint analogies, but Swift range punctuation and optional-binding scopes are language-specific; Kotlin smart-casting is not the same declaration.",
       "rubric": [
-        "Predicts zero iterations for count zero.",
-        "Predicts indices zero, one and two for count three.",
-        "Rejects closed count-minus-one for empty input.",
-        "Keeps the unwrapped name local to its successful branch."
+        "Predicts no iterations when count is zero.",
+        "Predicts zero, one and two when count is three.",
+        "Explains why a closed range ending at count minus one fails for empty input.",
+        "Uses the unwrapped name only inside the successful branch."
       ],
-      "answerHTML": "<p>A half-open range includes its lower bound and excludes its upper bound. <code>0..&lt;0</code> is empty, while <code>0..&lt;3</code> supplies zero, one and two. A closed <code>0...count - 1</code> produces invalid reversed bounds when count is zero. Half-open syntax does not generally authorize negative or reversed counts, so validate the input domain as needed.</p><p><code>if let name = input</code> creates a nonoptional local binding only in the successful branch. The original input remains optional outside it. A present empty String succeeds at binding and still needs a content decision. Direct element iteration will often be clearer once an Array exists. Guard in a loop can establish a prerequisite for the remaining body, but its else must leave that iteration or scope appropriately. Range coverage and optional presence are structural rules; they do not choose the user-visible caption or valid workflow transitions.</p>",
+      "answerHTML": "<p>A half-open range includes the start and stops before the end. Think of boxes numbered zero, one and two: the end marker three is outside them. <code>0..&lt;0</code> is empty, while <code>0..&lt;3</code> supplies zero, one and two. A closed <code>0...count - 1</code> produces invalid reversed bounds when count is zero. Half-open syntax does not generally authorize negative or reversed counts, so validate the input domain as needed.</p><p><code>if let name = input</code> gives the successful branch its own name with a present value. That is a local nonoptional binding. The original input remains optional outside it. A present empty String succeeds at binding and still needs a content decision. Direct element iteration will often be clearer once an Array exists. Guard in a loop can establish a prerequisite for the remaining body, but its else must leave that iteration or scope appropriately. Ranges choose which positions are visited. Optional binding checks whether a value exists. Neither chooses the caption or which workflow step is allowed next.</p>",
       "followUps": [
-        "When would indices be preferable to 0..<count?",
-        "How would guard let change the usable binding scope?"
+        "When would a collection’s indices be safer than 0..<count?",
+        "Where is the unwrapped value available if you use guard let instead?"
       ],
       "pitfalls": [
-        "Treating every closed range as empty when reversed.",
-        "Using the if-let name after its branch."
+        "Assuming a reversed closed range becomes empty.",
+        "Trying to use the local if-let name after its branch ends."
       ]
     },
     {
@@ -131,23 +131,23 @@
       "level": "Foundation",
       "kind": "Debug",
       "minutes": 7,
-      "prompt": "Diagnose a while loop that stops progressing after continue, then repair its execution order.",
-      "scenario": "A mutable attempt counter is incremented after a branch that continues whenever attempt is zero.",
+      "prompt": "A while loop reaches continue before increasing its counter. Why does it get stuck, and how would you fix the order?",
+      "scenario": "Attempt starts at zero. A branch continues whenever attempt is zero. The statement that increases attempt sits after that branch.",
       "androidBridge": "Kotlin continue has a similar nearest-loop role. Swift still requires Bool conditions and explicit optional binding; neither language automatically advances a while counter.",
       "rubric": [
-        "Traces the first iteration and skipped update.",
-        "Identifies a progress failure rather than a parser error.",
-        "Moves or redesigns advancement so all continuing paths progress.",
-        "Tests zero, one and several iterations without executing an unbounded hang."
+        "Traces the first iteration and shows that continue skips the update.",
+        "Identifies missing progress in code that can compile.",
+        "Makes every continuing path advance or end the loop.",
+        "Checks zero, one and several iterations with bounded traces."
       ],
-      "answerHTML": "<p>The loop starts at zero, enters the branch, and continues before incrementing. The next condition sees zero again, so the same path repeats indefinitely. Compilation can succeed because the control flow is syntactically valid; the defect is a missing progress rule. Do not execute an unbounded hang to prove it.</p><p>Advance the counter before the skip when that matches the algorithm, or rewrite the loop as for-in over a bounded range if each attempt is simply enumerated. Check which value should be processed before deciding the placement, since moving an update can create an off-by-one result. Predict zero, one and multiple-iteration fixtures and compare their bounded traces. A guard/continue has the same responsibility: every path that reenters a while loop must allow its condition to change or end. A timeout is diagnostic containment, not the algorithm’s correction.</p>",
+      "answerHTML": "<p>Attempt starts at zero. Continue jumps back to the loop condition before the counter can increase. The next condition sees zero again, so the same path repeats indefinitely. Compilation can succeed because the control flow is syntactically valid; the problem is that this path never advances. It is like returning to the start of a board game without moving your piece. Do not execute an unbounded hang to prove it.</p><p>Advance the counter before the skip when that matches the algorithm, or rewrite the loop as for-in over a bounded range if each attempt is simply enumerated. Check which value should be processed before deciding the placement, since moving an update can create an off-by-one result. Predict zero, one and multiple-iteration fixtures and compare their bounded traces. A guard/continue has the same responsibility: every path that reenters a while loop must allow its condition to change or end. A timeout limits the damage while you investigate. It does not fix the loop.</p>",
       "followUps": [
-        "How would a repeat loop differ for zero required attempts?",
-        "Which branch would break instead of continue?"
+        "Would repeat run once when zero attempts are needed?",
+        "Which condition should stop the loop with break instead of skipping with continue?"
       ],
       "pitfalls": [
-        "Changing the condition without tracing progress.",
-        "Assuming continue increments a counter automatically."
+        "Changing the condition without tracing the counter on each path.",
+        "Assuming continue increases the counter automatically."
       ]
     },
     {
@@ -156,23 +156,23 @@
       "level": "Foundation",
       "kind": "Explain",
       "minutes": 6,
-      "prompt": "Read caption(for name: String, attempt: Int = 1) and an optional tuple result without guessing labels.",
-      "scenario": "A caller wants the default attempt and then an explicit attempt two; a division helper returns (whole: Int, remainder: Int)?.",
+      "prompt": "How do you call caption(for name: String, attempt: Int = 1) with the default attempt and with attempt two? How do you read an optional tuple result?",
+      "scenario": "The caller wants captions for Sam. A division helper returns (whole: Int, remainder: Int)? and may return no result.",
       "androidBridge": "Kotlin named arguments usually follow parameter names. Swift can independently declare an external label and a local name; a tuple is not the exact Kotlin Pair API.",
       "rubric": [
-        "Calls caption(for:) and caption(for:attempt:).",
-        "Distinguishes external for from local name.",
-        "Explains omitted arguments use declared defaults.",
-        "Unwraps the whole optional tuple before reading nonoptional components."
+        "Calls caption using for: and, when needed, attempt:.",
+        "Distinguishes the caller’s for label from the body’s name binding.",
+        "Explains that omission selects the declared default.",
+        "Unwraps the whole tuple before reading its Int components."
       ],
-      "answerHTML": "<p>Call the first form as <code>caption(for: \"Sam\")</code>, using the default attempt one, and the second as <code>caption(for: \"Sam\", attempt: 2)</code>. For is the external label; name is available inside the body. Attempt has the same external/local spelling. An underscore would remove a label, not remove the argument. Defaulting affects omission at the call site and does not make the parameter mutable.</p><p>The question mark outside <code>(whole: Int, remainder: Int)</code> applies to the complete tuple. A successful optional binding provides a pair whose components are ordinary Int values; a failure yields no pair. Named members clarify the small result contract, and destructuring can introduce two locals. For a reusable domain result with methods or invariants, a named struct may be clearer. Every normal return path must satisfy the declared result type, while the function’s labels and defaults say nothing about scheduling or failure effects.</p>",
+      "answerHTML": "<p>A function’s argument labels tell the caller where each input goes. A default supplies an input the caller omits. Call the first form as <code>caption(for: \"Sam\")</code>, using the default attempt one, and the second as <code>caption(for: \"Sam\", attempt: 2)</code>. For is the label used by callers; name is the binding used inside the function. Attempt has the same external/local spelling. An underscore would remove a label, not remove the argument. Defaulting affects omission at the call site and does not make the parameter mutable.</p><p>The question mark outside <code>(whole: Int, remainder: Int)</code> applies to the whole pair. Picture one envelope holding two numbers: either the envelope is present or the entire result is absent. A successful optional binding provides a pair whose components are ordinary Int values; a failure yields no pair. Named members clarify the small result contract, and destructuring can introduce two locals. A named struct may be clearer when the result needs methods or rules that must always hold. Every normal return path must satisfy the declared result type, while the function’s labels and defaults say nothing about scheduling or failure effects.</p>",
       "followUps": [
-        "When would a struct improve the tuple contract?",
-        "Does changing the default change calls that explicitly pass attempt?"
+        "When would a named struct explain the result better than a tuple?",
+        "Does changing the default affect a call that passes attempt explicitly?"
       ],
       "pitfalls": [
-        "Calling with name: because it is the local name.",
-        "Interpreting the tuple as two separately optional fields."
+        "Using name: at the call because name is the local binding.",
+        "Reading the optional tuple as two separately optional numbers."
       ]
     },
     {
@@ -181,23 +181,23 @@
       "level": "Foundation",
       "kind": "Debug",
       "minutes": 7,
-      "prompt": "Repair a mislabeled call and a helper that mutates an ordinary parameter instead of returning an edit.",
-      "scenario": "A function func adjusted(_ value: Int, by amount: Int = 1) -> Int is called as adjusted(value: 3), and its body tries value += amount.",
+      "prompt": "Fix adjusted(value: 3) for func adjusted(_ value: Int, by amount: Int = 1) -> Int. Then fix its attempt to run value += amount.",
+      "scenario": "The function has no first argument label and returns an Int. Its caller supplies value:, and its body tries to change the ordinary value parameter.",
       "androidBridge": "Kotlin helper extraction transfers, but Swift argument labels and immutable ordinary parameters must be honored. Passing a reference object is different from modifying a scalar caller variable.",
       "rubric": [
-        "Removes the first external label at the call.",
-        "Keeps by: for an explicit second argument.",
-        "Uses a returned calculation or a local var copy.",
-        "Explains caller-visible mutation would need a separate inout contract."
+        "Calls the first argument without value:.",
+        "Uses by: when passing an explicit amount.",
+        "Returns the calculation or uses a local var for intermediate work.",
+        "Explains that changing caller storage requires a separate inout contract."
       ],
-      "answerHTML": "<p>The underscore in the declaration removes the first external label, so the default call is <code>adjusted(3)</code>. To choose a different amount, use <code>adjusted(3, by: 2)</code>. Writing value: contradicts the declaration even though value is the local parameter name. The default one is used only when that second argument is omitted.</p><p>Ordinary parameters are immutable bindings. For this operation, return <code>value + amount</code> directly, or create a local var if a longer algorithm needs local edits. Neither approach changes the caller’s scalar variable. If changing caller storage is the requirement, design a distinct inout signature and writable ampersand call, then review exclusivity. Do not solve a pure calculation by hiding mutable shared state. Test both default and explicit calls with expected results, and distinguish these compiler signature/mutation failures from a valid function returning the wrong arithmetic.</p>",
+      "answerHTML": "<p>The underscore means the caller supplies no label for the first argument, so the default call is <code>adjusted(3)</code>. To choose a different amount, use <code>adjusted(3, by: 2)</code>. Writing value: contradicts the declaration even though value is the local parameter name. The default one is used only when that second argument is omitted.</p><p>Ordinary parameter bindings cannot be reassigned. Think of value as a read-only input to this calculation. For this operation, return <code>value + amount</code> directly, or create a local var if a longer algorithm needs local edits. Neither approach changes the caller’s scalar variable. If changing caller storage is the requirement, declare a separate inout parameter and pass writable storage with an ampersand. Check exclusivity: conflicting access cannot overlap during that call. Do not solve a pure calculation by hiding mutable shared state. Test both default and explicit calls with expected results, and distinguish these compiler signature/mutation failures from a valid function returning the wrong arithmetic.</p>",
       "followUps": [
-        "How would an inout call make mutation visible?",
-        "Why should arithmetic bounds be checked separately from call syntax?"
+        "How would an inout signature and ampersand call show that caller storage changes?",
+        "Why do numeric bounds need a separate check even after the call compiles?"
       ],
       "pitfalls": [
-        "Assuming local parameter names define all labels.",
-        "Using inout merely to avoid a clear returned result."
+        "Assuming every local parameter name is also a caller label.",
+        "Adding inout when returning the calculated value is sufficient."
       ]
     },
     {
@@ -206,23 +206,23 @@
       "level": "Foundation",
       "kind": "Explain",
       "minutes": 6,
-      "prompt": "Predict a copied Array edit and an ArraySlice’s first valid index.",
-      "scenario": "Original is [Ada, Lin, Rae]. Edited replaces index one; original[1..<3] is retained as a slice.",
+      "prompt": "What changes when you edit a copy of an Array? What is the first valid index of original[1..<3]?",
+      "scenario": "Original contains [Ada, Lin, Rae]. Edited is a copy with index one replaced. A slice is made from original[1..<3].",
       "androidBridge": "Kotlin MutableList reference assignment typically aliases a collection object. Swift Array value assignment preserves independent observable values, while ArraySlice retains source coordinates.",
       "rubric": [
-        "Keeps the original Array unchanged.",
-        "Explains copy-on-write as an implementation optimization.",
-        "Predicts slice startIndex one and rebuilt Array startIndex zero.",
-        "Separates element identity from index position."
+        "Leaves Lin unchanged in the original Array.",
+        "Explains that copy-on-write shares storage only as an implementation detail.",
+        "Predicts slice startIndex one and Array(slice) startIndex zero.",
+        "Keeps an element’s identity separate from its current position."
       ],
-      "answerHTML": "<p>Replacing index one in edited leaves original’s Lin unchanged because Array has value semantics. The implementation may share storage before mutation through copy-on-write, but that optimization does not permit visible aliasing of these String elements. It also does not deep-clone class instances if references become elements later.</p><p>The slice containing Lin and Rae retains valid indices one and two from the parent. Its first valid element is slice[1], not slice[0]. Constructing Array(slice) creates a zero-based array container, so its first valid index is zero. A slice can retain larger backing storage, which matters when keeping a small subset long-term, but this tiny fixture does not measure memory. Prefer current indices or direct iteration rather than assuming every Collection begins at zero. An array position is not a stable record identifier after insertion or removal. Record both output and index-domain predictions.</p>",
+      "answerHTML": "<p>Replacing index one in edited leaves original’s Lin unchanged because Array has value semantics: each copied container can be edited independently. The implementation may share storage before mutation through copy-on-write, but that optimization does not permit visible aliasing of these String elements. It also does not deep-clone class instances if references become elements later.</p><p>The slice containing Lin and Rae keeps the source indices one and two. It is like taking two books while keeping their original shelf labels. Its first valid element is slice[1], not slice[0]. Constructing Array(slice) creates a zero-based array container, so its first valid index is zero. A slice can retain larger backing storage, which matters when keeping a small subset long-term, but this tiny fixture does not measure memory. Prefer current indices or direct iteration rather than assuming every Collection begins at zero. An array position is not a stable record identifier after insertion or removal. Check both the resulting values and the range of valid indices.</p>",
       "followUps": [
-        "When is Array(slice) a useful ownership decision?",
-        "What changes if elements contain mutable class references?"
+        "When would making Array(slice) help control retained storage?",
+        "What changes when the elements are mutable class objects?"
       ],
       "pitfalls": [
-        "Treating COW as deep cloning.",
-        "Subscripting a slice with zero unconditionally."
+        "Treating copy-on-write as a deep copy of every element.",
+        "Always using zero to read the first element of a slice."
       ]
     },
     {
@@ -231,23 +231,23 @@
       "level": "Foundation",
       "kind": "Debug",
       "minutes": 7,
-      "prompt": "Explain why saved list indices and removeLast assumptions fail after structural edits.",
-      "scenario": "A consumer saves index two, removes the first element, then subscripts the saved index; another path removes the last element from an empty list.",
+      "prompt": "Why can a saved index fail after removing a row? Why does removeLast fail on an empty Array?",
+      "scenario": "A consumer saves index two, removes the first element, then uses the saved index. Another path calls removeLast on an empty list.",
       "androidBridge": "Kotlin list editing also invalidates positional assumptions, but Swift ordinary array subscript/removal traps on invalid preconditions instead of offering an implicit getOrNull.",
       "rubric": [
-        "Traces changed count/positions after removal.",
-        "Classifies invalid subscript/removal as runtime traps.",
-        "Uses current indices and popLast/explicit emptiness handling.",
-        "Chooses stable domain identity for long-lived selection."
+        "Shows how removal changes count and later positions.",
+        "Identifies invalid subscripts and empty removeLast as runtime traps.",
+        "Uses current indices and popLast or an explicit nonempty check.",
+        "Uses a stable record ID for selection that must survive edits."
       ],
-      "answerHTML": "<p>Removing the first element shifts later positions and reduces count. A saved integer position may now refer to a different element or equal endIndex, which is past the last valid element. Recheck the current array’s indices before subscripting, and use a stable record identifier when selection must survive edits. Merely checking index less than count is insufficient for possibly negative input.</p><p>Removing from an empty array violates removeLast’s precondition and traps. Use popLast when absence is an ordinary outcome, or guard nonemptiness if the domain explicitly requires an element. Do not expect do/catch to turn these traps into a thrown service error. Construct kept elements in a new array when removal during traversal obscures index validity. Test empty, one-element and reordered fixtures, labeling intended absence handling separately from invariant violations. Value semantics protects copied containers; it does not preserve every old coordinate after mutation.</p>",
+      "answerHTML": "<p>Removing the first row moves later rows forward and makes the list shorter. In a three-row list, the old index two is now past the last row. A saved integer position may now refer to a different element or equal endIndex, which is past the last valid element. Recheck the current array’s indices before subscripting, and use a stable record identifier when selection must survive edits. Merely checking index less than count is insufficient for possibly negative input.</p><p>RemoveLast requires at least one element. An empty Array breaks that precondition, so the program traps. Use popLast when absence is an ordinary outcome, or guard nonemptiness if the domain explicitly requires an element. Do not expect do/catch to turn these traps into a thrown service error. Construct kept elements in a new array when removal during traversal obscures index validity. Test empty, one-element and reordered fixtures, separating normal absence from a broken rule that should always hold. Value semantics protects copied containers; it does not preserve every old coordinate after mutation.</p>",
       "followUps": [
-        "How would direct element iteration reduce positional mistakes?",
-        "When should an empty removal be a domain error rather than nil?"
+        "How does iterating elements directly avoid some index mistakes?",
+        "When should empty removal produce a domain error rather than nil?"
       ],
       "pitfalls": [
-        "Using endIndex as a valid element.",
-        "Assuming array copying makes saved positions stable."
+        "Reading endIndex as if it named the last element.",
+        "Expecting copied Arrays to keep saved positions valid after edits."
       ]
     },
     {
@@ -256,23 +256,23 @@
       "level": "Foundation",
       "kind": "Explain",
       "minutes": 6,
-      "prompt": "Distinguish a missing dictionary key, a stored zero and a present nil payload.",
-      "scenario": "A [String: Int] has empty mapped to zero; a separate [String: Int?] needs to retain a key with unknown payload.",
+      "prompt": "How do you distinguish a missing dictionary key, a key storing zero, and a key with a nil payload?",
+      "scenario": "A [String: Int] stores zero under empty. A separate [String: Int?] must keep a key whose payload is unknown.",
       "androidBridge": "Kotlin Map.get may need containsKey to distinguish missing and nullable payload. Swift lookup makes nested optional layers visible; default reads are not universal insertion guarantees.",
       "rubric": [
-        "Explains ordinary lookup returns an optional.",
-        "Keeps zero as a present value.",
-        "Explains outer versus inner optional for optional-valued dictionaries.",
-        "Uses updateValue(nil, forKey:) to retain a nil payload."
+        "Explains that ordinary lookup can find no association.",
+        "Keeps a stored zero distinct from a missing key.",
+        "Explains the outer key-presence and inner payload-presence checks.",
+        "Uses updateValue(nil, forKey:) to keep a key with a nil payload."
       ],
-      "answerHTML": "<p>For <code>[String: Int]</code>, ordinary lookup returns Int? because an association may be missing. A stored zero is present and must not be conflated with nil. Coalescing to zero can simplify display but loses that distinction if used as the only retained result.</p><p>For <code>[String: Int?]</code>, the lookup adds an outer optional around the optional payload. The outer layer answers whether the key exists; the inner layer answers whether its value exists. Assigning nil through the ordinary subscript removes the key. <code>updateValue(nil, forKey:)</code> explicitly retains an association whose value is nil. A default subscript read can supply a value without inserting it; mutating an Int through the default subscript writes the updated association. Test missing, zero and unknown payload independently. If nested optional meaning becomes obscure, a named enum can make the domain states clearer.</p>",
+      "answerHTML": "<p>A dictionary key can be absent even when zero is a valid stored number. For <code>[String: Int]</code>, ordinary lookup returns Int? because that key might have no entry. A stored zero is present and must not be conflated with nil. Coalescing to zero can simplify display but loses that distinction if used as the only retained result.</p><p>For <code>[String: Int?]</code>, lookup has two optional layers. Picture a labelled envelope: the outer layer says whether the envelope exists; the inner layer says whether it contains a number. The outer layer answers whether the key exists; the inner layer answers whether its value exists. Assigning nil through the ordinary subscript removes the key. <code>updateValue(nil, forKey:)</code> explicitly retains an association whose value is nil. A default subscript read can supply a value without inserting it; mutating an Int through the default subscript writes the updated association. Test missing, zero and unknown payload independently. If these two layers are hard to read, use an enum to give the domain states clear names.</p>",
       "followUps": [
-        "How would a named enum improve the unknown-payload model?",
-        "What different concern arises for reference-valued default subscripts?"
+        "How could an enum name the unknown-payload state more clearly?",
+        "Why does a reference-valued default need a separate mutation review?"
       ],
       "pitfalls": [
-        "Persisting a display fallback as domain data.",
-        "Confusing outer absence with inner nil."
+        "Saving a display fallback as though it were domain data.",
+        "Confusing a missing key with a present key whose payload is nil."
       ]
     },
     {
@@ -281,23 +281,23 @@
       "level": "Foundation",
       "kind": "Design",
       "minutes": 8,
-      "prompt": "Choose a duplicate-key and display-order policy for repeated labels, then preserve first-occurrence uniqueness.",
-      "scenario": "Input is general, dental, general, vision. The UI needs a sorted histogram and a separate unique list in encounter order.",
+      "prompt": "Count repeated labels and show counts in sorted order. Also keep one copy of each label in the order it first appeared.",
+      "scenario": "Input is general, dental, general, vision. The UI needs a sorted count table and a separate unique list in encounter order.",
       "androidBridge": "Kotlin Map/Set shapes transfer conceptually, but Swift value semantics and unordered collection traversal remain separate. Set uniqueness does not promise insertion-order presentation.",
       "rubric": [
-        "Aggregates general to two explicitly.",
-        "Sorts histogram keys at the presentation boundary.",
-        "Combines a seen Set with an ordered output Array.",
-        "Rejects hashValue as persistent identity."
+        "Counts general twice and each other label once.",
+        "Sorts dictionary keys when building the displayed count table.",
+        "Uses a seen Set and an ordered Array for first-occurrence uniqueness.",
+        "Explains why hashValue cannot serve as a lasting identifier."
       ],
-      "answerHTML": "<p>State the collision policy first: each occurrence contributes one to its label’s count. Increment a Dictionary’s default Int subscript so general becomes two and dental/vision each become one. Print keys in sorted order when deterministic presentation is required; incidental dictionary traversal is not a display contract.</p><p>For the first-occurrence unique list, keep a seen Set and append to an Array only when insertion reports a new member. That yields general, dental, vision in encounter order. Converting to Set and back would establish uniqueness while losing the requested ordering relationship. Hashing locates possible matches and equality decides membership; collisions are allowed, and hashValue is not a durable identifier. Test a changed input beginning with vision to show that encounter order changes while sorted histogram order remains separate. If equal labels represent different entities, use stable domain keys instead of display text.</p>",
+      "answerHTML": "<p>Choose the duplicate rule first: each occurrence adds one to that label’s count. Increment a Dictionary’s default Int subscript so general becomes two and dental/vision each become one. Print keys in sorted order when deterministic presentation is required; the order seen during dictionary traversal is not a display guarantee.</p><p>For the unique list, use a Set as a guest checklist and an Array as the arrival log. Append to the Array only when the Set says the label is new. That yields general, dental, vision in encounter order. Converting to Set and back would establish uniqueness while losing the requested ordering relationship. Hashing locates possible matches and equality decides membership; collisions are allowed, and hashValue is not a durable identifier. Test a changed input beginning with vision to show that encounter order changes while sorted histogram order remains separate. If equal labels represent different entities, use stable domain keys instead of display text.</p>",
       "followUps": [
-        "How would rejecting duplicate keys change acceptance tests?",
-        "What happens if the first input becomes vision?"
+        "How would the tests change if duplicate labels should be rejected?",
+        "Which output order changes if vision is the first input?"
       ],
       "pitfalls": [
-        "Relying on one observed dictionary order.",
-        "Using a display name or hash as universal record identity."
+        "Using one observed dictionary order as a display guarantee.",
+        "Treating a display label or hash as a permanent record ID."
       ]
     },
     {
@@ -306,23 +306,23 @@
       "level": "Foundation",
       "kind": "Explain",
       "minutes": 7,
-      "prompt": "Describe the output types of map, compactMap, flatMap and reduce for parsing/aggregation fixtures.",
-      "scenario": "String inputs are 3, bad, 8; nested groups are [1,2], [], [3].",
+      "prompt": "For the given inputs, what values and types do map, compactMap, flatMap and reduce produce?",
+      "scenario": "Parse the Strings 3, bad and 8. Separately, combine [1,2], [] and [3], and explain reduce on empty input.",
       "androidBridge": "Kotlin mapNotNull resembles compactMap, and fold resembles reduce. Swift Sequence is a broader iteration protocol, not automatically a lazy Kotlin Sequence.",
       "rubric": [
-        "Map preserves one optional output per String input.",
-        "CompactMap deliberately removes nil parse results.",
-        "FlatMap concatenates one layer of produced sequences.",
-        "Reduce on empty input returns its initial accumulator."
+        "Keeps three optional results when map parses the three Strings.",
+        "Explains that compactMap removes the failed parse.",
+        "Uses flatMap to join one layer of the nested groups.",
+        "Returns the initial accumulator for reduce on empty input."
       ],
-      "answerHTML": "<p>Int(text) is failable, so mapping it over three strings produces three optional results, including nil for bad. CompactMap removes that nil and returns [3, 8]. That shape is convenient but deliberately discards invalid-row evidence; a validation boundary may instead need a typed rejection for the original input.</p><p>FlatMap over the nested groups, returning each group, concatenates one layer to [1, 2, 3]. It is not a recursive arbitrary-data flattener or an error reporter. Reduce combines values through an initial accumulator and ordered steps; an empty sequence returns that initial value without invoking a step. Reduce(into:) offers a mutable accumulator contract for collection building. Identify each intermediate type before chaining operations, and state the product policy that authorizes dropping or combining inputs. None of these ordinary operations implies asynchronous execution or automatic concurrency.</p>",
+      "answerHTML": "<p>Int(text) can fail. Map keeps one result per input, so these three Strings produce three optional results with nil for bad. CompactMap removes that nil and returns [3, 8]. This is like removing an unreadable card from a stack. It loses evidence about the rejected row. Validation may need to keep that input and a typed reason instead.</p><p>FlatMap over the nested groups, returning each group, concatenates one layer to [1, 2, 3]. It is not a recursive arbitrary-data flattener or an error reporter. Reduce starts with a running result, called an accumulator, and updates it in iteration order; an empty sequence returns that initial value without invoking a step. Reduce(into:) offers a mutable accumulator contract for collection building. Identify each intermediate type before chaining operations, and state the product policy that authorizes dropping or combining inputs. None of these ordinary operations implies asynchronous execution or automatic concurrency.</p>",
       "followUps": [
-        "When would [Int?] be more useful than [Int]?",
-        "How would preserving rejected text change the output model?"
+        "When would keeping [Int?] help more than producing [Int]?",
+        "What result shape could retain the rejected text and its reason?"
       ],
       "pitfalls": [
-        "Expecting compactMap to report why parsing failed.",
-        "Calling every Sequence chain lazy."
+        "Expecting compactMap to explain a parse failure.",
+        "Assuming every Swift Sequence chain evaluates lazily."
       ]
     },
     {
@@ -331,23 +331,23 @@
       "level": "Foundation",
       "kind": "Debug",
       "minutes": 7,
-      "prompt": "Explain why traversing a lazy mapped prefix twice repeats production, then design a stable result snapshot.",
-      "scenario": "A pure-array lazy map increments a diagnostic counter. Before consumption it is zero; two one-element materializations make it two.",
+      "prompt": "Why does reading the same lazy mapped prefix twice run its transform twice? How would you keep one stable result?",
+      "scenario": "An Array-backed lazy map increases a diagnostic counter. It is zero before reading. Making two separate one-element Arrays from its prefix brings it to two.",
       "androidBridge": "Kotlin Sequence offers a deferred-evaluation analogy. Swift lazy adapters do not promise caching, and some Swift sequences are single-pass rather than repeatable collections.",
       "rubric": [
-        "Separates adapter construction from consumption.",
-        "Predicts repeated transformation in the specified simple map fixture.",
-        "Materializes once when a stored result snapshot is intended.",
-        "Avoids a universal visit-count claim for other lazy adapters."
+        "Separates creating the lazy adapter from reading elements.",
+        "Predicts two transform calls for this Array-backed map fixture.",
+        "Materializes once and keeps the Array for a stable snapshot.",
+        "Limits that exact visit count to this fixture rather than all lazy adapters."
       ],
-      "answerHTML": "<p>Creating the lazy adapter describes how elements will be produced; it does not run this transform immediately. Materializing one mapped element requests the transform once in the specified array/lazy-map fixture. Materializing the same prefix again requests it again, so the diagnostic counter reaches two. Laziness is deferred computation, not memoization.</p><p>If a consumer needs one stable result, materialize to an Array once and retain that array. Prefer pure transformations, since side effects can repeat during traversal and other adapters such as lazy filtering may visit inputs differently. Do not generalize this exact counter to every pipeline. Arrays can be replayed, while Sequence alone does not guarantee repeatability. Sorting also needs its relevant input values and cannot be made a two-element global sort merely by placing lazy before it. Document the output/freshness requirement first, then measure a real hot path if allocation or work reduction matters.</p>",
+      "answerHTML": "<p>A lazy adapter is a recipe for producing elements when asked. Creating it does not run this transform yet. Materializing one mapped element requests the transform once in the specified array/lazy-map fixture. Materializing the same prefix again requests it again, so the diagnostic counter reaches two. Lazy means doing work later. It does not mean caching the result for reuse, called memoization.</p><p>If a consumer needs one stable result, make an Array once and keep it. That stored Array is the snapshot. Prefer pure transformations, since side effects can repeat during traversal and other adapters such as lazy filtering may visit inputs differently. Do not generalize this exact counter to every pipeline. Arrays can be replayed, while Sequence alone does not guarantee repeatability. Sorting also needs its relevant input values and cannot be made a two-element global sort merely by placing lazy before it. Document the output/freshness requirement first, then measure a real hot path if allocation or work reduction matters.</p>",
       "followUps": [
-        "What changes when the underlying sequence is single-pass?",
-        "Why might an eager sort inspect more than a requested prefix?"
+        "What changes if the source can be consumed only once?",
+        "Why can sorting inspect more inputs than the prefix eventually returns?"
       ],
       "pitfalls": [
-        "Calling lazy a cache.",
-        "Using diagnostic side effects as the production contract."
+        "Expecting lazy to cache values automatically.",
+        "Making diagnostic side effects part of the production result contract."
       ]
     },
     {
@@ -356,23 +356,23 @@
       "level": "Foundation",
       "kind": "Explain",
       "minutes": 7,
-      "prompt": "Explain mutating on a struct method, inout on a parameter, and the ampersand at a call site.",
-      "scenario": "A let original Counter is assigned into var edited, incremented, then passed through add(3, to: &edited.value).",
+      "prompt": "What do mutating, inout and the ampersand at a call each allow you to change?",
+      "scenario": "A let original Counter is copied into var edited. Edited is incremented, then passed to add(3, to: &edited.value).",
       "androidBridge": "Kotlin data-class copy is a useful editing analogy, but Swift struct assignment provides value semantics directly. Inout is temporary writable access, not ordinary Kotlin object passing or a reusable pointer.",
       "rubric": [
-        "Predicts original value preservation.",
-        "Requires a mutable receiver for a mutating method.",
-        "Connects inout declaration with ampersand authorization.",
-        "Explains exclusive access ends with the synchronous call."
+        "Predicts that original keeps its value.",
+        "Explains why a mutating method needs a mutable receiver.",
+        "Connects the inout parameter to writable storage passed with an ampersand.",
+        "Explains that exclusive access ends when the synchronous call returns."
       ],
-      "answerHTML": "<p>A mutating value method changes the receiver’s stored state or replaces that value, so edited must be a var binding. Original remains unchanged by edited’s increment because Counter is a struct. A var property does not make mutation legal through a let-bound struct.</p><p>Inout declares a temporary caller-visible editing parameter, and the ampersand call explicitly supplies writable storage. Adding three changes edited.value during that access, then the access ends when the call returns. Its semantic model is copy-in/copy-out even when implementation optimizes storage handling. It is not a raw pointer to retain or mutate later, and an escaping closure cannot keep the inout parameter. Exclusivity forbids incompatible overlapping accesses to the same storage. Returning an edited value can be a clearer alternative when the caller should choose whether to adopt the result. None of these synchronous rules supplies concurrency isolation.</p>",
+      "answerHTML": "<p>Mutating lets a value-type method change the value it is called on, including replacing it. Edited must therefore be var. Original remains unchanged by edited’s increment because Counter is a struct. A var property does not make mutation legal through a let-bound struct.</p><p>Inout lets a function edit the caller’s storage for the duration of the call. The ampersand marks that permission at the call site. It is like lending a notebook for one edit, then taking it back. Adding three changes edited.value during that access, then the access ends when the call returns. Its semantic model is copy-in/copy-out even when implementation optimizes storage handling. It is not a raw pointer to retain or mutate later, and an escaping closure cannot keep the inout parameter. Exclusivity means conflicting accesses to that storage cannot overlap. Returning an edited value can be a clearer alternative when the caller should choose whether to adopt the result. None of these synchronous rules supplies concurrency isolation.</p>",
       "followUps": [
-        "When would a returned copy improve the API?",
-        "What happens if original is passed instead of edited?"
+        "When would returning an edited copy give the caller a clearer choice?",
+        "What happens if you pass the let original instead of var edited?"
       ],
       "pitfalls": [
-        "Equating var property with a mutable let receiver.",
-        "Treating ampersand as retained pointer ownership."
+        "Assuming a var property can be changed through a let-bound struct.",
+        "Treating the ampersand as permission to keep a pointer for later use."
       ]
     },
     {
@@ -381,23 +381,23 @@
       "level": "Foundation",
       "kind": "Debug",
       "minutes": 8,
-      "prompt": "Separate a same-variable inout rejection from a nested-reference edit that legally changes both wrappers.",
-      "scenario": "A two-inout balance function receives &count twice. A copied Packet contains the same mutable Note object as its original.",
+      "prompt": "Why is passing &count twice to one call rejected, while editing a Note shared by two copied structs is allowed?",
+      "scenario": "A balance function takes two inout arguments and receives &count twice. Separately, a copied Packet contains the same mutable Note object as its original.",
       "androidBridge": "Kotlin data-class copy can also share nested references, but Swift’s outer value assignment needs no copy call. Swift exclusivity is an access rule, not the same thing as a thread race.",
       "rubric": [
-        "Rejects two simultaneous modifications of count.",
-        "Chooses separate storage or a single-container operation matching intent.",
-        "Predicts shared Note mutation without claiming a struct became a class.",
-        "Separates compiler/runtime access checking from deep-copy policy."
+        "Identifies overlapping modifying access to count.",
+        "Uses separate storage or a single-container operation that matches the intended change.",
+        "Predicts shared Note edits while keeping Packet a value type.",
+        "Separates access checking from the choice to deep-copy nested state."
       ],
-      "answerHTML": "<p>Passing count to both inout parameters requests overlapping modifying access to the same storage. The conflict exists even on one thread and even if the balance implementation appears harmless for that fixture. Redesign the operation around independent variables or a single-storage algorithm. For swapping positions in one array, swapAt expresses the intended container mutation without overlapping inout subscripts.</p><p>Packet remains a value type, but its Note property stores a reference. Copying Packet copies that reference, so both wrappers can observe Note.text changes while their direct title fields remain independent. That behavior is legal and unrelated to the same-variable exclusivity failure. Use nested value state or deliberate object reconstruction when independent nested edits are required. Draw which fields are values and which are references, then test them separately. Do not call copy-on-write a deep clone or exclusivity a mutex; neither proves thread safety.</p>",
+      "answerHTML": "<p>Passing &count twice gives two parameters overlapping modifying access to the same storage for the call. That breaks exclusivity even on one thread and even if this balance implementation appears harmless. Redesign the operation around independent variables or a single-storage algorithm. For swapping positions in one array, swapAt expresses the intended container mutation without overlapping inout subscripts.</p><p>Packet is still a value type. Its Note property is a reference: both copied Packets point to the same Note, like two address cards naming one house. Copying Packet copies that reference, so both wrappers can observe Note.text changes while their direct title fields remain independent. That behavior is legal and unrelated to the same-variable exclusivity failure. For independent nested edits, use a nested value type or deliberately create a separate Note. Draw which fields are values and which are references, then test them separately. Do not call copy-on-write a deep clone or exclusivity a mutex; neither proves thread safety.</p>",
       "followUps": [
-        "How would a nested struct Note change the edit result?",
-        "Which symptom requires compiler evidence versus an identity probe?"
+        "What changes if Note is a nested struct?",
+        "Which problem needs a compiler diagnostic, and which needs a check of object identity?"
       ],
       "pitfalls": [
-        "Diagnosing every exclusivity error as concurrency.",
-        "Claiming struct assignment clones every reachable object."
+        "Calling every exclusivity error a thread race.",
+        "Expecting struct assignment to clone every reachable object."
       ]
     },
     {
@@ -406,23 +406,23 @@
       "level": "Foundation",
       "kind": "Explain",
       "minutes": 7,
-      "prompt": "Distinguish stored, computed, observed and lazy properties, then explain a failable initializer.",
-      "scenario": "A draft has stored count, computed current caption, lazy first caption and assignment observers; a PositiveQuantity init? rejects zero.",
+      "prompt": "How do stored, computed, observed and lazy properties behave? What happens when init? rejects an input?",
+      "scenario": "A draft has stored count, a computed current caption, a lazy first caption and assignment observers. PositiveQuantity uses init? to reject zero.",
       "androidBridge": "Kotlin accessors/lazy delegates offer related roles, but Swift lazy has no universal synchronization guarantee and its direct initialization/observer rules are distinct.",
       "rubric": [
-        "Explains storage versus getter computation.",
-        "Predicts lazy first-read persistence.",
-        "Separates observers from construction validation.",
-        "Treats init? failure as an optional absent instance."
+        "Separates stored state from a value produced by a getter.",
+        "Predicts that lazy keeps its first-read result.",
+        "Separates assignment observers from validation during construction.",
+        "Explains that a failed init? returns no instance."
       ],
-      "answerHTML": "<p>Stored count owns state. A computed caption runs its getter and reflects the value read at that access unless the getter implements another contract. A lazy caption initializes stored state on its first access and retains that snapshot afterward; changing count does not automatically invalidate it. Lazy must be var, and first access on a struct can require a mutable receiver.</p><p>WillSet/didSet observe assignments with proposed/previous values and can run for same-value assignments. Ordinary direct initial assignments establishing the type’s own stored properties do not invoke them, so observers are not a substitute for validating construction. A failable init? returns nil for invalid input rather than a partially usable quantity. Bind that optional before use. If the reason matters, a throwing initializer can preserve it instead. Visibility and isolation remain separate: none of these property spellings guarantees thread-safe first access, transaction rollback or a public construction API.</p>",
+      "answerHTML": "<p>A stored property keeps a value, such as count. A computed caption runs its getter and reflects the value read at that access unless the getter implements another contract. A lazy caption writes its value once, on first access, like filling in a card the first time you need it; changing count does not automatically invalidate it. Lazy must be var, and first access on a struct can require a mutable receiver.</p><p>WillSet receives the proposed value before assignment. DidSet receives the previous value afterward. These observers can run even when the assigned value is unchanged. Ordinary direct initial assignments establishing the type’s own stored properties do not invoke them, so observers are not a substitute for validating construction. A failable initializer, init?, returns nil when the input is invalid. It does not hand back a partly usable quantity. Bind that optional before use. If the reason matters, a throwing initializer can preserve it instead. Visibility and isolation remain separate: none of these property spellings guarantees thread-safe first access, transaction rollback or a public construction API.</p>",
       "followUps": [
-        "When should a lazy caption be replaced by a computed one?",
-        "What additional invariant must later editing preserve?"
+        "When should the caption use a computed property rather than lazy storage?",
+        "Which construction rule must later edits also preserve?"
       ],
       "pitfalls": [
-        "Calling computed properties automatic caches.",
-        "Expecting observers to validate all initialization paths."
+        "Expecting a computed property to cache its result automatically.",
+        "Expecting assignment observers to validate every initialization path."
       ]
     },
     {
@@ -431,23 +431,23 @@
       "level": "Foundation",
       "kind": "Debug",
       "minutes": 8,
-      "prompt": "Repair a stale lazy caption and a cross-module construction failure without broadening unrelated setters.",
-      "scenario": "A public struct has public fields but no explicit public init. A var draft reads its lazy caption at two, then changes count to four.",
+      "prompt": "Fix a lazy caption that stays old and a public struct that another module cannot construct. Keep unrelated setters restricted.",
+      "scenario": "A public struct has public fields but no explicit public init. A var draft first reads its lazy caption at count two, then changes count to four.",
       "androidBridge": "Kotlin internal/module and primary-constructor rules are not exact Swift access/synthesis counterparts. Swift public type visibility does not export synthesized memberwise construction.",
       "rubric": [
-        "Predicts the lazy caption remains based on two.",
-        "Chooses computed or explicit invalidation by freshness requirement.",
-        "Adds a deliberate public initializer for external clients.",
-        "Keeps setter permission separate from visibility and synchronization."
+        "Predicts that the lazy caption still describes two.",
+        "Chooses a computed property or explicit invalidation based on required freshness.",
+        "Adds a deliberate public initializer for external callers.",
+        "Keeps setter access separate from visibility and synchronization."
       ],
-      "answerHTML": "<p>The lazy caption intentionally stores its first-read value, so it remains based on two after count becomes four. If display should always reflect current count, use a computed property; if caching is needed, design explicit invalidation and synchronization from that requirement. Repeatedly reconstructing the model merely to refresh text can hide an ownership/freshness mistake.</p><p>The separate importing module cannot rely on a synthesized memberwise initializer being public. Add an explicit public initializer with the intended arguments and validation. Public on the struct and fields does not automatically export all construction APIs. A private(set) var can expose reads while confining edits, which differs from let and supplies no actor or lock. Verify the actual target/module boundary rather than borrowing Kotlin internal or Java package rules. Test changed inputs and, where relevant, a separate importing module; local testable access alone does not prove external API availability.</p>",
+      "answerHTML": "<p>Lazy keeps the value made on the first read. The caption still describes two after count changes to four. If display should always reflect current count, use a computed property; if caching is needed, decide when to discard the cached value and how to protect concurrent access. Those are invalidation and synchronization rules. Repeatedly reconstructing the model merely to refresh text can hide an ownership/freshness mistake.</p><p>Swift can generate a memberwise initializer, which takes the stored fields as arguments. Another module cannot assume this generated initializer is public. Add an explicit public initializer with the intended arguments and validation. Public on the struct and fields does not automatically export all construction APIs. Private(set) allows reads at the wider access level while restricting writes. That differs from let. It provides neither an actor nor a lock. Verify the actual target/module boundary rather than borrowing Kotlin internal or Java package rules. Test changed inputs and, where relevant, a separate importing module; local testable access alone does not prove external API availability.</p>",
       "followUps": [
-        "How would putting an initializer in an extension affect synthesis?",
-        "What evidence would prove the external construction boundary?"
+        "How can declaring an initializer in an extension affect the generated initializer?",
+        "What check would prove a separate module can construct this type?"
       ],
       "pitfalls": [
-        "Making every member open/public to silence one error.",
-        "Changing lazy to var while retaining the same stale contract."
+        "Making every member public or open to silence one access error.",
+        "Changing the declaration to var while keeping the same lazy freshness rule."
       ]
     },
     {
@@ -456,23 +456,23 @@
       "level": "Foundation",
       "kind": "Explain",
       "minutes": 7,
-      "prompt": "Predict reference identity and override dispatch through a superclass binding.",
-      "scenario": "A Record-typed variable holds a TaggedRecord; another let variable aliases a Counter with a mutable value.",
+      "prompt": "Two bindings share a class object, and a Record binding holds a TaggedRecord. Which edits and overridden methods do they observe?",
+      "scenario": "A Record-typed variable holds a TaggedRecord. Separately, another let binding refers to the same Counter object with a mutable value.",
       "androidBridge": "Kotlin/Java reference assignment offers a close analogy, but equality punctuation and final/open defaults differ across Kotlin, Java and Swift.",
       "rubric": [
-        "Explains let class references may expose mutable instance state.",
-        "Uses === for class identity rather than equating it with ==.",
-        "Predicts the subclass override through Record.",
-        "Explains an upcast changes the static view, not the object."
+        "Explains that let can still refer to an object with mutable state.",
+        "Uses === for shared class identity and separates it from ==.",
+        "Predicts the TaggedRecord override through the Record binding.",
+        "Explains that an upcast changes the available interface, not the object."
       ],
-      "answerHTML": "<p>Two variables assigned the same Counter reference identify one instance. A let binding prevents replacing that reference, not changing the instance’s var value, so mutation through one alias is visible through the other. Use === to compare class identity. Equal property values in two separately constructed Counters do not make their identities the same; == needs an equality contract and asks a different question.</p><p>A Record-typed reference holding TaggedRecord still has TaggedRecord as its dynamic type. Calling the overridable caption selects the subclass implementation. Upcasting exposes the superclass interface without constructing a new base object or discarding tag storage. Downcasting with as? can conditionally reveal subclass capabilities while retaining identity. Prefer a declared polymorphic operation when the consumer only needs behavior, and inspect ownership/isolation if shared mutation is intentional. These predictions establish reference and dispatch semantics, not thread safety or UI lifecycle.</p>",
+      "answerHTML": "<p>Both Counter bindings refer to one object, like two keys opening the same cupboard. A let binding prevents replacing that reference, not changing the instance’s var value, so mutation through one alias is visible through the other. Use === to compare class identity. Equal property values in two separately constructed Counters do not make their identities the same; == needs an equality contract and asks a different question.</p><p>The binding is declared as Record, but the object is still a TaggedRecord. That actual object type is its dynamic type. Calling the overridable caption selects the subclass implementation. Upcasting lets code use the superclass interface. It neither creates a new base object nor removes the tag. Downcasting with as? can conditionally reveal subclass capabilities while retaining identity. Prefer a declared polymorphic operation when the consumer only needs behavior, and inspect ownership/isolation if shared mutation is intentional. These predictions establish reference and dispatch semantics, not thread safety or UI lifecycle.</p>",
       "followUps": [
-        "When would a value struct better match independent edits?",
-        "What evidence distinguishes equality from shared identity?"
+        "When would a struct better support independent edits?",
+        "How would you show that equal values belong to separate objects?"
       ],
       "pitfalls": [
-        "Treating let as deep object immutability.",
-        "Assuming upcasts slice away subclass state."
+        "Treating let as a promise that the entire object cannot change.",
+        "Assuming an upcast removes subclass state."
       ]
     },
     {
@@ -481,23 +481,23 @@
       "level": "Foundation",
       "kind": "Debug",
       "minutes": 8,
-      "prompt": "Explain a subclass initialization failure and safely narrow a heterogeneous base array.",
-      "scenario": "TaggedRecord adds a stored tag, calls super.init before assigning it, and later force-casts every Record to TaggedRecord.",
+      "prompt": "Fix a subclass that calls super.init before setting its own tag. Then safely handle an Array containing both Record and TaggedRecord objects.",
+      "scenario": "TaggedRecord adds a stored tag but calls super.init before assigning it. Later code force-casts every Record in a mixed Array to TaggedRecord.",
       "androidBridge": "Kotlin superclass construction helps orient the problem but Swift enforces its own definite-initialization/delegation rules. Conditional casts have similar purpose without identical hierarchy/API guarantees.",
       "rubric": [
-        "Initializes introduced storage before designated upward delegation.",
-        "Routes convenience through same-class initialization.",
-        "Explains required without adding override to that required implementation.",
-        "Uses as? and handles a genuine base instance safely."
+        "Initializes the subclass’s introduced storage before its designated call to super.init.",
+        "Explains that convenience initialization delegates within the same class.",
+        "Explains why implementing an already required initializer uses required without override.",
+        "Uses as? and handles a genuine base Record."
       ],
-      "answerHTML": "<p>A designated subclass initializer must establish its introduced stored properties before delegating to the immediate superclass’s designated initializer. Assign tag first, then call super.init for inherited state. Convenience initialization delegates across the same class and must eventually reach a designated path. Required obliges subclasses to provide its construction shape through permitted inheritance or implementation; implementing an already required initializer uses required rather than adding override.</p><p>The array may legitimately contain a plain Record, so as! is an unsafe assumption and traps for that element. Use as? with optional binding, or redesign the consumer around a polymorphic requirement if tag-specific behavior is not necessary. A successful cast supplies a narrower view of the original object; it does not clone it. Test base and tagged instances plus the default convenience path. Unsupported archival construction that traps in a UIKit initializer is a separate programmer restriction, not ordinary failable input validation.</p>",
+      "answerHTML": "<p>A designated initializer is a main construction path. In a subclass, it must initialize the stored properties that subclass adds before calling the immediate superclass’s designated initializer. Assign tag first, then call super.init for inherited state. A convenience initializer starts by calling another initializer in the same class. That chain must eventually reach a designated initializer. Required obliges subclasses to provide its construction shape through permitted inheritance or implementation; implementing an already required initializer uses required rather than adding override.</p><p>A plain Record is a valid element in this Array. As! assumes it is a TaggedRecord and traps when that assumption is false. Use as? with optional binding, or redesign the consumer around a polymorphic requirement if tag-specific behavior is not necessary. A successful cast supplies a narrower view of the original object; it does not clone it. Test base and tagged instances plus the default convenience path. Unsupported archival construction that traps in a UIKit initializer is a separate programmer restriction, not ordinary failable input validation.</p>",
       "followUps": [
-        "When does overriding a nonrequired initializer use override?",
-        "What access levels permit external subclassing?"
+        "When does implementing a nonrequired superclass initializer need override?",
+        "Which access levels allow another module to subclass the type?"
       ],
       "pitfalls": [
-        "Using self before the required initialization stage.",
-        "Treating a forced cast as validation."
+        "Using self before the required initialization stage is complete.",
+        "Treating a forced cast as a safe input check."
       ]
     },
     {
@@ -506,23 +506,23 @@
       "level": "Foundation",
       "kind": "Explain",
       "minutes": 7,
-      "prompt": "Model empty success, failure and unknown raw codes without collapsing their meanings.",
-      "scenario": "Outcome carries loaded names or failed text; ReasonCode maps fixed strings offline and invalid.",
+      "prompt": "How would you keep empty success, failure and an unknown external code as different states?",
+      "scenario": "Outcome carries either loaded names or failure text. ReasonCode gives the fixed strings offline and invalid their own cases.",
       "androidBridge": "Kotlin sealed payload states resemble Swift associated-value enums, while raw-value conversion is a separate fixed-code contract rather than sealed subclass casting.",
       "rubric": [
-        "Distinguishes per-instance associated payload from fixed raw code.",
-        "Keeps loaded([]) distinct from idle and failure.",
-        "Binds payloads with an exhaustive switch.",
-        "Handles unknown raw conversion as nil with an explicit policy."
+        "Separates a payload on one enum instance from a case’s fixed raw code.",
+        "Keeps loaded([]) different from idle and failure.",
+        "Uses an exhaustive switch to read associated payloads.",
+        "Handles an unknown raw code as nil with an explicit policy."
       ],
-      "answerHTML": "<p>Associated values belong to particular enum instances: two loaded outcomes can contain different arrays. Raw values are fixed per declared case, so ReasonCode.offline always maps to its declared code. Unknown external strings passed to the rawValue initializer yield nil rather than adding a new case dynamically. Choose rejection, preservation or fallback deliberately instead of force unwrapping.</p><p>Loaded([]) is a completed successful result with no names, distinct from idle and failed. Render through an exhaustive switch and bind a loaded payload with case let. Adding a local variant then exposes missing decisions unless a catch-all hides them. The enum constrains representable combinations, not valid transitions or payload content. A failure message can still be blank, and successful arrays can contain duplicates unless validation says otherwise. Conformance such as Equatable or Codable is a separate capability; enum alone does not supply every desired behavior.</p>",
+      "answerHTML": "<p>An associated value is data carried by one enum instance. Two loaded outcomes can carry different Arrays, like two parcels carrying different contents. Raw values are fixed per declared case, so ReasonCode.offline always maps to its declared code. Unknown external strings passed to the rawValue initializer yield nil rather than adding a new case dynamically. Choose rejection, preservation or fallback deliberately instead of force unwrapping.</p><p>Loaded([]) says the work succeeded and found no names. Idle says it has not run; failed says it did not succeed. Render through an exhaustive switch and bind a loaded payload with case let. Adding a local variant then exposes missing decisions unless a catch-all hides them. The enum limits which state shapes can exist. It does not decide which transitions are allowed or whether the payload is valid. A failure message can still be blank, and successful arrays can contain duplicates unless validation says otherwise. Conformance such as Equatable or Codable is a separate capability; enum alone does not supply every desired behavior.</p>",
       "followUps": [
-        "When would offline deserve its own case?",
-        "How would retained old content change the state shape?"
+        "When would offline need its own state case?",
+        "How would you represent old content kept visible during a new request?"
       ],
       "pitfalls": [
-        "Calling raw strings arbitrary case payloads.",
-        "Replacing failed retrieval with an empty successful array."
+        "Treating fixed raw strings as arbitrary per-instance payloads.",
+        "Replacing a failed retrieval with an empty successful Array."
       ]
     },
     {
@@ -531,23 +531,23 @@
       "level": "Foundation",
       "kind": "Debug",
       "minutes": 8,
-      "prompt": "Trace nested defer cleanup on a thrown parser error and preserve the failure reason at its caller.",
-      "scenario": "An outer function registers cleanup, an inner do scope registers another cleanup, then a guard throws invalid input; the caller catches it.",
+      "prompt": "What is the order of nested defer cleanup when parsing throws? How does the caller keep the reason for failure?",
+      "scenario": "An outer function registers cleanup. An inner do scope registers more cleanup, then a guard throws for invalid input. The caller catches the error.",
       "androidBridge": "Kotlin finally shares cleanup intent, but Swift defer registers only when reached and is scoped/reverse-ordered. Swift traps are not ordinary thrown errors.",
       "rubric": [
-        "Orders inner cleanup before outer cleanup before caller handling.",
-        "Distinguishes try marking from catch handling.",
-        "Retains invalid text through a matched error payload.",
-        "Explains why try? fallback and try! change the failure contract."
+        "Orders inner cleanup, outer cleanup, then caller error handling.",
+        "Separates marking a throwing call with try from handling it with catch.",
+        "Keeps invalid text through the matching error payload.",
+        "Explains how try? with a fallback and try! change failure behavior."
       ],
-      "answerHTML": "<p>Once reached, each defer registers work for the exit of its enclosing scope. A thrown guard error leaves the inner scope first, running its cleanup, then leaves the function and runs outer cleanup, then reaches the caller’s catch. Multiple defers in one scope run in reverse registration order. A defer on an unreachable path is never registered; it does not catch or erase the error.</p><p>Try marks the throwing call. Catch handles the matching error payload, allowing the caller to retain the invalid input and explain recovery. Try? would convert the thrown reason to nil, and a zero fallback could then misrepresent failure as accepted data. Try! instead traps on an error and is not a user-facing repair. Force unwraps, invalid subscripts and failed preconditions are also not ordinary thrown errors recovered by this catch. Test normal and thrown exits while labeling print cleanup as scope evidence rather than proof of real resource release.</p>",
+      "answerHTML": "<p>Defer schedules cleanup when execution reaches it. That cleanup runs when the surrounding scope exits. A thrown guard error leaves the inner scope first, running its cleanup, then leaves the function and runs outer cleanup, then reaches the caller’s catch. Multiple defers in one scope run in reverse registration order. A defer on an unreachable path is never registered; it does not catch or erase the error.</p><p>Try marks a call that can throw. It does not handle the error. Catch handles the matching error payload, allowing the caller to retain the invalid input and explain recovery. Try? changes a thrown error into nil and loses its reason. Replacing that nil with zero could make rejected data look accepted. Try! instead traps on an error and is not a user-facing repair. Force unwraps, invalid subscripts and failed preconditions are also not ordinary thrown errors recovered by this catch. Test normal and thrown exits while labeling print cleanup as scope evidence rather than proof of real resource release.</p>",
       "followUps": [
-        "What if acquisition occurs after an early return?",
-        "Which mutation must be rolled back explicitly rather than by defer automatically?"
+        "What cleanup is registered if the function returns before acquiring the resource?",
+        "Which state change needs explicit rollback rather than relying on defer alone?"
       ],
       "pitfalls": [
-        "Assuming defer only runs on successful completion.",
-        "Calling try a catch operation."
+        "Assuming defer runs only on successful exits.",
+        "Thinking try itself catches the error."
       ]
     },
     {
@@ -556,23 +556,23 @@
       "level": "Foundation",
       "kind": "Explain",
       "minutes": 7,
-      "prompt": "Read an optional stored action and justify @escaping on the accepting plain callback parameter.",
-      "scenario": "Button.install stores () -> Void; Button.tap invokes it synchronously, and clearing the property stops its own delivery.",
+      "prompt": "Read the optional stored action type. Why must a plain callback parameter use @escaping when install saves it?",
+      "scenario": "Button.install stores a () -> Void action. Button.tap calls it synchronously. Clearing the property stops later delivery through that Button.",
       "androidBridge": "Kotlin callbacks/lambdas provide a role analogy, but noinline/crossinline are not exact Swift escaping contracts. Function types and escaping do not choose a queue.",
       "rubric": [
-        "Reads optional zero-input Void function type.",
-        "Explains storing a plain parameter may outlive the call.",
-        "Places @escaping on that parameter, not the property type.",
-        "Separates storage/lifetime from scheduling, ownership and invocation guarantees."
+        "Reads the type as an optional function with no inputs and no useful return value.",
+        "Explains that a saved callback may outlive install.",
+        "Places @escaping on the accepting plain parameter, not the property type.",
+        "Separates lifetime permission from scheduling, ownership and delivery guarantees."
       ],
-      "answerHTML": "<p><code>(() -&gt; Void)?</code> is an optional function value accepting no inputs and returning no useful result. Action?() invokes it only if that function value is present. The plain install parameter must be escaping because the property can retain it after install returns; the attribute belongs on the parameter declaration. A closure constructed internally for a property has no accepted plain parameter to annotate.</p><p>Escaping permits an extended lifetime, not background execution, weak capture, cancellation or guaranteed eventual invocation. Tap in this fixture runs synchronously. Clearing the property releases Button’s ownership of the action and makes later local taps no-ops, but a separately saved action may still exist. Review what that action captures and who owns it. Optional closure parameters have different type behavior, so do not mechanically apply the plain-parameter annotation rule to every optional function argument. State delivery and teardown contracts separately when adapting a real API.</p>",
+      "answerHTML": "<p>The action may be absent. If present, it is a function you can call. <code>(() -&gt; Void)?</code> is an optional function value accepting no inputs and returning no useful result. Action?() invokes it only if that function value is present. Install keeps the callback for later, like saving a phone number rather than using it only during this call. Its plain callback parameter therefore needs @escaping. Put that attribute on the parameter declaration. A closure constructed internally for a property has no accepted plain parameter to annotate.</p><p>Escaping means the function value may live beyond the accepting call. Scheduling, weak capture, cancellation and promised delivery are separate contracts. Tap in this fixture runs synchronously. Clearing the property releases Button’s ownership of the action and makes later local taps no-ops, but a separately saved action may still exist. Review what that action captures and who owns it. Optional closure parameters have different type behavior, so do not mechanically apply the plain-parameter annotation rule to every optional function argument. State delivery and teardown contracts separately when adapting a real API.</p>",
       "followUps": [
-        "What survives if another owner saved the action?",
-        "Which contract would establish exactly-once delivery?"
+        "What can still run if another owner saved the action before it was cleared?",
+        "Which additional rule would guarantee exactly-once delivery?"
       ],
       "pitfalls": [
         "Putting @escaping on a stored property’s function type.",
-        "Assuming escaping means asynchronous."
+        "Assuming an escaping callback automatically runs asynchronously."
       ]
     },
     {
@@ -581,23 +581,23 @@
       "level": "Foundation",
       "kind": "Debug",
       "minutes": 9,
-      "prompt": "Draw a stored owner/callback cycle, repair it, and explain why a nested closure needs a fresh capture review.",
-      "scenario": "Owner stores action capturing self strongly. A weak repair unwraps self, then creates another stored function using that binding.",
+      "prompt": "Show the strong-reference loop between an owner and its stored callback. Break it, then review an inner stored closure created after unwrapping weak self.",
+      "scenario": "Owner stores an action that captures self strongly. A proposed fix uses weak self, unwraps it, then makes another stored function using that binding.",
       "androidBridge": "Android/JVM tracing GC can collect root-unreachable cycles; Swift ARC retains a strong cycle. Android callbacks reachable from a singleton still require lifecycle cleanup.",
       "rubric": [
-        "Labels both strong edges in the cycle.",
-        "Rejects deinit-only cleanup when the cycle prevents deallocation.",
-        "Uses weak with an explicit missing-owner path and a weak probe.",
-        "Recognizes the nested strong local binding can be retained independently."
+        "Labels both strong references in the owner-action-owner loop.",
+        "Explains why deinit cannot start while the cycle keeps the owner alive.",
+        "Uses weak capture, handles a missing owner and checks a weak probe.",
+        "Identifies the new strong local self that an inner closure can retain."
       ],
-      "answerHTML": "<p>Owner strongly owns its stored action, and a strong self capture makes the action own Owner. Removing the external owner variable leaves the cycle intact under ARC. Deinit cannot clear a loop that prevents deallocation from beginning. Break an edge explicitly or use a weak capture when the action may outlive a disappearing owner.</p><p>After weak self succeeds at guard, the body has a strong local self. An inner stored closure can capture that binding strongly, so the outer weak policy does not propagate automatically. Draw the inner storage/release path and distinguish bounded retention from a new cycle. Test the simple repair by saving the action, observing Owner weakly, clearing the known strong owner and safely invoking the saved action. Clean up any intentional strong-cycle experiment afterward. Weakness protects memory ownership, not producer cancellation or whether a still-alive screen remains semantically active.</p>",
+      "answerHTML": "<p>Owner keeps its action alive. A strong self capture makes the action keep Owner alive in return. This two-way loop is a strong-reference cycle. Removing the external owner variable leaves the cycle intact under ARC. Deinit cannot clear a loop that prevents deallocation from beginning. Break an edge explicitly or use a weak capture when the action may outlive a disappearing owner.</p><p>A successful guard unwraps weak self into a strong local binding. The owner stays alive while that binding is needed. An inner stored closure can capture that binding strongly, so the outer weak policy does not propagate automatically. Draw who stores the inner closure and who releases it. Decide whether retention ends at a known point or creates another cycle. Test the simple repair by saving the action, observing Owner weakly, clearing the known strong owner and safely invoking the saved action. Clean up any intentional strong-cycle experiment afterward. Weakness protects memory ownership, not producer cancellation or whether a still-alive screen remains semantically active.</p>",
       "followUps": [
-        "When would deliberate strong retention be appropriate?",
-        "What lifetime proof would justify unowned?"
+        "When should a callback deliberately keep its owner alive?",
+        "What lifetime guarantee would make an unowned capture safe?"
       ],
       "pitfalls": [
-        "Expecting deinit to break its own preventing cycle.",
-        "Treating weak capture as cancellation."
+        "Expecting deinit to break the cycle that prevents deallocation.",
+        "Treating weak capture as a request to cancel producer work."
       ]
     },
     {
@@ -606,23 +606,23 @@
       "level": "Foundation",
       "kind": "Explain",
       "minutes": 8,
-      "prompt": "Choose generic, any and some contracts and distinguish uppercase Self from lowercase self.",
-      "scenario": "A source API must preserve element type; a registry stores different conformers; one factory hides its chosen implementation.",
+      "prompt": "When would you use a generic, any Protocol or some Protocol? What is the difference between Self and self?",
+      "scenario": "A source API must keep its element type visible. A registry stores different conformers. One factory hides the concrete implementation it chooses.",
       "androidBridge": "Kotlin generics/interfaces help with relationships and substitution, but JVM erasure/reified assumptions do not define Swift associated types, existentials or opaque result identity.",
       "rubric": [
-        "Generic links caller-visible types rather than boxing as Any.",
-        "Existential any exposes declared capabilities for interchangeable conformers.",
-        "Result some preserves one underlying implementation type.",
-        "Explains Self is a type relationship and self an instance."
+        "Uses a generic to preserve a caller-visible type relationship rather than erasing it to Any.",
+        "Uses any to expose protocol capabilities for interchangeable conformers.",
+        "Explains that result-position some hides one fixed underlying implementation type.",
+        "Explains Self as a type relationship and self as the current instance."
       ],
-      "answerHTML": "<p>A generic parameter names a type relationship: identity’s T input returns T without a cast, and Source’s associated Element can remain visible through a constrained generic. Uppercase Any instead accepts unrestricted values with little declared capability. Lowercase any Protocol is an existential exposing that protocol boundary while hiding the concrete conformer, which may be a struct or class.</p><p>Result-position some Protocol hides one chosen underlying implementation type, so ordinary branches cannot return unrelated concrete conformers merely because both satisfy the protocol. Parameter-position some is generic shorthand; independent some parameters do not imply one shared type. A constrained existential can retain an associated fact such as Element == Int, so any does not always discard every relationship. Uppercase Self refers to the current/conforming type, while lowercase self is the current instance. Choose the contract from information the caller needs, then test that boundary before claiming optimization benefits.</p>",
+      "answerHTML": "<p>A generic parameter gives a type a name and keeps a relationship visible: identity’s T input returns T without a cast, and Source’s associated Element can remain visible through a constrained generic. Uppercase Any instead accepts unrestricted values with little declared capability. Lowercase any Protocol is an existential: a value used through its protocol capabilities while its concrete type is hidden. That concrete type may be a struct or a class.</p><p>Result-position some Protocol hides the name of one chosen implementation type. Think of a factory that always makes the same kind of tool without revealing its brand. Ordinary branches cannot return unrelated concrete conformers merely because both satisfy the protocol. Parameter-position some is generic shorthand; independent some parameters do not imply one shared type. A constrained existential can still specify an associated type, such as Element == Int, so any does not always discard every relationship. Uppercase Self refers to the current/conforming type, while lowercase self is the current instance. Choose the contract from information the caller needs, then test that boundary before claiming optimization benefits. For GooglePlaceDetailsServing, inheriting Sendable is the type’s transfer-safety contract. Its fetchDetails method is async throws: it may suspend and fail. Those method effects do not supply Sendable conformance or promise background execution.</p>",
       "followUps": [
-        "When would a shared named T be necessary instead of two some parameters?",
-        "Which associated fact can a constrained existential retain?"
+        "When must two parameters share a named T rather than each use some?",
+        "Which element-type fact can a constrained existential keep visible?"
       ],
       "pitfalls": [
-        "Treating T as unrestricted Any.",
-        "Expecting opaque branches to vary their concrete type freely."
+        "Treating generic T as unrestricted Any.",
+        "Expecting ordinary opaque-result branches to return unrelated concrete types."
       ]
     },
     {
@@ -631,23 +631,23 @@
       "level": "Foundation",
       "kind": "Debug",
       "minutes": 9,
-      "prompt": "Explain why a concrete fake’s helper passes while a generic/protocol consumer selects the extension helper.",
-      "scenario": "Greeting declares message but not decoration. Its extension and CustomGreeting both define decoration; the test calls only the concrete value.",
+      "prompt": "Why does a concrete fake use its own decoration method while generic and protocol-based callers use the extension method?",
+      "scenario": "Greeting requires message but does not require decoration. Its extension and CustomGreeting each define decoration. The test calls only CustomGreeting directly.",
       "androidBridge": "Kotlin extension static selection is a useful analogy, but Swift declared requirements additionally have conformance witnesses and default implementations; subclass inheritance can add further limits.",
       "rubric": [
-        "Predicts concrete helper versus extension helper through the boundary.",
-        "Identifies decoration as missing from the requirements.",
-        "Adds a requirement when polymorphic customization is intended.",
-        "Tests generic and existential consumers, not only the concrete fake."
+        "Predicts the concrete helper call and the extension helper call through the protocol boundary.",
+        "Identifies decoration as absent from the protocol requirements.",
+        "Adds a requirement when callers need polymorphic customization.",
+        "Tests generic and existential callers as well as the concrete fake."
       ],
-      "answerHTML": "<p>Decoration is an extension-only helper, so the concrete CustomGreeting call can select its concrete method while a generic Greeting constraint or any Greeting view selects the extension helper. Message is different: it is a declared requirement, and the conformance supplies its implementation at that boundary. The code can compile while the API’s intended customization promise remains wrong.</p><p>If decoration must vary polymorphically, declare it in Greeting and optionally keep the extension as a default requirement implementation. Then test direct, generic and existential calls with expected results. A concrete-only fake test missed the consumer’s real access path. Do not infer that every inherited class conformance will automatically acquire a new witness when a subclass adds a same-named method; design superclass override paths deliberately. This small fixture checks dispatch contracts, not ABI, specialization performance or a repository-wide existential migration.</p>",
+      "answerHTML": "<p>Greeting does not require decoration; its extension merely adds a helper. A direct CustomGreeting call can choose the concrete method. A generic Greeting caller or any Greeting value chooses the extension helper. Message is different: it is a declared requirement, and the conformance supplies the implementation used through the protocol. This choice is recorded in a conformance witness. The code can compile while the API’s intended customization promise remains wrong.</p><p>If protocol callers must get each conformer’s decoration, declare it as a Greeting requirement. The extension can still provide a default implementation. Then test direct, generic and existential calls with expected results. A concrete-only fake test missed the consumer’s real access path. Do not infer that every inherited class conformance will automatically acquire a new witness when a subclass adds a same-named method; design superclass override paths deliberately. This small fixture checks dispatch contracts, not ABI, specialization performance or a repository-wide existential migration.</p>",
       "followUps": [
-        "How could a superclass provide an explicit overridable requirement path?",
-        "When should decoration intentionally remain a noncustomizable helper?"
+        "How can a superclass provide an overridable path for a protocol requirement?",
+        "When should decoration remain a helper that protocol callers cannot customize?"
       ],
       "pitfalls": [
-        "Testing only concrete calls.",
-        "Confusing a same name with a declared requirement."
+        "Testing only the concrete fake’s direct calls.",
+        "Assuming a matching method name creates a protocol requirement."
       ]
     },
     {
@@ -656,23 +656,23 @@
       "level": "Foundation",
       "kind": "Explain",
       "minutes": 8,
-      "prompt": "Explain what each integrated language test protects and what a passing result does not establish.",
-      "scenario": "The five-test scratch suite covers value edits, successful empty data, classified failures, unrelated errors and post-release callback invocation.",
+      "prompt": "What behavior does each integrated language test protect? What does passing the suite leave unverified?",
+      "scenario": "Five scratch tests check value edits, successful empty data, classified failures, unrelated errors and invoking a saved callback after its owner is released.",
       "androidBridge": "Android pure-core tests provide a close boundary-testing analogy. Swift Testing discovery, testable access and ARC probes require their own target/lifetime reasoning.",
       "rubric": [
-        "Maps assertions to observable domain/lifetime rules.",
-        "Distinguishes compile success from executed test discovery.",
-        "Explains internal core plus @testable test access.",
-        "Limits evidence to host/toolchain/fixtures rather than automatic mastery."
+        "Connects each assertion to an observable data or lifetime rule.",
+        "Separates compilation from actually discovering and running tests.",
+        "Explains the internal core and @testable access in the test target.",
+        "Limits the result to the recorded host, toolchain and inputs."
       ],
-      "answerHTML": "<p>The edit test protects original value preservation. The success test keeps nonempty and empty success valid. The failure test preserves invalid-text and nonpositive reasons, while the fake’s unrelated error remains an explicit unexpected failure. The callback test proves a saved weak-capturing action can coexist with owner release and safely tolerate absence. Local fixtures avoid shared mutable order dependence.</p><p>Compilation establishes source/module checking; the final Swift Testing summary establishes discovered execution. A compatibility line with zero XCTest tests is not the whole result. The internal core is accessible through testable import in the testing-enabled target, which still needs its declared dependency; that does not export a public API. Record toolchain, command and scope. Host tests do not verify UIKit, cancellation, platform availability, telemetry or independent learner transfer. A changed-input implementation and a retrieval plan are separate learning evidence, not automatically granted by passing authored tests.</p>",
+      "answerHTML": "<p>The edit test checks that changing a copied value leaves the original unchanged. The success test keeps nonempty and empty success valid. The failure test preserves invalid-text and nonpositive reasons, while the fake’s unrelated error remains an explicit unexpected failure. The callback test checks that a saved weak-capturing action lets its owner be released and handles the owner’s absence when called afterward. Local fixtures avoid shared mutable order dependence.</p><p>Compilation checks source and module rules. The final Swift Testing summary shows which tests were found and executed. A compatibility line with zero XCTest tests is not the whole result. The internal core is accessible through testable import in the testing-enabled target, which still needs its declared dependency; that does not export a public API. Record toolchain, command and scope. Host tests do not verify UIKit, cancellation, platform availability, telemetry or whether the learner can apply the idea to a new problem. A changed-input implementation and a retrieval plan are separate learning evidence, not automatically granted by passing authored tests.</p>",
       "followUps": [
-        "Which test should fail if errors become loaded([])?",
-        "What would prove an ordinary external module can construct the core?"
+        "Which test should fail if errors are changed into loaded([])?",
+        "What check would prove that an ordinary external module can construct the core?"
       ],
       "pitfalls": [
         "Counting compilation as executed tests.",
-        "Calling one passing suite Swift mastery."
+        "Calling one passing suite proof of Swift mastery."
       ]
     },
     {
@@ -681,23 +681,23 @@
       "level": "Foundation",
       "kind": "Debug",
       "minutes": 10,
-      "prompt": "Audit a capstone that drops invalid quantities, retains its owner and claims complete readiness from a passing smoke output.",
-      "scenario": "The implementation uses compactMap, stores a strong self callback, and tests only one valid input before printing passed.",
+      "prompt": "Review a capstone that silently drops invalid quantities, keeps its owner alive through a callback, and claims readiness after one smoke test.",
+      "scenario": "The implementation parses with compactMap, stores a strong self callback and checks only one valid input before printing passed.",
       "androidBridge": "Android listener ownership and validation policy transfer conceptually, but Swift ARC cycles, optional-drop semantics and host verification scope need explicit evidence.",
       "rubric": [
-        "Preserves invalid/domain errors instead of silently dropping them.",
-        "Tests empty success and multiple failure classes independently.",
-        "Repairs and probes callback ownership with post-release invocation.",
-        "Requires changed-input retrieval and explicit limits, not automatic completion."
+        "Keeps invalid-input and domain errors visible instead of silently dropping them.",
+        "Tests empty success and different failure classes separately.",
+        "Repairs ownership and invokes the saved action after checking owner release.",
+        "Requires changed-input practice and states what the host checks leave unverified."
       ],
-      "answerHTML": "<p>The smoke output covers only the happy fixture. CompactMap discards malformed quantities, which violates the capstone’s all-or-error policy and hides rejected input. Use explicit parsing/throwing classification, or change the domain contract to carry accepted and rejected rows visibly. Add invalid, nonpositive, empty-success and unrelated-error fixtures so failure cannot masquerade as loaded empty data.</p><p>The strong callback can form owner-to-action-to-owner retention under ARC. Choose weak capture with a deliberate missing-owner path for this exercise, save the action independently, clear the owner and check a weak probe before post-release invocation. That establishes ownership behavior, not cancellation, because this synchronous program has no producer task. Require the learner to predict and implement changed inputs without opening the answer, then record remaining practice goals. A passing host suite is useful evidence for those tested boundaries; it does not verify UI integration or grant automatic mastery or earlier progress completion.</p>",
+      "answerHTML": "<p>The printed passed result covers only the one valid input tested. CompactMap discards malformed quantities, which violates the capstone’s all-or-error policy and hides rejected input. Parse explicitly and throw the right error category. If the product instead accepts valid rows, change the contract to keep both accepted and rejected rows visible. Add invalid, nonpositive, empty-success and unrelated-error fixtures so failure cannot masquerade as loaded empty data.</p><p>The owner keeps the callback, and the callback keeps the owner through strong self. ARC cannot release this strong-reference cycle on its own. Choose weak capture with a deliberate missing-owner path for this exercise, save the action independently, clear the owner and check a weak probe before post-release invocation. That establishes ownership behavior, not cancellation, because this synchronous program has no producer task. Ask the learner to predict and implement a changed input without opening the answer. Record which practice still remains. A passing host suite is useful evidence for those tested boundaries; it does not verify UI integration or grant automatic mastery or earlier progress completion.</p>",
       "followUps": [
-        "How would an accept-valid-rows policy represent rejection evidence?",
-        "Which additional workshop owns asynchronous cancellation/freshness practice?"
+        "How would an accept-valid-rows policy keep evidence of rejected rows?",
+        "Which workshop covers asynchronous cancellation and preventing old results from replacing new ones?"
       ],
       "pitfalls": [
-        "Using a passed print as comprehensive evidence.",
-        "Dropping invalid data and calling it success."
+        "Treating a printed passed message as complete verification.",
+        "Silently dropping invalid data and reporting success."
       ]
     }
   ]

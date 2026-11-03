@@ -5,24 +5,24 @@
       "lesson": "071",
       "level": "Foundation",
       "kind": "Explain",
-      "prompt": "Explain how this scratch app reaches its first rendered screen.",
-      "scenario": "A learner has an iOS App project, an App entry, a WindowGroup and a greeting View but confuses the project with the executable.",
+      "prompt": "How does this scratch app get from its App entry to the first greeting on screen?",
+      "scenario": "The learner has an iOS App project with an App entry, WindowGroup and greeting View. They confuse the project settings with the executable those settings build.",
       "minutes": 5,
       "androidBridge": "Android Activity/Compose entry concepts help; Xcode targets, schemes and SwiftUI scenes have their own lifecycle and build boundaries.",
       "rubric": [
-        "Names the target as the app product and the scheme as action selection.",
-        "Identifies one @main entry and App's scene body.",
-        "Traces WindowGroup to the root View and its descriptive body.",
-        "Separates SDK, deployment target and runtime destination."
+        "Names the target as the app product definition and the scheme as the selected actions.",
+        "Finds the single @main entry and the App’s scene body.",
+        "Traces WindowGroup to the root View and its description of the greeting.",
+        "Separates the installed SDK, minimum OS and selected runtime destination."
       ],
-      "answerHTML": "<p>The app target defines the executable product and its compilation inputs. The scheme selects actions and configurations for that product, and the simulator destination selects where a Run action executes. The target's single @main App entry supplies a scene description. WindowGroup constructs the root view content for its window scope, and that root's body describes the greeting hierarchy for SwiftUI to render.</p><p>The installed SDK supplies available declarations; the deployment target states the oldest supported runtime. Selecting a newer simulator does not change that minimum. The View struct is a description rather than a retained Android View object. A complete explanation follows these boundaries without adding an Activity-equivalent object where none is needed. It also names actual Build and Run observations separately; source structure alone is not launch evidence.</p>",
+      "answerHTML": "<p>The target tells Xcode which app to build and which source files belong in it. The scheme chooses actions, such as Build and Run, and their configurations, and the simulator destination selects where a Run action executes. The target's single @main App entry supplies a scene description. WindowGroup constructs the root view content for its window scope, and that root's body describes the greeting hierarchy for SwiftUI to render.</p><p>The SDK gives the compiler the platform declarations. The deployment target states the oldest OS the app supports. Selecting a newer simulator does not change that minimum. The View struct is a description rather than a retained Android View object. Trace those steps without inventing an Activity object. SwiftUI does not need a matching Android object at every step. It also names actual Build and Run observations separately; source structure alone is not launch evidence.</p>",
       "followUps": [
-        "What changes if the source lacks app-target membership?",
-        "Why can a generic iOS destination build but not launch a simulator?"
+        "What happens if the source is not included in the app target?",
+        "Why can a generic iOS destination build the app but not launch a simulator?"
       ],
       "pitfalls": [
-        "Treating scheme, target and simulator as synonyms.",
-        "Claiming preview rendering proves app launch."
+        "Treating the scheme, target and simulator as the same thing.",
+        "Treating a rendered preview as proof of app launch."
       ]
     },
     {
@@ -30,24 +30,24 @@
       "lesson": "071",
       "level": "Foundation",
       "kind": "Debug",
-      "prompt": "Build succeeds, but the greeting never launches. What do you inspect?",
-      "scenario": "The learner selected a generic device destination and has not installed a compatible simulator runtime.",
+      "prompt": "The app builds, but the greeting does not launch. Which destination and runtime checks would you make?",
+      "scenario": "The selected destination is a generic device. No compatible simulator runtime is installed.",
       "minutes": 8,
       "androidBridge": "Gradle build versus emulator launch is a useful analogy; Xcode destination and simulator-runtime configuration are distinct Apple tooling concepts.",
       "rubric": [
         "Separates compilation, installation and launch failures.",
-        "Checks scheme and concrete simulator destination.",
-        "Confirms an installed runtime meets the deployment minimum.",
-        "Reads Run/report diagnostics before changing signing or source."
+        "Checks the scheme and selects a concrete simulator.",
+        "Checks that its installed runtime meets the deployment minimum.",
+        "Reads Run diagnostics before changing signing settings or source."
       ],
-      "answerHTML": "<p>First identify the failed action. A successful Build proves compilation for its selected SDK and configuration, not installation on a simulator. Inspect the app scheme and select a concrete simulator whose installed runtime meets the deployment target. A generic iOS device destination is not a launchable simulated device. If the runtime is absent, install or select a suitable one through Xcode's platform and device settings.</p><p>Then read the Run report to distinguish unavailable destination, installation failure and application crash. Confirm the source belongs to that app product and that it has one entry constructing the expected root. Simulator execution does not require distribution provisioning. Do not modify company signing settings or erase broad caches without evidence. Record the actual destination and failure, and leave launch pending until observed.</p>",
+      "answerHTML": "<p>Build, install and launch are separate steps. Find which one failed. A successful Build proves compilation for its selected SDK and configuration, not installation on a simulator. Inspect the app scheme and select a concrete simulator whose installed runtime meets the deployment target. A generic iOS device destination is not a launchable simulated device. If the runtime is absent, install or select a suitable one through Xcode's platform and device settings.</p><p>Read the Run report next. It can show whether the destination is unavailable, installation failed or the launched app crashed. Confirm the source belongs to that app product and that it has one entry constructing the expected root. Simulator execution does not require distribution provisioning. Do not modify company signing settings or erase broad caches without evidence. Record the selected destination and its failure. Report a successful launch only after observing it.</p>",
       "followUps": [
-        "How would you detect that a similarly named stale app is running?",
-        "What evidence belongs in a reproducible first-run note?"
+        "How would you check whether a similarly named old app is running?",
+        "What destination, command and result should a reproducible first-run note include?"
       ],
       "pitfalls": [
-        "Changing code before reading destination diagnostics.",
-        "Presenting a successful build as simulator interaction evidence."
+        "Changing code before reading the destination error.",
+        "Calling a successful build evidence of simulator interaction."
       ]
     },
     {
@@ -55,24 +55,24 @@
       "lesson": "072",
       "level": "Foundation",
       "kind": "Explain",
-      "prompt": "Explain the binding and resource arguments in the controls demo.",
-      "scenario": "A TextField edits name, a Picker selects an Int, and two Image initializers appear.",
+      "prompt": "What does $name let the TextField do? How do Picker tags and the two Image initializers select their values?",
+      "scenario": "A TextField edits name, a Picker selects an Int, and the demo creates one system-symbol Image and one bundled-asset Image.",
       "minutes": 5,
       "androidBridge": "Compose value/onValueChange resembles binding capability; Swift projections, Picker tags and bundle/SF Symbol lookup follow different contracts.",
       "rubric": [
-        "Explains text: expects Binding<String> and $name projects access.",
-        "Matches Picker tag type with selection type.",
-        "Distinguishes systemName from bundled asset lookup.",
-        "Keeps control configuration separate from validation and persistence."
+        "Explains that text: expects Binding<String> and $name supplies read/write access.",
+        "Matches the Picker tag type to its selection type.",
+        "Separates SF Symbol lookup with systemName from asset lookup in a bundle.",
+        "Separates control settings from validation and saving data."
       ],
-      "answerHTML": "<p>TextField's text argument receives a Binding to the locally owned String. The projected $name gives the control read/write access, while name alone is the current value. The field's title describes the input rather than supplying its editable content. Picker selection is Int in the example, so each option's tag must be a matching Int; its visible title is not the selection value.</p><p>Image(systemName:) asks the OS for an SF Symbol, whose name and availability must be valid. Image with an unlabeled name resolves a bundled resource and requires the correct asset and bundle. Keyboard configuration helps input but does not validate every pasted value. A reminder Toggle changes only its bound Boolean unless an explicit action schedules something. These controls do not automatically save data or request permissions.</p>",
+      "answerHTML": "<p>A Binding is a handle for reading and writing someone else’s state. TextField’s text argument needs that handle to the locally owned String. The projected $name gives the control read/write access, while name alone is the current value. The field's title describes the input rather than supplying its editable content. Picker selection is Int in the example, so each option's tag must be a matching Int; its visible title is not the selection value.</p><p>Image(systemName:) asks the OS for an SF Symbol, a named system icon. Check that the symbol name exists on the supported OS. Image with an unlabeled name resolves a bundled resource and requires the correct asset and bundle. Keyboard configuration helps input but does not validate every pasted value. A reminder Toggle edits its Boolean. It schedules a reminder only if a separate action performs that work. These controls do not automatically save data or request permissions.</p>",
       "followUps": [
-        "How would an editable preview differ from a constant binding?",
-        "Why use a semantic Button for an icon action?"
+        "Why does an editable preview need state rather than a constant binding?",
+        "Why should an icon action use a semantic Button instead of only a tap gesture?"
       ],
       "pitfalls": [
-        "Calling $name string interpolation.",
-        "Assuming an asset name is always a system symbol."
+        "Calling $name String interpolation rather than a binding projection.",
+        "Assuming a bundled asset name is an SF Symbol name."
       ]
     },
     {
@@ -80,24 +80,24 @@
       "lesson": "072",
       "level": "Foundation",
       "kind": "Debug",
-      "prompt": "The Picker ignores selection and the custom image is blank. Diagnose both.",
-      "scenario": "Selection is Int, the options have String tags, and DemoBadge was never added to the app asset catalog.",
+      "prompt": "The Picker ignores a selection and DemoBadge is blank. How would you fix each problem?",
+      "scenario": "The Picker selection is Int but its option tags are Strings. DemoBadge is missing from the app’s asset catalog.",
       "minutes": 8,
       "androidBridge": "Android resource and state debugging habits transfer; SwiftUI tag matching and bundle lookup need their actual typed APIs.",
       "rubric": [
-        "Identifies the mismatched Picker tag types.",
-        "Checks selection source instead of adding copied state.",
-        "Checks exact asset name, catalog membership and bundle.",
-        "Separates missing resource from resizing/aspect-ratio behavior."
+        "Finds the mismatch between Int selection and String tags.",
+        "Checks writes to the original selection instead of adding copied state.",
+        "Checks the exact asset name, target membership and bundle.",
+        "Separates resource lookup failure from image sizing."
       ],
-      "answerHTML": "<p>The Picker has a type mismatch in its selection contract. Keep its Int source and use Int tags, or deliberately change both source and tags to a coherent alternative type. Adding a second local selection variable would create a synchronization problem rather than fix the mismatch. Verify that the control writes the original source.</p><p>The image uses a bundle lookup, so create DemoBadge in the app's asset catalog and ensure that catalog belongs to the selected product. Check capitalization and bundle scope. If the resource exists but displays at an unsuitable size, inspect resizable and scaledToFit separately; a frame alone does not necessarily resize the bitmap. Returning to a known system-symbol baseline can isolate lookup from layout. Record observed fixes rather than assuming every missing image is an observation failure.</p>",
+      "answerHTML": "<p>The Picker’s selected value is an Int, but its tags are Strings. These types must match. Keep its Int source and use Int tags, or deliberately change both source and tags to a coherent alternative type. Adding a second local selection variable would create a synchronization problem rather than fix the mismatch. Verify that the control writes the original source.</p><p>The image looks for a bundled asset named DemoBadge. Add it to the app’s asset catalog and check that the catalog belongs to this product. Check capitalization and bundle scope. If the resource exists but displays at an unsuitable size, inspect resizable and scaledToFit separately; a frame alone does not necessarily resize the bitmap. Returning to a known system-symbol baseline can isolate lookup from layout. Record which check fixed the image. Missing resources and state-observation failures have different causes.</p>",
       "followUps": [
-        "How does this change for a framework or package resource?",
-        "What makes a symbol-only action understandable to VoiceOver?"
+        "Which bundle should be checked for a framework or package image?",
+        "What label makes a symbol-only action understandable to VoiceOver?"
       ],
       "pitfalls": [
-        "Changing State wrappers to fix an asset lookup.",
-        "Using mismatched tags because the displayed text looks right."
+        "Changing State wrappers to fix a missing asset.",
+        "Using String tags for an Int selection because the displayed labels look correct."
       ]
     },
     {
@@ -105,24 +105,24 @@
       "lesson": "073",
       "level": "Foundation",
       "kind": "Explain",
-      "prompt": "Predict the two padding/background examples and explain the generic card.",
-      "scenario": "One chain applies padding before background; the other applies background first. InfoCard accepts @ViewBuilder content.",
+      "prompt": "Which area is colored when padding comes before background, or after it? How does InfoCard accept its generic content?",
+      "scenario": "Compare a chain with padding then background to one with background then padding. InfoCard accepts a @ViewBuilder content closure.",
       "minutes": 5,
       "androidBridge": "Compose modifier order is a conceptual bridge; SwiftUI wrappers, opaque types and builders have their own typed composition rules.",
       "rubric": [
-        "Reads modifier chains from the base outward.",
-        "Predicts whether added padding is colored.",
-        "Explains Content: View and the content closure.",
-        "Distinguishes description construction from event work."
+        "Reads each modifier as wrapping the preceding description.",
+        "Predicts whether the added padding gets the background color.",
+        "Explains Content: View and the closure that creates the content.",
+        "Keeps view-description construction separate from event work."
       ],
-      "answerHTML": "<p>Padding followed by background attaches decoration outside the padded result, so the added margins are colored. Background followed by padding colors the original text extent and adds uncolored space afterward. Each modifier returns another description around the preceding one; it does not mutate one Android View in place. Frame, padding and offset therefore have different layout effects.</p><p>InfoCard's Content parameter is constrained to View. Its @ViewBuilder initializer lets callers supply multiple or conditional view expressions that become typed content. The initializer evaluates that closure and stores the resulting description. Some View hides a concrete return type without becoming an unrestricted box. No request should start from this content closure or body. A strong answer also chooses HStack, VStack or ZStack according to child relationships rather than merely reproducing a screenshot.</p>",
+      "answerHTML": "<p>Padding first adds space around the text. Background then colors that larger area, including the padding. Background followed by padding colors the original text extent and adds uncolored space afterward. Each modifier returns another description around the preceding one; it does not mutate one Android View in place. Frame, padding and offset therefore have different layout effects.</p><p>InfoCard names its content type Content and requires that type to conform to View. @ViewBuilder combines multiple or conditional view expressions into typed content. It is like a recipe for assembling descriptions, not an event callback. The initializer evaluates that closure and stores the resulting description. Some View hides a concrete return type without becoming an unrestricted box. No request should start from this content closure or body. A strong answer also chooses HStack, VStack or ZStack according to child relationships rather than merely reproducing a screenshot.</p>",
       "followUps": [
-        "Why can offset cause overlap?",
-        "When would an overlay be preferable to a main ZStack?"
+        "Why can offset move a view into its neighbor’s space?",
+        "When should decoration use an overlay rather than another main ZStack child?"
       ],
       "pitfalls": [
-        "Treating every modifier as an in-place property setter.",
-        "Using AnyView or random identity to hide a layout problem."
+        "Treating modifiers as property setters on one durable view object.",
+        "Using AnyView or random identity to conceal a layout problem."
       ]
     },
     {
@@ -130,24 +130,24 @@
       "lesson": "073",
       "level": "Foundation",
       "kind": "Debug",
-      "prompt": "A long subtitle overlaps after an offset-based spacing fix. What changes?",
-      "scenario": "A card's HStack has fixed widths and the subtitle was moved visually with offset.",
+      "prompt": "A long subtitle overlaps its neighbor after an offset spacing fix. How would you change the layout?",
+      "scenario": "The card uses an HStack with fixed widths. The subtitle was moved visually with offset to create a gap.",
       "minutes": 8,
       "androidBridge": "Compose layout diagnosis helps; offset and SwiftUI proposal/response behavior are not identical to every Compose constraint rule.",
       "rubric": [
-        "Explains offset does not reserve neighbor space.",
-        "Inspects fixed widths and offered content width.",
-        "Chooses padding/spacing or a vertical alternative with a reason.",
-        "Plans long/narrow/large-text checks without random IDs."
+        "Explains that offset moves drawing without reserving extra space.",
+        "Checks fixed widths and the width offered to the text.",
+        "Chooses real spacing, padding or a vertical layout and explains why.",
+        "Checks long text, narrow width and larger fonts without random IDs."
       ],
-      "answerHTML": "<p>Offset changes drawing position without adding the matching layout space, so nearby children still occupy their original arrangement. Remove the offset-based spacing workaround and inspect the HStack's actual spacing, fixed widths, flexible space and text-wrapping policy. Use container spacing or padding when the gap should participate in measurement. If meaningful text cannot remain readable side by side, offer a vertical arrangement instead of shrinking the font.</p><p>Check modifier order to determine which wrapper owns the background and frame. Test a long subtitle, a narrow window and larger text, recording actual overflow. Changing .id to a random value can reset state but cannot establish a correct width contract. Custom Layout may eventually be useful for wrapping collections, but this first card needs an understandable container policy before adding advanced measurement machinery.</p>",
+      "answerHTML": "<p>Offset moves where a view is drawn. It does not reserve the moved space, so neighbors still use the original arrangement. Remove the offset-based spacing workaround and inspect the HStack's actual spacing, fixed widths, flexible space and text-wrapping policy. Use container spacing or padding when the gap should participate in measurement. If meaningful text cannot remain readable side by side, offer a vertical arrangement instead of shrinking the font.</p><p>Read the modifier order to find which wrapper supplies the background and frame. Test a long subtitle, a narrow window and larger text, recording actual overflow. Changing .id to a random value can reset state but cannot make the layout’s width rules correct. Custom Layout may eventually be useful for wrapping collections, but this first card needs an understandable container policy before adding custom measurement code.</p>",
       "followUps": [
-        "How would you preserve all actions in a narrow fallback?",
-        "What does fixedSize request and what can it fail to solve?"
+        "How would a narrow vertical fallback keep every action reachable?",
+        "What does fixedSize ask for, and why might that still leave overflow?"
       ],
       "pitfalls": [
-        "Treating offset as padding.",
-        "Declaring adaptive correctness from one default-size screenshot."
+        "Treating offset as padding that reserves space.",
+        "Claiming adaptive correctness from one default-size screenshot."
       ]
     },
     {
@@ -155,24 +155,24 @@
       "lesson": "074",
       "level": "Foundation",
       "kind": "Explain",
-      "prompt": "Design static and editable previews without production side effects.",
-      "scenario": "The component needs a display name now and may later require a model or service.",
+      "prompt": "How would you make static and editable previews that use synthetic data and avoid production side effects?",
+      "scenario": "The component needs a display name now. Later it may also need a model or service dependency.",
       "minutes": 5,
       "androidBridge": "Compose preview fixtures are a useful analogy; Xcode compiles/runs a preview host and macro availability is a toolchain-specific boundary.",
       "rubric": [
-        "Uses explicit ordinary/empty/long synthetic inputs.",
-        "Provides a stateful host for editable bindings.",
-        "Installs required dependencies at the preview boundary.",
-        "Qualifies Xcode macro support and content API availability."
+        "Uses ordinary, empty and long synthetic inputs.",
+        "Uses a state-owning host for editable bindings.",
+        "Installs fixture dependencies where the preview creates its hierarchy.",
+        "Separates #Preview toolchain support from the OS availability of its content."
       ],
-      "answerHTML": "<p>Give the display component plain fixture inputs for ordinary, empty and long-name cases. For editing, use a small host with State and pass its binding to the control; a constant binding intentionally cannot demonstrate changing input. Construct only synthetic models and deterministic service fixtures. Preview initializers and tasks can execute, so naming a dependency mock is insufficient if it still reaches production.</p><p>#Preview requires a macro-capable toolchain introduced with Xcode 15. The APIs in its content still obey their OS requirements. SwiftUI previews can support earlier targets under appropriate configurations, so do not raise deployment minimums merely from an old blanket claim. Our track uses iOS 17 explicitly. A direct child preview must install its environment model or in-memory store; it does not automatically inherit every WindowGroup dependency.</p>",
+      "answerHTML": "<p>Give the component sample names: one ordinary, one empty and one long. These fixtures make the display cases repeatable. For editing, use a small host with State and pass its binding to the control; a constant binding intentionally cannot demonstrate changing input. Construct only synthetic models and deterministic service fixtures. Preview initializers and tasks can execute, so naming a dependency mock is insufficient if it still reaches production.</p><p>#Preview uses a macro, which creates code during compilation. It needs a supporting toolchain, introduced with Xcode 15. The APIs in its content still obey their OS requirements. SwiftUI previews can support earlier targets under appropriate configurations, so do not raise deployment minimums merely from an old blanket claim. Our track uses iOS 17 explicitly. A preview of a child alone must supply its required environment model or an in-memory store; it does not automatically inherit every WindowGroup dependency.</p>",
       "followUps": [
-        "When is PreviewProvider a suitable alternative?",
-        "What additional evidence remains after a preview renders?"
+        "When would PreviewProvider be an appropriate alternative?",
+        "What app behavior still needs checking after a preview renders?"
       ],
       "pitfalls": [
-        "Constructing production singletons in a preview.",
-        "Treating a constant binding as an interactive source."
+        "Creating production singletons while setting up a preview.",
+        "Expecting a constant binding to show interactive editing."
       ]
     },
     {
@@ -180,24 +180,24 @@
       "lesson": "074",
       "level": "Foundation",
       "kind": "Debug",
-      "prompt": "The app root works but a direct child preview fails or cannot edit.",
-      "scenario": "The child expects a required environment model, and a TextField fixture uses a constant binding.",
+      "prompt": "The app root works, but a child preview fails or cannot edit its TextField. What is missing?",
+      "scenario": "The child expects a required environment model. Its TextField preview also receives a constant binding.",
       "minutes": 8,
       "androidBridge": "Android preview-specific setup is analogous; SwiftUI environment scope and wrapper storage are separate from app entry wiring.",
       "rubric": [
-        "Checks compiler/runtime diagnostics and preview scope.",
-        "Supplies a fixture dependency locally.",
-        "Replaces constant binding with a stateful host when editing is required.",
-        "Separates canvas evidence from app launch/lifecycle evidence."
+        "Reads the first compiler or runtime diagnostic and checks the preview’s hierarchy.",
+        "Supplies a local synthetic dependency for the required model.",
+        "Uses a stateful host when the field must accept edits.",
+        "Separates canvas rendering from app launch and lifecycle evidence."
       ],
-      "answerHTML": "<p>Inspect the first preview build or runtime diagnostic, then check the hierarchy created by that preview. A direct component preview does not automatically receive the environment model installed on the app's WindowGroup. Create a synthetic instance in a suitable fixture owner and install it at the preview boundary. Avoid weakening the production component with an invisible real-service fallback merely to make the canvas display.</p><p>The TextField's constant binding is a second independent issue: its writes cannot change the constant. Use a stateful host for an editing scenario, or label the fixture as a frozen rendering check. Confirm interactive preview mode where relevant, and reproduce the component in the scratch app when diagnosing canvas infrastructure. Record what rendered and what ran separately; neither a screenshot nor a successful preview proves navigation, cancellation or persistence behavior.</p>",
+      "answerHTML": "<p>Read the first preview error. Then check which views and dependencies that preview actually creates. A direct component preview does not automatically receive the environment model installed on the app's WindowGroup. Create a synthetic instance in a suitable fixture owner and install it at the preview boundary. Avoid weakening the production component with an invisible real-service fallback merely to make the canvas display.</p><p>The constant binding is a separate issue. The field can try to write, but the constant source will not change. Use a stateful host for an editing scenario, or label it as a display-only fixture. Confirm interactive preview mode where relevant, and reproduce the component in the scratch app when diagnosing canvas infrastructure. Record what rendered and what ran separately; neither a screenshot nor a successful preview proves navigation, cancellation or persistence behavior.</p>",
       "followUps": [
-        "What changes for a child reading ModelContext?",
-        "How would you fixture loading and failure without a network?"
+        "What dependency must a preview provide for a child reading ModelContext?",
+        "How could deterministic fixtures show loading and failure without network calls?"
       ],
       "pitfalls": [
-        "Blaming Observation before checking missing injection.",
-        "Changing deployment settings without an availability diagnostic."
+        "Blaming Observation before checking the missing dependency.",
+        "Changing deployment settings without an OS-availability diagnostic."
       ]
     },
     {
@@ -205,24 +205,24 @@
       "lesson": "075",
       "level": "Foundation",
       "kind": "Explain",
-      "prompt": "Trace one name edit through State and Binding.",
-      "scenario": "A parent owns a String, a child declares @Binding, and a summary receives a plain value.",
+      "prompt": "Follow one typed name from the child’s TextField through Binding to the parent’s State and summary.",
+      "scenario": "The parent owns a String. The child uses @Binding to edit it. The summary receives the current String as an ordinary value.",
       "minutes": 5,
       "androidBridge": "Compose value/onValueChange helps explain access; SwiftUI State identity and projected Binding storage are not SavedStateHandle semantics.",
       "rubric": [
-        "Identifies the parent as the single source.",
-        "Explains wrapped versus projected access.",
-        "Keeps the child binding from allocating a copy.",
-        "States that identity storage is not disk persistence."
+        "Identifies the parent as the one source of the name.",
+        "Separates the current name value from the $name read/write handle.",
+        "Explains that the child’s Binding accesses the same source rather than copying it.",
+        "Explains that State’s identity-based lifetime is not disk persistence."
       ],
-      "answerHTML": "<p>The parent owns the String in SwiftUI-managed State storage. Its projected $name supplies read/write access to that source. The child receives a Binding through its initializer and forwards its projected binding to TextField. Typing writes through that handle to the parent. A summary reads the same current source as a value, so it does not need a second synchronized store.</p><p>The View struct can be reconstructed while its associated State remains under stable identity. That distinction explains why ordinary parent updates need not erase typing. The child should not create private State from the received value unless it intentionally stages an independent draft with a commit/cancel policy. State does not promise disk storage or process-death restoration. A strong answer names owner, access path, identity lifetime and persistence separately instead of matching wrappers to Android class names.</p>",
+      "answerHTML": "<p>The parent owns the name. SwiftUI keeps that String in State storage associated with the parent’s identity. Its projected $name supplies read/write access to that source. The child receives a Binding through its initializer and forwards its projected binding to TextField. Typing follows the handle back to the parent’s source, like editing one shared notebook rather than synchronizing two copies. A summary reads the same current source as a value, so it does not need a second synchronized store.</p><p>SwiftUI can make a new View struct while keeping the same State for its stable identity. That distinction explains why ordinary parent updates need not erase typing. The child should not create private State from the received value unless it intentionally stages an independent draft with a commit/cancel policy. State does not promise disk storage or process-death restoration. A strong answer names owner, access path, identity lifetime and persistence separately instead of matching wrappers to Android class names.</p>",
       "followUps": [
-        "What policy is needed for an editor seeded from a record?",
-        "How do clear-fields and identity replacement differ?"
+        "What commit or cancel policy does an editor seeded from a record need?",
+        "How does clearing the fields differ from replacing the editor’s identity?"
       ],
       "pitfalls": [
-        "Calling Binding a persistent copy.",
-        "Adding parent/child onChange synchronization without precedence."
+        "Treating Binding as a saved copy of the value.",
+        "Adding parent-child onChange synchronization without deciding which source wins."
       ]
     },
     {
@@ -230,24 +230,24 @@
       "lesson": "075",
       "level": "Foundation",
       "kind": "Debug",
-      "prompt": "Typing disappears whenever the parent counter changes. Diagnose it.",
-      "scenario": "The editor is given .id(UUID()) inside body and initializes a local draft.",
+      "prompt": "Why does typing disappear when an unrelated parent counter changes? Find the effect of .id(UUID()).",
+      "scenario": "The editor creates a local draft and receives .id(UUID()) inside body. Each body evaluation generates a new UUID.",
       "minutes": 8,
       "androidBridge": "Compose stable keys suggest the issue; SwiftUI explicit identity governs associated State storage under its own hierarchy rules.",
       "rubric": [
-        "Finds the newly generated identity on each evaluation.",
-        "Explains replacement versus normal reconstruction.",
-        "Removes accidental ID changes while preserving intended reset policy.",
-        "Checks owner placement and later-record replacement separately."
+        "Finds that every evaluation creates a new explicit identity.",
+        "Separates replacing identity from rebuilding a View description.",
+        "Removes accidental replacement while keeping a deliberate reset policy.",
+        "Checks the state owner and the policy for switching to another record."
       ],
-      "answerHTML": "<p>The random UUID generated during body evaluation can make every description present a new editor identity. SwiftUI can discard the previous identity's State and seed new storage, so typing disappears after an unrelated parent change. Remove that accidental identity replacement or use a stable key tied to a deliberate new-flow event. Reconstructing a View value by itself should not be treated as a required draft reset.</p><p>Then verify that the field and summary share one source and that the owner remains in the hierarchy. Keep explicit Clear fields as a value assignment and a deliberate Replace editor action as a separate identity operation. If selected records later change, define whether to preserve unsaved edits, parent-own the draft or replace its identity. Do not claim the corrected local state survives process termination; persistence remains additional work.</p>",
+      "answerHTML": "<p>Each body evaluation makes a fresh UUID. That tells SwiftUI this is a different editor, like attaching a new name tag on every update. SwiftUI can discard the previous identity's State and seed new storage, so typing disappears after an unrelated parent change. Remove that accidental identity replacement or use a stable key tied to a deliberate new-flow event. Reconstructing a View value by itself should not be treated as a required draft reset.</p><p>Check next that the field and summary use the same source and that its owner stays in the view hierarchy. Keep explicit Clear fields as a value assignment and a deliberate Replace editor action as a separate identity operation. If selected records later change, decide whether to keep unsaved edits, move draft ownership to the parent or deliberately replace the editor’s identity. Do not claim the corrected local state survives process termination; persistence remains additional work.</p>",
       "followUps": [
-        "What if the editor moves between conditional branches?",
-        "Why is an initializer seed not continual synchronization?"
+        "What happens to State if the editor moves between conditional branches?",
+        "Why does an initializer’s starting value not keep a draft synchronized afterward?"
       ],
       "pitfalls": [
-        "Adding another random ID to force refresh.",
-        "Assuming every body evaluation should allocate fresh state."
+        "Adding another random ID to force a refresh.",
+        "Expecting every body evaluation to create new State storage."
       ]
     },
     {
@@ -255,24 +255,24 @@
       "lesson": "076",
       "level": "Foundation",
       "kind": "Explain",
-      "prompt": "Choose creator and consumer wrappers for modern and legacy models.",
-      "scenario": "One model is @Observable; another conforms to ObservableObject with @Published fields.",
+      "prompt": "Which wrappers should create and consume an @Observable model? How do those choices differ for ObservableObject with @Published?",
+      "scenario": "One model uses modern Observation through @Observable. Another uses the legacy ObservableObject protocol and @Published fields.",
       "minutes": 5,
       "androidBridge": "Android state-holder ownership is a useful analogy; Observation tracking, Combine notifications and SwiftUI identity wrappers are distinct mechanisms.",
       "rubric": [
-        "Uses State for the modern local reference owner.",
-        "Uses Bindable when modern consumers need projected bindings.",
-        "Uses plain references for modern body reads.",
-        "Matches StateObject/ObservedObject to actual ObservableObject models."
+        "Uses State to keep a locally created modern model under stable identity.",
+        "Uses Bindable where a modern consumer needs bindings.",
+        "Uses plain references for read-only modern body access.",
+        "Uses StateObject and ObservedObject only with actual ObservableObject models."
       ],
-      "answerHTML": "<p>For the modern Observation model, the root can retain its locally created reference in State. A receiving editor uses Bindable when controls need projections such as $draft.name, while a read-only child can hold a plain reference and read observable properties during body evaluation. The macro supplies tracking, not stable owner storage or persistence. MainActor declares isolation separately.</p><p>For the legacy ObservableObject model, the creator commonly uses StateObject and a receiving consumer uses ObservedObject; Published supplies property notifications. StateObject requires that protocol, so it cannot be placed around an arbitrary Observation-only class. Migrating only a wrapper is not a complete migration. Check publisher consumers, delegates, tests and deployment requirements. In both systems, explicitly name who owns the reference and what, if anything, writes data to a persistent store.</p>",
+      "answerHTML": "<p>Observation tracks reads of model properties so SwiftUI knows what may need updating. The root can keep its locally created @Observable model in State. A receiving editor uses Bindable when controls need projections such as $draft.name, while a read-only child can hold a plain reference and read observable properties during body evaluation. The macro supplies tracking. State supplies stable local ownership; saving data needs a separate store. MainActor separately controls isolated access, not a dedicated thread for each model.</p><p>For an ObservableObject model, the creator commonly uses StateObject and the receiver uses ObservedObject. Published sends property-change notifications. StateObject requires that protocol, so it cannot be placed around an arbitrary Observation-only class. Migrating only a wrapper is not a complete migration. Check publisher consumers, delegates, tests and deployment requirements. In both systems, explicitly name who owns the reference and what, if anything, writes data to a persistent store.</p>",
       "followUps": [
-        "Why does a let class reference remain mutable?",
-        "What retains a weak delegate receiver?"
+        "Why can a let binding still point to a mutable class object?",
+        "Who must keep a receiver alive when its delegate property is weak?"
       ],
       "pitfalls": [
-        "Treating Observable and ObservableObject as identical protocols.",
-        "Assuming an observation annotation manages disk or delegate lifetime."
+        "Treating @Observable and ObservableObject as the same mechanism.",
+        "Expecting observation to save data or retain a weak delegate."
       ]
     },
     {
@@ -280,24 +280,24 @@
       "lesson": "076",
       "level": "Foundation",
       "kind": "Debug",
-      "prompt": "The summary stays stale and a delegate stops receiving callbacks.",
-      "scenario": "The editor creates a new model in body, while a temporary coordinator was assigned to a weak delegate.",
+      "prompt": "The summary shows old data, and a delegate stops receiving callbacks. How would you check model identity and receiver ownership?",
+      "scenario": "The editor creates a new model in body. Separately, a temporary coordinator is assigned to a weak delegate property.",
       "minutes": 8,
       "androidBridge": "Android reference ownership concepts transfer; Swift ARC weak references and SwiftUI observation storage have distinct retention rules.",
       "rubric": [
-        "Checks whether editor and summary share the same instance.",
-        "Moves creator ownership to stable State or the supplied feature owner.",
-        "Explains weak delegate needs another retaining owner.",
-        "Keeps observation, MainActor and persistence distinct."
+        "Checks whether the editor and summary refer to the same model.",
+        "Moves creation into stable State or the existing feature owner.",
+        "Explains why a weak delegate needs another owner to retain its receiver.",
+        "Separates observation, MainActor isolation and saving data."
       ],
-      "answerHTML": "<p>First verify that editor and summary refer to the same model. Creating a new model in body can produce a different source on each reconstruction, so a correct binding may edit an instance the summary never reads. Place creation at the intended stable owner or receive the existing feature reference. Ensure the summary reads the relevant observable property during body evaluation rather than a copied snapshot.</p><p>The vanished delegate is a separate retention issue. A weak delegate property does not keep a temporary coordinator alive; retain that receiver in an appropriate owner for the intended callback lifetime. Observable does not provide that retention automatically, and MainActor does not either. Confirm registration and teardown separately. The active address demo retains its coordinator explicitly, while the legacy consumer's upstream owner must be traced. None of these fixes establishes disk persistence.</p>",
+      "answerHTML": "<p>Check that the editor and summary point to one model. Two model instances are two separate sources, even if they start with the same text. Creating a new model in body can produce a different source on each reconstruction, so a correct binding may edit an instance the summary never reads. Place creation at the intended stable owner or receive the existing feature reference. Ensure the summary reads the relevant observable property during body evaluation rather than a copied snapshot.</p><p>The missing delegate callbacks have a separate lifetime problem. A weak delegate does not keep its receiver alive. Give the coordinator a retaining owner for as long as callbacks are needed. Observable does not provide that retention automatically, and MainActor does not either. Confirm registration and teardown separately. The active address demo retains its coordinator explicitly, while the legacy consumer's upstream owner must be traced. None of these fixes establishes disk persistence.</p>",
       "followUps": [
-        "How would you diagnose an actor-isolation mutation error?",
-        "What migration evidence is needed beyond wrapper replacement?"
+        "Which diagnostic would distinguish an actor-isolation mutation error from an observation issue?",
+        "What consumers and deployment requirements need checking in an Observation migration?"
       ],
       "pitfalls": [
-        "Adding observation annotations to repair weak retention.",
-        "Creating multiple model copies and synchronizing them manually."
+        "Adding observation annotations to fix weak-reference lifetime.",
+        "Creating multiple models and trying to synchronize their copies manually."
       ]
     },
     {
@@ -305,24 +305,24 @@
       "lesson": "077",
       "level": "Foundation",
       "kind": "Explain",
-      "prompt": "Explain identity, editing and refresh in the notes list.",
-      "scenario": "The list supports duplicate titles, live editing, search and a synthetic refresh.",
+      "prompt": "How does the notes list keep stable row identity while editing, searching and refreshing?",
+      "scenario": "The list allows duplicate titles, writes edits live, shows search results and performs a synthetic refresh.",
       "minutes": 5,
       "androidBridge": "RecyclerView/Compose list keys and event handlers provide a bridge; SwiftUI ForEach, Binding and refreshable have their own data/lifetime contracts.",
       "rubric": [
-        "Uses stable IDs independent of mutable titles.",
-        "Explains live editing versus staged commit.",
-        "Keeps the unfiltered array as the source.",
-        "Awaits refresh directly and states its merge/persistence limits."
+        "Uses stable IDs that do not depend on mutable titles.",
+        "Explains live edits and how they differ from a staged commit.",
+        "Keeps the full unfiltered Array as the source.",
+        "Awaits refresh directly and states the merge and persistence limits."
       ],
-      "answerHTML": "<p>Each note receives a stable UUID at construction. Title changes and duplicate titles do not change that identity. ForEach uses it to relate row descriptions to records. Search derives a visible subset while the full notes array remains authoritative. The editor's binding looks up the current record by ID instead of capturing an index that can point elsewhere after movement.</p><p>This editor writes live into the source, so Back preserves edits; discard-on-Cancel would require staging. Add trims and validates at its explicit action boundary. Refreshable directly awaits its operation, keeping work inside the closure's lifetime. The synthetic refresh changes only a message and preserves edits. A real returned dataset needs a deliberate merge and account policy. Local State and a finished refresh indicator do not establish disk persistence or newer server data.</p>",
+      "answerHTML": "<p>Give each note its own stable UUID when it is created. The ID acts like a record label that stays the same when its title changes. Title changes and duplicate titles do not change that identity. ForEach uses it to relate row descriptions to records. Search derives a visible subset while the full notes Array remains the source of truth. The editor's binding looks up the current record by ID instead of capturing an index that can point elsewhere after movement.</p><p>This editor writes directly to the source, so Back keeps the edits. To discard on Cancel, edit a separate draft and copy it back only on Save. Add trims and validates at its explicit action boundary. Refreshable directly awaits its operation, keeping work inside the closure's lifetime. The synthetic refresh changes only a message and preserves edits. A real returned dataset needs a deliberate merge and account policy. Local State and a finished refresh indicator do not establish disk persistence or newer server data.</p>",
       "followUps": [
-        "How should filtered reordering be defined?",
-        "What happens when an edited record disappears?"
+        "What order should a filtered reorder change in the full source?",
+        "What should the editor do if its record disappears?"
       ],
       "pitfalls": [
-        "Using title or array index as mutable-record identity.",
-        "Replacing the authoritative store with filtered results."
+        "Using a title or Array position as the identity of an editable record.",
+        "Replacing the full source with only the search results."
       ]
     },
     {
@@ -330,24 +330,24 @@
       "lesson": "077",
       "level": "Foundation",
       "kind": "Debug",
-      "prompt": "Deleting the first search match removes a hidden note. Find the bug.",
-      "scenario": "The source is A/B/C, visible results are B/C, and the handler removes source index zero.",
+      "prompt": "Deleting the first search match removes a hidden note. Which collection does the delete offset belong to?",
+      "scenario": "The source order is A, B, C. Search shows B, C. Deleting visible offset zero incorrectly removes source offset zero, which is A.",
       "minutes": 8,
       "androidBridge": "Filtered RecyclerView positions suggest the same risk; SwiftUI deletion offsets refer to the displayed ForEach collection, not arbitrary backing indices.",
       "rubric": [
-        "Identifies offset zero as visible B.",
-        "Snapshots displayed order before mutation.",
-        "Maps offsets to stable IDs before deleting source records.",
-        "Separates reorder policy and stale-index bindings from deletion."
+        "Identifies visible offset zero as B.",
+        "Captures the displayed order before changing the source.",
+        "Maps visible offsets to stable IDs and deletes those source records.",
+        "Separates deletion from filtered reordering and stale-index bindings."
       ],
-      "answerHTML": "<p>The delete offset is relative to the displayed ForEach collection. Here visible offset zero names B, not source A. Snapshot the visible results, map the selected offsets to stable record IDs, and remove those IDs from the authoritative array. Computing that mapping before mutation also prevents shifting indices from redirecting a multi-row deletion. Clearing search should reveal A and C.</p><p>Inspect editing bindings for the same class of error: a captured source index can target another row after deletion or reordering. Resolve by ID when reading and writing. Reordering under search needs a separate product policy; this beginner example guards it until the filter is empty. Test duplicate titles so display text cannot accidentally stand in for identity. Record the removed IDs, not just the apparent remaining labels.</p>",
+      "answerHTML": "<p>The offset counts rows in the displayed ForEach collection, not in every backing Array. Here visible offset zero names B, not source A. Keep the current visible order long enough to map offsets to record IDs. Then remove those IDs from the full source Array. Computing that mapping before mutation also prevents shifting indices from redirecting a multi-row deletion. Clearing search should reveal A and C.</p><p>Check editing bindings for the same position-mapping mistake: a captured source index can target another row after deletion or reordering. Resolve by ID when reading and writing. Reordering under search needs a separate product policy; this beginner example guards it until the filter is empty. Test duplicate titles so display text cannot accidentally stand in for identity. Record the removed IDs, not just the apparent remaining labels.</p>",
       "followUps": [
-        "How would sorting change the visible-to-source mapping?",
-        "How do you recover if the destination's record was deleted?"
+        "How does sorting affect the mapping from visible positions to source records?",
+        "How should navigation recover when its destination record has been deleted?"
       ],
       "pitfalls": [
-        "Applying filtered offsets directly to the source.",
-        "Calling the bug a List animation problem."
+        "Applying search-result offsets directly to the full source.",
+        "Calling a wrong-record deletion a List animation problem."
       ]
     },
     {
@@ -355,24 +355,24 @@
       "lesson": "078",
       "level": "Foundation",
       "kind": "Explain",
-      "prompt": "Explain a custom environment key, ViewModifier and ButtonStyle.",
-      "scenario": "A screen receives scoped copy, applies a card wrapper and uses a styled semantic Button.",
+      "prompt": "What does a custom environment key pass down the view tree? How do ViewModifier and ButtonStyle change appearance?",
+      "scenario": "A screen receives scoped display text, applies a reusable card wrapper and uses a styled semantic Button.",
       "minutes": 5,
       "androidBridge": "CompositionLocal and reusable modifiers are helpful analogies; EnvironmentKey defaults and SwiftUI style activation have different typed contracts.",
       "rubric": [
-        "Defines a typed default and EnvironmentValues accessor.",
-        "Scopes injection to descendants and previews.",
-        "Explains modifier wrapper order without assigning data ownership.",
+        "Defines the value type, default and EnvironmentValues accessor.",
+        "Installs overrides for the intended descendants and previews.",
+        "Explains wrapper order without giving the modifier ownership of feature data.",
         "Keeps activation in Button and appearance in ButtonStyle."
       ],
-      "answerHTML": "<p>The custom EnvironmentKey declares the slot's value type through its default value. An EnvironmentValues property accesses that typed slot, and the ancestor installs an override with a key-path environment modifier. Descendants read it from their current hierarchy. The preview supplies its own synthetic override; environment distribution does not construct a global owner or persistent store.</p><p>ViewModifier receives content and returns ordered padding, frame and background wrappers. It reuses appearance without silently loading a feature or owning a draft. ButtonStyle receives the semantic Button's label and pressed state, reads enabled state where needed, and renders its appearance. The Button's action remains the activation owner. Adding an independent tap gesture inside the style can duplicate or interfere with that behavior. Defaults, visual contracts and dependency lifetime should all be explicit.</p>",
+      "answerHTML": "<p>An environment key names a typed value available down a view tree. Its default value establishes the value type. An EnvironmentValues property accesses that typed slot, and the ancestor installs an override with a key-path environment modifier. Descendants read it from their current hierarchy. The preview supplies its own synthetic override; environment distribution does not construct a global owner or persistent store.</p><p>ViewModifier wraps supplied content with reusable appearance rules. Here it adds padding, frame and background in a defined order. It reuses appearance without silently loading a feature or owning a draft. ButtonStyle receives the semantic Button's label and pressed state, reads enabled state where needed, and renders its appearance. The Button still owns what happens when it is activated. Adding an independent tap gesture inside the style can duplicate or interfere with that behavior. Defaults, visual contracts and dependency lifetime should all be explicit.</p>",
       "followUps": [
-        "When is explicit initializer injection clearer?",
-        "How does legacy EnvironmentObject differ from Observation environment distribution?"
+        "When would passing the dependency through an initializer be clearer?",
+        "How does legacy EnvironmentObject differ from distributing an Observation model through the environment?"
       ],
       "pitfalls": [
-        "Using a default to hide a missing production dependency.",
-        "Moving the action into the style's tap gesture."
+        "Using a default value to conceal a required production dependency that was never supplied.",
+        "Adding a tap gesture to the style that duplicates the Button action."
       ]
     },
     {
@@ -380,24 +380,24 @@
       "lesson": "078",
       "level": "Foundation",
       "kind": "Debug",
-      "prompt": "An alternate preview still shows default copy and a disabled button looks active.",
-      "scenario": "The environment override is attached to a sibling, and the custom style ignores isEnabled.",
+      "prompt": "Why does an alternate preview still show default text, and why does a disabled Button still look active?",
+      "scenario": "The environment override is placed on a sibling view. The custom ButtonStyle does not read isEnabled.",
       "minutes": 8,
       "androidBridge": "Scoped CompositionLocal diagnosis helps; SwiftUI environment ancestry and ButtonStyle configuration must be checked in the actual hierarchy.",
       "rubric": [
-        "Locates injection on the relevant ancestor.",
-        "Checks that read and override address the same key.",
-        "Separates visual disabled feedback from actual activation.",
-        "Avoids singleton fallback or copied stale configuration."
+        "Places the override on an ancestor of the view that reads it.",
+        "Checks that the override and read use the same environment key.",
+        "Separates disabled appearance from whether activation is allowed.",
+        "Checks for copied old configuration without adding a global fallback."
       ],
-      "answerHTML": "<p>An environment override affects its descendants, not siblings. Attach the alternate copy value to the screen or a common intended ancestor, and confirm its read uses the same EnvironmentValues key. A direct preview has its own hierarchy, so the app's WindowGroup wiring is not enough. If a model still uses old copy, inspect whether it captured an initial value instead of reading current configuration.</p><p>The Button may be functionally disabled while its custom style still renders an active appearance. Read isEnabled in the style and provide appropriate disabled feedback while leaving activation with the Button. Inspect contrast and large-text states separately; reduced opacity alone is not complete accessibility evidence. Do not repair these scope and appearance issues with a global singleton or a second action gesture. Test both the intended subtree and an unaffected sibling.</p>",
+      "answerHTML": "<p>An environment override flows down to descendants. A sibling is on another branch and does not receive it. Attach the alternate copy value to the screen or a common intended ancestor, and confirm its read uses the same EnvironmentValues key. A direct preview has its own hierarchy, so the app's WindowGroup wiring is not enough. If a model still uses old copy, inspect whether it captured an initial value instead of reading current configuration.</p><p>The Button can block its action while the custom style still draws it as active. Behavior and appearance need separate checks. Read isEnabled in the style and provide appropriate disabled feedback while leaving activation with the Button. Inspect contrast and large-text states separately; reduced opacity alone is not complete accessibility evidence. Do not repair these scope and appearance issues with a global singleton or a second action gesture. Check the views that should receive the override and a sibling that should keep its default.</p>",
       "followUps": [
-        "How would you fixture pressed, disabled and large-text states?",
-        "Why is environment access not a reference lifetime policy?"
+        "How would you preview pressed, disabled and large-text states separately?",
+        "Why does reading an environment value not decide who retains its referenced object?"
       ],
       "pitfalls": [
-        "Expecting a sibling override to propagate across the tree.",
-        "Treating an active-looking style as proof the action can run."
+        "Expecting a sibling’s override to reach another branch.",
+        "Assuming an active appearance proves the disabled action can run."
       ]
     },
     {
@@ -405,24 +405,24 @@
       "lesson": "079",
       "level": "Foundation",
       "kind": "Explain",
-      "prompt": "Distinguish tab selection, typed push path and split selection.",
-      "scenario": "A library has Browse and Settings tabs, a note route enum and an optional selected UUID.",
+      "prompt": "How do tab selection, a typed NavigationStack path and split-view selection represent different choices?",
+      "scenario": "The library has Browse and Settings tabs, a note route enum and an optional UUID for the selected record.",
       "minutes": 5,
       "androidBridge": "Android back stacks, top-level navigation and two-pane selection are conceptual bridges; SwiftUI containers adapt under their own state and hierarchy rules.",
       "rubric": [
-        "Names separate owners for tab/path/selection.",
-        "Explains Hashable routes and destination registration scope.",
-        "Uses stable IDs resolved against current records.",
-        "States compact adaptation and restoration need separate checks."
+        "Names separate owners for the tab, push path and split selection.",
+        "Explains Hashable routes and where their destinations are registered.",
+        "Uses stable record IDs and resolves them against current data.",
+        "Treats compact-window behavior and restoration as separate checks."
       ],
-      "answerHTML": "<p>Tab selection chooses a top-level area and uses values matching the tab tags. A NavigationStack path describes pushed destinations, here as a homogeneous route-enum array. NavigationLink supplies a route value, and navigationDestination maps that type to a description inside the intended stack scope. A split view instead binds row selection to detail content, with nil meaning no selection.</p><p>Routes and selected records use stable IDs rather than mutable labels or positions. Resolve them against current records and show recovery when absent. Register typed destinations outside lazily constructed rows so the stack can discover them reliably. The split view may collapse in a compact window, and an iPad can have a narrow window. These in-memory values do not automatically persist a navigation session or validate an external deep link.</p>",
+      "answerHTML": "<p>Tab selection chooses a top-level area, such as Browse or Settings. Its value must match a tab tag. A NavigationStack path describes pushed destinations, here as an Array whose elements all use one route enum type. NavigationLink supplies a route value, and navigationDestination maps that type to a description inside the intended stack scope. A split view instead binds row selection to detail content, with nil meaning no selection.</p><p>Routes and selection carry record IDs that stay stable when titles or row positions change. Resolve them against current records and show recovery when absent. Register typed destinations outside lazily constructed rows so the stack can discover them reliably. The split view may collapse in a compact window, and an iPad can have a narrow window. These values live in memory. Saving and restoring navigation, or accepting an external deep link, needs separate validation and ownership.</p>",
       "followUps": [
-        "How should each tab preserve or reset its path?",
-        "What policy handles an account change with a selected record?"
+        "Should switching tabs preserve or reset each tab’s path?",
+        "What should happen to a selected record when the account changes?"
       ],
       "pitfalls": [
-        "Appending a tab switch into an unrelated push path.",
-        "Assuming every iPad always shows two columns."
+        "Appending a top-level tab switch to an unrelated push path.",
+        "Assuming an iPad always has room for two columns."
       ]
     },
     {
@@ -430,24 +430,24 @@
       "lesson": "079",
       "level": "Foundation",
       "kind": "Debug",
-      "prompt": "A route opens stale data and split selection points at a removed row.",
-      "scenario": "Routes store mutable titles, selection stores row indices, and the detail force-unwraps lookup.",
+      "prompt": "A route opens old data and split selection points to a deleted row. How would you repair identity and missing-record handling?",
+      "scenario": "Routes hold mutable titles, selection holds row indices and the detail force-unwraps its lookup result.",
       "minutes": 8,
       "androidBridge": "Stable Android list and route keys highlight the risk; SwiftUI Hashable navigation values do not validate data availability or authorization.",
       "rubric": [
-        "Replaces titles/indices with stable record identifiers.",
-        "Resolves current data at the destination.",
-        "Provides absent-record recovery without forced unwrap.",
-        "Reconciles selection and defines restoration/authentication boundaries."
+        "Replaces titles and positions with stable record IDs.",
+        "Resolves current data when opening the destination.",
+        "Handles a missing record with recovery rather than a forced unwrap.",
+        "Reconciles selection and defines restoration and authentication checks."
       ],
-      "answerHTML": "<p>Use a stable record ID in the typed route and split selection. Titles can change or collide, and indices move after reorder or deletion. Resolve that ID against current records when constructing detail. If lookup fails, present an unavailable-record state with a clear return or reselection action instead of force-unwrapping. A nil selection is a different state and can show a choose-a-note placeholder.</p><p>The owner should clear invalid selection or deliberately keep a recoverable missing-record state after deletion or account changes. Restored and externally supplied route values need validation against current scope; Hashable and valid UUID syntax do not authorize access. Inspect destination registration and container ownership separately if a value link fails to open. Test reorder, deletion and compact navigation rather than only the ordinary two-column fixture.</p>",
+      "answerHTML": "<p>Carry the record’s stable ID in both the route and split selection. It is like a ticket number that still names the record after its title changes. Titles can change or collide, and indices move after reorder or deletion. Resolve that ID against current records when constructing detail. If lookup fails, present an unavailable-record state with a clear return or reselection action instead of force-unwrapping. A nil selection is a different state and can show a choose-a-note placeholder.</p><p>After deletion or an account change, the owner must decide whether to clear selection or show a missing-record state with a recovery action. Restored and externally supplied route values need validation against current scope; Hashable supports navigation’s value handling. A well-formed UUID still does not prove the current account may access that record. Inspect destination registration and container ownership separately if a value link fails to open. Test reorder, deletion and compact navigation rather than only the ordinary two-column fixture.</p>",
       "followUps": [
-        "Why register destinations outside lazy row content?",
-        "What extra contract would encoded navigation restoration need?"
+        "Why should typed destinations be registered outside lazily created rows?",
+        "What validation and recovery rules would saved navigation need?"
       ],
       "pitfalls": [
-        "Treating a hashable value as guaranteed valid data.",
-        "Adding nested stacks instead of resolving ownership and scope."
+        "Treating a Hashable route as proof that its record exists and is accessible.",
+        "Adding nested stacks before fixing data ownership and destination scope."
       ]
     },
     {
@@ -455,24 +455,24 @@
       "lesson": "080",
       "level": "Foundation",
       "kind": "Explain",
-      "prompt": "Design a sheet whose Cancel preserves committed data.",
-      "scenario": "A title editor must Save trimmed content, Cancel without mutation, and support a defined interactive-dismiss policy.",
+      "prompt": "How would you build a sheet where Save commits trimmed text and Cancel keeps the original title?",
+      "scenario": "The title editor must validate trimmed text on Save, leave committed data untouched on Cancel and define what a swipe dismissal does.",
       "minutes": 5,
       "androidBridge": "Android modal draft staging provides a useful analogy; SwiftUI item presentation, environment dismiss and onDismiss are separate context-sensitive APIs.",
       "rubric": [
-        "Owns optional item presentation at the root.",
-        "Stages editable values inside the sheet.",
-        "Commits only through validated Save.",
-        "Reads dismiss inside the presented subtree and separates closing from outcome."
+        "Places the optional identifiable presentation request at the root.",
+        "Edits a local draft inside the sheet.",
+        "Commits only through a validated Save action.",
+        "Reads dismiss inside the sheet and separates closing from a successful outcome."
       ],
-      "answerHTML": "<p>The root owns an optional identifiable presentation request carrying the initial title. The sheet owns a local staged draft, so typing does not mutate the committed root value. Save trims and validates, invokes an explicit commit callback, then asks the sheet's own environment to dismiss. Cancel dismisses without calling that callback. A live binding would need a different rollback design to make the same promise.</p><p>Read dismiss inside the presented subtree because its action targets that context. onDismiss tells you that the presentation closed, not that Save succeeded. Interactive closure needs a stated policy: this lesson blocks dirty swipe dismissal until an explicit Save or Cancel, rather than pretending a modifier supplies a discard prompt. For async saving, successful operation and transition timing need further state; dismissal alone proves neither.</p>",
+      "answerHTML": "<p>The root keeps an optional presentation request with an ID and the starting title. A present request asks for the sheet. The sheet edits its own draft, like marking a spare copy before replacing the original. Typing leaves the committed title unchanged. Save trims and validates, invokes an explicit commit callback, then asks the sheet's own environment to dismiss. Cancel dismisses without calling that callback. A live binding would need a different rollback design to make the same promise.</p><p>Read dismiss inside the presented sheet. Its action applies to that presentation context. onDismiss tells you that the presentation closed, not that Save succeeded. Interactive closure needs a stated policy: this lesson blocks dirty swipe dismissal until an explicit Save or Cancel, rather than pretending a modifier supplies a discard prompt. For async saving, successful operation and transition timing need further state; dismissal alone proves neither.</p>",
       "followUps": [
-        "How would a failed asynchronous save affect closure policy?",
-        "Why might sheet(item:) be clearer than separate selection and Boolean state?"
+        "What should happen to dismissal while an asynchronous Save is pending or has failed?",
+        "Why can sheet(item:) keep presentation and selected data clearer than separate Boolean and selection state?"
       ],
       "pitfalls": [
-        "Committing a draft in onDismiss.",
-        "Passing the root's dismiss action into a different presentation context."
+        "Saving the draft unconditionally in onDismiss.",
+        "Passing the root’s dismiss action into a sheet with a different presentation context."
       ]
     },
     {
@@ -480,24 +480,24 @@
       "lesson": "080",
       "level": "Foundation",
       "kind": "Debug",
-      "prompt": "Cancel loses the original title and Help behaves like a sheet on a phone.",
-      "scenario": "The modal edits a live root binding; the popover uses default compact adaptation.",
+      "prompt": "Why does Cancel fail to restore the title, and why can Help appear as a sheet on a phone?",
+      "scenario": "The editor changes a live binding to the root’s committed title. The Help popover uses its default behavior in a compact window.",
       "minutes": 8,
       "androidBridge": "Android modal rollback and adaptive presentation concepts transfer; SwiftUI popover adaptation and dismiss scope are platform-specific.",
       "rubric": [
-        "Finds live edits to committed data before Cancel.",
-        "Introduces staged draft or a deliberate rollback policy.",
+        "Finds that live typing already changed committed data.",
+        "Uses a separate draft or a deliberate rollback policy.",
         "Recognizes default compact popover adaptation.",
-        "Plans actual window checks and avoids using onDismiss as Save."
+        "Requires window interaction checks and keeps onDismiss separate from Save."
       ],
-      "answerHTML": "<p>The title was already changed while typing through a live binding, so simply dismissing on Cancel cannot restore the original. Stage the draft in the presented editor and call a commit callback only after valid Save. Alternatively, define a real rollback snapshot policy, but do not pretend a Cancel label supplies one. Ensure the dismiss action is read from the presented editor and keep onDismiss free of unconditional commits.</p><p>The Help presentation may legitimately adapt from popover to a sheet-like form in a compact window. Inspect the actual device/window and content behavior rather than diagnosing that adaptation as lost state. If a product needs an explicit compact preference, investigate presentationCompactAdaptation with its OS availability and test it. Save/cancel correctness and popover appearance are independent checks, and both need actual interaction evidence.</p>",
+      "answerHTML": "<p>Typing through the live binding already changed the original title. Closing the sheet on Cancel does not undo those writes. Stage the draft in the presented editor and call a commit callback only after valid Save. Alternatively, define a real rollback snapshot policy, but do not pretend a Cancel label supplies one. Ensure the dismiss action is read from the presented editor and keep onDismiss free of unconditional commits.</p><p>In a compact window, SwiftUI can adapt a popover into a sheet-like presentation. Help may therefore be behaving as designed. Inspect the actual device/window and content behavior rather than diagnosing that adaptation as lost state. If a product needs an explicit compact preference, investigate presentationCompactAdaptation with its OS availability and test it. Check Save and Cancel behavior separately from popover appearance, and both need actual interaction evidence.</p>",
       "followUps": [
-        "What does interactiveDismissDisabled fail to provide automatically?",
-        "How do competing independent presentation flags need coordination?"
+        "What discard confirmation does interactiveDismissDisabled fail to provide by itself?",
+        "How should the owner coordinate competing presentation flags?"
       ],
       "pitfalls": [
-        "Assuming dismissal undoes live data mutations.",
-        "Claiming a popover always floats on every phone."
+        "Expecting dismissal to undo live edits automatically.",
+        "Assuming a popover always floats on every phone."
       ]
     },
     {
@@ -505,24 +505,24 @@
       "lesson": "081",
       "level": "Foundation",
       "kind": "Explain",
-      "prompt": "Explain task(id:) cancellation and the model's separate publication token.",
-      "scenario": "Query edits change a token; the view awaits a synthetic search and checks freshness after suspension.",
+      "prompt": "What cancellation does task(id:) request, and why does the model also need a token before publishing results?",
+      "scenario": "A query edit changes the request token. The view awaits a synthetic search and rechecks whether its result is still current after suspension.",
       "minutes": 5,
       "androidBridge": "LaunchedEffect suggests keyed work; Swift task cancellation, MainActor reentrancy and producer lifetime are not identical to Android lifecycle jobs.",
       "rubric": [
-        "Scopes work through task and awaits directly.",
-        "Describes cooperative cancellation rather than forced termination.",
-        "Captures and rechecks a current request token.",
-        "Guards both success and error and invalidates on the stated lifecycle policy."
+        "Starts view-scoped work through task and awaits it directly.",
+        "Explains cancellation as a cooperative request rather than instant termination.",
+        "Captures the attempt’s token and checks it again after await.",
+        "Checks both success and error and invalidates according to the lifecycle policy."
       ],
-      "answerHTML": "<p>Task associates asynchronous work with the view's lifetime and an Equatable key. Changing that key or ending the view scope requests cancellation of the associated task. The closure awaits the operation directly rather than launching detached work. Cancellation is cooperative and does not prove that every underlying transport or callback stopped.</p><p>The model's token separately controls whether a completion may update visible state. Capture it before await and check it afterward, together with cancellation, on both success and error paths. MainActor serializes commits but permits other actor work while an operation suspends, so it does not eliminate stale outcomes. Synchronously invalidate the token when query or the defined lifecycle boundary changes. The iOS 17 onChange overload observes events; it need not be a second work trigger. A clear answer separates trigger, cancellation and publication permission.</p>",
+      "answerHTML": "<p>Task ties asynchronous work to a view’s lifetime. Task(id:) also uses an Equatable key to decide when to replace that work. Changing that key or ending the view scope requests cancellation of the associated task. The closure awaits the operation directly rather than launching detached work. Cancellation is cooperative and does not prove that every underlying transport or callback stopped.</p><p>A token is an attempt label, like a numbered order ticket. It separately decides whether a completion may update visible state. Capture it before await and check it afterward, together with cancellation, on both success and error paths. MainActor prevents simultaneous isolated commits. During await, other work can run on that actor and change the current request. Actor isolation therefore does not make an old result current. Synchronously invalidate the token when query or the defined lifecycle boundary changes. The iOS 17 onChange overload observes events; it need not be a second work trigger. A clear answer separates trigger, cancellation and publication permission.</p>",
       "followUps": [
-        "Why does query equality fail for A1/B/A2?",
-        "What does explicit invalidation without a replacement request protect?"
+        "Why does comparing query text fail when the order is A1, B, A2?",
+        "What does invalidating the token without starting another request protect?"
       ],
       "pitfalls": [
-        "Calling cancellation forced producer termination.",
-        "Adding guards only to the success branch."
+        "Claiming cancellation instantly stops every producer.",
+        "Checking freshness only before publishing success and leaving errors unguarded."
       ]
     },
     {
@@ -530,24 +530,24 @@
       "lesson": "081",
       "level": "Foundation",
       "kind": "Debug",
-      "prompt": "An old request for A replaces a newer request for A after A → B → A.",
-      "scenario": "The code only compares returned query text and ignores obsolete errors.",
+      "prompt": "After A → B → A, an old A result replaces the new A result. Why is query-text equality insufficient?",
+      "scenario": "The code checks only returned query text. It also lets obsolete errors update the UI without checking freshness.",
       "minutes": 8,
       "androidBridge": "Android stale-state debugging principles apply; SwiftUI task lifetime does not automatically validate every result or handle actor reentrancy.",
       "rubric": [
-        "Explains the A1/A2 text collision.",
-        "Uses a generation/token invalidated before completion.",
-        "Applies freshness checks to old success and old failure.",
-        "Proposes gated tests with a cancellation-ignoring fixture."
+        "Explains that A1 and A2 have equal text but different attempts.",
+        "Uses a generation token invalidated before old work can publish.",
+        "Checks both old success and old failure.",
+        "Tests controlled completions with a fixture that deliberately ignores cancellation."
       ],
-      "answerHTML": "<p>A1 and A2 share the same query text, so text equality cannot identify the current request. Assign a new token for each requested generation and invalidate it synchronously when the query changes. Capture the expected token before awaiting and require that token to remain current before publishing. Guard failure as well as success; an obsolete error can otherwise hide newer valid results.</p><p>Task cancellation complements this check but cannot replace it. Build a fixture that signals request start and lets the test release outcomes despite cancellation. Start A1, then B, then A2, finish A2 first and await its commit, then release old success and old error and assert the current output remains. Also invalidate without a new request and verify the old outcome is rejected. Use completion gates, not guessed sleeps, and report producer cancellation separately from UI freshness.</p>",
+      "answerHTML": "<p>A1 and A2 both search for A, but they are different attempts. Matching the text cannot tell which attempt is current. Assign a new token for each requested generation and invalidate it synchronously when the query changes. Capture the expected token before awaiting and require that token to remain current before publishing. Guard failure as well as success; an obsolete error can otherwise hide newer valid results.</p><p>Cancellation asks old work to stop. The token still has to reject any old result that arrives anyway. Build a fixture that signals request start and lets the test release outcomes despite cancellation. Start A1, then B, then A2, finish A2 first and await its commit, then release old success and old error and assert the current output remains. Also invalidate without a new request and verify the old outcome is rejected. Use gates that release named completions in a known order. Guessed sleeps do not prove that order. Report whether the producer stopped separately from whether the UI rejected an old result.</p>",
       "followUps": [
-        "How can lifecycle invalidation revoke a completed-but-queued callback?",
-        "What cleanup must a continuation-based test fixture provide?"
+        "How can lifecycle invalidation reject a callback that finished but is still queued?",
+        "How must a test fixture clean up every stored continuation?"
       ],
       "pitfalls": [
-        "Assuming MainActor prevents reentrancy across await.",
-        "Testing only a cancellable sleep that never reaches old publication."
+        "Expecting MainActor to prevent other actor work during await.",
+        "Using only a cancellable sleep that never delivers an old outcome to the publication check."
       ]
     },
     {
@@ -555,24 +555,24 @@
       "lesson": "082",
       "level": "Foundation",
       "kind": "Explain",
-      "prompt": "Describe an adaptive and accessible version of this synthetic screen.",
-      "scenario": "It has a long title, a practice Button, a Toggle and a count across narrow/wide windows.",
+      "prompt": "How would you keep this screen readable and usable in narrow windows and with accessibility settings?",
+      "scenario": "The screen has a long title, a practice Button, a Toggle and a count. It must work in both narrow and wide windows.",
       "minutes": 5,
       "androidBridge": "Android adaptive UI and accessibility semantics help; SwiftUI fitting, Dynamic Type and VoiceOver require their own environment and interaction checks.",
       "rubric": [
-        "Uses local available space and meaningful layout alternatives.",
-        "Preserves actions and allows vertical growth.",
+        "Uses the available local width and meaningful layout alternatives.",
+        "Keeps all actions and allows content to grow vertically.",
         "Keeps semantic controls and intentional reading groups.",
-        "Separates visual, localization and assistive evidence."
+        "Separates visual, translation and assistive-interaction checks."
       ],
-      "answerHTML": "<p>Base layout on available window space and content instead of physical screen width or device name. Provide a vertical alternative when a side-by-side row cannot remain readable, and preserve every action in that fallback. System text roles respond to Dynamic Type, but fixed heights and line limits can still clip, so allow vertical growth and scrolling where appropriate.</p><p>Use Button and Toggle semantics rather than rebuilding activation on decorative images. Combine informational title/caption text when useful while keeping controls individually reachable. A decorative symbol can be hidden; meaningful icons need labels. Test long text, narrow/wide windows, large text, appearance and RTL layout, then separately inspect VoiceOver reading order and activation. A locale override does not create missing translations, and an accessibilityIdentifier is for automation rather than the spoken label. Record actual observed configurations and pending checks.</p>",
+      "answerHTML": "<p>Use the space this window offers. A device name or physical screen width does not tell you how much room this view has. Provide a vertical alternative when a side-by-side row cannot remain readable, and preserve every action in that fallback. System text roles respond to Dynamic Type, the user’s preferred text size, but fixed heights and line limits can still clip, so allow vertical growth and scrolling where appropriate.</p><p>Use Button and Toggle so the system knows which elements are controls and how they activate. A decorative image with a tap gesture loses that built-in meaning. Combine informational title/caption text when useful while keeping controls individually reachable. A decorative symbol can be hidden; meaningful icons need labels. Test long text, narrow/wide windows, large text, appearance and RTL layout, then separately inspect VoiceOver reading order and activation. A locale override does not create missing translations, and an accessibilityIdentifier is for automation rather than the spoken label. Record actual observed configurations and pending checks.</p>",
       "followUps": [
-        "How can a candidate technically fit while unreadably compressing text?",
-        "What remains to verify for custom fonts and touch targets?"
+        "How can a layout fit within its bounds but still compress text until it is unreadable?",
+        "What custom-font scaling and touch-target checks remain?"
       ],
       "pitfalls": [
-        "Shrinking text to fit a fixed screenshot.",
-        "Combining the whole screen and hiding its actions."
+        "Shrinking text to match one fixed screenshot.",
+        "Combining the entire screen into one accessibility element and hiding its actions."
       ]
     },
     {
@@ -580,24 +580,24 @@
       "lesson": "082",
       "level": "Foundation",
       "kind": "Debug",
-      "prompt": "Large text clips the action, and an RTL preview is reported as translated.",
-      "scenario": "The card has a fixed height and no String Catalog translations were added.",
+      "prompt": "Large text clips an action, and an RTL preview is called translated. What must be fixed and what evidence is missing?",
+      "scenario": "The card has a fixed height. No String Catalog translations were added, but the preview uses right-to-left layout.",
       "minutes": 8,
       "androidBridge": "Android font-scale and RTL testing provide a bridge; Dynamic Type, key lookup and VoiceOver evidence remain specific to the iOS implementation.",
       "rubric": [
-        "Removes or revises fixed-height assumptions.",
-        "Preserves reachable actions through layout/scroll alternatives.",
-        "Distinguishes locale, direction and translated resources.",
-        "Requires actual assistive and contrast checks beyond screenshots."
+        "Revises the fixed-height rule that clips larger text.",
+        "Keeps actions reachable through layout or scrolling.",
+        "Separates locale, layout direction and translated resources.",
+        "Requires assistive and contrast checks beyond screenshots."
       ],
-      "answerHTML": "<p>The font may scale correctly while its ancestor still clips it. Inspect fixed height, line limits and horizontal layout assumptions; use a minimum height and vertical growth where possible. Offer a meaningful vertical fallback and preserve the action in the scrollable area. Avoid reducing the font to hide the problem. Check the actual tappable area and reading order separately from drawn bounds.</p><p>An Arabic locale or right-to-left layout override exercises direction and formatting, not translation generation. Add and verify real localized resources before claiming translated content. Mark the existing preview as an RTL layout fixture. Inspect long strings, dark/light and larger text, then exercise VoiceOver labels, states and actions on an appropriate runtime. A screenshot or compiler success cannot prove those interactions, contrast or complete accessibility coverage.</p>",
+      "answerHTML": "<p>The font can grow correctly while a fixed-height parent cuts it off. Dynamic Type support includes the space around the text. Inspect fixed height, line limits and horizontal layout assumptions; use a minimum height and vertical growth where possible. Offer a meaningful vertical fallback and preserve the action in the scrollable area. Avoid reducing the font to hide the problem. Check the actual tappable area and reading order separately from drawn bounds.</p><p>An Arabic locale can change formatting. A right-to-left override changes layout direction. Neither creates Arabic translations that are missing from the resources. Add and verify real localized resources before claiming translated content. Label the existing preview as an RTL, or right-to-left, layout fixture. Inspect long strings, dark/light and larger text, then exercise VoiceOver labels, states and actions on an appropriate runtime. A screenshot or compiler success cannot prove those interactions, contrast or complete accessibility coverage.</p>",
       "followUps": [
-        "Why prefer leading/trailing to left/right for text layout?",
-        "How do UI test identifiers differ from accessibility labels?"
+        "Why do leading and trailing usually express text layout better than left and right?",
+        "How does an automation identifier differ from a spoken accessibility label?"
       ],
       "pitfalls": [
-        "Treating scaled fonts alone as Dynamic Type support.",
-        "Claiming localization from an environment override without resources."
+        "Calling scaled fonts complete Dynamic Type support while ancestors still clip.",
+        "Claiming translated content from an environment override without translated resources."
       ]
     },
     {
@@ -605,24 +605,24 @@
       "lesson": "083",
       "level": "Foundation",
       "kind": "Explain",
-      "prompt": "Trace first SwiftData CRUD through model, container, context and query.",
-      "scenario": "The app disables autosave, the row edits through Bindable and the preview uses memory storage.",
+      "prompt": "How do SwiftData’s model, container, context and Query take a record through create, read, update and delete?",
+      "scenario": "Autosave is disabled. The row edits through Bindable, and the preview installs an in-memory store.",
       "minutes": 5,
       "androidBridge": "Room motivates durable records; SwiftData tracked models, context pending changes and SwiftUI Query are not DAO/Flow equivalents.",
       "rubric": [
-        "Defines schema/model versus container configuration.",
-        "Explains context tracking and explicit save.",
-        "Explains Query and Bindable without equating display to durability.",
-        "Separates in-memory preview checks from disk restart."
+        "Separates model schema from container and store configuration.",
+        "Explains context tracking and the explicit save attempt.",
+        "Explains Query and Bindable without treating display as durability.",
+        "Separates in-memory CRUD checks from a disk-backed restart check."
       ],
-      "answerHTML": "<p>Model declares persistent fields and generated SwiftData support. ModelContainer supplies schema and store configuration. ModelContext tracks fetched models and pending inserts, edits and deletions; explicit save attempts to commit that pending state. Query provides sorted data to the installed SwiftUI hierarchy and can display tracked changes before a successful durable save. Bindable lets the row edit its model properties.</p><p>Add constructs and inserts, read comes through Query, update changes a property then saves, and delete marks models then saves. With autosave disabled, live field edits remain pending until explicit Save. A save can include all changes in that context, not only one row. The preview installs a fresh in-memory container to isolate fixtures. Saving there can support CRUD evidence but cannot prove process-restart durability, migration safety or company-client adoption.</p>",
+      "answerHTML": "<p>The model declares the fields SwiftData stores. Its macro generates the support needed to track that data. ModelContainer supplies schema and store configuration. ModelContext tracks loaded records and changes waiting to be saved. Those include inserts, edits and deletions. Save attempts to commit the pending changes. Query provides sorted data to the installed SwiftUI hierarchy and can display tracked changes before a successful durable save. Bindable lets the row edit its model properties.</p><p>Create makes and inserts a model. Read comes through Query. Update changes a property and saves. Delete marks the model for removal and saves. With autosave disabled, live field edits remain pending until explicit Save. A save can include all changes in that context, not only one row. The preview installs a fresh in-memory container to isolate fixtures. Saving there can support CRUD evidence but cannot prove process-restart durability, migration safety or company-client adoption.</p>",
       "followUps": [
-        "Why fetch with a fresh context after save in a test?",
-        "What additional ownership is needed for background store work?"
+        "Why does fetching through a fresh context strengthen a save check?",
+        "Who should own a context used for background store work?"
       ],
       "pitfalls": [
-        "Treating Query appearance as a successful disk write.",
-        "Sharing managed models and context across arbitrary tasks."
+        "Treating a row appearing in Query as proof of a successful disk write.",
+        "Passing managed models or a context into arbitrary tasks without an isolation contract."
       ]
     },
     {
@@ -630,24 +630,24 @@
       "lesson": "083",
       "level": "Foundation",
       "kind": "Debug",
-      "prompt": "A save fails, but the row remains visible and the app says it was persisted.",
-      "scenario": "The code assumes Query output proves success and proposes deleting the store to repair setup.",
+      "prompt": "A save fails, but the row stays visible and the app reports it as saved. How should the UI and recovery policy change?",
+      "scenario": "The code treats Query output as proof of saving. It also proposes deleting the store when setup fails.",
       "minutes": 8,
       "androidBridge": "Android transaction failures provide a useful analogy; SwiftData pending state, rollback scope and container errors have their own behavior.",
       "rubric": [
-        "Distinguishes pending tracked state from committed data.",
-        "Reports save failure with retry/discard policy.",
-        "Explains whole-context rollback consequences.",
-        "Rejects unrequested store deletion and separates setup recovery."
+        "Separates tracked pending changes from committed data.",
+        "Reports failure and defines retry or discard behavior.",
+        "Explains that rollback affects the whole context’s pending changes.",
+        "Rejects unrequested store deletion and handles setup failure separately."
       ],
-      "answerHTML": "<p>The visible row may be a tracked pending insertion or edit. Query output does not prove save succeeded. Catch the save error and report the pending state honestly. Define retry or discard behavior: retry attempts the context's pending changes again, while rollback discards all pending changes in that context. Do not present it as a harmless per-row undo when another editor has unsaved changes.</p><p>Container setup failure is a separate boundary from a failed later save. Display a bounded recovery state and gather diagnostics without automatically deleting persisted data. A fresh-context fetch after a successful save is useful local evidence, and a disk-backed relaunch checks durability separately. An in-memory preview cannot establish that restart claim. Migration, uniqueness, cloud and account policies require additional scoped design rather than a destructive reset to make the sample appear healthy.</p>",
+      "answerHTML": "<p>The row can be visible because the context is tracking an unsaved insert or edit. Seeing it does not prove it reached disk. Query output does not prove save succeeded. Catch the save error and report the pending state honestly. Define retry or discard behavior: retry attempts the context's pending changes again, while rollback discards all pending changes in that context. Do not present it as a harmless per-row undo when another editor has unsaved changes.</p><p>Failure to create or open the container is different from a later save failure. Display a bounded recovery state and gather diagnostics without automatically deleting persisted data. A fresh-context fetch after a successful save is useful local evidence, and a disk-backed relaunch checks durability separately. An in-memory preview cannot establish that restart claim. Schema migration, uniqueness, cloud and account behavior each need their own design. Erasing the store to make the sample look healthy does not solve them.</p>",
       "followUps": [
-        "How would staged editing reduce shared-context cancellation risk?",
-        "What evidence would distinguish in-memory CRUD from disk durability?"
+        "How can editing a separate draft reduce the risk of discarding another editor’s pending work?",
+        "Which checks distinguish in-memory CRUD from disk durability after restart?"
       ],
       "pitfalls": [
-        "Deleting the store to hide initialization errors.",
-        "Calling a failed save successful because UI changed."
+        "Deleting the store to conceal initialization errors.",
+        "Reporting a failed save as successful because the UI changed."
       ]
     },
     {
@@ -655,24 +655,24 @@
       "lesson": "084",
       "level": "Foundation",
       "kind": "Explain",
-      "prompt": "Describe the capstone owner map and verification layers.",
-      "scenario": "The app has one draft, a topic picker, Review, Reset and an injected suggestion service.",
+      "prompt": "Who owns the capstone’s draft, presentation and work? Which checks prove each part works?",
+      "scenario": "The capstone has one draft, a topic picker, Review, Reset and an injected suggestion service.",
       "minutes": 5,
       "androidBridge": "Android feature state and test pyramids help; SwiftUI model ownership, presentation and XCTest products require actual Apple target setup.",
       "rubric": [
-        "Names root draft and presentation/task owners.",
-        "States eligibility, Cancel, Reset and freshness invariants.",
-        "Separates unit-test and UI-test target membership.",
-        "Distinguishes typecheck, build, runtime and accessibility evidence."
+        "Names the root draft owner and the owners of presentation and task work.",
+        "States the rules for eligibility, Cancel, Reset and current-result publication.",
+        "Places model and UI tests in their correct separate targets.",
+        "Separates type checking, linked build, runtime and accessibility evidence."
       ],
-      "answerHTML": "<p>The root owns one observable draft in State and the picker and Review receive that same reference. Choosing a topic commits it; Cancel closes without assignment. Review eligibility derives from trimmed name and a present topic. Reset clears fields and revokes old suggestion publication. The root-associated task awaits an injected synthetic service, while a token independently guards both success and failure. No store is included, so process restart has no draft-preservation promise.</p><p>Model tests belong in the hosted unit-test target with the correct app module import. UI tests belong in their separate product and verify actual controls, routing and reset interaction. Type checking covers declarations and API assumptions under a compiler/SDK; a linked build, simulator launch, executed tests and assistive inspection add separate evidence. A good handoff lists actual results and pending layers rather than calling every authored example verified execution.</p>",
+      "answerHTML": "<p>The root keeps one observable draft in State. The picker and Review both receive that same object rather than separate copies. Choosing a topic commits it; Cancel closes without assignment. Review is allowed only when the trimmed name is valid and a topic is present. Reset clears fields and revokes old suggestion publication. The root-associated task awaits an injected synthetic service, while a token independently guards both success and failure. No store is included, so process restart has no draft-preservation promise.</p><p>Put model tests in the hosted unit-test target and import the actual app module. The app target itself is not the test target. UI tests belong in their separate product and verify actual controls, routing and reset interaction. Type checking covers declarations and API assumptions under a compiler/SDK; a linked build, simulator launch, executed tests and assistive inspection add separate evidence. A good handoff lists actual results and pending layers rather than calling every authored example verified execution.</p>",
       "followUps": [
-        "What changes if the app module is renamed?",
-        "Why is the workbench build not automatically a run of this snippet?"
+        "Which test import changes when the app module is renamed?",
+        "Why does building the workbench not prove that this capstone snippet ran?"
       ],
       "pitfalls": [
-        "Compiling tests into the app target.",
-        "Inferring disk persistence or runtime success from source presence."
+        "Compiling test files into the app target.",
+        "Inferring saved data or runtime success from source files being present."
       ]
     },
     {
@@ -680,24 +680,24 @@
       "lesson": "084",
       "level": "Foundation",
       "kind": "Debug",
-      "prompt": "A stale-result test passes only because the fixture cancels before completing.",
-      "scenario": "The suite uses a delay and never releases an obsolete success or error after the newer result.",
+      "prompt": "A stale-result test passes because cancellation prevents every old completion. How would you test the publication guard itself?",
+      "scenario": "The suite waits for a delay. It never releases an old success or error after the newer result has committed.",
       "minutes": 8,
       "androidBridge": "Android controllable fakes are a useful bridge; Swift continuations, XCTest expectations and cooperative task cancellation need explicit completion ownership.",
       "rubric": [
-        "Challenges freshness with a cancellation-ignoring fixture.",
-        "Waits for actual starts before issuing subsequent requests.",
-        "Releases new result first, then old success/error and awaits each task.",
-        "Cleans up continuations and reports executed versus authored tests."
+        "Uses a controlled fixture that ignores cancellation to challenge freshness.",
+        "Waits for actual request starts before starting later attempts.",
+        "Finishes the new result first, then old success and error, and awaits each task.",
+        "Resumes every continuation and separates authored tests from executed tests."
       ],
-      "answerHTML": "<p>The test has not challenged the freshness branch if cancellation prevents every obsolete outcome. Use a controlled service that records each request start and retains a completion continuation while intentionally ignoring cancellation. Wait for A1 to start, issue B and A2 under new tokens, wait for their starts, and finish A2 first. After awaiting its commit, release old success and old error and assert the newer output and nil error remain.</p><p>Every started continuation must eventually be resumed, including a cleanup plan for unexpected setup failure. An expectation timeout bounds failure but should not determine completion ordering. Add invalidation-only and old-A1-error variations, then separately exercise task cancellation and UI flow. Run the actual test target and report its result; a source example or workbench build is not proof that these XCTest schedules executed.</p>",
+      "answerHTML": "<p>The test never reaches the freshness check if cancellation stops all old outcomes first. It must deliver an old result to test whether publication is rejected. Use a controlled service that records each request start and keeps a continuation, a handle for resuming that request later, while deliberately ignoring cancellation. Wait for A1 to start, issue B and A2 under new tokens, wait for their starts, and finish A2 first. After awaiting its commit, release old success and old error and assert the newer output and nil error remain.</p><p>Resume every started continuation exactly once. Plan cleanup for setup failures too, so no test task remains suspended. An expectation timeout bounds failure but should not determine completion ordering. Add invalidation-only and old-A1-error variations, then separately exercise task cancellation and UI flow. Run the actual test target and report its result; a source example or workbench build is not proof that these XCTest schedules executed.</p>",
       "followUps": [
-        "How do you test old A1 failure after a new A2 success?",
-        "What UI checks remain even after these model assertions pass?"
+        "How would you release old A1 failure after new A2 success and check that the UI stays successful?",
+        "Which actual UI interactions still need checking after the model assertions pass?"
       ],
       "pitfalls": [
-        "Using sleeps as completion-order proof.",
-        "Reporting producer cancellation from a UI publication assertion."
+        "Using guessed sleep durations as proof of completion order.",
+        "Claiming the producer stopped because the UI rejected an old result."
       ]
     }
   ]
