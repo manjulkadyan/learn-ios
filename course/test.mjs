@@ -6,6 +6,7 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { handleRequest } from './serve.mjs';
+import { simpleIssues, teachingIdentity, interviewIdentity } from './teaching.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const context = vm.createContext({ window: {} });
@@ -60,6 +61,22 @@ const expectedWorkshops = (await Promise.all(manifest.practiceBanks.map(async fi
 check(course.paths.length === 8 && course.workshops.length === expectedWorkshops, 'Original paths plus advanced and elective paths with all registered practice');
 check(course.paths.find(item => item.id === 'advanced').stages.flatMap(stage => stage.lessons).length === 24 && course.paths.find(item => item.id === 'specialists').stages.flatMap(stage => stage.lessons).length === 4, 'All new lessons have a deliberate reading path');
 check(course.paths.find(item => item.id === 'swift').stages[0].lessons[0] === '057' && course.paths.find(item => item.id === 'swiftui').stages[0].lessons[0] === '071', 'Reading paths can start from zero without renumbering original IDs');
+const plainContract = JSON.parse(await fs.readFile(path.join(root, 'content/progress-plain-contract.json'), 'utf8'));
+const teaching = new Map([
+  ...lessons.map(item => [`lesson:${item.id}`, item]),
+  ...course.workshops.map(item => [`workshop:${item.id}`, item]),
+  ...course.essentials.map(item => [`guide:${item.id}`, item])
+]);
+check(teaching.size === 133 && plainContract.entries.length === teaching.size && plainContract.interviews.length === course.interview.questions.length, 'Every existing teaching page and interview is in the plain-language preservation contract');
+for (const item of plainContract.entries) {
+  const original = teaching.get(`${item.kind}:${item.id}`);
+  check(original && createHash('sha256').update(JSON.stringify(teachingIdentity(original))).digest('hex') === item.sha256, `Assessment, section and code preservation ${item.kind}/${item.id}`);
+  check(simpleIssues(original.simple, item.id).length === 0, `Concrete story/example/picture/vocabulary structure ${item.id}`);
+}
+for (const item of plainContract.interviews) {
+  const question = course.interview.questions.find(question => question.id === item.id);
+  check(question && createHash('sha256').update(JSON.stringify(interviewIdentity(question))).digest('hex') === item.sha256, `Interview meaning boundary identity and code ${item.id}`);
+}
 for (const learningPath of course.paths) for (const stage of learningPath.stages) {
   check(stage.lessons.every(id => lessons.some(lesson => lesson.id === id)) && stage.workshops.every(id => course.workshops.some(item => item.id === id)), `Path resolves ${learningPath.id}/${stage.title}`);
 }
@@ -145,7 +162,7 @@ for (const artifact of course.artifacts) {
   check(response.status === 200 && response.body === artifact.source && response.headers['content-type'].startsWith(artifact.path.endsWith('.json') ? 'application/json' : 'text/plain'), `Declared artifact handler ${artifact.path}`);
   check((await request('/' + artifact.path, 'HEAD')).body === '', `Artifact HEAD ${artifact.path}`);
 }
-for (const url of ['/content/progress-contract.json', '/labs/SwiftLanguageLab/.build/debug/SwiftWorkbench', '/labs/unknown.swift', '/labs/unknown.py', '/labs/unknown.sh', '/labs/SwiftUIWorkbench/App/../../../../serve.mjs']) check((await request(url)).status === 404, `Private/undeclared companion denied ${url}`);
+for (const url of ['/content/progress-contract.json', '/content/progress-plain-contract.json', '/labs/SwiftLanguageLab/.build/debug/SwiftWorkbench', '/labs/unknown.swift', '/labs/unknown.py', '/labs/unknown.sh', '/labs/SwiftUIWorkbench/App/../../../../serve.mjs']) check((await request(url)).status === 404, `Private/undeclared companion denied ${url}`);
 const anchors = new Map(lessons.flatMap(lesson => lesson.repo).map(item => [item.path, item]));
 for (const source of course.catalogue.sources) anchors.set(source.path, source);
 for (const item of anchors.values()) {

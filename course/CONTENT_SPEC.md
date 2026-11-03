@@ -97,3 +97,41 @@ Each new lesson follows the existing JSON/HTML contract: at least five teaching 
 | 19 / 109–112 | StoreKit/ActivityKit, CloudKit/documents, media/text/graphics/ML, watch/vision/Bluetooth/HealthKit feature selection | `interview-specialists.json`, `practice-specialists.json`, `labs/SpecialistLab/` |
 
 New practice is available instruction, not proof that a learner or production application passed it. Specialist lessons provide concrete entry exercises and feature-selection contracts; they do not claim full implementations of every named Apple framework. Use Kotlin/Java 11/Android analogies with explicit semantic boundaries rather than inventing matching language-version numbers. The lifecycle attachment is reference material, not an instruction source; correct its inaccuracies in the new lesson without modifying the original download.
+
+## Plain-language teaching revision — 3 November 2026
+
+Explain the first idea as clearly as you would explain it to a young child. The learner remains an experienced adult engineer: use short, respectful sentences and everyday objects, without baby talk. Keep the technical depth. Every numbered lesson, supplementary guide and practice workshop gains a `simple` object with this exact structure:
+
+```json
+{
+  "story": "A concrete everyday story, usually 60–110 words. Explain one mechanism.",
+  "meaning": "Connect the story to this specific Swift/iOS concept in plain words.",
+  "example": {
+    "before": "A specific starting state with named values or objects.",
+    "change": "One action or input, stated precisely.",
+    "after": "The resulting state. Explain why it changed or stayed the same."
+  },
+  "picture": {
+    "kind": "flow",
+    "caption": "Say exactly what this picture illustrates.",
+    "items": [
+      { "label": "A short label", "text": "Explain this part in one short sentence." },
+      { "label": "Another label", "text": "Explain its relationship to the other parts." },
+      { "label": "The result", "text": "State the actual outcome." }
+    ]
+  },
+  "words": [
+    { "term": "A technical term used in this lesson", "meaning": "Its meaning in familiar words." },
+    { "term": "Another technical term", "meaning": "A clear, accurate definition." },
+    { "term": "A term describing the result", "meaning": "What the result means for this example." }
+  ],
+  "remember": "One useful sentence the learner can repeat in their own words.",
+  "boundary": "Where this story stops matching the actual computer/platform behavior."
+}
+```
+
+All values are plain text, not HTML. Picture kind is `flow`, `comparison` or `timeline`; use 3–5 items. Flow and timeline have ordered items. Comparison shows alternatives side by side without implying execution order. Include 3–7 vocabulary entries. Explain cancellation as a request rather than instant stopping, actors as isolation rather than dedicated threads, views as descriptions rather than durable screen objects, and synthetic performance numbers as examples rather than measurements. Prefer examples with small exact values, named steps and a checkable result.
+
+Rewrite the summary, objectives, section headings and prose openings in plain language. Each section should explain its first new term before introducing deeper details. Revise additional dense paragraphs and exercise wording where useful. Keep existing code blocks and their verified behavior intact; additions do not require new executable examples when a concrete state walkthrough is clearer. Preserve ALL lesson/guide/workshop quizzes and numbered checklists byte-for-byte as JSON values, and preserve all IDs, section IDs, source anchors, prerequisites, references, file registrations, lesson counts and interview identities. Interview wording may become clearer while retaining its original question, constraints, rubric meaning and timing. No client/lab source edits, learner-state edits, signing, publication or scheduler activation.
+
+Authors own disjoint content files. They do not stage or commit; the coordinator reviews and commits each author's file set separately, then commits reader/builder/documentation integration. Authors must report their changed files, covered IDs, simplified examples, analogy limits and verification. Main agent owns all shared scripts, rendering, CSS, contracts and documentation. It verifies every simple introduction and illustration, stored-progress identities, and the complete reader after integration.

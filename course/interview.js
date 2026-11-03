@@ -32,8 +32,8 @@
     }
     function entry(id) { return state.questions[id] ||= model.blank(); }
     const options = (items, selected) => items.map(([value, text]) => `<option value="${esc(value)}" ${value === selected ? 'selected' : ''}>${esc(text)}</option>`).join('');
-    const related = question => `<a href="#lesson/${question.lesson}">Session ${question.lesson}: ${esc(lessonById.get(question.lesson).title)}</a>`;
-    const scoring = '<ol start="0"><li><strong>0 — Not yet:</strong> cannot explain the mechanism.</li><li><strong>1 — Vocabulary:</strong> names terms but misses the causal rule.</li><li><strong>2 — Partial:</strong> explains some behavior, with important gaps.</li><li><strong>3 — Sound:</strong> explains the mechanism and a relevant failure case.</li><li><strong>4 — Defensible:</strong> adds alternatives, tradeoffs and a credible verification plan.</li></ol><p>Scores are your self-assessment, not automatic essay grading, mentor acceptance or a staff qualification. Assess against the question-specific rubric, not answer length.</p>';
+    const related = question => `<a href="#lesson/${question.lesson}">Session ${question.lesson}: ${esc(lessonById.get(question.lesson).title)}</a><br><a href="#lesson/${question.lesson}/simple">Start with its story, picture and new words →</a>`;
+    const scoring = '<ol start="0"><li><strong>0 — Not yet:</strong> cannot explain how it works.</li><li><strong>1 — Names only:</strong> knows some words but cannot show how they fit together.</li><li><strong>2 — Partly clear:</strong> explains some behavior but leaves important gaps.</li><li><strong>3 — Clear:</strong> explains what happens, why it happens, and one way it can fail.</li><li><strong>4 — Ready to defend:</strong> compares options, explains their costs, and shows how to check the answer.</li></ol><p>Use the answer checklist, also called a rubric, to choose your own score. A longer answer does not automatically earn more points. Your score records practice; a mentor still needs to review your reasoning.</p>';
     function lessonHTML(id) {
       const items = questions.filter(question => question.lesson === id);
       if (!items.length) return '';

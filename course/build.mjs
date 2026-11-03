@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildCatalogue } from './inventory.mjs';
 import { createHash } from 'node:crypto';
+import { simpleIssues, teachingIdentity, interviewIdentity } from './teaching.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const workspace = path.resolve(root, '../..');
@@ -36,6 +37,7 @@ for (const [unitIndex, entry] of (manifest?.units || []).entries()) {
     const lesson = content.lessons[index];
     const expectedId = String(entry.first + index).padStart(3, '0');
     const label = `${filename} session ${lesson.id}`;
+    errors.push(...simpleIssues(lesson.simple, label));
     if (lesson.id !== expectedId) errors.push(`${label}: expected ID ${expectedId}`);
     for (const key of ['title', 'summary', 'level']) requiredString(lesson[key], `${label}.${key}`);
     if (!Number.isFinite(lesson.duration) || lesson.duration < 15 || lesson.duration > 180) errors.push(`${label}: invalid duration`);
@@ -87,6 +89,7 @@ if (!Array.isArray(essentials?.guides) || essentials.guides.length !== 3) errors
 const guideIDs = new Set();
 for (const guide of essentials?.guides || []) {
   const label = `Swift supplement ${guide.id}`;
+  errors.push(...simpleIssues(guide.simple, label));
   if (!/^[a-z0-9-]+$/.test(guide.id) || guideIDs.has(guide.id)) errors.push(`${label}: invalid/duplicate ID`);
   guideIDs.add(guide.id);
   for (const key of ['title', 'summary']) requiredString(guide[key], `${label}.${key}`);
@@ -177,6 +180,7 @@ for (const file of manifest?.practiceBanks || []) {
   if (!Array.isArray(content.workshops) || !content.workshops.length) { errors.push(`${file}: expected workshops`); continue; }
   for (const workshop of content.workshops) {
     const label = `Workshop ${workshop.id}`;
+    errors.push(...simpleIssues(workshop.simple, label));
     if (!/^[a-z0-9-]+$/.test(workshop.id) || workshopIDs.has(workshop.id)) errors.push(`${label}: invalid/duplicate ID`);
     workshopIDs.add(workshop.id);
     for (const key of ['title', 'summary']) requiredString(workshop[key], `${label}.${key}`);
@@ -327,6 +331,28 @@ try {
     if (!lesson || createHash('sha256').update(JSON.stringify({ quiz: lesson.quiz, checklist: lesson.checklist })).digest('hex') !== original.sha256) errors.push(`${original.id}: pre-expansion quiz/checklist storage contract changed`);
   }
 } catch (error) { errors.push(`progress-expansion-contract.json: ${error.message}`); }
+try {
+  const contract = JSON.parse(await fs.readFile(path.join(root, 'content/progress-plain-contract.json'), 'utf8'));
+  const items = new Map([
+    ...lessons.map(item => [`lesson:${item.id}`, item]),
+    ...workshops.map(item => [`workshop:${item.id}`, item]),
+    ...(essentials?.guides || []).map(item => [`guide:${item.id}`, item])
+  ]);
+  const questions = new Map(interviewQuestions.map(item => [item.id, item]));
+  if (contract.version !== 1 || !/^[a-f0-9]{40}$/.test(contract.basedOnCommit || '') || contract.entries?.length !== items.size || contract.interviews?.length !== questions.size) errors.push('Invalid plain-language teaching baseline');
+  for (const original of contract.entries || []) {
+    const key = `${original.kind}:${original.id}`;
+    const item = items.get(key);
+    if (!item || createHash('sha256').update(JSON.stringify(teachingIdentity(item))).digest('hex') !== original.sha256) errors.push(`${key}: existing quiz/checklist, section identities or code example changed`);
+    items.delete(key);
+  }
+  for (const original of contract.interviews || []) {
+    const item = questions.get(original.id);
+    if (!item || createHash('sha256').update(JSON.stringify(interviewIdentity(item))).digest('hex') !== original.sha256) errors.push(`${original.id}: interview identity, timing or code example changed`);
+    questions.delete(original.id);
+  }
+  if (items.size || questions.size) errors.push('Plain-language baseline does not cover every existing teaching and interview item');
+} catch (error) { errors.push(`progress-plain-contract.json: ${error.message}`); }
 if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1; }
 else {
   const catalogue = await buildCatalogue(workspace);

@@ -2,6 +2,8 @@
 
 A private, local course for an experienced Android engineer starting iOS. Nineteen chapters contain 112 detailed sessions: 14 beginner Swift lessons, 14 beginner SwiftUI lessons, 28 core lessons, 28 deep dives, 24 advanced practice sessions and four specialist entry electives. Lessons include Kotlin/Java comparisons with explicit boundaries, explained quizzes, worked exercises and repository connections.
 
+The 3 November teaching revision starts each lesson, Swift details guide and practice workbench with an everyday story. A small picture shows the parts or steps. A before/change/after example gives you a result to predict. New technical words have nearby definitions. Each introduction ends with one sentence to remember and explains where its story stops matching the real platform. The deeper mechanics, Android comparisons, code, failure cases and exercises follow. Short, familiar sentences help you learn the idea before meeting several unfamiliar terms at once.
+
 The 29 October expansion repaired the language-first progression and connected teaching to implementation. It introduced six paths covering Swift, SwiftUI, mixed UIKit delivery, production engineering, staff practice and principal platform practice, plus eleven guided workbenches with a standalone Swift package, an isolated Xcode app, synthetic regression tooling and a costed multi-team design review. The original 001–056 lesson IDs, quizzes and checklist order remain stable; teaching prose and worked answers were corrected where the audit found gaps. Saved-progress hash contracts prevent accidental quiz/checklist changes during future builds.
 
 The 2 November expansion adds sessions 085–112 without changing earlier quizzes, checklists or interview identities. Eight paths and eighteen guided workbenches connect event processing, practical synchronization, modern Swift concurrency, UI runtime mechanics, durable recovery, integrated profiling and delivery review. The specialist path introduces concrete feature contracts for commerce/live updates, cloud documents, text/media/graphics/inference and additional Apple platforms; deeper framework-specific projects remain elective.
@@ -37,6 +39,8 @@ If you already have the course open, reload the same page after the expansion. K
 For a fresh language-first start, choose **Learn Swift** (057–070), then **Learn SwiftUI** (071–084), then the mixed-framework and production paths. The higher IDs preserve the older course's storage identities; they do not indicate prerequisites in the teaching sequence. The initial continue card still points to session 004 because sessions 001–004 were delivered in the mentor log. No exercises or competencies were marked complete, and the saved reading position is not reset.
 
 Read the explanation, follow its source connections, attempt the knowledge checks and exercise, then expand the worked answer. Complete the reflection checklist and confirm that you attempted the exercise before marking a session reviewed. A reviewed session is your own assessment; it is not mentor verification or a qualification.
+
+Begin with **The idea in everyday words**. Describe its picture out loud, then predict the small example's final state. Read **New words, explained** before the technical sections. Ordered pictures show a flow or timeline; comparison pictures show alternatives rather than an execution order. Every picture has a text caption and labelled parts, works offline and uses the same light/dark theme as the reader. Search also finds the stories, picture labels and word definitions. Use **A story and a picture** in the page's contents to return to the introduction.
 
 Keep a 45-minute daily habit: five minutes of recall, ten of explanation, ten of tracing a scratch example or repository connection, fifteen of independent practice and five of reflection. Per-session estimates include hands-on work; spread longer topics across multiple days. The original core follows the sixth-session lab/seventh-session review rhythm. Beginner and deep-dive chapters have their own integrated work and evidence reviews; do not assume the same calendar pattern. The course supports an ongoing delivery portfolio, not a fixed completion date or guaranteed staff/principal title.
 
@@ -92,6 +96,7 @@ After a content change:
 ```sh
 node ios-learning/course/build.mjs
 node ios-learning/course/build.mjs --check
+node ios-learning/course/check-teaching.mjs
 node --check ios-learning/course/app.js
 node --check ios-learning/course/state.js
 node --check ios-learning/course/serve.mjs
@@ -101,7 +106,7 @@ node ios-learning/course/test-interview.mjs
 node ios-learning/course/labs/MeasurementLab/test-evaluate.mjs
 ```
 
-The builder validates ranges, lesson order, both the original 56-session and pre-expansion 84-session quiz/checklist hashes, essential fields, references, teaching depth, safe HTML, prerequisites, coverage/path/guide/workbench links, mock-round timing and repository path/line existence. Artifact paths must resolve to bounded text files inside `labs/`; only declared sources enter the bundle/server allowlist. SHA-256 digests identify bundled source snapshots. Generated `data.js` may be refreshed by the builder; edit source files rather than the bundle.
+The builder validates ranges, lesson order, both the original 56-session and pre-expansion 84-session quiz/checklist hashes, essential fields, references, teaching depth, safe HTML, prerequisites, coverage/path/guide/workbench links, mock-round timing and repository path/line existence. It also requires the story/example/picture/vocabulary structure for all 133 teaching pages. `content/progress-plain-contract.json` preserves the existing assessments, section identities and code blocks for all 112 lessons, 18 workbenches and three guides, plus interview identities/timing/code. `check-teaching.mjs` can check one author's registered files, for example `node ios-learning/course/check-teaching.mjs unit-09.json unit-10.json`, while other authors are still working. Artifact paths must resolve to bounded text files inside `labs/`; only declared sources enter the bundle/server allowlist. SHA-256 digests identify bundled source snapshots. Generated `data.js` may be refreshed by the builder; edit source files rather than the bundle.
 
 The units were authored/audited in parallel with disjoint files, then reviewed and integrated. The core anchors were checked on 26 October 2026; expanded anchors and remote dependency graphs were checked on 27 October 2026. Verify target membership and current line numbers if sources change. Code examples are teaching material; UIKit/SwiftUI examples require suitable iOS targets, and an isolated Swift run does not establish that the main app builds.
 
@@ -110,6 +115,34 @@ The audit distinguishes guide prose from active code: ZDRxCore exports ReactiveK
 ## Verification and limits
 
 The validator checks safe HTML, teaching depth, source anchors, all path/guide/workbench connections, explained assessments, interview rubrics and honest full-round budgets. `test.mjs` checks progress rules, the original 56-session and pre-expansion 84-session storage contracts, old backups, artifact containment/digests/source equality, pin anchors and the read-only HTTP handler without opening a port. `test-reader.mjs` exercises every lesson, guide, path, workbench, artifact and interview route in a controlled DOM adapter, including anchors, local-file links, escaping, search, storage and transactional backups. `test-interview.mjs` checks history, bounds, dates, grading, new quiz-bank scopes and preservation of old history. These do not establish real-browser layout or native interactions.
+
+Integrated checks on **3 November 2026** passed for the plain-language revision: build/check, source checks across all **41 registered teaching/interview files**, **1,879 state/handler/artifact/wiring checks**, **1,941 controlled-DOM reader checks**, **65 interview-ledger checks**, and syntax checks for all eight changed JavaScript files. The reader was rebuilt from the final sources. Its **112 lessons, 18 workbenches and three guides** each have a unique everyday story, a concrete before/change/after example, a captioned illustration and defined vocabulary. The pictures include 52 flows, 43 comparisons and 38 timelines. All 841 technical-section openings were revised. Technical teaching remains substantial: every page retains at least 1,129 words of non-code explanation across its sections and worked answer. All **224 interview questions** have clearer prompts, scenarios, answers and review criteria.
+
+The new preservation baseline matches the starting commit, `b2b5978`, for every existing quiz/checklist payload, section ID, displayed code block and interview identity/time budget. Existing notes, unfinished answers, reading position and interview history remain compatible. Tests also check that the new plain-text stories and picture labels are escaped, searchable offline and linked to their captions. The course does not mark any learner exercise complete.
+
+Thirteen authors worked in separate file scopes. Two independent reviewers checked every rewritten lesson, guide, workbench and interview question against the starting sources. Review corrected a Swift explanation that confused `Sendable` conformance with the `async throws` method contract, and clarified the UI workbench's different coordinates before and after wrapping. Interview review added missing definitions for sign-in `state`, PKCE and `nonce`, qualified layout coordinates for both offered widths, and explained the p95 rounding formula with exact values. All five findings were resolved and rechecked; neither reviewer has outstanding findings. The author commits and review fixes are recorded below; the reader, supplementary guides, validation contract and generated bundle are integrated in a separate commit.
+
+| Author | Content scope | Commit |
+|---|---|---|
+| Jason | Lessons 001–014 | `bcdc125` |
+| Ptolemy | Lessons 015–028 | `0577330` |
+| James | Lessons 029–042 | `27cffb1` |
+| Gauss | Lessons 043–056 | `787f7d5` |
+| Mencius | Swift lessons 057–070 | `3565ccd` |
+| Carver | SwiftUI lessons 071–084 | `6b5bfe5` |
+| Russell | Runtime/concurrency lessons 085–092 | `18f1838` |
+| Averroes | UI/durable-data lessons 093–100 | `b1e7014` |
+| Goodall | Profiling/delivery/electives 101–112 | `42046c7` |
+| Descartes | Original eleven workbenches | `51bf5d5` |
+| Gibbs | Seven advanced workbenches | `d1ebfba` |
+| Dewey | Interview questions for 001–056 | `70af66f` |
+| Fermat | Interview questions for 057–112 | `7d9e3ac` |
+| Heisenberg review → integration fix | `Sendable` versus `async throws` | `19d39d2` |
+| Boole review → integration fix | Wrapped-row example coordinates | `2f2bb83` |
+| Heisenberg review → integration fix | Sign-in `state`, PKCE and `nonce` definitions | `ff9609f` |
+| Boole review → integration fix | Layout widths and nearest-rank p95 arithmetic | `ecb1129` |
+
+A headless attempt with the installed Chrome exited with code 134 before producing a screenshot. Real-browser layout, mobile rendering and print appearance remain unverified; the pictures have controlled-DOM and source validation only. No native or production-client code changed in this revision, and native suites were not rerun. Earlier native-build and host evidence below retains its original date and limits.
 
 Integrated checks on **2 November 2026** passed for the full 112-session expansion: build/check, **1,387 state/handler/artifact/wiring checks** (170 source viewers), **1,466 controlled-DOM reader checks**, **65 pure interview-ledger checks**, the **13-test synthetic regression evaluator**, and JavaScript syntax checks. The current bank contains **345 numbered-lesson MCQs**, **63 explained supplemental checks**, **224 interview prompts** and **18 mock rounds**. All 001–084 quiz/checklist payload hashes match the pre-expansion baseline; tests preserve existing notes, unfinished work, reading position and interview history without marking new lessons complete. Every declared companion file is available through the offline artifact reader and the optional read-only handler, including Python and shell source shown as text. Undeclared files remain unavailable.
 
@@ -141,6 +174,7 @@ If that package has no bundled browser, also set `IOS_COURSE_BROWSER_PATH` to yo
 - `interview.js`, `interview-state.js`: interview/quiz UI and bounded, separate practice history
 - `data.js`: generated course and reference bundle
 - `build.mjs`: dependency-free validation and bundling
+- `teaching.mjs`, `check-teaching.mjs`: story/picture checks and preservation of the existing teaching contracts
 - `inventory.mjs`: read-only remote dependency and graph snapshot
 - `serve.mjs`: loopback server and bounded source viewer
 - `content/`: maintainable course source units

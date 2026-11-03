@@ -17,6 +17,16 @@ baseURL.hash = '';
 const base = baseURL.href;
 const output = process.env.IOS_COURSE_SCREENSHOTS || '/private/tmp/ios-course-preview';
 await fs.mkdir(output, { recursive: true });
+async function checkSimple(id, simple) {
+  const intro = page.locator(`#${id}`);
+  await intro.locator('.simple-figure').waitFor();
+  if (await intro.locator('.simple-story').textContent() !== simple.story) throw new Error(`Missing story ${id}`);
+  if (await intro.locator('figcaption').textContent() !== simple.picture.caption) throw new Error(`Missing picture caption ${id}`);
+  if (await intro.locator('.simple-figure').getAttribute('aria-labelledby') !== `${id}-picture-caption`) throw new Error(`Picture has no linked accessible caption ${id}`);
+  if (await intro.locator('.simple-picture > li').count() !== simple.picture.items.length) throw new Error(`Missing picture parts ${id}`);
+  if (await intro.locator('.simple-picture').evaluate(node => node.tagName) !== (simple.picture.kind === 'comparison' ? 'UL' : 'OL')) throw new Error(`Picture confuses comparison with sequence ${id}`);
+  if (await intro.locator('.simple-words dt').count() !== simple.words.length) throw new Error(`Missing vocabulary ${id}`);
+}
 try {
   await page.goto(base);
   await page.locator('#course-heading').waitFor();
@@ -67,6 +77,7 @@ try {
   for (const guide of data.essentials) {
     await page.goto(`${base}#essentials/${guide.id}`);
     await page.locator(`#g-${guide.id}-${guide.sections[0].id}`).waitFor();
+    await checkSimple(`g-${guide.id}-simple`, guide.simple);
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2)) throw new Error(`Desktop overflow in guide ${guide.id}`);
     if (await page.locator(`#g-${guide.id}-quiz .practice-quiz article`).count() !== guide.quiz.length) throw new Error(`Guide assessments missing ${guide.id}`);
   }
@@ -78,6 +89,7 @@ try {
   for (const workshop of data.workshops) {
     await page.goto(`${base}#workshops/${workshop.id}`);
     await page.locator(`#w-${workshop.id}-files`).waitFor();
+    await checkSimple(`w-${workshop.id}-simple`, workshop.simple);
     if (await page.locator('.practice-quiz article').count() !== workshop.quiz.length) throw new Error(`Workbench assessments missing ${workshop.id}`);
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2)) throw new Error(`Workbench overflow ${workshop.id}`);
   }
@@ -108,6 +120,7 @@ try {
   for (const lesson of data.lessons) {
     await page.goto(`${base}#lesson/${lesson.id}`);
     await page.locator('#lesson-notes').waitFor();
+    await checkSimple(`simple-${lesson.id}`, lesson.simple);
     if (await page.locator('.quiz-card').count() !== lesson.quiz.length) throw new Error(`Missing quiz in ${lesson.id}`);
     if (await page.locator('.repo-link').count() !== lesson.repo.length) throw new Error(`Missing source connections in ${lesson.id}`);
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2)) throw new Error(`Desktop overflow in ${lesson.id}`);
@@ -131,6 +144,7 @@ try {
   if (await page.locator('#menu-button').getAttribute('aria-expanded') !== 'false') throw new Error('Mobile menu did not close');
   for (const lesson of data.lessons) {
     await page.goto(`${base}#lesson/${lesson.id}`);
+    await checkSimple(`simple-${lesson.id}`, lesson.simple);
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2)) throw new Error(`Mobile overflow in ${lesson.id}`);
   }
   for (const route of ['coverage', 'libraries', 'interviews', 'interviews/iq-001-a', 'interviews/quiz', 'interviews/round/staff-design', ...data.essentials.map(guide => `essentials/${guide.id}`), ...data.paths.map(item => `path/${item.id}`), ...data.workshops.map(item => `workshops/${item.id}`), ...data.artifacts.map(item => `artifact/${encodeURIComponent(item.path)}`)]) {

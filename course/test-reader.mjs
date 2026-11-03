@@ -45,7 +45,7 @@ class Node {
 const persistent = new Map();
 let passed = 0;
 function check(value, message) { assert.ok(value, message); passed++; }
-function start(protocol = 'http:', narrow = false) {
+function start(protocol = 'http:', narrow = false, alterCourse) {
   const nodes = new Map([...shell.matchAll(/\bid="([^"]+)"/g)].map(match => [match[1], new Node()]));
   const get = id => { if (!nodes.has(id)) nodes.set(id, new Node()); return nodes.get(id); };
   const nav = [...shell.matchAll(/\bdata-nav="([^"]+)"/g)].map(match => new Node('A', { nav: match[1] }));
@@ -67,7 +67,10 @@ function start(protocol = 'http:', narrow = false) {
   };
   env.window = env;
   vm.createContext(env);
-  scripts.forEach((script, i) => vm.runInContext(script, env, { filename: scriptNames[i] }));
+  scripts.forEach((script, i) => {
+    vm.runInContext(script, env, { filename: scriptNames[i] });
+    if (i === 0 && alterCourse) alterCourse(env.IOS_COURSE);
+  });
   const route = hash => { env.location.hash = hash; env.listeners.hashchange(); };
   const click = data => document.dispatch('click', { target: new Node('BUTTON', data) });
   return { env, get, document, route, click, html: () => get('main').innerHTML, state: () => JSON.parse(persistent.get('across-the-stack.v1') || '{}') };
@@ -78,7 +81,12 @@ check((reader.html().match(/class="unit-card"/g) || []).length === reader.env.IO
 check(!reader.html().includes('undefined'), 'Deep-dive chapter labels and symbols are defined');
 for (const lesson of reader.env.IOS_COURSE.lessons) {
   reader.route(`#lesson/${lesson.id}`);
-  check(reader.html().includes(lesson.title), `Title ${lesson.id}`);
+  check(decode(reader.html()).includes(lesson.title), `Title ${lesson.id}`);
+  check(decode(reader.html()).includes(lesson.simple.story) && reader.html().includes(`id="simple-${lesson.id}"`) && decode(reader.html()).includes(lesson.simple.picture.caption), `Specific simple story and captioned illustration ${lesson.id}`);
+  check(lesson.simple.words.every(word => decode(reader.html()).includes(word.term)) && reader.html().includes('Where the story stops matching:'), `New words and analogy limits ${lesson.id}`);
+  check(reader.html().includes(`<${lesson.simple.picture.kind === 'comparison' ? 'ul' : 'ol'} class="simple-picture ${lesson.simple.picture.kind}" role="list">`), `Illustration preserves sequence versus comparison meaning ${lesson.id}`);
+  reader.route(`#lesson/${lesson.id}/simple`);
+  check(reader.get(`simple-${lesson.id}`).scrolled, `Simple introduction is reachable ${lesson.id}`);
   check((reader.html().match(/class="quiz-card"/g) || []).length === lesson.quiz.length, `Quiz forms ${lesson.id}`);
   check((reader.html().match(/class="repo-link"/g) || []).length === lesson.repo.length, `Repository anchors ${lesson.id}`);
   check(reader.html().includes('Worked solution & mentor commentary') && reader.html().includes('data-note='), `Practice and notes ${lesson.id}`);
@@ -136,7 +144,8 @@ check(reader.html().includes('Swift, in finer detail.') && reader.html().include
 for (const guide of reader.env.IOS_COURSE.essentials) {
   const previousState = JSON.stringify(reader.state());
   reader.route(`#essentials/${guide.id}`);
-  check(reader.html().includes(guide.title) && reader.html().includes(guide.exercise.brief), `Guide explanation and practice ${guide.id}`);
+  check(decode(reader.html()).includes(guide.title) && decode(reader.html()).includes(guide.exercise.brief), `Guide explanation and practice ${guide.id}`);
+  check(decode(reader.html()).includes(guide.simple.story) && decode(reader.html()).includes(guide.simple.picture.caption), `Simple guide with illustration ${guide.id}`);
   check(!reader.html().includes('data-reviewed=') && JSON.stringify(reader.state()) === previousState, `Guides never mutate learner progress ${guide.id}`);
   reader.route(`#essentials/${guide.id}/${guide.sections[0].id}`);
   check(reader.get(`g-${guide.id}-${guide.sections[0].id}`).scrolled, `Guide section navigation ${guide.id}`);
@@ -161,7 +170,8 @@ check(reader.html().includes('Practice with inspectable code.') && reader.html()
 for (const workshop of reader.env.IOS_COURSE.workshops) {
   const unchanged = JSON.stringify(reader.state());
   reader.route(`#workshops/${workshop.id}`);
-  check(reader.html().includes(workshop.title) && reader.html().includes(workshop.exercise.brief) && reader.html().includes(workshop.quiz[0].explanation), `Workbench explanation, practice and assessment ${workshop.id}`);
+  check(decode(reader.html()).includes(workshop.title) && decode(reader.html()).includes(workshop.exercise.brief) && decode(reader.html()).includes(workshop.quiz[0].explanation), `Workbench explanation, practice and assessment ${workshop.id}`);
+  check(decode(reader.html()).includes(workshop.simple.story) && decode(reader.html()).includes(workshop.simple.picture.caption), `Simple workbench with illustration ${workshop.id}`);
   check(workshop.files.every(file => reader.html().includes(`#artifact/${encodeURIComponent(file.path)}`)), `All workbench files inspectable ${workshop.id}`);
   check(JSON.stringify(reader.state()) === unchanged && !reader.html().includes('data-reviewed='), `Provided code does not imply learner completion ${workshop.id}`);
   for (const section of [...workshop.sections.map(item => item.id), 'files','exercise','quiz','sources']) {
@@ -304,4 +314,18 @@ await importBackup({ ...reader.state(), interviews: ledgerState() });
 check(ledgerState().questions[firstInterview.id].attempts.length === 1 && ledgerState().quizzes.length === 1, 'Actual combined backup merge deduplicates attempt and quiz history');
 reader.route('#interviews/missing-question');
 check(reader.html().includes('Interview question not found.'), 'Unknown interview route has a fallback');
+const probe = start('file:', false, data => {
+  const simple = data.lessons[0].simple;
+  simple.story = 'simpleonlyprobe <script>alert(1)</script>';
+  simple.picture.caption = 'pictureonlyprobe <img src=x onerror=alert(2)>';
+  simple.picture.items[0].label = 'itemonlyprobe <button onclick=alert(3)>';
+  simple.words[0].term = 'wordonlyprobe <svg onload=alert(4)>';
+});
+probe.route('#lesson/001');
+check(probe.html().includes('&lt;script&gt;alert(1)&lt;/script&gt;') && probe.html().includes('&lt;img src=x onerror=alert(2)&gt;') && probe.html().includes('&lt;button onclick=alert(3)&gt;') && probe.html().includes('&lt;svg onload=alert(4)&gt;'), 'Stories, captions, picture labels and vocabulary remain escaped plain text');
+check(!probe.html().includes('<script>alert(1)') && probe.html().includes('aria-labelledby="simple-001-picture-caption"'), 'Illustration uses its caption as an accessible name without executing content');
+for (const value of ['simpleonlyprobe', 'pictureonlyprobe', 'itemonlyprobe', 'wordonlyprobe']) {
+  probe.get('search-input').dispatch('input', { target: { value } });
+  check(probe.get('search-results').innerHTML.includes('href="#lesson/001"'), `Simple teaching is searchable offline: ${value}`);
+}
 console.log(`Passed ${passed} app rendering/event checks in a controlled DOM adapter. Covers ${reader.env.IOS_COURSE.lessons.length} lessons, ${reader.env.IOS_COURSE.interview.questions.length} interview routes, interview/quiz history, combined backups, section navigation, notes, review gates, coverage/library filtering, daily plan, menu/theme, and file links. This does not validate browser layout or native interactions.`);
