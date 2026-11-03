@@ -2,52 +2,52 @@
   "unit": {
     "id": "swift-bootcamp-basics",
     "title": "Swift bootcamp: programs and collections",
-    "summary": "Seven standalone beginner sessions introduce source execution, scalar contracts, branches, functions and collection algorithms before any iOS framework or advanced-core prerequisite.",
+    "summary": "Start with small Swift files. Learn numbers, choices, functions, and collections before adding an iOS framework.",
     "order": 9
   },
   "lessons": [
     {
       "id": "057",
-      "title": "Your first Swift program and a reproducible workbench",
-      "summary": "Start at zero: read a Swift source file, run it on the host, and separate source syntax from toolchain and iOS build settings.",
+      "title": "Write and run your first Swift program",
+      "summary": "Write a small Swift file, run it on your computer, and explain what the code and build tools each do.",
       "duration": 75,
       "level": "Foundation",
       "prerequisites": [],
       "objectives": [
-        "Run a standalone Swift file and explain each declaration and call.",
-        "Distinguish source, executable, compiler, package, language mode, SDK and deployment target.",
-        "Classify a first failure without modifying the client."
+        "Run a Swift file and explain what each line does.",
+        "Tell source text, a runnable program, and the tools that build it apart.",
+        "Find whether a first failure comes from the code, the command, or the output."
       ],
       "sections": [
         {
           "id": "why-start-small",
-          "title": "Start with the feedback loop you already trust",
-          "html": "<p>On Android you can test a calculation in a Kotlin file before introducing an Activity, Gradle variant, or device. We will begin Swift the same way. Your years of engineering experience are useful for making predictions and reading diagnostics, but no Swift keywords, project structure, or Apple frameworks are prerequisites. A source file is plain text containing instructions in the language. A compiler checks those instructions and can produce a program the machine executes. Swift also supplies a command that compiles and runs a file as a convenient first feedback loop.</p><p>Today’s program prints a synthetic booking caption. It has no network, company data, screen, or credentials. Save it in your own scratch directory as <code>First.swift</code>; the filename suffix tells tools and readers which language the text contains. An editor is enough to author it. Xcode is Apple’s IDE and includes platform tools, but opening an iOS project is unnecessary for this host exercise. A host is the computer executing the program, here macOS. A successful host run establishes this little program’s behavior; it does not establish an iOS build or installation.</p>"
+          "title": "Start with one small calculation",
+          "html": "<p>A source file is a text file with instructions for a program. A compiler checks those instructions and translates them into code the computer can run. You can try a Kotlin calculation before adding an Android screen. You can start Swift just as simply. First predict one result. Then run the file and compare. Your engineering experience helps you ask useful questions; this lesson assumes no Swift syntax, Apple framework knowledge, or iOS project setup.</p><p>Today’s program prints a made-up booking caption. It has no network, company data, screen, or credentials. Save it in your own scratch directory as <code>First.swift</code>; the filename suffix tells tools and readers which language the text contains. An editor is enough to author it. Xcode is Apple’s IDE and includes platform tools, but opening an iOS project is unnecessary for this host exercise. A host is the computer executing the program, here macOS. A successful host run establishes this little program’s behavior; it does not establish an iOS build or installation.</p>"
         },
         {
           "id": "read-a-file",
-          "title": "A complete program, explained one line at a time",
-          "html": "<pre><code class=\"language-swift\">// A synthetic caption, run as one file.\nlet learner = \"Sam\"\nvar attempts = 1\nattempts = attempts + 1\nlet caption = \"Hello, \\(learner). Attempt \\(attempts).\"\nprint(caption)</code></pre><p>The first line starts with <code>//</code>, so it is a comment for the reader and does not execute. Line two declares a binding named learner. <code>let</code> means that binding cannot be assigned a new value later. The equals sign assigns its initial value; double quotes delimit a String, a text value. Line three uses <code>var</code> because attempts will change. The unquoted numeral is an integer value. Swift infers these types from the initial expressions, so we have not needed to spell them yet.</p><p>Line four reads the current attempts, adds one, and assigns the result back. Assignment uses one equals sign; a comparison will use two. Line five constructs a new string. Within quoted text, <code>\\(expression)</code> inserts the printable representation of an expression; this is called interpolation. Swift uses that syntax instead of Kotlin’s dollar interpolation. Line six calls the standard-library function print. Parentheses enclose its argument, caption. The expected single line is <code>Hello, Sam. Attempt 2.</code>. Swift usually needs no semicolon at a line’s end. Keep the order: the later caption uses the already updated integer.</p>"
+          "title": "Read the six lines in order",
+          "html": "<p>A binding gives a value a name. In this program, <code>let</code> creates a binding you cannot assign again. <code>var</code> creates one you can change. A String holds text, and an integer holds a whole number. The comment starts with <code>//</code> and is for the reader. The program names the learner Sam, starts attempts at one, adds one, builds a caption, and prints it. Swift works out the types from these starting values; this is called type inference.</p><pre><code class=\"language-swift\">// A synthetic caption, run as one file.\nlet learner = \"Sam\"\nvar attempts = 1\nattempts = attempts + 1\nlet caption = \"Hello, \\(learner). Attempt \\(attempts).\"\nprint(caption)</code></pre><p>Line four reads the current attempts, adds one, and assigns the result back. Assignment uses one equals sign; a comparison will use two. Line five constructs a new string. Within quoted text, <code>\\(expression)</code> inserts the printable representation of an expression; this is called interpolation. Swift uses that syntax instead of Kotlin’s dollar interpolation. Line six calls the standard-library function print. Parentheses enclose its argument, caption. The expected single line is <code>Hello, Sam. Attempt 2.</code>. Swift usually needs no semicolon at a line’s end. Keep the order: the later caption uses the already updated integer.</p>"
         },
         {
           "id": "run-and-build",
-          "title": "Run, then distinguish an executable from its source",
-          "html": "<pre><code class=\"language-shell\">swift --version\nswift First.swift\nswiftc First.swift -o First\n./First</code></pre><p>Run these commands from the scratch directory containing your file. The first prints the selected Swift compiler/toolchain version. The second compiles and executes this source through the Swift driver. The third uses <code>swiftc</code>, the compiler command, and <code>-o</code> to name the resulting executable First. The fourth launches that executable; <code>./</code> means it is in the current directory. First.swift remains editable source, while First is generated machine code. Both execution routes should print the same caption. A command failing to find a file is different from Swift rejecting the contents.</p><p>On macOS, <code>xcrun swift --version</code> can inspect Swift through Apple’s selected developer tools. Tool selection depends on the local setup; record the command and observed version instead of memorizing the author’s machine. Later lessons use modern syntax such as explicit <code>any</code> and <code>some</code>; a Swift 6 or newer scratch toolchain is a simple baseline for this sequence. No package or remote dependency is needed here. If command-line tools are absent, keep your predictions and diagnose installation separately. Do not clear shared caches or alter client build settings to make this six-line example run.</p>"
+          "title": "Run the text, then build a program file",
+          "html": "<p>An executable is a file the computer can run. Source text is the editable recipe; the executable is a result of building that recipe. Run these commands in the folder holding First.swift. <code>swift --version</code> names the selected tools. <code>swift First.swift</code> compiles and runs the text. <code>swiftc</code> builds an executable, and <code>-o First</code> names it. <code>./First</code> runs that file from the current folder. Both routes should print the same caption. A missing file and rejected Swift syntax need different repairs.</p><pre><code class=\"language-shell\">swift --version\nswift First.swift\nswiftc First.swift -o First\n./First</code></pre><p>On macOS, <code>xcrun swift --version</code> can inspect Swift through Apple’s selected developer tools. Tool selection depends on the local setup; record the command and observed version instead of memorizing the author’s machine. Later lessons use modern syntax such as explicit <code>any</code> and <code>some</code>; a Swift 6 or newer scratch toolchain is a simple baseline for this sequence. No package or remote dependency is needed here. If command-line tools are absent, keep your predictions and diagnose installation separately. Do not clear shared caches or alter client build settings to make this six-line example run.</p>"
         },
         {
           "id": "version-axes",
-          "title": "Use the Gradle analogy carefully",
-          "html": "<p>An Android source file, its Kotlin compiler version, JVM target, Android SDK, and minimum Android version answer different questions. Swift has related distinctions. The installed compiler implements the language and performs checks. The source language mode selects compatibility rules supported by that compiler. A package’s tools-version header selects the minimum package tools and manifest API; it is not an operating-system version. An SDK provides compile-time platform declarations. An iOS deployment target names the oldest supported runtime for that component. A newer compiler does not automatically make every client module use the newest mode.</p><p>A Swift package groups named targets, dependencies, and products. A target is a buildable component, often also a module you import; a product exposes built targets to consumers. Xcode schemes choose actions and configurations for targets. These concepts resemble Gradle modules and tasks, but a scheme is not exactly a product flavor and a package is not exactly an AAR. This is orientation, not an advanced build prerequisite. Our file requires the Swift standard library, which provides String, integers, and print. It does not require <code>import UIKit</code>. UIKit is an iOS UI framework, and adding that import would change which platform can build the example.</p>"
+          "title": "Know what each version number describes",
+          "html": "<p>A toolchain is the set of tools used to build code, including the compiler. Its version tells you which language features it understands. Language mode selects supported checking rules for your source. A package tools-version header sets its minimum package tools and manifest API. A manifest is the file describing what the package builds. An SDK supplies platform declarations at build time. A deployment target sets the oldest supported OS for that component. These numbers answer separate questions, just as Kotlin, JVM target, Android SDK, and minimum Android version do.</p><p>A Swift package groups targets, dependencies, and products. A target is a component built by the tools, often also a module you can import. A dependency is another component it needs. A product offers built targets to users of the package. An Xcode scheme chooses actions and configurations for targets. These resemble parts of a Gradle build, but schemes are not exact product flavors and packages are not AARs. Our small file uses the standard library, which supplies String, Int, and print. UIKit is an iOS UI framework. Adding <code>import UIKit</code> would change which platform can build the file; it is unnecessary for this host calculation.</p>"
         },
         {
           "id": "diagnose-first-errors",
-          "title": "Turn a failure into a specific question",
-          "html": "<p>Try to predict the diagnostic for <code>learner = \"Lee\"</code> after the let declaration. It attempts to reassign a constant, so compilation fails before any output. Use var only if changing that binding is part of the requirement. Renaming every let to var suppresses useful checks. Next, <code>print(captin)</code> misspells a name; Swift cannot resolve that binding. A missing closing quote is a parsing problem: the compiler cannot recognize the intended structure. These are source errors. A shell reporting that swift or First.swift cannot be found is a tool/path error.</p><p>A program can also compile and be wrong. Moving caption construction above the increment prints attempt one, because constructing a String records the then-current values. It does not establish a live subscription to attempts. This is a behavioral mistake, similar to creating a Kotlin string template before updating its input. Record expected output before changing code, then compare observed output. Your first debugging artifact should contain the command, the first relevant diagnostic or printed result, and the rule you think explains it. Keep intentionally invalid experiments in separate scratch copies so the working program remains available. Nothing about compiling this script establishes thread safety, persistence, or UI lifetime.</p>"
+          "title": "Separate rejected code from wrong output",
+          "html": "<p>A diagnostic is a message explaining a problem the compiler found. Try predicting one for <code>learner = \"Lee\"</code>: learner was declared with let, so assignment fails before the program runs. Use var when the requirement calls for a later change. Making every binding mutable removes helpful checks. A misspelling such as <code>captin</code> names no known binding. A missing closing quote breaks parsing, the step that reads code structure. If the shell cannot find swift or First.swift, check tools or paths instead.</p><p>Code can pass the compiler and still give the wrong answer. If you build the caption before adding one, it records attempt one. That String does not keep watching attempts. The same timing issue can occur when a Kotlin string template is made before its input changes. Write the expected line first, then compare it with the run. Save the command, the first useful diagnostic or output, and the rule you think explains it. Keep rejected experiments in separate scratch files so the working version remains available. A passing script checks this behavior; it does not establish persistence, safe thread access, or screen lifetime.</p>"
         },
         {
           "id": "repo-orientation",
-          "title": "Find a real declaration without importing the client",
-          "html": "<p>Open the two repository anchors after running the tiny file. The first line of ZDAppointments/Package.swift says tools 5.9, while its platforms section specifies iOS 17. Those numbers have different meanings. The cancellation target’s Project.swift declares an iOS static framework and explicitly includes its Sources directory. That source glob is evidence that the adjacent question model belongs to the generated target. A directory existing on disk alone would be weaker evidence. We verified these locations in this checkout; we did not compile the company client.</p><p>In CancelAppointmentQuestionData, read <code>let key: String</code> as an immutable property with an explicit type. A property belongs to an instance of a named type, whereas learner in our program is a local/top-level binding. You will learn those containers later. For now, identify the familiar declaration pieces without understanding every surrounding type. Imported company modules are not needed for any beginner exercise. A main companion may provide a host package at <code>labs/SwiftLanguageLab</code>; its concrete APIs must be read before use. This lesson’s standalone source remains the runnable contract even if that companion is absent.</p>"
+          "title": "Find the same pieces in real source",
+          "html": "<p>A repository anchor points to a specific file and line you can inspect. Open the linked package and target declarations after running your small file. The package tools header says 5.9; the iOS platform says 17. They describe different requirements. The cancellation target builds an iOS static framework and lists the source files it includes. That file pattern, called a source glob, connects the question model to the target. Seeing a folder alone would not prove it is built. Reading these lines does not prove the company app builds.</p><p>In CancelAppointmentQuestionData, read <code>let key: String</code> as an immutable property with an explicit type. A property belongs to an instance of a named type, whereas learner in our program is a local/top-level binding. You will learn those containers later. For now, identify the familiar declaration pieces without understanding every surrounding type. Imported company modules are not needed for any beginner exercise. A main companion may provide a host package at <code>labs/SwiftLanguageLab</code>; its concrete APIs must be read before use. This lesson’s standalone source remains the runnable contract even if that companion is absent.</p>"
         }
       ],
       "quiz": [
@@ -83,13 +83,13 @@
         }
       ],
       "exercise": {
-        "brief": "Write and run your own caption with a changed learner name and a counter updated twice, recording both source and output.",
+        "brief": "Write your own caption. Change the name, update a counter twice, and save the source and output.",
         "steps": [
-          "Create a scratch Swift file, declare a let name and var counter initially zero.",
-          "Increment the counter twice, construct a caption, and print it.",
-          "Predict the effect of constructing the caption before the second update.",
-          "In a separate scratch copy, attempt let reassignment and record the compiler diagnostic.",
-          "Write a three-sentence note separating host execution, tools version and iOS deployment."
+          "Create a scratch Swift file. Use let for a name and var for a counter starting at zero.",
+          "Add one twice. Then build and print a caption.",
+          "Predict what the caption would say if you built it before the second update.",
+          "In a separate copy, try assigning a new value to the let name. Save the compiler message.",
+          "Write three sentences explaining a host run, a tools version, and an iOS deployment target."
         ],
         "acceptance": [
           "The final working caption contains your synthetic name and counter two.",
@@ -97,7 +97,7 @@
           "The negative example is identified as a compiler rejection, not a thrown runtime error.",
           "The record states the toolchain command and actual output, or labels paper predictions explicitly."
         ],
-        "solution": "<p>Attempt the task first. This complete standalone answer uses different input so you must retrieve the rule rather than copy today’s caption. No import is required. Save and run it through the same commands, substituting your chosen filename.</p><pre><code class=\"language-swift\">let name = \"Rae\"\nvar counter = 0\ncounter = counter + 1\nlet early = \"\\(name): \\(counter)\"\ncounter = counter + 1\nlet finalCaption = \"\\(name): \\(counter)\"\nprint(early)\nprint(finalCaption)</code></pre><p>The outputs are Rae: 1 and Rae: 2. Name stays fixed, counter permits assignments, and each String records its construction-time value. The early value does not change after the second update. Reassigning name would fail compilation, while changing the initial literal is permitted when you edit and rerun source. Explain both distinctions.</p><p>Your verification note can say that a selected Swift toolchain compiled and ran this standalone host file. The inspected package header names a minimum tools requirement, and its iOS platform declaration constrains that client target. Neither statement proves the client built. Keep the learner’s attempt pending until they have produced their own source and evidence; this worked answer is reference material.</p>"
+        "solution": "<p>Try your own program first. The worked answer below runs as one file and uses Rae as its input. An import brings another module into scope; this program needs none. Save it with your chosen filename and use the same run commands. Before running, predict the two printed lines. Notice where each caption is made relative to the counter updates.</p><pre><code class=\"language-swift\">let name = \"Rae\"\nvar counter = 0\ncounter = counter + 1\nlet early = \"\\(name): \\(counter)\"\ncounter = counter + 1\nlet finalCaption = \"\\(name): \\(counter)\"\nprint(early)\nprint(finalCaption)</code></pre><p>The outputs are Rae: 1 and Rae: 2. Name stays fixed, counter permits assignments, and each String records its construction-time value. The early value does not change after the second update. Reassigning name would fail compilation, while changing the initial literal is permitted when you edit and rerun source. Explain both distinctions.</p><p>Your verification note can say that a selected Swift toolchain compiled and ran this standalone host file. The inspected package header names a minimum tools requirement, and its iOS platform declaration constrains that client target. Neither statement proves the client built. Keep the learner’s attempt pending until they have produced their own source and evidence; this worked answer is reference material.</p>"
       },
       "references": [
         {
@@ -138,52 +138,107 @@
         "I can separate source, executable and toolchain evidence.",
         "I can distinguish compile rejection from incorrect output.",
         "I have recorded my own changed-input attempt."
-      ]
+      ],
+      "simple": {
+        "story": "Rae keeps a paper tally at a bake sale. The tally starts at one. She adds one mark, then writes \"Attempt 2\" on a separate card. Later she adds another mark to the tally. The card still says \"Attempt 2\" because she wrote it earlier. To show the new tally, she must write a new card. The card records what she saw at one moment; it does not keep watching the tally.",
+        "meaning": "Swift runs the file in order. Building a caption with string interpolation reads attempts at that moment and makes a String value.",
+        "example": {
+          "before": "attempts is 1. There is no caption yet.",
+          "change": "Add 1 to attempts, then build \"Hello, Sam. Attempt 2.\" from its current value.",
+          "after": "attempts is 2 and the caption says \"Hello, Sam. Attempt 2.\" Later counter changes do not rewrite that String."
+        },
+        "picture": {
+          "kind": "timeline",
+          "caption": "The caption records the counter after the update.",
+          "items": [
+            {
+              "label": "Start",
+              "text": "attempts holds 1."
+            },
+            {
+              "label": "Update",
+              "text": "Adding 1 makes attempts equal 2."
+            },
+            {
+              "label": "Write caption",
+              "text": "The new String contains Attempt 2."
+            },
+            {
+              "label": "Print",
+              "text": "print reads the String that was already made."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "source",
+            "meaning": "Text containing the program instructions."
+          },
+          {
+            "term": "compiler",
+            "meaning": "A tool that checks and translates source code."
+          },
+          {
+            "term": "binding",
+            "meaning": "A name connected to a value."
+          },
+          {
+            "term": "interpolation",
+            "meaning": "Putting an expression’s current value into new text."
+          },
+          {
+            "term": "executable",
+            "meaning": "A built file the computer can run."
+          }
+        ],
+        "remember": "A caption remembers when it was made.",
+        "boundary": "A String is a computer value, not a paper card. This story explains construction order, not memory storage, UI updates, or how all Swift types copy."
+      }
     },
     {
       "id": "058",
-      "title": "Types, operators, strings and optional absence",
-      "summary": "Make scalar contracts explicit, predict arithmetic and Boolean expressions, and preserve nil separately from empty content.",
+      "title": "Choose types and handle numbers, text, and missing values",
+      "summary": "Choose the right kind of value, calculate an average, and keep a missing label separate from an empty label.",
       "duration": 75,
       "level": "Foundation",
       "prerequisites": [
         "057"
       ],
       "objectives": [
-        "Read type annotations and choose appropriate numeric widths.",
-        "Predict division, conversion, comparison, short-circuiting and interpolation.",
-        "Explain an optional and nil coalescing without force unwrapping."
+        "Read the type after a colon and choose a suitable number type.",
+        "Predict arithmetic, comparisons, text construction, and which conditions run.",
+        "Handle a value that may be missing with an explicit fallback."
       ],
       "sections": [
         {
           "id": "why-types",
-          "title": "A familiar calculation with different scalar contracts",
-          "html": "<p>Consider an Android summary calculating an average and displaying a missing label. You already know the domain questions: is the result fractional, can input be absent, and what must fit on the wire? Swift asks you to make these distinctions visible in the types. A type describes the values and operations permitted for a binding. <code>let count: Int = 3</code> names count, annotates its type after a colon, and initializes it. Inference from <code>let count = 3</code> gives Int here; omitting the annotation does not make the binding dynamically typed.</p><p>The standard library supplies Int for native-size signed integers, explicit widths such as Int64, Double for floating-point numbers, Bool for true/false, String for text, and Character for one extended grapheme cluster. A numeric literal is interpreted using context, so a literal can initialize a Double without implying automatic conversion of an existing Int variable. Kotlin Int always has 32 bits; Swift Int follows platform width and is 64 bits on this modern Apple host. Use Int64 when a signed 64-bit wire contract matters, and Int for ordinary local counts. Naming a type is not input validation.</p>"
+          "title": "Say what kind of value you need",
+          "html": "<p>A type says what kind of value a name can hold and which operations it supports. A form summary may need a whole-number count, a fractional average, and a label that can be missing. Swift keeps those choices visible. <code>let count: Int = 3</code> gives count the whole-number type Int. The colon introduces a type annotation, an explicit type name. <code>let count = 3</code> lets Swift infer Int from the value. Inference still gives a fixed type; it does not let count become arbitrary text later.</p><p>Int stores native-size signed whole numbers. Explicit widths such as Int64 state a fixed number of bits. Double stores floating-point numbers, Bool stores true or false, and String stores text. Character holds one extended grapheme cluster, the Unicode group Swift treats as one character. The context can make a number literal a Double; this is different from automatically converting an existing Int variable. Kotlin Int is always 32 bits. Swift Int follows the platform width and is 64 bits on this Apple host. Use Int64 for an explicitly signed 64-bit wire value and Int for ordinary local counts. A fitting type still does not validate a product rule.</p>"
         },
         {
           "id": "arithmetic",
-          "title": "Predict division and conversion line by line",
-          "html": "<pre><code class=\"language-swift\">let total: Int = 7\nlet count: Int = 2\nlet whole = total / count\nlet average = Double(total) / Double(count)\nlet remainder = total % count\nlet enabled: Bool = count &gt; 0 &amp;&amp; average &gt;= 3.0\nprint(whole)\nprint(average)\nprint(remainder)\nprint(enabled)</code></pre><p>Lines one and two establish integer operands. Line three performs integer division: seven divided by two yields three, discarding the fractional part toward zero. Line four explicitly constructs Double values from the two integers before dividing; the result is 3.5. Converting the already computed integer quotient would yield 3.0 and could not restore lost information. Line five uses remainder, producing one; Swift’s remainder sign follows the dividend, so do not silently interpret it as mathematical modulo for negative input.</p><p>Line six first compares count with zero, producing a Bool, then uses <code>&amp;&amp;</code> to require the other comparison too. That operator short-circuits: the right expression is evaluated only if the left is true. Parentheses can clarify a compound expression. The printed values are 3, 3.5, 1 and true. Existing numeric variables of different types generally need explicit conversions before arithmetic. This resembles Kotlin’s explicit numeric conversions, but the platform width and available exactness rules differ. Double conversion may lose precision for large integers; a successful conversion does not prove an exact identifier round trip.</p>"
+          "title": "Convert before you divide",
+          "html": "<p>Integer division keeps only the whole-number part, rounding toward zero. Seven divided by two as integers is three. A Double can hold a fractional result. <code>Double(total)</code> and <code>Double(count)</code> convert the operands before division, giving 3.5. Converting the integer answer afterward gives 3.0; the lost fraction cannot return. The remainder operator <code>%</code> gives one here. With negative input, its sign follows the number being divided, called the dividend. Keep that rule separate from a mathematical modulo rule.</p><pre><code class=\"language-swift\">let total: Int = 7\nlet count: Int = 2\nlet whole = total / count\nlet average = Double(total) / Double(count)\nlet remainder = total % count\nlet enabled: Bool = count &gt; 0 &amp;&amp; average &gt;= 3.0\nprint(whole)\nprint(average)\nprint(remainder)\nprint(enabled)</code></pre><p>Line six first compares count with zero, producing a Bool, then uses <code>&amp;&amp;</code> to require the other comparison too. That operator short-circuits: the right expression is evaluated only if the left is true. Parentheses can clarify a compound expression. The printed values are 3, 3.5, 1 and true. Existing numeric variables of different types generally need explicit conversions before arithmetic. This resembles Kotlin’s explicit numeric conversions, but the platform width and available exactness rules differ. Double conversion may lose precision for large integers; a successful conversion does not prove an exact identifier round trip.</p>"
         },
         {
           "id": "operators-and-overflow",
-          "title": "Operators express separate questions",
-          "html": "<p>Assignment <code>=</code> changes a mutable binding; equality <code>==</code> compares values; inequality <code>!=</code> compares difference. <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code> and <code>&gt;=</code> compare order for suitable types. Bool does not accept an integer as an implicit truth value: a count must be compared explicitly. <code>!</code> before a Bool negates it. A ternary expression <code>condition ? yes : no</code> chooses one value and evaluates only the selected branch. Its punctuation is different from the question mark attached to an optional type.</p><p>Ordinary integer addition, subtraction and multiplication trap if the result exceeds the type’s range. This differs from common JVM integer overflow wrapping. Swift’s explicit wrapping operators exist, but using one is a semantic decision, not a fix for unvalidated input. For counters from external data, define bounds or inspect overflow deliberately. Integer division by zero also traps; ordinary Swift throws/catch, introduced later, does not recover these traps. For now, use known nonzero fixtures and make the required precondition part of the reasoning. For a narrowing conversion, <code>Int8(exactly: value)</code> returns an optional so an out-of-range value can be represented safely as absence. Converting before arithmetic and validating before conversion solve different problems.</p>"
+          "title": "Read each symbol as one question",
+          "html": "<p>An operator is a symbol that performs an operation. <code>=</code> assigns a value to a mutable binding. <code>==</code> asks whether two values are equal; <code>!=</code> asks whether they differ. The four order comparisons ask less than, at most, greater than, or at least. Their result is Bool, meaning true or false. Swift requires a Bool condition: a count must be compared, not treated as truth by itself. Prefix <code>!</code> reverses a Bool. <code>condition ? yes : no</code> evaluates only the selected answer.</p><p>A trap stops normal execution when a runtime rule is violated. Ordinary integer addition, subtraction, and multiplication trap on overflow, meaning the result cannot fit in the type. Common JVM integer operations instead wrap. Swift has explicit wrapping operators, but choosing them changes the number rule; it does not validate input. Division by zero also traps. Ordinary throws/catch does not recover these traps. Use safe known inputs here, and define bounds for external counts. <code>Int8(exactly: value)</code> returns nil for a value that cannot fit unchanged. Checking bounds and converting before arithmetic address separate risks.</p>"
         },
         {
           "id": "strings",
-          "title": "Text is a value with Unicode semantics",
-          "html": "<p>Double-quoted text creates a String. Interpolation embeds expressions using <code>\\(...)</code>; concatenation with <code>+</code> can join strings. A <code>Character</code> annotation restricts a literal to one extended grapheme cluster. Swift String counts perceived characters with <code>count</code>, while Kotlin/Java String length counts UTF-16 code units. The composed accented letter and a multi-scalar emoji make this boundary visible. Neither quantity is universally the right wire byte length. Choose <code>utf8.count</code> when an explicitly UTF-8 byte limit is the requirement, and keep user-visible limits distinct.</p><p>Swift strings do not support an arbitrary integer subscript as though every character occupied one fixed-width slot. We will study collection indices separately; today use count and isEmpty. <code>\"\"</code> is a present empty String. Spaces are content too, so checking isEmpty does not reject whitespace-only input. Standard-library text operations require no Foundation import. More specialized localization or formatting may introduce Foundation and platform rules later. Kotlin string templates are a useful construction analogy, but their dollar syntax and representation assumptions should not be transplanted. A string constructed from a counter is a value, not reactive state; updating the counter will not rewrite it.</p>"
+          "title": "Count text using the unit you mean",
+          "html": "<p>A String is text. A Character is one extended grapheme cluster: the group of Unicode pieces Swift treats as one character. For example, an accented letter can use more than one Unicode piece. Swift String.count counts Characters; Java and Kotlin String length count UTF-16 code units, smaller encoding pieces. A complex emoji can therefore have different counts. If a limit is in UTF-8 bytes, use utf8.count. Bytes, code units, and visible characters answer different questions. Interpolation builds text using <code>\\(...)</code>; <code>+</code> joins strings.</p><p>Swift strings do not support an arbitrary integer subscript as though every character occupied one fixed-width slot. We will study collection indices separately; today use count and isEmpty. <code>\"\"</code> is a present empty String. Spaces are content too, so checking isEmpty does not reject whitespace-only input. Standard-library text operations require no Foundation import. More specialized localization or formatting may introduce Foundation and platform rules later. Kotlin string templates are a useful construction analogy, but their dollar syntax and representation assumptions should not be transplanted. A string constructed from a counter is a value, not reactive state; updating the counter will not rewrite it.</p>"
         },
         {
           "id": "optional-absence",
-          "title": "Learn the smallest useful optional contract",
-          "html": "<pre><code class=\"language-swift\">let absent: String? = nil\nlet blank: String? = \"\"\nlet absentCaption = absent ?? \"Unknown\"\nlet blankCaption = blank ?? \"Unknown\"\nlet narrow: Int8? = Int8(exactly: 200)\nprint(absentCaption)\nprint(blankCaption.isEmpty)\nprint(narrow == nil)</code></pre><p>Line one uses <code>String?</code>, meaning either a String value or no value, spelled nil. The question mark is part of the type annotation. Line two contains an empty String, so it is present. Lines three and four use nil coalescing: <code>??</code> selects a fallback only when the left optional is nil. The results are Unknown and the empty String. Line five asks for an exact Int8 representation of two hundred. Int8 cannot hold it, so the initializer returns nil. Lines six to eight print Unknown, true and true.</p><p>Kotlin nullable types and the Elvis operator provide a conceptual bridge, but Swift optional handling uses its own syntax and explicit bindings in the next lesson. An optional is not the string \"null\", a zero, or an empty placeholder. Applying postfix <code>!</code> forces an optional’s contained value and traps for nil; the examples deliberately preserve absence instead. Prefix <code>!</code> negates a Bool, so placement changes meaning. Optional chaining and binding will let you consume a present value without changing the original domain fact. Do not erase a missing identifier merely to simplify display.</p>"
+          "title": "Keep missing and empty separate",
+          "html": "<p>An optional can hold a value or no value. <code>String?</code> means either text or absence, spelled <code>nil</code>. An empty String is still present text. Nil coalescing, written <code>??</code>, chooses a fallback only for absence. Thus absentCaption becomes Unknown, while blankCaption stays empty. An exact conversion checks whether a value fits without changing it. <code>Int8(exactly: 200)</code> returns nil because a signed eight-bit integer cannot hold 200. The example prints Unknown, true, and true.</p><pre><code class=\"language-swift\">let absent: String? = nil\nlet blank: String? = \"\"\nlet absentCaption = absent ?? \"Unknown\"\nlet blankCaption = blank ?? \"Unknown\"\nlet narrow: Int8? = Int8(exactly: 200)\nprint(absentCaption)\nprint(blankCaption.isEmpty)\nprint(narrow == nil)</code></pre><p>Kotlin nullable types and the Elvis operator provide a conceptual bridge, but Swift optional handling uses its own syntax and explicit bindings in the next lesson. An optional is not the string \"null\", a zero, or an empty placeholder. Applying postfix <code>!</code> forces an optional’s contained value and traps for nil; the examples deliberately preserve absence instead. Prefix <code>!</code> negates a Bool, so placement changes meaning. Optional chaining and binding will let you consume a present value without changing the original domain fact. Do not erase a missing identifier merely to simplify display.</p>"
         },
         {
           "id": "failures-and-repo",
-          "title": "Separate data correctness from syntax correctness",
-          "html": "<p>A valid but wrong average is <code>Double(total / count)</code>: integer division has already truncated. An invalid expression is <code>total + average</code> when one existing operand is Int and the other Double. These failures belong to different categories, and the repair should follow the domain. A fractional average requires conversion before division; a count that must remain exact should remain integral. Likewise, <code>blank ?? \"Unknown\"</code> compiling does not establish that blank should display Unknown. Absence and content validation are independent rules.</p><p>In the active question model, key and prompt are String, subtitle is String?, and isOptional is Bool. These are separate scalar contracts in a real feature. Reading them does not tell you whether blank subtitles are accepted; a consumer must decide presentation behavior. In the active Array chunking helper, <code>count &gt; size</code> guards a branch and a later conversion constructs Int from the requested size. Its signature uses UInt, an unsigned integer, so you must inspect input boundaries rather than assuming negative values or zero have a universal meaning. Our positive fixtures teach numeric intent; they are not a complete audit of that helper. Source membership is confirmed in ZDCore’s Project.swift.</p>"
+          "title": "Check the result as well as the type",
+          "html": "<p>A type error means the compiler rejects the expression. A wrong calculation may still compile. <code>total + average</code> mixes existing Int and Double values and needs an explicit conversion. <code>Double(total / count)</code> compiles but has already lost the fraction. Decide whether the requirement needs exact whole numbers or a fractional average before repairing it. Likewise, <code>blank ?? \"Unknown\"</code> keeps empty text. If the product requires empty text to show Unknown, write a separate content rule; absence is a different question.</p><p>In the active question model, key and prompt are String, subtitle is String?, and isOptional is Bool. These are separate scalar contracts in a real feature. Reading them does not tell you whether blank subtitles are accepted; a consumer must decide presentation behavior. In the active Array chunking helper, <code>count &gt; size</code> guards a branch and a later conversion constructs Int from the requested size. Its signature uses UInt, an unsigned integer, so you must inspect input boundaries rather than assuming negative values or zero have a universal meaning. Our positive test inputs teach numeric intent; they are not a complete audit of that helper. Source membership is confirmed in ZDCore’s Project.swift.</p>"
         }
       ],
       "quiz": [
@@ -219,13 +274,13 @@
         }
       ],
       "exercise": {
-        "brief": "Compute a synthetic average and retain three distinct label states without crashes or lossy integer ordering.",
+        "brief": "Calculate an average and compare missing, empty, and named labels. Keep exact conversion failures visible.",
         "steps": [
-          "Declare total seven and count two as Int; predict integer quotient and fractional average.",
-          "Construct Double operands before division and print both results.",
-          "Declare String? fixtures nil, empty and Ada; print whether each fallback would be used.",
-          "Ask Int8(exactly:) to represent 127 and 128; preserve the optional result.",
-          "Explain the difference between a missing label and a domain-invalid empty label."
+          "Set total to Int seven and count to Int two. Predict the whole-number answer and the fractional answer.",
+          "Convert both operands to Double before division. Print both answers.",
+          "Make three String? inputs: nil, empty text, and Ada. Predict which uses the fallback.",
+          "Try exact Int8 conversion for 127 and 128. Keep the optional results.",
+          "Explain why a missing label and an empty label need separate validation rules."
         ],
         "acceptance": [
           "The fractional average is 3.5 rather than 3.0.",
@@ -233,7 +288,7 @@
           "127 converts exactly and 128 yields nil.",
           "No force unwrap, overflow demonstration or division-by-zero execution is needed."
         ],
-        "solution": "<p>This worked standalone program keeps the conversion and display policies visible. No framework imports or earlier type declarations are required. Predict all outputs before running it.</p><pre><code class=\"language-swift\">let total = 7\nlet count = 2\nprint(total / count)\nprint(Double(total) / Double(count))\nlet absent: String? = nil\nlet blank: String? = \"\"\nlet named: String? = \"Ada\"\nprint(absent ?? \"Unknown\")\nprint((blank ?? \"Unknown\").isEmpty)\nprint(named ?? \"Unknown\")\nprint(Int8(exactly: 127) == 127)\nprint(Int8(exactly: 128) == nil)</code></pre><p>The outputs are 3, 3.5, Unknown, true, Ada, true and true. Parentheses around blank’s fallback group the resulting nonoptional String before isEmpty is read. Exact conversion at the signed eight-bit upper boundary succeeds, and one step beyond it returns nil. None of this makes two hundred a valid booking count; the exercise checks representation, not a product rule.</p><p>For a real display rule that treats blank as invalid, state that policy separately and validate content before presenting a caption. Do not replace nil in a stored identifier with zero because the UI needs text. If the count could be zero, require a control-flow check before division; lesson 059 supplies that syntax. Record what your run established and which conditions you only predicted. The standalone scalar checks do not verify localization, network serialization, or any company model.</p>"
+        "solution": "<p>This answer runs as a standalone file. It keeps number conversion and label display decisions in view. No framework import or earlier declaration is required. Predict the seven outputs first. Check especially whether the empty String uses the fallback, and whether 128 fits in Int8.</p><pre><code class=\"language-swift\">let total = 7\nlet count = 2\nprint(total / count)\nprint(Double(total) / Double(count))\nlet absent: String? = nil\nlet blank: String? = \"\"\nlet named: String? = \"Ada\"\nprint(absent ?? \"Unknown\")\nprint((blank ?? \"Unknown\").isEmpty)\nprint(named ?? \"Unknown\")\nprint(Int8(exactly: 127) == 127)\nprint(Int8(exactly: 128) == nil)</code></pre><p>The outputs are 3, 3.5, Unknown, true, Ada, true and true. Parentheses around blank’s fallback group the resulting nonoptional String before isEmpty is read. Exact conversion at the signed eight-bit upper boundary succeeds, and one step beyond it returns nil. None of this makes two hundred a valid booking count; the exercise checks representation, not a product rule.</p><p>For a real display rule that treats blank as invalid, state that policy separately and validate content before presenting a caption. Do not replace nil in a stored identifier with zero because the UI needs text. If the count could be zero, require a control-flow check before division; lesson 059 supplies that syntax. Record what your run established and which conditions you only predicted. The standalone scalar checks do not verify localization, network serialization, or any company model.</p>"
       },
       "references": [
         {
@@ -274,12 +329,63 @@
         "I can predict conversion order and overflow boundaries.",
         "I can explain nil, empty and whitespace independently.",
         "I have recorded the scalar exercise outputs."
-      ]
+      ],
+      "simple": {
+        "story": "At lunch, Ada shares seven small cakes between two plates. Each plate can hold three whole cakes, with one cake left over. If Ada cuts that last cake in half first, each plate receives three and a half cakes. Cutting after she has written \"3 per plate\" does not change the number already written. Before choosing how to count, she must decide whether the answer allows pieces or only whole cakes.",
+        "meaning": "Int division produces a whole-number result. Convert the inputs to Double before dividing when the answer needs a fraction.",
+        "example": {
+          "before": "total is Int 7 and count is Int 2.",
+          "change": "Compute total / count, and separately compute Double(total) / Double(count).",
+          "after": "The integer result is 3. The Double result is 3.5 because the second division uses converted operands."
+        },
+        "picture": {
+          "kind": "comparison",
+          "caption": "Two ways to divide the same starting numbers.",
+          "items": [
+            {
+              "label": "Int operands",
+              "text": "7 / 2 as integers produces 3."
+            },
+            {
+              "label": "Double operands",
+              "text": "7.0 / 2.0 produces 3.5."
+            },
+            {
+              "label": "Late conversion",
+              "text": "Converting the integer result produces 3.0."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "type",
+            "meaning": "The kind of value and operations allowed."
+          },
+          {
+            "term": "Int",
+            "meaning": "A signed whole-number type whose width follows the platform."
+          },
+          {
+            "term": "Double",
+            "meaning": "A floating-point number type that can represent fractions."
+          },
+          {
+            "term": "optional",
+            "meaning": "A value that can be present or missing."
+          },
+          {
+            "term": "nil",
+            "meaning": "The missing case of an optional."
+          }
+        ],
+        "remember": "Convert the ingredients before doing fractional arithmetic.",
+        "boundary": "Double does not represent every fraction or large integer exactly. The cake story explains division order; real counts, bounds, and money rules still need their own checks."
+      }
     },
     {
       "id": "059",
-      "title": "Control flow, optional binding and ranges",
-      "summary": "Choose branches and iterations deliberately, including empty ranges, loop exits and Swift’s exhaustive switch behavior.",
+      "title": "Choose branches and repeat work safely",
+      "summary": "Choose what runs for each input, handle missing values, and make loops start and stop at the right points.",
       "duration": 75,
       "level": "Foundation",
       "prerequisites": [
@@ -287,40 +393,40 @@
         "058"
       ],
       "objectives": [
-        "Read if/else, switch, while, repeat and for-in from first principles.",
-        "Bind optionals and distinguish branch-local values from loop prerequisites.",
-        "Predict half-open, closed and stepped iteration without off-by-one traps."
+        "Read if, switch, while, repeat, and for-in as choices about what runs.",
+        "Use optional binding and explain where its new name can be read.",
+        "Predict range endpoints, empty loops, and steps between values."
       ],
       "sections": [
         {
           "id": "why-flow",
-          "title": "Move an Android decision table into Swift",
-          "html": "<p>Imagine validating a local form, showing one caption per state, and generating slot numbers. Your Android experience helps you enumerate the cases; Swift control flow tells the program which statements execute for each input. A condition is a Bool expression. An <code>if</code> evaluates it and runs the matching body enclosed by braces. An <code>else</code> supplies the alternative. Swift generally omits parentheses around a simple condition, but braces remain required. Indentation supports reading and does not replace those braces.</p><p>Start with one decision per branch. A nullable label needs an absence decision; a nonempty requirement needs a separate content decision. Counting slots needs boundaries, including zero. Combining these into a huge Boolean expression may compile, but it hides the rule you should test. Unlike some languages, Swift cannot treat zero or an empty string as false implicitly. Comparisons and isEmpty produce the needed Bool. These examples are synchronous standalone Swift: entering a branch does not schedule a job or update a UI. We are learning execution order before adding functions, collections, or framework callbacks.</p>"
+          "title": "Turn a decision table into branches",
+          "html": "<p>Control flow is the order in which the program runs instructions. A branch chooses a path. In a form, one path handles a missing caption and another handles a present caption. A condition is an expression producing Bool, true or false. <code>if</code> checks it and runs the body between braces when true. <code>else</code> gives the other path. This resembles an Android decision table you already use. Swift usually needs no parentheses around a simple condition, but it still requires braces; indentation helps readers and does not replace them.</p><p>Start with one decision per branch. A nullable label needs an absence decision; a nonempty requirement needs a separate content decision. Counting slots needs boundaries, including zero. Combining these into a huge Boolean expression may compile, but it hides the rule you should test. Unlike some languages, Swift cannot treat zero or an empty string as false implicitly. Comparisons and isEmpty produce the needed Bool. These examples are synchronous standalone Swift: entering a branch does not schedule a job or update a UI. We are learning execution order before adding functions, collections, or framework callbacks.</p>"
         },
         {
           "id": "optional-binding",
-          "title": "A complete branch program with optional binding",
-          "html": "<pre><code class=\"language-swift\">let input: String? = \"\"\nif let name = input {\n    if name.isEmpty {\n        print(\"Present but blank\")\n    } else {\n        print(\"Hello, \\(name)\")\n    }\n} else {\n    print(\"Absent\")\n}\nprint(input ?? \"Fallback\")</code></pre><p>Line one creates a present empty optional String. <code>if let name = input</code> on line two asks whether a value exists. On success it creates name as a nonoptional String inside that branch. It does not overwrite input. The nested if evaluates name.isEmpty; it prints Present but blank for our fixture. The nested else would greet a nonempty value. The outer else handles nil and would print Absent. After the braces, name is outside its scope and cannot be used. The original input is still available, and coalescing it produces the present empty String, so the final print is a blank line.</p><p>Kotlin often smart-casts a stable nullable value after a null check. Swift optional binding makes a new binding explicit. The modern shorthand <code>if let input</code> unwraps an optional under the same name within the success branch; use the longer form while learning the scopes. A comma can combine optional binding with another condition, evaluated in order. Do not confuse a comma-separated condition with passing arguments to a function. A postfix force unwrap would avoid this branch syntax but would turn nil into a runtime trap. Write the intended absence behavior instead.</p>"
+          "title": "Use a present value inside its branch",
+          "html": "<p>Optional binding asks whether an optional holds a value and gives that value a usable name. <code>if let name = input</code> creates a nonoptional String named name only in the successful branch. It leaves input alone. Here input contains empty text, so name.isEmpty is true and the program prints Present but blank. A nonempty value takes the greeting path. Nil takes the outer else and prints Absent. Scope means where a name is available: name ends at its branch’s closing brace. The final print reads input and prints a blank line.</p><pre><code class=\"language-swift\">let input: String? = \"\"\nif let name = input {\n    if name.isEmpty {\n        print(\"Present but blank\")\n    } else {\n        print(\"Hello, \\(name)\")\n    }\n} else {\n    print(\"Absent\")\n}\nprint(input ?? \"Fallback\")</code></pre><p>Kotlin often smart-casts a stable nullable value after a null check. Swift optional binding makes a new binding explicit. The modern shorthand <code>if let input</code> unwraps an optional under the same name within the success branch; use the longer form while learning the scopes. A comma can combine optional binding with another condition, evaluated in order. Do not confuse a comma-separated condition with passing arguments to a function. A postfix force unwrap would avoid this branch syntax but would turn nil into a runtime trap. Write the intended absence behavior instead.</p>"
         },
         {
           "id": "ranges",
-          "title": "Half-open and closed ranges have different endpoints",
-          "html": "<pre><code class=\"language-swift\">let slotCount = 3\nfor slot in 0..&lt;slotCount {\n    print(\"Index \\(slot)\")\n}\nfor day in 1...3 {\n    print(\"Day \\(day)\")\n}\nfor minute in stride(from: 0, to: 15, by: 5) {\n    print(\"Minute \\(minute)\")\n}</code></pre><p>The first for-in loops over <code>0..&lt;slotCount</code>, a half-open range: zero is included and three is excluded. It prints indices zero, one and two. Each iteration binds slot to that iteration’s value; you do not increment it manually. The second loop uses a closed range <code>1...3</code>, including both endpoints, so it prints days one, two and three. These are related to Kotlin’s until and inclusive ranges, but the exact Swift punctuation and inferred element types differ.</p><p>Stride produces values with a step. From zero, stopping before fifteen, stepping by five gives zero, five and ten. The corresponding through overload includes an exactly reached end. Positive and negative steps express direction deliberately. A half-open <code>0..&lt;0</code> is empty and performs no iterations; a closed range with lower bound greater than upper bound is invalid. Therefore <code>0...count - 1</code> is unsafe for a count of zero. Counts from untrusted input need a nonnegative validation rule too: half-open does not mean reversed bounds are generally legal. Prefer direct element iteration once you have an array, rather than building indices unnecessarily.</p>"
+          "title": "Choose whether the endpoint is included",
+          "html": "<p>A range describes values between two bounds. A half-open range includes its start and excludes its end. <code>0..&lt;3</code> gives zero, one, and two. A closed range includes both ends, so <code>1...3</code> gives one, two, and three. A for-in loop visits each value and gives it a local name for that iteration, one pass through the body. You do not increment that name yourself. Kotlin until and inclusive ranges express similar intent; use Swift’s own punctuation and types.</p><pre><code class=\"language-swift\">let slotCount = 3\nfor slot in 0..&lt;slotCount {\n    print(\"Index \\(slot)\")\n}\nfor day in 1...3 {\n    print(\"Day \\(day)\")\n}\nfor minute in stride(from: 0, to: 15, by: 5) {\n    print(\"Minute \\(minute)\")\n}</code></pre><p>Stride produces values with a step. From zero, stopping before fifteen, stepping by five gives zero, five and ten. The corresponding through overload includes an exactly reached end. Positive and negative steps express direction deliberately. A half-open <code>0..&lt;0</code> is empty and performs no iterations; a closed range with lower bound greater than upper bound is invalid. Therefore <code>0...count - 1</code> is unsafe for a count of zero. Counts from untrusted input need a nonnegative validation rule too: half-open does not mean reversed bounds are generally legal. Prefer direct element iteration once you have an array, rather than building indices unnecessarily.</p>"
         },
         {
           "id": "loops-and-exits",
-          "title": "While, repeat, break, continue and guard",
-          "html": "<p>A <code>while</code> checks its condition before each iteration; its body may never run. A <code>repeat</code> body runs once before its trailing while condition is checked. This resembles Kotlin while/do-while, but Swift spells the second form repeat. If your condition depends on a var counter, update it on every path intended to progress. A continue skips the rest of the current iteration, so placing a counter update after that continue can cause an accidental infinite loop. A break exits the nearest loop, not every surrounding scope.</p><p>Guard expresses a prerequisite. Its else branch must leave the guarded scope, through return in a function, throw in a throwing function, or break/continue where those exit the relevant scope. In a loop, <code>guard candidate &gt; 0 else { continue }</code> skips invalid iterations, leaving the rest focused on positive values. Optional values bound by a successful guard are available afterward within that scope, unlike an if-let branch-local binding. Functions and return are taught in lesson 060; no function syntax is required for today’s runnable loops. Guard is not an exception handler and does not evaluate arbitrary cleanup. Choosing it should make the happy path clearer, not conceal a domain decision.</p>"
+          "title": "Give every loop a way to progress",
+          "html": "<p>A while loop checks its condition before each pass, so it can run zero times. A repeat loop runs its body once before checking. This is like Kotlin while and do-while, with a different keyword. <code>continue</code> skips the rest of the current pass; <code>break</code> leaves the nearest loop. If the condition uses a counter, make sure every continuing path updates it. An update placed after continue never runs on that path, which can leave the condition true forever.</p><p>Guard checks a prerequisite and requires its else branch to leave the guarded scope. Inside a function, that can be return or throw. Inside a loop, break or continue can provide the required exit. <code>guard candidate &gt; 0 else { continue }</code> skips this pass when candidate is not positive. A successful guard binding remains available afterward in that scope; an if-let binding is limited to its branch. Functions and return arrive in lesson 060, so today’s loops need no function declaration. Guard does not catch errors or provide automatic cleanup. Use it to make a required condition and its rejected path easy to see.</p>"
         },
         {
           "id": "switch",
-          "title": "Match a value and account for the alternatives",
-          "html": "<pre><code class=\"language-swift\">let score = 7\nswitch score {\ncase 0:\n    print(\"None\")\ncase 1...5:\n    print(\"Small\")\ncase 6...10:\n    print(\"Medium\")\ndefault:\n    print(\"Outside the taught range\")\n}\nfor candidate in -1...2 {\n    guard candidate &gt; 0 else { continue }\n    print(\"Accepted \\(candidate)\")\n}</code></pre><p>Switch reads the score and selects a matching case. Zero has a literal pattern; the next two cases match integer ranges. Seven produces Medium. Int has many values outside those patterns, so default completes the coverage. Swift requires exhaustive switching. Once a selected branch finishes, execution leaves the switch without falling into the next case; Java’s classic break habit is unnecessary here. A break can still express a deliberate no-op branch. Avoid fallthrough while learning because it changes execution without rechecking the next pattern.</p><p>The for loop demonstrates a guard that continues on minus one and zero, then prints Accepted 1 and Accepted 2. Guarding the prerequisite leaves the useful action unnested. For a later locally declared enum, explicit cases can cover every possible variant and make default unnecessary. That is where compiler coverage becomes especially useful. A broad default in a finite domain can hide a newly added decision. Today’s range matching does not cast classes or unpack tuples; those language constructs have their own lessons. Exhaustive matching checks possible inputs, not whether your messages are sensible or whether a workflow transition is allowed.</p>"
+          "title": "Make a switch cover every value",
+          "html": "<p>A switch compares one value with patterns, rules describing which values match. Here zero matches the first case, ranges match the next cases, and default handles the rest. Seven prints Medium. An exhaustive switch covers every possible input; Swift requires this. The selected case finishes without entering the next one. You do not need Java’s usual break after each case. A break can express a branch that deliberately does nothing. Avoid fallthrough while learning: it enters the next body without testing its pattern again.</p><pre><code class=\"language-swift\">let score = 7\nswitch score {\ncase 0:\n    print(\"None\")\ncase 1...5:\n    print(\"Small\")\ncase 6...10:\n    print(\"Medium\")\ndefault:\n    print(\"Outside the taught range\")\n}\nfor candidate in -1...2 {\n    guard candidate &gt; 0 else { continue }\n    print(\"Accepted \\(candidate)\")\n}</code></pre><p>The for loop demonstrates a guard that continues on minus one and zero, then prints Accepted 1 and Accepted 2. Guarding the prerequisite leaves the useful action unnested. For a later locally declared enum, explicit cases can cover every possible variant and make default unnecessary. That is where compiler coverage becomes especially useful. A broad default in a finite domain can hide a newly added decision. Today’s range matching does not cast classes or unpack tuples; those language constructs have their own lessons. Exhaustive matching checks possible inputs, not whether your messages are sensible or whether a workflow transition is allowed.</p>"
         },
         {
           "id": "repo-and-debug",
-          "title": "Predict the missing iteration before fixing it",
-          "html": "<p>A loop over zero through count incorrectly includes count itself when counting array indices. A while counter that never changes can keep running. A guard else that simply prints and then falls through is rejected because it fails to exit. Distinguish these: one is a boundary error, one is a progress error, and one is a compile-time control-flow violation. Write zero, one and several-element fixtures before choosing range punctuation. For nested loops, label a loop only when you need a clearly documented outer exit; otherwise keep the example’s exit local and obvious.</p><p>The active core array helper uses stride and half-open slices when chunking. We inspected its source and target inclusion, but its unsigned size argument still requires thought about zero and conversion; a real signature is evidence of code shape, not a universal correctness promise. The cancellation coordinator switches over its NavigationState at line 53, with associated payloads you will learn later. Read only the branch structure now. In the core sequence grouping helper, a guard continues when no grouping key exists. That policy deliberately omits elements without keys. Compare it with Kotlin continue: the role is similar, but Swift optional binding creates a concrete local key for the remaining body.</p>"
+          "title": "Try zero, one, and several items",
+          "html": "<p>An off-by-one error includes or excludes one position by mistake. A range from zero through count includes count, which is one past an array’s last valid index. A while counter that never changes has a progress error. A guard is a prerequisite check whose failing branch must leave its scope; merely printing and falling through is a compiler error. These failures need different explanations. Predict behavior for zero, one, and several items before choosing punctuation. If a nested loop needs an outer exit, name that loop and explain why.</p><p>The active core array helper uses stride and half-open slices when chunking. We inspected its source and target inclusion, but its unsigned size argument still requires thought about zero and conversion; a real signature is evidence of code shape, not a universal correctness promise. The cancellation coordinator switches over its NavigationState at line 53, with associated payloads you will learn later. Read only the branch structure now. In the core sequence grouping helper, a guard continues when no grouping key exists. That policy deliberately omits elements without keys. Compare it with Kotlin continue: the role is similar, but Swift optional binding creates a concrete local key for the remaining body.</p>"
         }
       ],
       "quiz": [
@@ -356,13 +462,13 @@
         }
       ],
       "exercise": {
-        "brief": "Generate valid slot indices and classify optional captions with explicit zero, blank and absent fixtures.",
+        "brief": "Print valid slot indices and handle missing, empty, and named captions as separate cases.",
         "steps": [
-          "Loop over a nonnegative slot count using a half-open range; repeat with zero and one.",
-          "Classify nil, empty and Sam inputs with optional binding and separate content checks.",
-          "Write a while counter that prints zero and one, then exits.",
-          "Explain why a closed count-minus-one range and an unchanging counter are unsafe.",
-          "Read a guard/continue source anchor and describe which inputs it omits."
+          "Use a half-open range for a nonnegative slot count. Try zero and one too.",
+          "Use optional binding for nil, empty text, and Sam. Check emptiness separately.",
+          "Write a while loop that prints zero and one and then stops.",
+          "Explain on paper why count-minus-one with a closed range can fail, and why an unchanged counter can loop forever.",
+          "Read the linked guard/continue example. Say which inputs it skips."
         ],
         "acceptance": [
           "Zero slots print no indices; one slot prints only zero.",
@@ -370,7 +476,7 @@
           "The while loop terminates through an explicit update.",
           "No invalid range or infinite loop is executed as part of the working exercise."
         ],
-        "solution": "<p>The complete standalone answer below uses direct fixtures, so arrays and functions are not prerequisites. Repeat the optional block with nil and Sam to test the other paths.</p><pre><code class=\"language-swift\">let slots = 0\nfor index in 0..&lt;slots {\n    print(index)\n}\nlet caption: String? = \"\"\nif let value = caption {\n    print(value.isEmpty ? \"Blank\" : value)\n} else {\n    print(\"Absent\")\n}\nvar attempt = 0\nwhile attempt &lt; 2 {\n    print(\"Attempt \\(attempt)\")\n    attempt += 1\n}</code></pre><p>There are no index lines, followed by Blank, Attempt 0 and Attempt 1. The compound assignment <code>+= 1</code> is shorthand for reading the integer, adding one and assigning it back. It occurs before the next condition check and is not skipped by any branch. Changing slots to one yields one index line, zero. Changing caption to nil activates the outer else; changing it to Sam activates the nonempty selection.</p><p>A closed zero-through-minus-one range is invalid instead of being a clever way to skip the loop. An unchanged attempt would never make the condition false. Explain those outcomes on paper rather than running a hang or trap. For the repository guard, absence of a grouping key triggers continue and excludes that element, which is a business/utility policy in addition to a syntax choice. Record your changed-input evidence; reading this trace does not complete your own practice.</p>"
+        "solution": "<p>This answer runs as one file and needs no arrays or functions. The test inputs are values written directly into the program. Predict the output for slots zero and caption empty. Then try the same optional block with nil and Sam so each path gets its own check.</p><pre><code class=\"language-swift\">let slots = 0\nfor index in 0..&lt;slots {\n    print(index)\n}\nlet caption: String? = \"\"\nif let value = caption {\n    print(value.isEmpty ? \"Blank\" : value)\n} else {\n    print(\"Absent\")\n}\nvar attempt = 0\nwhile attempt &lt; 2 {\n    print(\"Attempt \\(attempt)\")\n    attempt += 1\n}</code></pre><p>There are no index lines, followed by Blank, Attempt 0 and Attempt 1. The compound assignment <code>+= 1</code> is shorthand for reading the integer, adding one and assigning it back. It occurs before the next condition check and is not skipped by any branch. Changing slots to one yields one index line, zero. Changing caption to nil activates the outer else; changing it to Sam activates the nonempty selection.</p><p>A closed zero-through-minus-one range is invalid instead of being a clever way to skip the loop. An unchanged attempt would never make the condition false. Explain those outcomes on paper rather than running a hang or trap. For the repository guard, absence of a grouping key triggers continue and excludes that element, which is a business/utility policy in addition to a syntax choice. Record your changed-input evidence; reading this trace does not complete your own practice.</p>"
       },
       "references": [
         {
@@ -407,12 +513,67 @@
         "I can choose endpoints for zero, one and several iterations.",
         "I can show the progress rule for a terminating loop.",
         "I have attempted the changed-input control-flow task."
-      ]
+      ],
+      "simple": {
+        "story": "Sam labels three seats along a bench. He starts counting at zero, so the labels are 0, 1, and 2. The number 3 tells him where to stop; it is not another seat label. On another day the bench has no seats to label. Starting at zero and stopping before zero gives him no labels at all. He checks the stop rule before walking along the bench, rather than hoping an extra label will fit.",
+        "meaning": "A half-open range from zero to a nonnegative count visits exactly the valid zero-based positions and excludes count itself.",
+        "example": {
+          "before": "slotCount is 3.",
+          "change": "Visit each slot in 0..<slotCount.",
+          "after": "The loop visits 0, 1, and 2 once each. With slotCount 0, it visits nothing."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "The loop checks the exclusive stop before each next position.",
+          "items": [
+            {
+              "label": "Count",
+              "text": "There are 3 slots to label."
+            },
+            {
+              "label": "Start",
+              "text": "The first visited value is 0."
+            },
+            {
+              "label": "Continue",
+              "text": "The next values are 1 and 2."
+            },
+            {
+              "label": "Stop",
+              "text": "3 is excluded, so no fourth label is printed."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "branch",
+            "meaning": "One chosen path through instructions."
+          },
+          {
+            "term": "condition",
+            "meaning": "A true-or-false test."
+          },
+          {
+            "term": "scope",
+            "meaning": "The part of code where a name can be used."
+          },
+          {
+            "term": "half-open range",
+            "meaning": "A range including the start and excluding the end."
+          },
+          {
+            "term": "guard",
+            "meaning": "A check that leaves the current scope if a prerequisite fails."
+          }
+        ],
+        "remember": "For a nonnegative count, start at zero and stop before count.",
+        "boundary": "Not every collection starts at integer zero. A reversed range is not a safe empty range. This seat story applies to the nonnegative count fixture, not arbitrary indices."
+      }
     },
     {
       "id": "060",
-      "title": "Functions, argument labels, tuples and defaults",
-      "summary": "Declare small synchronous operations with explicit inputs and outputs, and read Swift call sites without importing Kotlin label rules.",
+      "title": "Give functions clear inputs and results",
+      "summary": "Write reusable functions, read their argument labels, and return one value or a small group of values.",
       "duration": 75,
       "level": "Foundation",
       "prerequisites": [
@@ -421,40 +582,40 @@
         "059"
       ],
       "objectives": [
-        "Separate a function’s external labels from its local parameter names.",
-        "Use return, guard, default parameters and simple overloads.",
-        "Return and destructure a tuple while recognizing when a named type will be clearer."
+        "Tell a call-site label from the parameter name used inside the function.",
+        "Use return, guard, defaults, and distinct function signatures.",
+        "Return and unpack a tuple, and know when a named type would explain more."
       ],
       "sections": [
         {
           "id": "why-functions",
-          "title": "Extract a rule before building a service",
-          "html": "<p>An Android engineer routinely extracts a formatter or validator so it can be called with several fixtures. A Swift function serves that same purpose: it names a reusable operation, receives parameters, and optionally returns a value. Calling it begins executing its body synchronously unless the signature introduces other effects; today it does not. The declaration itself does not run the body. A <code>func</code> keyword introduces a function, parentheses describe its input list, an arrow introduces the result type, and braces delimit the body.</p><p>A function should expose the domain question being answered. A caption operation can return text without printing it. This separates calculation from an observable output and makes fixtures easier to compare. A guard can return an early fallback for missing input, leaving the remaining path with a validated nonoptional value. None of this requires an interface, dependency injection container, UIKit controller, or coroutine. Your Kotlin experience with pure helpers is useful, but Swift’s argument labels and immutable parameters have their own rules. Start with explicit names and return statements; terse expression bodies and overload tricks are less valuable than being able to explain a call.</p>"
+          "title": "Name a rule you want to reuse",
+          "html": "<p>A function is a named operation you can call with inputs. A parameter is an input name inside its body; an argument is the value a caller supplies. A result is the value sent back. This is familiar from a Kotlin formatter or validator. In Swift, <code>func</code> begins the declaration, parentheses list inputs, an arrow names the result type, and braces hold the body. Declaring it does not run it. Calling today’s function runs its body synchronously, before the caller continues; the signature adds no suspension or other effects.</p><p>A function should expose the domain question being answered. A caption operation can return text without printing it. This separates calculation from an observable output and makes test inputs easier to compare. A guard can return an early fallback for missing input, leaving the remaining path with a validated nonoptional value. None of this requires an interface, dependency injection container, UIKit controller, or coroutine. Your Kotlin experience with pure helpers is useful, but Swift’s argument labels and immutable parameters have their own rules. Start with explicit names and return statements; terse expression bodies and overload tricks are less valuable than being able to explain a call.</p>"
         },
         {
           "id": "labels",
-          "title": "External labels and local names are different",
-          "html": "<pre><code class=\"language-swift\">func caption(for name: String, attempt: Int = 1) -&gt; String {\n    return \"\\(name): attempt \\(attempt)\"\n}\nfunc twice(_ value: Int) -&gt; Int {\n    return value * 2\n}\nlet first = caption(for: \"Sam\")\nlet second = caption(for: \"Sam\", attempt: 2)\nprint(first)\nprint(second)\nprint(twice(3))</code></pre><p>Read the first declaration as caption(for:attempt:). <code>for</code> is the external label used by the caller, while name is the local parameter binding used inside the body. Attempt has one name, so it is both its external label and local name. The equals one establishes a default argument. The return expression constructs a String and exits the function with that result. The second declaration uses an underscore as its external label, which means callers pass the value without a label. Its local parameter is still value.</p><p>The first call omits attempt and uses the declared default. The second supplies attempt two. Neither call uses <code>name:</code>, because that is not the first external label. Twice is called as <code>twice(3)</code>, not <code>twice(value: 3)</code>. Output is Sam: attempt 1, Sam: attempt 2, and 6. Swift labels are part of the callable shape and often make APIs read like phrases. Kotlin named arguments generally use the declared parameter name; there is no direct equivalent to Swift independently spelling for and name. An underscore removes the label, not the argument itself.</p>"
+          "title": "Read labels at the call and names in the body",
+          "html": "<p>An argument label is the name written at a call site. A parameter name is the name used inside the function. They can differ. In <code>caption(for name:)</code>, the caller writes for and the body reads name. Attempt uses one name for both roles. Its default is one, used when the caller omits that argument. <code>return</code> supplies the result and exits the function. In twice, an underscore removes the external label; it does not remove the input. The body still reads the local value parameter.</p><pre><code class=\"language-swift\">func caption(for name: String, attempt: Int = 1) -&gt; String {\n    return \"\\(name): attempt \\(attempt)\"\n}\nfunc twice(_ value: Int) -&gt; Int {\n    return value * 2\n}\nlet first = caption(for: \"Sam\")\nlet second = caption(for: \"Sam\", attempt: 2)\nprint(first)\nprint(second)\nprint(twice(3))</code></pre><p>The first call omits attempt and uses the declared default. The second supplies attempt two. Neither call uses <code>name:</code>, because that is not the first external label. Twice is called as <code>twice(3)</code>, not <code>twice(value: 3)</code>. Output is Sam: attempt 1, Sam: attempt 2, and 6. Swift labels are part of the callable shape and often make APIs read like phrases. Kotlin named arguments generally use the declared parameter name; there is no direct equivalent to Swift independently spelling for and name. An underscore removes the label, not the argument itself.</p>"
         },
         {
           "id": "returns-and-guard",
-          "title": "Define the exit contract, including absence",
-          "html": "<pre><code class=\"language-swift\">func greeting(for input: String?) -&gt; String {\n    guard let name = input else {\n        return \"Hello\"\n    }\n    guard !name.isEmpty else {\n        return \"Please add a name\"\n    }\n    return \"Hello, \\(name)\"\n}\nprint(greeting(for: nil))\nprint(greeting(for: \"\"))\nprint(greeting(for: \"Ada\"))</code></pre><p>The parameter is String?, so the function accepts a missing value. The result is String, so every ordinary exit must provide actual text. The first guard unwraps input into name; nil exits with Hello. The second checks content and exits for the present empty String. The final return uses a known present nonempty name. The outputs preserve three different rules. Return leaves this function call; it does not stop the process or every caller. A return from an inner operation must be interpreted in that operation’s own scope.</p><p>Parameters are immutable bindings inside a function by default. Attempting <code>input = nil</code> or incrementing an Int parameter is rejected. Make a local var copy when you intend local mutation; inout for caller-visible mutation is taught in lesson 064. A function returning no useful value has result type Void, which Swift models as the empty tuple. Omitting the arrow/result type declares that form. Print itself is an output action, not a substitute for returning a calculated String. Swift checks ordinary return coverage, but a compiling function can still conflate absent and blank incorrectly if your branches encode the wrong policy.</p>"
+          "title": "Return a result on every ordinary path",
+          "html": "<p>A return leaves the current function call and gives its result to the caller. Here the input type String? permits absence, but the result type String promises actual text on each ordinary exit. The first guard returns Hello for nil. The second returns Please add a name for present empty text. The last return greets a nonempty name. The guard binds a usable String after checking input. These are three domain rules, not one null check. Returning does not shut down the process or every surrounding caller.</p><pre><code class=\"language-swift\">func greeting(for input: String?) -&gt; String {\n    guard let name = input else {\n        return \"Hello\"\n    }\n    guard !name.isEmpty else {\n        return \"Please add a name\"\n    }\n    return \"Hello, \\(name)\"\n}\nprint(greeting(for: nil))\nprint(greeting(for: \"\"))\nprint(greeting(for: \"Ada\"))</code></pre><p>Parameters are immutable bindings inside a function by default. Attempting <code>input = nil</code> or incrementing an Int parameter is rejected. Make a local var copy when you intend local mutation; inout for caller-visible mutation is taught in lesson 064. A function returning no useful value has result type Void, which Swift models as the empty tuple. Omitting the arrow/result type declares that form. Print itself is an output action, not a substitute for returning a calculated String. Swift checks ordinary return coverage, but a compiling function can still treat as the same absent and blank incorrectly if your branches encode the wrong policy.</p>"
         },
         {
           "id": "tuples",
-          "title": "Return two related results without inventing a hierarchy",
-          "html": "<pre><code class=\"language-swift\">func division(_ total: Int, by count: Int) -&gt; (whole: Int, remainder: Int)? {\n    guard count &gt; 0 else { return nil }\n    return (whole: total / count, remainder: total % count)\n}\nif let result = division(7, by: 2) {\n    print(result.whole)\n    print(result.remainder)\n    let (whole, remainder) = result\n    print(\"\\(whole), \\(remainder)\")\n}\nprint(division(7, by: 0) == nil)</code></pre><p>A tuple groups values in parentheses. The result type names two Int components, whole and remainder. The question mark outside the tuple makes the entire result optional; it is not a pair of optional integers. The guard rejects nonpositive divisors before arithmetic. The return constructs both components, and optional binding gives the caller a nonoptional pair. Named members can be read through result.whole and result.remainder, or destructured into two local bindings. Unnamed tuples also permit position access such as <code>.0</code>, but names are clearer at a public decision boundary.</p><p>This resembles returning Kotlin Pair, yet a Swift tuple is a language compound value rather than the exact Kotlin Pair class/API. Tuple labels improve reading but do not replace a domain type with construction invariants, reusable methods, or explicit protocol conformances. For a small internal pair, a tuple is economical; once the result means a reusable concept, a struct may be preferable. The example assumes a modest positive divisor and total seven; integer minimum divided by minus one is deliberately avoided by its positive-divisor guard. Guarding zero alone would not prove every arithmetic combination safe. The output is 3, 1, then 3, 1 as one line, and true.</p>"
+          "title": "Return a small pair as a tuple",
+          "html": "<p>A tuple groups several values in parentheses. This result has two named Int parts, whole and remainder. The question mark after the tuple makes the entire pair optional. Guard returns nil for a nonpositive divisor before division occurs. On success, optional binding gives the caller the whole pair. Read its named members or unpack it into two local names; unpacking is called destructuring. An unnamed tuple can use <code>.0</code>, but named parts make a result easier to read. This is a language value, not Kotlin’s exact Pair class.</p><pre><code class=\"language-swift\">func division(_ total: Int, by count: Int) -&gt; (whole: Int, remainder: Int)? {\n    guard count &gt; 0 else { return nil }\n    return (whole: total / count, remainder: total % count)\n}\nif let result = division(7, by: 2) {\n    print(result.whole)\n    print(result.remainder)\n    let (whole, remainder) = result\n    print(\"\\(whole), \\(remainder)\")\n}\nprint(division(7, by: 0) == nil)</code></pre><p>This resembles returning Kotlin Pair, yet a Swift tuple is a language compound value rather than the exact Kotlin Pair class/API. Tuple labels improve reading but do not replace a domain type with construction invariants, reusable methods, or explicit protocol conformances. For a small internal pair, a tuple is economical; once the result means a reusable concept, a struct may be preferable. The example assumes a modest positive divisor and total seven; integer minimum divided by minus one is deliberately avoided by its positive-divisor guard. Guarding zero alone would not prove every arithmetic combination safe. The output is 3, 1, then 3, 1 as one line, and true.</p>"
         },
         {
           "id": "defaults-and-overloads",
-          "title": "Keep the call contract predictable",
-          "html": "<p>A default value allows an argument to be omitted at a call site; it does not remove that parameter from the declaration. Defaults can describe common behavior, but a default should not hide a meaningful product choice. If an operation’s caller must choose whether to overwrite a value, make that choice explicit rather than copying a convenient default without reading its effect. Overloading means several functions share a base name with distinguishable signatures or labels. Labels can disambiguate Swift calls, and context can select a compatible result, but ambiguous overloads remain a design warning.</p><p>Variadic parameters accept zero or more values of one element type; <code>func count(_ values: Int...) -&gt; Int { values.count }</code> sees them as an array inside its body. Array mechanics arrive in lesson 061, so variadics are optional orientation here, not an exercise prerequisite. Default arguments and variadics are not interchangeable. A function is also a value with a function type, but closures and capture lifetime belong to lesson 068. Keep today’s calls direct. No default, label, tuple, or function declaration establishes a background queue. A later <code>throws</code> adds failure permission and <code>async</code> adds suspension permission; neither meaning should be inferred from a name like load.</p>"
+          "title": "Make omitted inputs and alternate calls easy to read",
+          "html": "<p>A default argument supplies a value when the caller omits that input. The parameter still exists. Use a default for a common choice, such as the first attempt; require an explicit input when the caller must make a meaningful decision, such as whether to overwrite data. Overloading gives several functions the same base name but different callable signatures. A signature is the shape of the inputs, labels, and result. Labels can help Swift choose the right call. If a caller cannot tell which overload is intended, simplify the API.</p><p>A variadic parameter accepts zero or more inputs of one type. In <code>func count(_ values: Int...) -&gt; Int { values.count }</code>, values is an array inside the body. Arrays arrive in lesson 061; this is optional orientation rather than today’s prerequisite. Variadic inputs and defaults solve different problems. A function can also be stored as a value with a function type; closures and ownership arrive in lesson 068. Keep the calls direct for now. A default, tuple, or function name does not schedule background work. Throws permits failure; async permits suspension. A name such as load promises neither by itself.</p>"
         },
         {
           "id": "repo-and-misconceptions",
-          "title": "Read the actual label instead of guessing from a variable",
-          "html": "<p>The active set helper declares <code>toggled(value:)</code>; its single name is both label and local binding. The core array helper declares <code>resize(count target: ...)</code>, giving count externally and target internally. It also supplies a default delete closure, which you can identify now while deferring closure behavior. In the sequence grouping helper, the returned array contains named key/values tuples. These are actual checkout patterns, with source globs confirming membership. Our examples do not import these modules or assert every input to these utility functions is safe.</p><p>A common invalid translation is <code>caption(name: \"Sam\")</code> because Kotlin encourages matching the parameter name. The correction is the declared external label for. A common behavioral error is printing inside a function intended to return a String and forgetting the return; the caller then lacks its promised result. Another is ignoring nil from an optional result and forcing the tuple, turning invalid input into a trap. Distinguish signature mistakes from domain mistakes. Write expected outputs at the call boundary before reading the helper’s body. That habit scales to unfamiliar client APIs without requiring the entire framework architecture.</p>"
+          "title": "Check the declared label before calling",
+          "html": "<p>A call contract tells a caller how to invoke an operation and what to expect. The linked Set helper declares toggled(value:), using value both outside and inside. The Array helper declares resize(count target:), using count at the call and target inside. Its delete closure has a default; a closure is a function value you will study later. The grouping helper returns tuples with named key and values parts. Source patterns confirm these helpers belong to their targets. Reading their labels does not prove all possible inputs are safe.</p><p>A common invalid translation is <code>caption(name: \"Sam\")</code> because Kotlin encourages matching the parameter name. The correction is the declared external label for. A common behavioral error is printing inside a function intended to return a String and forgetting the return; the caller then lacks its promised result. Another is ignoring nil from an optional result and forcing the tuple, turning invalid input into a trap. Distinguish signature mistakes from domain mistakes. Write expected outputs at the call boundary before reading the helper’s body. That habit scales to unfamiliar client APIs without requiring the entire framework architecture.</p>"
         }
       ],
       "quiz": [
@@ -490,13 +651,13 @@
         }
       ],
       "exercise": {
-        "brief": "Write a labeled distribution helper returning an optional quotient/remainder tuple and a caption helper with a default suffix.",
+        "brief": "Write a distribution function with an optional pair result and a caption function with a default suffix.",
         "steps": [
-          "Declare distribute(_ total: Int, among count: Int) with a named optional tuple result.",
-          "Reject count zero or negative using guard.",
-          "Call it with seven/two and seven/zero, preserving nil.",
-          "Declare caption(for name: String, suffix: String = \"ready\") and call both forms.",
-          "Explain each external label and each return path."
+          "Declare distribute(_ total: Int, among count: Int). Return an optional tuple with whole and remainder parts.",
+          "Use guard to return nil for zero or negative counts.",
+          "Try seven among two and seven among zero. Handle the optional result safely.",
+          "Declare caption(for name: String, suffix: String = \"ready\"). Try both the default and an explicit suffix.",
+          "Explain the external labels and every return path."
         ],
         "acceptance": [
           "Seven/two returns whole three and remainder one.",
@@ -504,7 +665,7 @@
           "The caption default and explicit suffix produce distinct expected strings.",
           "The solution uses no casts, force unwraps or client dependencies."
         ],
-        "solution": "<p>Here is a complete standalone answer. Tuple extraction stays inside optional binding, and the caption returns data so the caller chooses when to print.</p><pre><code class=\"language-swift\">func distribute(_ total: Int, among count: Int) -&gt; (whole: Int, remainder: Int)? {\n    guard count &gt; 0 else { return nil }\n    return (total / count, total % count)\n}\nfunc caption(for name: String, suffix: String = \"ready\") -&gt; String {\n    return \"\\(name): \\(suffix)\"\n}\nif let parts = distribute(7, among: 2) {\n    print(parts.whole)\n    print(parts.remainder)\n}\nprint(distribute(7, among: 0) == nil)\nprint(caption(for: \"Rae\"))\nprint(caption(for: \"Rae\", suffix: \"waiting\"))</code></pre><p>Expected lines are 3, 1, true, Rae: ready and Rae: waiting. Tuple labels come from the declared return contract even though the return expression uses positional construction. The local name count is supplied under external among; total has no external label. Nil means this helper could not produce its result for the stated divisor, not that either component equals zero.</p><p>To test transfer, change the valid input to eight among three and predict two and two. Then state an additional domain rule, such as forbidding negative totals, and decide where to validate it. Do not assume positive divisor validation already covers that separate product requirement. Your own helper, predictions and observed run establish exercise evidence. These small synchronous operations do not establish service effects, actor isolation, or UI formatting correctness.</p>"
+        "solution": "<p>This answer runs as a standalone file. It handles the tuple only after optional binding succeeds. The caption function returns text instead of printing it itself, so the caller controls output. Predict the five printed lines before running.</p><pre><code class=\"language-swift\">func distribute(_ total: Int, among count: Int) -&gt; (whole: Int, remainder: Int)? {\n    guard count &gt; 0 else { return nil }\n    return (total / count, total % count)\n}\nfunc caption(for name: String, suffix: String = \"ready\") -&gt; String {\n    return \"\\(name): \\(suffix)\"\n}\nif let parts = distribute(7, among: 2) {\n    print(parts.whole)\n    print(parts.remainder)\n}\nprint(distribute(7, among: 0) == nil)\nprint(caption(for: \"Rae\"))\nprint(caption(for: \"Rae\", suffix: \"waiting\"))</code></pre><p>Expected lines are 3, 1, true, Rae: ready and Rae: waiting. Tuple labels come from the declared return contract even though the return expression uses positional construction. The local name count is supplied under external among; total has no external label. Nil means this helper could not produce its result for the stated divisor, not that either component equals zero.</p><p>To test transfer, change the valid input to eight among three and predict two and two. Then state an additional domain rule, such as forbidding negative totals, and decide where to validate it. Do not assume positive divisor validation already covers that separate product requirement. Your own helper, predictions and observed run establish exercise evidence. These small synchronous operations do not establish service effects, actor isolation, or UI formatting correctness.</p>"
       },
       "references": [
         {
@@ -541,12 +702,67 @@
         "I can explain every return and guard path.",
         "I can distinguish an optional tuple from optional components.",
         "I have implemented and checked changed function fixtures."
-      ]
+      ],
+      "simple": {
+        "story": "Lin shares seven pencils between two friends. She gives each friend three pencils and keeps one left over. She writes the answer on one slip with two labeled spaces: \"each\" and \"left over.\" If someone asks her to share between zero friends, she gives no answer slip, rather than inventing a number. A slip with two zeros would still be an answer. No slip means the request could not produce this kind of answer.",
+        "meaning": "A function can return a named tuple for a small related result. An optional tuple lets the whole result be absent for a rejected input.",
+        "example": {
+          "before": "The total is 7 and the recipient count is 2.",
+          "change": "Call distribute(7, among: 2), then separately call distribute(7, among: 0).",
+          "after": "The first result has whole 3 and remainder 1. The second is nil because its guard rejects the divisor before arithmetic."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "A valid call reaches division and returns both tuple parts.",
+          "items": [
+            {
+              "label": "Inputs",
+              "text": "The caller supplies total 7 and count 2."
+            },
+            {
+              "label": "Check",
+              "text": "The guard accepts count because it is positive."
+            },
+            {
+              "label": "Calculate",
+              "text": "Integer division gives 3 and remainder gives 1."
+            },
+            {
+              "label": "Result",
+              "text": "One present tuple carries whole 3 and remainder 1."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "parameter",
+            "meaning": "A named input inside a function."
+          },
+          {
+            "term": "argument label",
+            "meaning": "The input name written at the call site."
+          },
+          {
+            "term": "return",
+            "meaning": "Leave this function call with its result."
+          },
+          {
+            "term": "tuple",
+            "meaning": "A small group of values treated as one result."
+          },
+          {
+            "term": "default argument",
+            "meaning": "The input used when a caller omits that argument."
+          }
+        ],
+        "remember": "Read the call’s labels, then check what the whole result promises.",
+        "boundary": "The slip models an optional pair, not every Swift tuple or domain rule. This divisor guard does not reject negative totals or define a real sharing policy."
+      }
     },
     {
       "id": "061",
-      "title": "Arrays, indices, slices and value edits",
-      "summary": "Build ordered collections, handle empty inputs safely, and predict the effect of assignment and mutation.",
+      "title": "Keep arrays in order and edit copies safely",
+      "summary": "Build ordered lists, handle empty lists, and explain which value changes after a copy or a slice.",
       "duration": 75,
       "level": "Foundation",
       "prerequisites": [
@@ -556,40 +772,40 @@
         "060"
       ],
       "objectives": [
-        "Declare and mutate typed arrays using safe index preconditions.",
-        "Distinguish element iteration, indices and slice index domains.",
-        "Predict value-copy behavior and avoid importing Kotlin mutable-list aliasing."
+        "Create and edit typed arrays while checking index bounds.",
+        "Choose element iteration or indices, and use a slice’s own index range.",
+        "Predict array value copies and explain why shared storage is not shared edits."
       ],
       "sections": [
         {
           "id": "why-arrays",
-          "title": "Start with an ordered result list",
-          "html": "<p>An Android result list preserves order and may contain repeated names. Swift Array is the corresponding ordered collection for today’s synthetic model. Its element type is part of the contract: <code>[String]</code> means every element is a String. Brackets containing values create an array literal. A typed empty array can be declared as <code>let names: [String] = []</code>; the annotation supplies the element information that an empty literal alone lacks. Array is a standard-library value type, so no Foundation or UI import is required.</p><p>Kotlin List describes a read-only collection interface and MutableList permits mutation through that interface. Assigning a Kotlin mutable-list reference normally aliases its object. Swift Array assignment instead gives independent observable values. A let-bound Swift array cannot append or replace its elements; use var at a deliberate edit point. This difference is more substantial than replacing Kotlin val with Swift let. Neither model alone promises deep immutability of objects contained in the collection. We will define classes later; for now, String and Int elements make the independence directly observable. Repeated elements are valid unless your domain says otherwise, and an empty array is still a present collection.</p>"
+          "title": "Use an array when order matters",
+          "html": "<p>An Array is an ordered list whose entries all have one element type. <code>[String]</code> means a list of text values. Square brackets containing values create an array literal, a list written directly in source. A typed empty array such as <code>let names: [String] = []</code> still has a known element type. This fits an Android result list that may contain repeated names. Array comes from Swift’s standard library and is a value type: assigning it gives observable value independence. You need no UI or Foundation import.</p><p>Kotlin List describes a read-only collection interface and MutableList permits mutation through that interface. Assigning a Kotlin mutable-list reference normally aliases its object. Swift Array assignment instead gives independent observable values. A let-bound Swift array cannot append or replace its elements; use var at a deliberate edit point. This difference is more substantial than replacing Kotlin val with Swift let. Neither model alone promises deep immutability of objects contained in the collection. We will define classes later; for now, String and Int elements make the independence directly observable. Repeated elements are valid unless your domain says otherwise, and an empty array is still a present collection.</p>"
         },
         {
           "id": "mutation",
-          "title": "A complete ordered edit, line by line",
-          "html": "<pre><code class=\"language-swift\">let original = [\"Ada\", \"Lin\", \"Ada\"]\nvar edited = original\nedited.append(\"Rae\")\nedited[1] = \"Sam\"\nedited.insert(\"Kai\", at: 0)\nlet removed = edited.removeLast()\nprint(original)\nprint(edited)\nprint(removed)</code></pre><p>Line one infers [String] from the literal. Line two makes a mutable binding with the same initial array value. Append places Rae after the existing elements. The subscript assignment replaces the element at index one, currently Lin, with Sam. Insert puts Kai at zero and shifts later positions. RemoveLast returns Rae while removing it from edited. Output shows the unchanged original, edited containing Kai, Ada, Sam, Ada, and the removed Rae. The functions’ names and labels tell you which positions they affect; no automatic deduplication occurs.</p><p>This describes value semantics, not a promise that line two immediately copies all storage bytes. Arrays can share internal storage and use copy-on-write when mutation requires separation. That implementation optimization does not authorize aliasing observable element values. COW is also not a synchronization primitive. If different tasks access mutable state unsafely, array value semantics will not create an actor or lock. Replacing an element requires the index to exist; after insertion or removal, saved integer positions may refer to a different element or become invalid. Choose semantic identifiers for long-lived UI identity instead of treating an array index as a stable record ID.</p>"
+          "title": "Follow each edit in order",
+          "html": "<p>Mutation means changing a value. Here the original array stays fixed under let, and edited can change under var. Append adds Rae at the end. Subscript assignment uses <code>[1]</code> to replace Lin with Sam. Insert adds Kai at zero and moves later positions forward. RemoveLast removes and returns Rae. The original remains Ada, Lin, Ada; edited becomes Kai, Ada, Sam, Ada. Duplicates remain because none of these operations removes them. An index is a position in this list, not a lasting identity for a person.</p><pre><code class=\"language-swift\">let original = [\"Ada\", \"Lin\", \"Ada\"]\nvar edited = original\nedited.append(\"Rae\")\nedited[1] = \"Sam\"\nedited.insert(\"Kai\", at: 0)\nlet removed = edited.removeLast()\nprint(original)\nprint(edited)\nprint(removed)</code></pre><p>Value semantics describes what callers can observe, not when every storage byte is copied. Arrays can share internal storage until an edit needs separation. This optimization is called copy-on-write, or COW. It preserves independent array values, but supplies no actor or lock for unsafe concurrent mutation. Subscript replacement requires an existing index. An insertion or removal can move positions, so a saved index may later name a different element or become invalid. A semantic identifier names the record itself; use that for lasting UI identity. A small output check establishes the edit result, not the allocation cost or thread safety.</p>"
         },
         {
           "id": "safe-access",
-          "title": "Empty collections and valid indices are ordinary cases",
-          "html": "<pre><code class=\"language-swift\">let names: [String] = []\nprint(names.isEmpty)\nprint(names.count)\nprint(names.first ?? \"No first name\")\nfor name in names {\n    print(name)\n}\nlet populated = [\"Ada\", \"Lin\"]\nfor index in populated.indices {\n    print(\"\\(index): \\(populated[index])\")\n}</code></pre><p>IsEmpty and count are valid for the empty array. First returns an optional element, so coalescing provides display text for absence without a trap. Direct for-in iteration visits elements; zero elements means zero iterations. Populated.indices supplies exactly the valid index range, here zero and one. A fresh Array uses integer indices beginning at zero; endIndex is the position after the last element and cannot be subscripted. Checking only <code>index &lt; count</code> is insufficient if a supplied index could be negative. <code>array.indices.contains(index)</code> checks both bounds for that array.</p><p>Ordinary <code>array[index]</code> is not Kotlin’s getOrNull: an invalid index traps instead of returning nil. RemoveFirst and removeLast also require nonempty input; popLast returns an optional and fits a possibly empty stack. Optional elements and an absent first element are separate questions. Once you mutate structure, reconsider indices saved before that edit. For display traversal, direct element iteration is usually clearer than index arithmetic. If you need both position and value, enumerated yields an offset/value tuple; that offset is an enumeration position and is not a universal Collection.Index, especially for slices. Do not assume every future collection begins at integer zero.</p>"
+          "title": "Treat an empty list as a normal input",
+          "html": "<p>An index identifies a position you can access. An empty array has no valid element indices, but isEmpty and count still work: they give true and zero. First returns an optional because the first element may not exist. Direct for-in iteration runs zero times for an empty array. For a populated array, indices gives precisely the current valid range, here zero and one. endIndex means the position after the last element. You cannot read an element there. If an input index can be negative, checking only that it is less than count is not enough.</p><pre><code class=\"language-swift\">let names: [String] = []\nprint(names.isEmpty)\nprint(names.count)\nprint(names.first ?? \"No first name\")\nfor name in names {\n    print(name)\n}\nlet populated = [\"Ada\", \"Lin\"]\nfor index in populated.indices {\n    print(\"\\(index): \\(populated[index])\")\n}</code></pre><p>Ordinary <code>array[index]</code> traps for an invalid position. It is not Kotlin getOrNull. removeFirst and removeLast require an element; popLast returns an optional when the array may be empty. An optional element and an absent first element are also separate questions. Recheck saved indices after structural edits. Direct element iteration is clearer when positions are unnecessary. Enumerated gives an offset and a value; that offset counts steps in the traversal and is not every collection’s actual Index. A slice may start at one or another retained source position. Use the collection’s own indices instead of assuming zero.</p>"
         },
         {
           "id": "slices",
-          "title": "A slice retains its parent’s index coordinates",
-          "html": "<pre><code class=\"language-swift\">let names = [\"Ada\", \"Lin\", \"Rae\", \"Sam\"]\nlet tail = names[1..&lt;3]\nprint(tail.startIndex)\nprint(tail[1])\nlet standalone = Array(tail)\nprint(standalone.startIndex)\nprint(standalone[0])</code></pre><p>The subscript using a range returns an ArraySlice rather than a new zero-based Array. Tail contains Lin and Rae, but its valid integer indices are one and two, inherited from the parent array coordinate system. Therefore tail[1] is Lin; tail[0] is invalid. Constructing Array(tail) makes a new array value whose indices begin at zero. Both printed names are Lin, with startIndex values one and zero. This is a common failure when translating Kotlin subList assumptions or treating every bracketed result as the same container type.</p><p>A slice can share and retain the parent storage, so keeping a tiny slice of a large array may retain a larger allocation than expected. Converting to Array can be a useful ownership boundary for a long-lived small subset, but it is a choice with allocation costs, not automatic optimization advice. The range bounds must still be valid for the source. Slicing does not transform or validate elements, and constructing an Array of class references would not deep-clone their objects. Describe both index behavior and contained-value behavior when reviewing a helper. Today’s tiny fixtures verify observable results; they do not measure allocation sizes or client memory usage.</p>"
+          "title": "Use the slice’s own positions",
+          "html": "<p>An ArraySlice is a part of an array that keeps the parent’s index coordinates. The slice <code>names[1..&lt;3]</code> contains Lin and Rae at indices one and two. It does not start at zero. Reading tail[1] gives Lin; tail[0] is invalid. <code>Array(tail)</code> builds an Array whose indices start at zero, so standalone[0] gives Lin too. The start indices print one and zero. The element values match, but the two containers use different coordinates. A range must also fit the source before you can slice it.</p><pre><code class=\"language-swift\">let names = [\"Ada\", \"Lin\", \"Rae\", \"Sam\"]\nlet tail = names[1..&lt;3]\nprint(tail.startIndex)\nprint(tail[1])\nlet standalone = Array(tail)\nprint(standalone.startIndex)\nprint(standalone[0])</code></pre><p>A slice can share and retain the parent storage, so keeping a tiny slice of a large array may retain a larger allocation than expected. Converting to Array can be a useful ownership boundary for a long-lived small subset, but it is a choice with allocation costs, not automatic optimization advice. The range bounds must still be valid for the source. Slicing does not transform or validate elements, and constructing an Array of class references would not deep-clone their objects. Describe both index behavior and contained-value behavior when reviewing a helper. Today’s tiny test inputs verify observable results; they do not measure allocation sizes or client memory usage.</p>"
         },
         {
           "id": "editing-policy",
-          "title": "Choose algorithms from the update rule",
-          "html": "<p>Appending one element, appending a sequence with contentsOf, replacing a range, and returning a new array are different edit contracts. A function receiving an Array ordinarily gets a value parameter and cannot directly reassign its caller’s variable; returning an edited copy is a simple functional option. Inout in lesson 064 permits caller-visible mutation under a separate exclusivity rule. ReserveCapacity can request storage for expected growth but does not change count or insert placeholder elements. Repeated insertion at the front shifts positions and may be costly for large workloads; choose it because the order requirement needs it, then measure if performance matters.</p><p>Do not remove elements while assuming an old traversal’s positions remain correct. One safe beginner strategy is to construct a new array of kept elements using a for loop; filter later supplies a concise expression of that policy. Sorting returns or mutates an order, and removing duplicates needs a separate rule about which occurrence and order to preserve. Converting to Set will lose multiplicity and has no stable display order. Kotlin collection intuition is valuable for algorithm intent, but Swift’s value storage and slice coordinates remain independent facts. Distinguish a user-visible edit requirement from an incidental storage optimization when choosing the operation.</p>"
+          "title": "Choose an edit from the rule it must follow",
+          "html": "<p>An edit contract says what should change and what should stay. Append adds one item; append(contentsOf:) adds several; replacing a range changes a span. Returning a new array lets the caller choose whether to keep it. An ordinary Array parameter is a value and cannot directly replace the caller’s variable. Lesson 064 adds inout for that purpose. reserveCapacity asks for room to grow; it does not add elements or change count. Front insertion moves later positions, so repeated front inserts can cost more as lists grow. Measure that cost if it matters.</p><p>Do not remove elements while assuming an old traversal’s positions remain correct. One safe beginner strategy is to construct a new array of kept elements using a for loop; filter later supplies a concise expression of that policy. Sorting returns or mutates an order, and removing duplicates needs a separate rule about which occurrence and order to preserve. Converting to Set will lose multiplicity and has no stable display order. Kotlin collection intuition is valuable for algorithm intent, but Swift’s value storage and slice coordinates remain independent facts. Distinguish a user-visible edit requirement from an incidental storage optimization when choosing the operation.</p>"
         },
         {
           "id": "repo-and-failures",
-          "title": "Read helpers as contracts with inputs",
-          "html": "<p>The active Array extensions distinguish mutating resize from resized, which copies into a local var, calls resize and returns the result. You can now predict the intended outer value behavior before learning the generic signature. Its remove-duplicates helper converts through a set; that establishes uniqueness but not preservation of the original order. Do not promise a stable result-list ordering merely because a helper has a friendly name. The source glob for ZDCoreBase confirms this file belongs to the active generated target.</p><p>The question model has an options array, and the cancellation coordinator appends responses and removes the last one on an error path. These source observations connect ordered state with update policy, but proving all removal paths safe needs workflow context and tests. Our lesson does not supply that proof. Misconceptions to catch include force-subscripting an empty array, treating endIndex as the last valid element, reading tail[0], and assuming assignment aliases a Kotlin MutableList. Predict the failure category: an invalid index is a runtime trap, while append on a let-bound Array is a compiler rejection. Neither is an ordinary thrown service error.</p>"
+          "title": "Read what a helper actually preserves",
+          "html": "<p>A mutating method changes the value it is called on. The linked resize helper does that. Its resized partner makes a local copy, edits it, and returns the result, leaving the caller to choose what to store. Its duplicate-removal helper converts through Set, a collection of unique members. That removes repeats but promises no original display order. Check the implementation before telling a UI consumer its list order is preserved. The ZDCoreBase source pattern includes this file in the target; it is active source, not evidence of an executed test.</p><p>The question model has an options array, and the cancellation coordinator appends responses and removes the last one on an error path. These source observations connect ordered state with update policy, but proving all removal paths safe needs workflow context and tests. Our lesson does not supply that proof. Misconceptions to catch include reading an empty array by subscript without checking, treating endIndex as the last valid element, reading tail[0], and assuming assignment aliases a Kotlin MutableList. Predict the failure category: an invalid index is a runtime trap, while append on a let-bound Array is a compiler rejection. Neither is an ordinary thrown service error.</p>"
         }
       ],
       "quiz": [
@@ -625,13 +841,13 @@
         }
       ],
       "exercise": {
-        "brief": "Edit a copied ordered list, safely inspect an empty list, and explain a nonzero-based slice.",
+        "brief": "Edit a copied list, inspect an empty list safely, and compare a slice’s positions with a new Array.",
         "steps": [
-          "Create original [Ada, Lin, Rae], copy into var edited, replace Lin and append Sam.",
-          "Print original and edited with expected order.",
-          "Use first and popLast on an empty mutable array without force unwraps.",
-          "Slice original at 1..<3 and compare its startIndex with Array(slice).startIndex.",
-          "Predict the rejection for appending to original without executing a crash."
+          "Start with original [Ada, Lin, Rae]. Copy it into var edited, replace Lin with Kai, and append Sam.",
+          "Predict and print both lists in order.",
+          "Read first and call popLast on an empty mutable array. Handle nil without forcing it.",
+          "Slice original at 1..<3. Compare slice.startIndex with Array(slice).startIndex.",
+          "Predict why appending to the let original is rejected. Keep invalid operations out of the passing program."
         ],
         "acceptance": [
           "Original remains Ada, Lin, Rae; edited is Ada, Kai, Rae, Sam.",
@@ -639,7 +855,7 @@
           "Slice starts at one and the reconstructed Array starts at zero.",
           "The explanation distinguishes COW, value semantics and deep copying."
         ],
-        "solution": "<p>Run this complete program separately from earlier snippets. The guards use current collection index domains rather than hard-coded assumptions.</p><pre><code class=\"language-swift\">let original = [\"Ada\", \"Lin\", \"Rae\"]\nvar edited = original\nedited[1] = \"Kai\"\nedited.append(\"Sam\")\nprint(original)\nprint(edited)\nvar empty: [String] = []\nprint(empty.first == nil)\nprint(empty.popLast() == nil)\nlet slice = original[1..&lt;3]\nlet rebuilt = Array(slice)\nprint(slice.startIndex)\nprint(rebuilt.startIndex)\nif slice.indices.contains(1) {\n    print(slice[1])\n}</code></pre><p>The two array prints differ only in the edited value. Both empty checks print true. Start indices print one and zero, and the final line is Lin. Contains is evaluated against the slice’s own indices, so it does not mistakenly authorize index zero. The original let prevents mutating its array, while edited’s var permits replacement and append.</p><p>For a transfer fixture, slice 2..<3 and predict a start index of two and a single Rae element. If you need to keep that slice long-term, explain whether preserving source coordinates or creating an independent array container better serves the consumer. Do not claim a measured memory improvement from this small run. Record the actual or explicitly predicted output as your learner evidence, separate from the author’s worked answer.</p>"
+        "solution": "<p>Run this complete program in its own file. An index domain is the set of positions valid for that collection. The final check uses the slice’s current indices before reading index one. Predict both arrays, both empty checks, and both start indices before running.</p><pre><code class=\"language-swift\">let original = [\"Ada\", \"Lin\", \"Rae\"]\nvar edited = original\nedited[1] = \"Kai\"\nedited.append(\"Sam\")\nprint(original)\nprint(edited)\nvar empty: [String] = []\nprint(empty.first == nil)\nprint(empty.popLast() == nil)\nlet slice = original[1..&lt;3]\nlet rebuilt = Array(slice)\nprint(slice.startIndex)\nprint(rebuilt.startIndex)\nif slice.indices.contains(1) {\n    print(slice[1])\n}</code></pre><p>The two array prints differ only in the edited value. Both empty checks print true. Start indices print one and zero, and the final line is Lin. Contains is evaluated against the slice’s own indices, so it does not mistakenly authorize index zero. The original let prevents mutating its array, while edited’s var permits replacement and append.</p><p>For a transfer test input, slice 2..<3 and predict a start index of two and a single Rae element. If you need to keep that slice long-term, explain whether preserving source coordinates or creating an independent array container better serves the consumer. Do not claim a measured memory improvement from this small run. Record the actual or explicitly predicted output as your learner evidence, separate from the author’s worked answer.</p>"
       },
       "references": [
         {
@@ -676,12 +892,67 @@
         "I can safely handle empty collection operations.",
         "I can explain slice indices without rebasing assumptions.",
         "I have run or traced my own array fixtures."
-      ]
+      ],
+      "simple": {
+        "story": "Ada writes a shopping list: milk, bread, and apples. She makes another list with the same three entries, then replaces bread with rice on the second list and adds tea. The first list still says bread and has no tea. Later she takes a marked excerpt from lines one and two of the original. That excerpt keeps those line numbers. Writing its contents on a fresh list would give them new line numbers starting at zero.",
+        "meaning": "Array assignment preserves independent values. An ArraySlice keeps source index positions; converting it to Array gives zero-based positions.",
+        "example": {
+          "before": "original is [Ada, Lin, Rae]. edited starts with the same array value.",
+          "change": "Replace edited[1] with Kai and append Sam.",
+          "after": "original stays [Ada, Lin, Rae]. edited becomes [Ada, Kai, Rae, Sam]. Only the writable copied value was edited."
+        },
+        "picture": {
+          "kind": "comparison",
+          "caption": "Original and edited arrays after the edit, plus the slice coordinate rule.",
+          "items": [
+            {
+              "label": "Original",
+              "text": "Its entries remain Ada, Lin, Rae."
+            },
+            {
+              "label": "Edited",
+              "text": "Its entries become Ada, Kai, Rae, Sam."
+            },
+            {
+              "label": "Slice 1..<3",
+              "text": "The original’s Lin and Rae retain indices 1 and 2."
+            },
+            {
+              "label": "Array of slice",
+              "text": "The same two entries get indices 0 and 1."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Array",
+            "meaning": "An ordered collection of elements of one type."
+          },
+          {
+            "term": "index",
+            "meaning": "A position valid for a particular collection."
+          },
+          {
+            "term": "slice",
+            "meaning": "A collection part that keeps its source coordinates."
+          },
+          {
+            "term": "value semantics",
+            "meaning": "Changing an assigned value does not change the other value."
+          },
+          {
+            "term": "copy-on-write",
+            "meaning": "Shared internal storage is separated when an edit needs independence."
+          }
+        ],
+        "remember": "Use the current collection’s indices, and predict edits by value.",
+        "boundary": "Swift need not copy all storage when an array is assigned. Arrays containing class references can still share those objects. Paper lists do not model allocation, races, or deep copying."
+      }
     },
     {
       "id": "062",
-      "title": "Dictionaries, sets, hashing and collision policy",
-      "summary": "Choose keyed lookup or membership deliberately, preserve missing values, and state what happens for duplicate keys and unordered output.",
+      "title": "Look up keys and track unique members",
+      "summary": "Choose a dictionary for key lookup or a set for membership. Keep missing values and duplicate handling explicit.",
       "duration": 75,
       "level": "Foundation",
       "prerequisites": [
@@ -692,40 +963,40 @@
         "061"
       ],
       "objectives": [
-        "Read keyed lookup, default subscripts and removal semantics.",
-        "Define a duplicate-key policy and distinguish missing from stored optional values.",
-        "Use Set for membership and uniqueness without claiming a display order."
+        "Look up, update, and remove dictionary entries, including default reads.",
+        "State what duplicates mean and separate a missing key from a stored nil value.",
+        "Use Set for uniqueness and membership, with a separate display-order rule."
       ],
       "sections": [
         {
           "id": "why-shapes",
-          "title": "Order, lookup and membership answer different questions",
-          "html": "<p>Your Android model may need an ordered list of names, a map of counts by specialty, and a set of selected identifiers. Swift supplies different collections for those requirements. Dictionary stores key/value associations, spelled <code>[String: Int]</code> for text keys and integer counts. Set stores unique elements, spelled <code>Set&lt;String&gt;</code>. The angle brackets supply a type argument; we will explain generic declarations later. You can use these standard containers before authoring your own generics. Neither collection requires Foundation.</p><p>Dictionary keys and Set elements must support Hashable, a standard-library contract that includes value equality and hashing. A hash helps locate possible matches; equality still determines whether keys/elements are the same. Hash collisions between unequal values are permitted and do not make them equal. A hash value is not a durable record identifier and must not be persisted as though stable across runs. Kotlin Map/Set are useful shape analogies, but Swift’s standard Dictionary and Set have value semantics. Their traversal order is not a declared display order. Use an Array or explicitly sort output when a product requires a deterministic presentation.</p>"
+          "title": "Pick a list, a lookup table, or a membership group",
+          "html": "<p>A Dictionary connects a key with a value. <code>[String: Int]</code> maps text keys to whole-number counts. A Set keeps unique members; <code>Set&lt;String&gt;</code> keeps unique text values. The angle brackets supply the element type, called a type argument. An Array keeps ordered entries, including repeats. These answer different questions in an Android model: list the results, find the count for a specialty, or ask whether an ID is selected. You can use these standard containers before learning how to write generics. They need no Foundation import.</p><p>Dictionary keys and Set elements must support Hashable, a standard-library contract that includes value equality and hashing. A hash helps locate possible matches; equality still determines whether keys/elements are the same. Hash collisions between unequal values are permitted and do not make them equal. A hash value is not a durable record identifier and must not be persisted as though stable across runs. Kotlin Map/Set are useful shape analogies, but Swift’s standard Dictionary and Set have value semantics. Their traversal order is not a declared display order. Use an Array or explicitly sort output when a product requires a deterministic presentation.</p>"
         },
         {
           "id": "dictionary",
-          "title": "A complete keyed update with a missing-value check",
-          "html": "<pre><code class=\"language-swift\">var counts: [String: Int] = [\"general\": 2]\nlet original = counts\ncounts[\"general\", default: 0] += 1\ncounts[\"dental\"] = 4\nlet missing = counts[\"vision\"]\nprint(counts[\"general\"] ?? -1)\nprint(missing == nil)\ncounts[\"dental\"] = nil\nprint(counts[\"dental\"] == nil)\nprint(original[\"general\"] ?? -1)</code></pre><p>Line one declares a mutable dictionary literal; each colon associates a key with a value. Line two preserves the original value. The default subscript on line three supplies zero if general is missing, and the compound mutation writes the updated Int back. Dental assignment creates or replaces that association. Ordinary lookup returns Int? because the key may be absent, so missing is nil. Setting the ordinary subscript to nil removes dental. Output is 3, true, true and 2. The minus-one fallback is only a print aid, not a stored key/value sentinel.</p><p>A dictionary has one value per equal key. Reassigning a key replaces the previous value rather than appending a duplicate entry. Reading <code>counts[\"unknown\", default: 0]</code> alone supplies a fallback without necessarily inserting a stored association; the value mutation form above is what persists the increment. Default subscript behavior with reference-valued elements has additional writeback subtleties, so do not infer object insertion merely because a reached object mutates. Our Int example is deliberately simple. Unlike an Array index, an absent ordinary dictionary key returns nil instead of trapping.</p>"
+          "title": "Update one key and notice what is absent",
+          "html": "<p>A dictionary association is one key linked to one value. The literal starts with general linked to two. Assigning counts to original preserves that value. The default subscript supplies zero when needed, and <code>+= 1</code> writes the updated count back. Assigning dental creates its entry; looking up vision gives nil because it is missing. Ordinary lookup returns Int? for this reason. Assigning nil removes dental. The output is 3, true, true, and 2. The printed minus-one fallback is not saved as an entry.</p><pre><code class=\"language-swift\">var counts: [String: Int] = [\"general\": 2]\nlet original = counts\ncounts[\"general\", default: 0] += 1\ncounts[\"dental\"] = 4\nlet missing = counts[\"vision\"]\nprint(counts[\"general\"] ?? -1)\nprint(missing == nil)\ncounts[\"dental\"] = nil\nprint(counts[\"dental\"] == nil)\nprint(original[\"general\"] ?? -1)</code></pre><p>Each equal key has one stored value. Reassignment replaces its value rather than adding another entry with that key. A default read such as <code>counts[\"unknown\", default: 0]</code> can supply zero without storing an entry. In our Int example, <code>+= 1</code> mutates the value through the subscript, so the updated count is written back. Reference-valued dictionaries require care: changing a property of a returned object need not assign that object into a missing entry. Do not infer insertion from a reached object’s mutation. Unlike an array’s out-of-bounds access, an ordinary dictionary lookup for a missing key simply returns nil.</p>"
         },
         {
           "id": "presence",
-          "title": "Missing key and present optional payload can differ",
-          "html": "<p>For <code>[String: Int]</code>, a lookup’s Int? expresses the missing-key question. For <code>[String: Int?]</code>, the value itself may be nil, so ordinary lookup returns Int??. The outer optional describes whether the key exists; the inner optional describes its stored payload. This is a real representation distinction, not an instruction to use nested optionals everywhere. Often a named enum for unknown, pending or known value makes the product meaning clearer once you learn enums. At this stage, be able to identify which layer answers which question.</p><p>When assigning to an optional-valued dictionary, <code>values[\"a\"] = nil</code> removes the key because the outer subscript result is nil. To retain a key with a nil payload, use <code>updateValue(nil, forKey: \"a\")</code> or explicitly construct the outer present optional. A binding of the lookup can reveal that the key exists while its bound optional payload remains nil. Kotlin Map.get also often conflates absent and nullable-valued entries unless you inspect containsKey; Swift makes the nested optional types visible. Neither language chooses your domain rule. Use an explicit presence check when deletion versus unknown payload matters, and test both situations independently instead of substituting a fallback too early.</p>"
+          "title": "Separate no key from a key with no payload",
+          "html": "<p>A payload is the value stored for an existing key. In <code>[String: Int]</code>, lookup returns Int? to express whether the key exists. In <code>[String: Int?]</code>, the payload can also be absent, so lookup returns Int??. The outer optional answers whether there is an entry; the inner optional answers whether that entry has an integer. These are separate questions. Nested optionals can be useful, but a named state such as unknown or known often explains the domain better. First make sure you can tell which question each layer answers.</p><p>In an optional-valued dictionary, <code>values[\"a\"] = nil</code> removes the key: it sets the outer optional to absence. To keep the entry but store no integer, use <code>updateValue(nil, forKey: \"a\")</code> or explicitly supply a present outer optional with a nil payload. Optional binding of a lookup can confirm the entry exists while its inner payload remains nil. Kotlin Map.get can also mix up missing entries and nullable values unless you check containsKey. Swift shows the two optional layers in the type. Test deletion and an unknown stored payload separately before applying a fallback.</p>"
         },
         {
           "id": "collisions-and-order",
-          "title": "Choose collision and output policies explicitly",
-          "html": "<pre><code class=\"language-swift\">let labels = [\"general\", \"dental\", \"general\"]\nvar histogram: [String: Int] = [:]\nfor label in labels {\n    histogram[label, default: 0] += 1\n}\nfor key in histogram.keys.sorted() {\n    if let count = histogram[key] {\n        print(\"\\(key): \\(count)\")\n    }\n}</code></pre><p>The empty literal for a dictionary is <code>[:]</code>, distinguished from an empty array. Each input occurrence increments its label’s count, so repeated general values are deliberately aggregated. Keys.sorted creates a deterministic array of String keys for printing. Optional binding consumes the ordinary lookup. Output order is dental: 1 then general: 2. Do not rely on whatever order a dictionary happened to print in one process. Sorting presentation does not change the dictionary’s key/value relationship.</p><p>Some initializers require unique input keys and trap if duplicates are supplied. Others accept a combining closure so you can define how conflicts resolve. Closures are taught in lessons 063 and 068; today’s explicit loop makes the combining rule visible without that prerequisite. Common choices include first wins, last wins, aggregate, or reject. Pick one from the business rule and test duplicate inputs. Silent overwrite can conceal data loss when a producer adds a second record with the same key. A map keyed by display name is especially fragile if equal names represent different records. Hashing does not fix a mistaken identity choice.</p>"
+          "title": "State how duplicates combine and how output is ordered",
+          "html": "<p>A duplicate-key policy says what to do when inputs name the same key more than once. This histogram counts every occurrence. A histogram is a lookup table of counts. The empty dictionary literal is <code>[:]</code>. Each general input increments its count, so general becomes two and dental one. Sorting the keys makes the printed order dental then general. A dictionary’s incidental traversal order is not your presentation rule. Sorting the output does not alter which value belongs to each key.</p><pre><code class=\"language-swift\">let labels = [\"general\", \"dental\", \"general\"]\nvar histogram: [String: Int] = [:]\nfor label in labels {\n    histogram[label, default: 0] += 1\n}\nfor key in histogram.keys.sorted() {\n    if let count = histogram[key] {\n        print(\"\\(key): \\(count)\")\n    }\n}</code></pre><p>Some initializers require unique input keys and trap if duplicates are supplied. Others accept a combining closure so you can define how conflicts resolve. Closures are taught in lessons 063 and 068; today’s explicit loop makes the combining rule visible without that prerequisite. Common choices include first wins, last wins, aggregate, or reject. Pick one from the business rule and test duplicate inputs. Silent overwrite can conceal data loss when a producer adds a second record with the same key. A map keyed by display name is especially fragile if equal names represent different records. Hashing does not fix a mistaken identity choice.</p>"
         },
         {
           "id": "set",
-          "title": "Membership is different from position",
-          "html": "<pre><code class=\"language-swift\">var selected: Set&lt;String&gt; = [\"Ada\", \"Lin\", \"Ada\"]\nlet original = selected\nlet insertion = selected.insert(\"Rae\")\nselected.remove(\"Lin\")\nlet visible: Set&lt;String&gt; = [\"Ada\", \"Sam\"]\nprint(original.count)\nprint(insertion.inserted)\nprint(selected.contains(\"Rae\"))\nprint(selected.intersection(visible).sorted())\nprint(selected.union(visible).sorted())</code></pre><p>The annotation interprets the literal as a Set, collapsing repeated Ada into one element. Insert returns a tuple including inserted, which is true for the new Rae. Remove drops Lin if present; a missing element would be an ordinary optional return, not an index trap. Contains answers membership directly. Intersection retains members in both sets, and union includes all members of either. Sorted is used only for stable printed presentation. Output is 2, true, true, an Ada-only array, and Ada, Rae, Sam in sorted order.</p><p>This resembles Kotlin set operations, but assigning selected to original preserves an independent Set value rather than necessarily aliasing a mutable-set instance. A Set has no first-insertion display-order guarantee. Turning an ordered Array into Set loses duplicates and may lose the original order; turning it back does not reconstruct them. If the domain needs first-occurrence order, maintain an output Array and a seen Set together, as the active unique helper does. Mutating equality/hash-defining state of a referenced key while it is stored can undermine lookup invariants; define keys from stable value data. Custom Hashable implementations are further practice, not required today.</p>"
+          "title": "Ask membership questions with a set",
+          "html": "<p>Membership asks whether a value belongs to a group. A Set keeps one copy of each equal value, so repeated Ada produces one member. Insert returns information including inserted, which says whether a new member was added. Remove returns an optional removed member, and contains returns Bool. Intersection keeps members present in both groups; union includes members from either. Here the original count is two, Rae is newly inserted, and selected contains Rae. Sorting the intersection and union only makes their printed presentation stable.</p><pre><code class=\"language-swift\">var selected: Set&lt;String&gt; = [\"Ada\", \"Lin\", \"Ada\"]\nlet original = selected\nlet insertion = selected.insert(\"Rae\")\nselected.remove(\"Lin\")\nlet visible: Set&lt;String&gt; = [\"Ada\", \"Sam\"]\nprint(original.count)\nprint(insertion.inserted)\nprint(selected.contains(\"Rae\"))\nprint(selected.intersection(visible).sorted())\nprint(selected.union(visible).sorted())</code></pre><p>This resembles Kotlin set operations, but assigning selected to original preserves an independent Set value rather than necessarily aliasing a mutable-set instance. A Set has no first-insertion display-order guarantee. Turning an ordered Array into Set loses duplicates and may lose the original order; turning it back does not reconstruct them. If the domain needs first-occurrence order, maintain an output Array and a seen Set together, as the active unique helper does. Mutating equality/hash-defining state of a referenced key while it is stored can undermine lookup invariants; define keys from stable value data. Custom Hashable implementations are further practice, not required today.</p>"
         },
         {
           "id": "repo-and-failure",
-          "title": "Read a utility’s name together with its body",
-          "html": "<p>The active Set.toggled helper copies self into temp, removes a present value or inserts an absent one, and returns the resulting Set. Its value contract matches our predictions. The active Sequence.unique helper keeps a set of seen keys and an array of chosen elements, preserving first-occurrence order while using hashing for membership. This is stronger than simply converting to Set and back. The dictionary helpers have explicit shouldOverrideExistingValues and uniquingKeysWith parameters; their existence demonstrates that collisions require a policy rather than a universal overwrite rule.</p><p>Misconceptions include treating a missing key as a stored zero, treating a default read as proof of insertion, expecting Set to preserve UI ordering, and using hashValue as a persistent ID. Identify the likely symptom for each: a hidden absent-data state, a surprising count/membership result, nondeterministic presentation, or incompatible saved identifiers across runs. The source globs for ZDCoreBase and ZDCorePlusSentry confirm the inspected helpers belong to active targets. We do not import those targets into this lesson or claim their full algorithms were tested. Your standalone fixtures should show the collision rule and display order you chose.</p>"
+          "title": "Check the helper’s duplicate rule",
+          "html": "<p>A helper’s name is a clue; its body gives the rule. Set.toggled copies its value, removes a present member or adds a missing member, and returns the result. Sequence.unique uses a seen Set to detect repeated keys and an Array to retain the first chosen entries in input order. That preserves more than Set conversion alone. Dictionary helpers name overwrite and combining policies in their parameters. Those policies decide which data survives. Source patterns include these helpers in the active targets; our lesson does not claim to have run all their algorithms.</p><p>Misconceptions include treating a missing key as a stored zero, treating a default read as proof of insertion, expecting Set to preserve UI ordering, and using hashValue as a persistent ID. Identify the likely symptom for each: a hidden absent-data state, a surprising count/membership result, presentation that can vary between runs, or incompatible saved identifiers across runs. The source globs for ZDCoreBase and ZDCorePlusSentry confirm the inspected helpers belong to active targets. We do not import those targets into this lesson or claim their full algorithms were tested. Your standalone test inputs should show the collision rule and display order you chose.</p>"
         }
       ],
       "quiz": [
@@ -761,13 +1032,13 @@
         }
       ],
       "exercise": {
-        "brief": "Build a deterministic histogram and first-occurrence unique list from repeated synthetic labels.",
+        "brief": "Count repeated labels and keep one copy of each label in first-appearance order.",
         "steps": [
-          "Use [general, dental, general, vision] as input.",
-          "Count occurrences with a Dictionary default subscript.",
-          "Keep a seen Set and append only new labels to an output Array.",
-          "Print histogram keys sorted and preserve input order in the unique list.",
-          "Demonstrate one absent key separately from a present key with count zero."
+          "Use the text labels general, dental, general, vision in that order.",
+          "Count each label with a Dictionary default subscript.",
+          "Use a seen Set and an output Array. Append a label only the first time it appears.",
+          "Print counts by sorted key. Keep the unique list in input order.",
+          "Show the difference between an absent key and an existing key whose count is zero."
         ],
         "acceptance": [
           "General count is two; dental and vision counts are one.",
@@ -775,7 +1046,7 @@
           "An absent key remains nil rather than silently becoming stored zero.",
           "The explanation states collision and presentation-order policies."
         ],
-        "solution": "<p>This complete standalone implementation uses only constructs already introduced. Insert’s named tuple member provides the new-member decision without a second membership lookup.</p><pre><code class=\"language-swift\">let labels = [\"general\", \"dental\", \"general\", \"vision\"]\nvar counts: [String: Int] = [:]\nvar seen: Set&lt;String&gt; = []\nvar ordered: [String] = []\nfor label in labels {\n    counts[label, default: 0] += 1\n    if seen.insert(label).inserted {\n        ordered.append(label)\n    }\n}\nfor key in counts.keys.sorted() {\n    if let value = counts[key] { print(\"\\(key): \\(value)\") }\n}\nprint(ordered)\ncounts[\"empty\"] = 0\nprint(counts[\"absent\"] == nil)\nprint(counts[\"empty\"] == 0)</code></pre><p>The histogram prints dental one, general two and vision one in sorted-key order. Ordered contains general, dental and vision in their first appearance order, independent of set traversal. Both final checks print true, while the dictionary states they test differ: absent has no association; empty has a present zero.</p><p>To test transfer, begin the input with vision and confirm that the unique output begins with vision while the sorted histogram still begins with dental. That checks the two ordering contracts independently. If duplicate labels should be rejected rather than counted, state a different rule before changing implementation. The present exercise validates synthetic value behavior and does not establish production identifier correctness or benchmark hashing performance.</p>"
+        "solution": "<p>This answer runs on its own and uses the syntax introduced so far. Set.insert returns a tuple; its inserted member tells you whether this label is new. That lets you append first occurrences without a second lookup. Predict the sorted count lines and the ordered unique list separately.</p><pre><code class=\"language-swift\">let labels = [\"general\", \"dental\", \"general\", \"vision\"]\nvar counts: [String: Int] = [:]\nvar seen: Set&lt;String&gt; = []\nvar ordered: [String] = []\nfor label in labels {\n    counts[label, default: 0] += 1\n    if seen.insert(label).inserted {\n        ordered.append(label)\n    }\n}\nfor key in counts.keys.sorted() {\n    if let value = counts[key] { print(\"\\(key): \\(value)\") }\n}\nprint(ordered)\ncounts[\"empty\"] = 0\nprint(counts[\"absent\"] == nil)\nprint(counts[\"empty\"] == 0)</code></pre><p>The histogram prints dental one, general two and vision one in sorted-key order. Ordered contains general, dental and vision in their first appearance order, independent of set traversal. Both final checks print true, while the dictionary states they test differ: absent has no association; empty has a present zero.</p><p>To test transfer, begin the input with vision and confirm that the unique output begins with vision while the sorted histogram still begins with dental. That checks the two ordering contracts independently. If duplicate labels should be rejected rather than counted, state a different rule before changing implementation. The present exercise validates made-up value behavior and does not establish production identifier correctness or benchmark hashing performance.</p>"
       },
       "references": [
         {
@@ -812,12 +1083,67 @@
         "I can state a collision rule before collecting data.",
         "I can choose Set membership without assuming display order.",
         "I have checked ordered and keyed outputs independently."
-      ]
+      ],
+      "simple": {
+        "story": "Rae counts fruit orders on a board. An order for apples adds one to the apples tally. Another apple order raises the same tally instead of creating a second apples heading. She also keeps a separate list of fruit types in the order customers first asked for them. A basket containing unique name cards tells her whether a name has appeared. It does not tell her the order in which those cards arrived, so she keeps that first-arrival list separately.",
+        "meaning": "Dictionary stores one value per key; a counting rule combines repeats. Set checks uniqueness, while an Array can preserve first-appearance order.",
+        "example": {
+          "before": "labels is [general, dental, general, vision]. counts, seen, and ordered are empty.",
+          "change": "Visit each label, increment its count, and append it only when seen.insert reports a new member.",
+          "after": "general has count 2; dental and vision have count 1. ordered is [general, dental, vision]. The repeated general increments a count but adds no second unique entry."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Counting and first-occurrence filtering use different rules for the same inputs.",
+          "items": [
+            {
+              "label": "Read label",
+              "text": "Each input occurrence is visited in order."
+            },
+            {
+              "label": "Count",
+              "text": "The label’s dictionary count rises by one."
+            },
+            {
+              "label": "Check seen",
+              "text": "Set insertion reports whether this is a new member."
+            },
+            {
+              "label": "Keep first",
+              "text": "Only new labels enter the ordered Array."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Dictionary",
+            "meaning": "A collection linking each key to one value."
+          },
+          {
+            "term": "Set",
+            "meaning": "A collection with one member per equal value."
+          },
+          {
+            "term": "Hashable",
+            "meaning": "A contract supplying equality and a hash for lookup."
+          },
+          {
+            "term": "collision policy",
+            "meaning": "The rule for inputs that produce the same key."
+          },
+          {
+            "term": "membership",
+            "meaning": "Whether a value belongs to a collection."
+          }
+        ],
+        "remember": "Count with keys, test membership with a set, and keep order separately.",
+        "boundary": "The board does not explain hash-table storage. Different keys can have matching hashes; equality still distinguishes them. A set promises no insertion display order, and hashes are not persistent IDs."
+      }
     },
     {
       "id": "063",
-      "title": "Transformations, reductions and lazy iteration",
-      "summary": "Read closure-based collection pipelines from first principles and distinguish output shape, dropped values and deferred work.",
+      "title": "Transform collections and know when work runs",
+      "summary": "Read collection transformations as small rules. Track retained values, dropped values, result shapes, and deferred work.",
       "duration": 75,
       "level": "Foundation",
       "prerequisites": [
@@ -829,40 +1155,40 @@
         "062"
       ],
       "objectives": [
-        "Explain a closure parameter before using map, filter, compactMap or flatMap.",
-        "Choose the output shape and failure policy of a transformation.",
-        "Predict reduction order and distinguish lazy description from cached results."
+        "Read a closure before passing it to map, filter, compactMap, or flatMap.",
+        "Choose how many results to keep and how to report invalid input.",
+        "Follow a reduction and explain why a lazy recipe does not cache its results."
       ],
       "sections": [
         {
           "id": "why-pipelines",
-          "title": "Make the collection rule readable before making it short",
-          "html": "<p>On Android you may chain map, filter and a Sequence to prepare list content. Swift has analogous standard-library operations, but the result shape, optional policy and evaluation timing deserve explicit reasoning. Begin with a for loop in your head: which inputs are visited, which outputs are appended, and what happens when an input is invalid? A pipeline is a compact expression of that algorithm. It should not replace that explanation. These operations are synchronous unless a different API explicitly states asynchronous effects; a function named map does not imply concurrency.</p><p>A closure is an unnamed function value that can be passed to another operation. Its inputs and result follow a function type, such as <code>(Int) -&gt; Int</code>. Braces surround its definition, <code>in</code> separates parameter declarations from the body, and the body may return a value. We introduce just the closure syntax needed to transform local values here. Storage, escaping and ownership are taught separately in lesson 068. The standard eager Array operations produce new arrays. Kotlin collection operations provide a useful algorithm analogy, but do not assume Swift’s generic Sequence means a lazy Kotlin Sequence.</p>"
+          "title": "Explain the loop before shortening it",
+          "html": "<p>A pipeline passes values through a series of operations. You may already chain map and filter in Kotlin. Start by describing the equivalent loop: which inputs are visited, what gets kept, and what happens to invalid data? A shorter expression must keep the same rule. The result shape means whether you get one value per input, fewer values, nested values, or one final total. Timing matters too: eager work runs now; lazy work waits for a consumer. These standard-library operations are synchronous. The name map does not mean work runs concurrently.</p><p>A closure is an unnamed function value that can be passed to another operation. Its inputs and result follow a function type, such as <code>(Int) -&gt; Int</code>. Braces surround its definition, <code>in</code> separates parameter declarations from the body, and the body may return a value. We introduce just the closure syntax needed to transform local values here. Storage, escaping and ownership are taught separately in lesson 068. The standard eager Array operations produce new arrays. Kotlin collection operations provide a useful algorithm analogy, but do not assume Swift’s generic Sequence means a lazy Kotlin Sequence.</p>"
         },
         {
           "id": "closure-and-map",
-          "title": "A small complete pipeline explained from its inputs",
-          "html": "<pre><code class=\"language-swift\">let values = [1, 2, 3, 4]\nlet double: (Int) -&gt; Int = { value in\n    return value * 2\n}\nlet doubled = values.map(double)\nlet even = values.filter { value in\n    return value % 2 == 0\n}\nprint(doubled)\nprint(even)</code></pre><p>Line one is the input array. The next declaration gives double an explicit function type: one Int enters, one Int returns. The closure’s local parameter is value, and return computes twice that value. Passing double to map supplies the operation to apply for each element; it does not call double once and pass one result. Map keeps one output per input and order, so doubled is [2, 4, 6, 8]. The filter call uses trailing-closure syntax: the closure appears after the function name instead of as a labeled argument inside parentheses.</p><p>Filter’s closure returns Bool and decides whether the original element is retained. It does not replace that element with true or false. Even is [2, 4]. With a single expression, a closure can omit return; Swift can infer its parameter/result types from the surrounding operation. Shorthand <code>$0</code> means the first implicit closure parameter and <code>$1</code> the second. Use explicit names until you can read the full rule. Kotlin often uses it for a single lambda parameter; Swift does not. A trailing closure is ordinary function-value syntax, not a special concurrent block. Map preserves multiplicity unless your transform itself changes the values.</p>"
+          "title": "Give map a value rule and filter a yes-or-no rule",
+          "html": "<p>A closure is an unnamed function value. <code>(Int) -&gt; Int</code> says one integer enters and one integer returns. In braces, value names the local input and <code>in</code> starts the body. Passing double to map tells it what to do for each element. Map preserves input order and produces one output per input, so the result is [2, 4, 6, 8]. Filter’s closure answers Bool: keep this original value or leave it out. The trailing closure is written after filter rather than inside the call’s parentheses.</p><pre><code class=\"language-swift\">let values = [1, 2, 3, 4]\nlet double: (Int) -&gt; Int = { value in\n    return value * 2\n}\nlet doubled = values.map(double)\nlet even = values.filter { value in\n    return value % 2 == 0\n}\nprint(doubled)\nprint(even)</code></pre><p>Filter’s closure returns Bool and decides whether the original element is retained. It does not replace that element with true or false. Even is [2, 4]. With a single expression, a closure can omit return; Swift can infer its parameter/result types from the surrounding operation. Shorthand <code>$0</code> means the first implicit closure parameter and <code>$1</code> the second. Use explicit names until you can read the full rule. Kotlin often uses it for a single lambda parameter; Swift does not. A trailing closure is ordinary function-value syntax, not a special concurrent block. Map preserves multiplicity unless your transform itself changes the values.</p>"
         },
         {
           "id": "optional-and-nested",
-          "title": "Compact and flatten are two different shape decisions",
-          "html": "<pre><code class=\"language-swift\">let texts = [\"3\", \"bad\", \"8\"]\nlet attempts: [Int?] = texts.map { text in Int(text) }\nlet valid: [Int] = texts.compactMap { text in Int(text) }\nlet groups = [[1, 2], [], [3]]\nlet flattened = groups.flatMap { group in group }\nprint(attempts.count)\nprint(valid)\nprint(flattened)</code></pre><p>Int(text) is a failable initializer returning Int? because not every String spells an integer. Map retains one optional output per input, so attempts has three entries, including nil for bad. CompactMap accepts a transform returning an optional and drops nil outputs, producing [3, 8]. This drop is a policy: invalid rows disappear. It can be suitable for optional decoration and unsuitable for a form where the user needs an error for each invalid entry. Keep the original text or a result record when rejection must remain visible.</p><p>FlatMap in this example accepts a transform producing a sequence for each input group, then concatenates the elements into one array. The result is [1, 2, 3]. It flattens one nesting layer; it does not recursively flatten arbitrary data or automatically skip domain errors. Historical Swift code sometimes used flatMap for optional removal; modern explicit compactMap makes today’s intention clearer. Kotlin mapNotNull resembles compactMap’s shape, and flatMap has a related flattening role, but neither analogy chooses your error policy. Map with an optional-returning transform is not a compile error: [Int?] may be exactly what the consumer needs.</p>"
+          "title": "Keep absence or remove it deliberately",
+          "html": "<p>A failable initializer can return no value for unsuitable input. <code>Int(text)</code> returns Int? because bad is not an integer string. Map keeps every position, so attempts contains three optional entries, one nil. CompactMap removes nil results and returns [3, 8]. That is a data policy, not just a shorter spelling. A form may need to keep the failed text and explain it. FlatMap here joins each returned group into one array, giving [1, 2, 3]. It removes one nesting layer; it does not report errors or recursively flatten everything.</p><pre><code class=\"language-swift\">let texts = [\"3\", \"bad\", \"8\"]\nlet attempts: [Int?] = texts.map { text in Int(text) }\nlet valid: [Int] = texts.compactMap { text in Int(text) }\nlet groups = [[1, 2], [], [3]]\nlet flattened = groups.flatMap { group in group }\nprint(attempts.count)\nprint(valid)\nprint(flattened)</code></pre><p>FlatMap in this example accepts a transform producing a sequence for each input group, then concatenates the elements into one array. The result is [1, 2, 3]. It flattens one nesting layer; it does not recursively flatten arbitrary data or automatically skip domain errors. Historical Swift code sometimes used flatMap for optional removal; modern explicit compactMap makes today’s intention clearer. Kotlin mapNotNull resembles compactMap’s shape, and flatMap has a related flattening role, but neither analogy chooses your error policy. Map with an optional-returning transform is not a compile error: [Int?] may be exactly what the consumer needs.</p>"
         },
         {
           "id": "reduce",
-          "title": "Reduce a sequence into one explicit accumulator",
-          "html": "<pre><code class=\"language-swift\">let values = [1, 2, 3]\nlet sum = values.reduce(0) { total, value in\n    return total + value\n}\nlet labels = [\"a\", \"b\", \"a\"]\nlet counts = labels.reduce(into: [String: Int]()) { counts, label in\n    counts[label, default: 0] += 1\n}\nprint(sum)\nprint(counts[\"a\"] ?? -1)\nprint([Int]().reduce(10) { total, value in total + value })</code></pre><p>Reduce starts from its initial value, here zero. At each step its closure receives the accumulated total and the next input, returning the next total. The progression is zero, one, three, six. An empty input returns the initial value, so the final expression produces ten. Order matters for noncommutative operations such as concatenation or subtraction. A reduction does not guarantee the chosen integer arithmetic cannot overflow; input bounds remain part of the contract.</p><p>Reduce(into:) passes a mutable accumulator to its closure and expects mutation rather than a returned replacement. The typed empty dictionary establishes [String: Int], and the familiar default subscript increments a count. This can avoid repeatedly constructing new collection values for an accumulating collection. It is still a synchronous operation and does not synchronize concurrent access. Kotlin fold provides a useful accumulation analogy, but Swift’s into form has a mutation contract that we will connect to inout in lesson 064. Choose it from the output and mutation requirements, not from an unmeasured performance claim. A clearer for loop remains a good option when error handling or intermediate evidence matters.</p>"
+          "title": "Carry one answer through the inputs",
+          "html": "<p>An accumulator is the answer built up as each input arrives. Reduce begins with an initial value and calls its closure with the current accumulator and the next element. For zero and [1, 2, 3], the successive totals are one, three, and six. Empty input returns the starting value, so an empty reduction starting at ten returns ten. The order can matter: subtraction and concatenation are not freely reorderable. Input limits still matter too; reduce does not make integer addition immune to overflow.</p><pre><code class=\"language-swift\">let values = [1, 2, 3]\nlet sum = values.reduce(0) { total, value in\n    return total + value\n}\nlet labels = [\"a\", \"b\", \"a\"]\nlet counts = labels.reduce(into: [String: Int]()) { counts, label in\n    counts[label, default: 0] += 1\n}\nprint(sum)\nprint(counts[\"a\"] ?? -1)\nprint([Int]().reduce(10) { total, value in total + value })</code></pre><p>Reduce(into:) gives its closure temporary mutable access to the accumulator. Change it in place rather than returning a replacement. The typed empty dictionary sets up text keys and integer counts; the default subscript increments each label’s count. This can avoid repeatedly making replacement collection values. It remains synchronous and provides no synchronization for shared concurrent access. Kotlin fold helps explain the running-answer idea, but into has its own mutation rule, connected to inout in lesson 064. Choose the clearer form for the required output. A for loop is useful when errors or intermediate evidence need explicit handling; claim speed only after measuring relevant code.</p>"
         },
         {
           "id": "lazy",
-          "title": "Deferred work is not remembered work",
-          "html": "<pre><code class=\"language-swift\">let values = [1, 2, 3, 4]\nvar visits = 0\nlet pipeline = values.lazy.map { value in\n    visits += 1\n    return value * 10\n}\nprint(visits)\nlet firstTwo = Array(pipeline.prefix(2))\nprint(firstTwo)\nprint(visits)\nlet firstTwoAgain = Array(pipeline.prefix(2))\nprint(firstTwoAgain)\nprint(visits)</code></pre><p>Lazy creates an adapter that describes how to obtain elements when a consumer requests them. Defining this pipeline does not invoke the map transform, so the first print is zero. Materializing its first two mapped values with Array produces [10, 20], with two visits in this simple lazy-map example. Asking again obtains those values again and the final visit count is four. The adapter does not memoize the transformed results. If the consumer needs a stable result snapshot, store the materialized array rather than repeatedly traversing a side-effectful pipeline.</p><p>The counter exists only to make evaluation visible. Real transforms should usually be pure, because lazy traversal can repeat evaluation and different adapters/collection operations may visit elements differently. Do not generalize this precise count to every lazy-filter pipeline. A Sequence only promises iteration; some sequences are single-pass and cannot be safely replayed. Arrays are repeatable collections. Sorting needs the relevant values and produces an eager ordered result; a lazy prefix cannot make an arbitrary global sort inspect just two inputs. Kotlin Sequence is a helpful deferred-evaluation analogy, while Swift Sequence is the broader iteration protocol and lazy is an explicit adapter.</p>"
+          "title": "Separate a lazy recipe from saved results",
+          "html": "<p>Lazy means defer producing elements until a consumer asks for them. A lazy adapter wraps the source and describes how to get those elements. Creating this mapped pipeline does not call the transform, so visits starts at zero. Making an Array from its first two values gives [10, 20] and two visits in this example. Asking for those values again repeats the mapping and raises visits to four. Memoization means saving computed answers for later reuse; this adapter does not do that. Save the materialized Array if you need a result snapshot.</p><pre><code class=\"language-swift\">let values = [1, 2, 3, 4]\nvar visits = 0\nlet pipeline = values.lazy.map { value in\n    visits += 1\n    return value * 10\n}\nprint(visits)\nlet firstTwo = Array(pipeline.prefix(2))\nprint(firstTwo)\nprint(visits)\nlet firstTwoAgain = Array(pipeline.prefix(2))\nprint(firstTwoAgain)\nprint(visits)</code></pre><p>The visit counter makes evaluation visible. Prefer transforms without side effects: repeated lazy traversal may call them again, and different adapters may visit inputs differently. Do not assume every lazy filter has this exact visit count. Sequence is Swift’s iteration protocol, the capability to supply values in a traversal. Some sequences are single-pass and cannot be replayed safely; arrays can be traversed again. Sorting needs the relevant values and produces an eager result. A lazy prefix cannot make an arbitrary global sort inspect only two inputs. Kotlin Sequence helps explain deferred work, but Swift Sequence is broader; lazy is an explicit adapter.</p>"
         },
         {
           "id": "repo-and-failure",
-          "title": "Read actual transformations through their shape",
-          "html": "<p>The active Sequence.flatSorted helper compactMaps optional sort keys into tuples, sorts those tuples, then maps back to original elements. You can now identify where rows without keys disappear and how the output shape changes. Key-path access is separate syntax for later study; today read the transform’s return shape. In the cancellation controller’s selectedOption helper, filter keeps selected options before soleItem asks whether exactly one remains. That differs from simply choosing the first selected item. Its count/absence rule matters to domain correctness.</p><p>Misconceptions include expecting filter to produce Bools, assuming compactMap reports parse failures, expecting a lazy adapter to cache, and treating all Sequence operations as lazy. Rewrite a suspect chain as a loop and label each intermediate type. A valid pipeline can still lose required data: converting bad input to nil and dropping it may hide a validation error. If ordering matters, check where a sort or set conversion enters the chain. We verified these repository helpers and their source membership, but did not benchmark them or establish asynchronous behavior. The standalone exercise measures only its specified local outputs and evaluation counts.</p>"
+          "title": "Read each intermediate result type",
+          "html": "<p>An intermediate type describes the values between two steps of a chain. The linked flatSorted helper first removes elements with missing sort keys using compactMap. It then sorts key/element tuples and maps back to elements. That is where missing-key rows disappear. A key path names a property to read; its syntax is separate further study. The selectedOption helper filters selected entries, then asks for the sole item, meaning exactly one. That policy differs from taking the first selected item and ignoring the others.</p><p>Misconceptions include expecting filter to produce Bools, assuming compactMap reports parse failures, expecting a lazy adapter to cache, and treating all Sequence operations as lazy. Rewrite a suspect chain as a loop and label each intermediate type. A valid pipeline can still lose required data: converting bad input to nil and dropping it may hide a validation error. If ordering matters, check where a sort or set conversion enters the chain. We verified these repository helpers and their source membership, but did not benchmark them or establish asynchronous behavior. The standalone exercise measures only its specified local outputs and evaluation counts.</p>"
         }
       ],
       "quiz": [
@@ -898,13 +1224,13 @@
         }
       ],
       "exercise": {
-        "brief": "Parse synthetic quantity strings while retaining invalid-input evidence, then compare eager and lazy output production.",
+        "brief": "Parse quantity strings, count rejected input, and compare immediate work with repeated lazy consumption.",
         "steps": [
-          "Use [2, bad, 5] and create mapped optionals plus compacted integers.",
-          "State why counting valid values alone would hide a rejected input.",
-          "Sum valid integers with reduce and test an empty-input total.",
-          "Construct a lazy doubled array prefix with an invocation counter.",
-          "Traverse twice and explain why production repeats without claiming a general performance result."
+          "Use the strings \"2\", \"bad\", and \"5\". Make both mapped optionals and compacted integers.",
+          "Explain which input was rejected and why counting only valid results hides it.",
+          "Sum valid integers with reduce. Also try empty input with initial zero.",
+          "Build a lazy doubled prefix and count transform calls.",
+          "Consume it twice. Explain repeated work without treating the call count as a general performance measurement."
         ],
         "acceptance": [
           "The mapped result has three positions and the compacted result is [2, 5].",
@@ -912,7 +1238,7 @@
           "A lazy adapter performs no mapping until consumed.",
           "The answer explicitly reports one invalid input instead of treating dropped data as full success."
         ],
-        "solution": "<p>This complete standalone program makes each output shape explicit. The discarded-input count is a small diagnostic for these fixtures, not a full parser error model.</p><pre><code class=\"language-swift\">let texts = [\"2\", \"bad\", \"5\"]\nlet attempts = texts.map { text in Int(text) }\nlet valid = texts.compactMap { text in Int(text) }\nprint(attempts.count)\nprint(valid)\nprint(attempts.count - valid.count)\nprint(valid.reduce(0) { total, value in total + value })\nprint([Int]().reduce(0) { total, value in total + value })\nvar calls = 0\nlet doubled = valid.lazy.map { value in\n    calls += 1\n    return value * 2\n}\nprint(calls)\nprint(Array(doubled.prefix(1)))\nprint(Array(doubled.prefix(1)))\nprint(calls)</code></pre><p>The output is three, [2, 5], one, seven, zero, zero, [4], [4], two. Both materializations request the first mapped value again. Map retained the rejected position, while compactMap removed it. A user-facing parser should usually preserve which original text failed and the reason, rather than only a count; lesson 067 introduces enum/error representations for that purpose.</p><p>For retrieval, change bad to a valid three and predict the new count and sum before running. Then explain whether your product should reject an entire batch or accept valid entries with explicit rejection evidence. The language operations permit either policy; they do not choose it. A passing synthetic pipeline does not verify real networking, asynchronous cancellation, performance or learner mastery.</p>"
+        "solution": "<p>This answer runs as one file and prints each result shape. It counts rejected inputs for these test inputs; it is not a full error model that names every rejected row. Predict the outputs before running. Notice that the counter stays zero until the lazy result is consumed.</p><pre><code class=\"language-swift\">let texts = [\"2\", \"bad\", \"5\"]\nlet attempts = texts.map { text in Int(text) }\nlet valid = texts.compactMap { text in Int(text) }\nprint(attempts.count)\nprint(valid)\nprint(attempts.count - valid.count)\nprint(valid.reduce(0) { total, value in total + value })\nprint([Int]().reduce(0) { total, value in total + value })\nvar calls = 0\nlet doubled = valid.lazy.map { value in\n    calls += 1\n    return value * 2\n}\nprint(calls)\nprint(Array(doubled.prefix(1)))\nprint(Array(doubled.prefix(1)))\nprint(calls)</code></pre><p>The output is three, [2, 5], one, seven, zero, zero, [4], [4], two. Both materializations request the first mapped value again. Map retained the rejected position, while compactMap removed it. A user-facing parser should usually preserve which original text failed and the reason, rather than only a count; lesson 067 introduces enum/error representations for that purpose.</p><p>For retrieval, change bad to a valid three and predict the new count and sum before running. Then explain whether your product should reject an entire batch or accept valid entries with explicit rejection evidence. The language operations permit either policy; they do not choose it. A passing made-up pipeline does not verify real networking, asynchronous cancellation, performance or learner mastery.</p>"
       },
       "references": [
         {
@@ -949,7 +1275,62 @@
         "I can justify compactMap’s dropped-value policy.",
         "I can distinguish eager arrays, Sequence and lazy adapters.",
         "I have checked my own transformation and traversal fixtures."
-      ]
+      ],
+      "simple": {
+        "story": "A café has order slips marked 3, bad, and 8. Lin tries to read a number from each slip. One tray keeps three places, including an empty place for bad. A second tray keeps only the readable numbers, so it has 3 and 8. Neither tray tells the customer why the bad slip failed. If that customer needs to fix it, Lin must keep the original slip and explain the problem rather than quietly throwing it away.",
+        "meaning": "map keeps one optional result per input. compactMap drops nil results. Choose whether rejected input must remain visible before selecting the operation.",
+        "example": {
+          "before": "texts is [\"3\", \"bad\", \"8\"].",
+          "change": "Convert each String with Int(text), once using map and once using compactMap.",
+          "after": "map produces three positions containing 3, nil, and 8. compactMap produces [3, 8]. The rejected position disappears only in the second result."
+        },
+        "picture": {
+          "kind": "comparison",
+          "caption": "Two output shapes for the same parse attempts.",
+          "items": [
+            {
+              "label": "Input",
+              "text": "There are three strings, including bad."
+            },
+            {
+              "label": "map output",
+              "text": "Three optional positions preserve the failed attempt."
+            },
+            {
+              "label": "compactMap output",
+              "text": "Two integers remain after nil is removed."
+            },
+            {
+              "label": "Needed feedback",
+              "text": "A user-facing rejection still needs its original input and reason."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "closure",
+            "meaning": "An unnamed function value passed as a rule."
+          },
+          {
+            "term": "map",
+            "meaning": "Produce one result for each input."
+          },
+          {
+            "term": "compactMap",
+            "meaning": "Transform inputs and discard nil results."
+          },
+          {
+            "term": "reduce",
+            "meaning": "Combine inputs into one accumulated answer."
+          },
+          {
+            "term": "lazy",
+            "meaning": "Wait to produce values until they are requested."
+          }
+        ],
+        "remember": "Know what disappears, and remember that deferred work can repeat.",
+        "boundary": "The trays explain result shape, not execution cost. Swift transforms are synchronous here; lazy adapters are neither background workers nor caches, and parse failures may need richer records."
+      }
     }
   ]
 }
