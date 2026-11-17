@@ -1,0 +1,715 @@
+{
+  "unit": {
+    "id": "todo-project",
+    "title": "Build a local Todo app",
+    "summary": "Create identified, validated tasks; connect a SwiftUI editor and list; save versioned local data with explicit recovery and accessibility practice.",
+    "order": 20
+  },
+  "lessons": [
+    {
+      "id": "113",
+      "title": "Give every task an identity and a valid title",
+      "summary": "Create a small task value whose identity survives edits, moves and saving. Validate input before it enters the collection.",
+      "duration": 120,
+      "level": "Project sequence",
+      "prerequisites": [
+        "061",
+        "064",
+        "067",
+        "070"
+      ],
+      "objectives": [
+        "Distinguish a task's identity from its title, position and complete value.",
+        "Write throwing title validation and reject duplicate identities at collection boundaries.",
+        "Predict which values change during rename, toggle, move and decode."
+      ],
+      "sections": [
+        {
+          "id": "name-and-identity",
+          "title": "A task keeps its name tag when its words change",
+          "html": "<p>A task is one thing you intend to do, such as Pack bag. Identity answers which task this is; title answers what it currently says. Imagine two paper cards both labelled Check lamp. They can represent two different jobs. Give each card its own permanent name tag. Renaming one card to Check desk lamp changes its words while preserving the job you selected.</p><p>For an Android list, you already separate an entity key from an adapter position. SwiftUI needs the same reasoning, but its Identifiable protocol only supplies an id contract. It does not allocate a database key, reject duplicates or persist anything. A conforming type and its consumer must agree on the identity's scope and lifetime. Our task uses one stored UUID across this local collection and its saved file.</p><p>UUID is Foundation's universally unique identifier value. The companion generates a UUID when a new task is accepted. Imported records can still repeat an ID, so collection validation remains necessary. Do not implement id as a computed property that returns UUID() on every read. Reading the same task would then claim it was a new entity, disturbing row continuity and navigation selection.</p><p>Equality asks whether all relevant stored values match. Identity asks whether two values describe the same entity. Before a rename, task A has title Pack bag and isComplete false. After the rename, A has title Pack blue bag and remains incomplete. Its full value differs; its ID is unchanged. Two tasks with equal titles and different IDs are both allowed.</p>"
+        },
+        {
+          "id": "small-value",
+          "title": "Describe a task with a value type",
+          "html": "<pre><code class=\"language-swift\">import Foundation\n\nstruct TaskCard: Identifiable, Equatable {\n    let id: UUID\n    var title: String\n    var isComplete: Bool\n}\n\nlet a = UUID(uuidString: \"00000000-0000-0000-0000-000000000001\")!\nvar original = TaskCard(id: a, title: \"Pack bag\", isComplete: false)\nvar copy = original\ncopy.title = \"Pack blue bag\"\nprint(original.title) // Pack bag\nprint(copy.id == original.id) // true\nprint(copy == original) // false</code></pre><p>struct declares a value type. The colon introduces protocol conformances. Identifiable requires a suitable id property; Equatable permits comparing complete values with ==. let fixes the ID after initialization, while var permits changing the title and flag. Here Swift can synthesize equality from the stored properties. The fixed UUID string makes this teaching prediction repeatable; production creation uses UUID().</p><p>The exclamation mark force unwraps an optional returned by the UUID string initializer. It is justified here only because this exact fixed teaching literal is valid. A value read from a user file must use guarded decoding or optional handling instead. The two print calls about equality produce true and false because the copied value preserves identity while changing its title.</p><p>Swift value semantics mean assigning original to copy gives independently behaving values. Do not infer that every underlying byte is eagerly duplicated; the language's observable behavior matters. Kotlin data class copy has a useful similarity, but assigning a Kotlin object to another variable normally preserves the same reference. A Swift struct containing reference-valued fields would also need deeper ownership reasoning; our fields are simple values.</p><p>TaskCard is deliberately a first sketch, not the companion's validated type. Public writable fields allow invalid titles. Core/Todo.swift narrows mutation through rename and toggle, so validation has one entry point. Build a small model before adding view state, persistence or a repository abstraction. These concerns become easier when the value itself has clear invariants.</p>"
+        },
+        {
+          "id": "validation-policy",
+          "title": "Make the input rule precise before writing the form",
+          "html": "<p>An invariant is a rule every accepted model value must satisfy. Our title policy removes whitespace and newlines at both ends, rejects an empty result, and allows at most 80 Swift Characters. Interior spaces remain as typed. Input consisting of three spaces fails. Input with two spaces before Pack bag and a newline after it becomes exactly Pack bag. Duplicate titles are permitted.</p><p>Swift String.count counts extended grapheme clusters, the elements people generally perceive as characters. A composed emoji can contain multiple Unicode scalars and many UTF-8 bytes while counting as one Character. Kotlin String.length counts UTF-16 code units, so translating the numeric limit directly changes behavior. Choose the user-facing rule explicitly and separately bound transport bytes if a future network service requires that.</p><p>Validation belongs in the model or domain boundary, as well as useful form feedback. A form-only check misses decoded files, unit tests and future import paths. A persistence check alone lets invalid values circulate before saving. normalizedTitle throws emptyTitle or titleTooLong; the caller chooses how to present those failures. Throwing communicates that no valid task value was produced by that call.</p><p>A failed rename must preserve the old title. Evaluate normalization first and assign only after it succeeds. Before rename, A says Pack bag. Calling rename with whitespace throws and leaves A unchanged. Present Enter a task title beside the draft, allowing correction. Do not reinterpret a validation failure as a successful empty task or close the editor just because Save was tapped.</p>"
+        },
+        {
+          "id": "mutation-commands",
+          "title": "Change one identified task, then validate the collection",
+          "html": "<pre><code class=\"language-swift\">func renamed(_ tasks: [Todo], id: UUID, title: String) throws -&gt; [Todo] {\n    var next = tasks\n    guard let index = next.firstIndex(where: { $0.id == id }) else {\n        throw TodoError.unknownID\n    }\n    try next[index].rename(to: title)\n    try Todo.validate(next)\n    return next\n}</code></pre><p>This function uses Todo and TodoError from the companion, so compile it with Core/Todo.swift rather than as an isolated standalone snippet. The tasks parameter is an array of current values. id identifies the target; title is the candidate text. -> declares the returned array type. throws tells callers to handle rejection. next starts as the existing value collection, providing a candidate that can be discarded.</p><p>firstIndex searches for the matching ID. Inside the closure, $0 is the candidate element being inspected. guard let unwraps the optional index and exits with unknownID if no task matches. The saved index is used immediately against this candidate array. There is no suspension between lookup and assignment. try propagates a failed rename, while collection validation protects uniqueness before publication.</p><p>Unknown identity is a normal edge case for an editor opened before a task was deleted elsewhere. Do not silently add a replacement task or rename whichever row now occupies an old numeric position. A command carries the stable ID from selection. Array indices are short-lived coordinates, valid for a specific snapshot. Their usefulness does not make them durable business identifiers.</p><p>Validate imported collections before presenting them. If file records A and B both use A's ID, two separate rows cannot be reliably distinguished by that identifier. Reject the collection and preserve the original bytes for recovery. Title equality remains irrelevant: two Check lamp tasks with IDs A and B pass. Enforcing unique titles would be a different product rule, with different user costs.</p>"
+        },
+        {
+          "id": "decode-and-identity",
+          "title": "Saving the ID is part of preserving the task",
+          "html": "<p>Codable is the pair of encoding and decoding protocols that translate supported values to and from an external representation. Add Codable to Todo so JSONEncoder can produce bytes and JSONDecoder can construct values. Encoding a UUID records its identifier; loading must restore that identifier. Generating a new UUID on every load turns yesterday's selected task into a different entity even if its words look identical.</p><p>Synthesized decoding can initialize stored properties without calling your public validating initializer. private(set) controls Swift source writes from outside the type; it does not prove a JSON record is valid. Therefore FileTodoStore decodes and then calls Todo.validate. Validation checks each title and the full set of IDs. Successful syntax decoding and accepted domain data are distinct results.</p><p>Our current format requires canonical titles, meaning the stored title already equals its trimmed valid form. A version-one migration is allowed to normalize old names through Todo's initializer. A current version-two record with extra edge spaces is rejected instead of silently repaired. This distinction makes migration intentional and avoids hiding unexpected corruption behind cleanup.</p><p>These files are app-owned local data, not a secure source of truth for authorization. UUID uniqueness does not authenticate an owner, and JSON readability does not authorize an action. A later account-backed task service would add namespace, conflict and permission rules. Begin with a single owner's local collection and state the boundary; a tiny Todo app does not need invented distributed guarantees.</p>"
+        },
+        {
+          "id": "android-and-source",
+          "title": "Connect the task rule to a real client example",
+          "html": "<p>The inspected WellGuideTaskListView.TaskItem derives its ID from task.recommendationId.rawValue at line 79. Its status is a separate field. That is the same conceptual split as the synthetic Todo: completion can change while the recommendation remains the same entity. The client uses a domain-provided String identity rather than allocating a fresh UUID for every screen rendering.</p><p>Read Model.sortedTasks around line 54 too. It orders incomplete tasks before completed tasks, demonstrating that presentation order is separate from identity. Do not copy that business policy into this companion automatically: Pocket Tasks preserves the learner's manual order. Sorting after each completion would make reorder behavior surprising. Choose the ordering rule and explain its interaction with row actions.</p><p>On Android, a Room primary key and a Compose lazy-list key are related but separate contracts. A persistent key can serve both roles when its scope is appropriate. Swift Identifiable is closer to supplying a UI-friendly identity contract than declaring a database schema. Neither platform makes imported duplicates impossible simply because a language interface or annotation is present.</p><p>For review, describe four independent observations: two identical titles are retained; invalid text is rejected; a renamed task preserves its ID; duplicate imported IDs fail before publication. These observations target behavior rather than checking that a helper happens to call another helper. Add an independent case such as a combined emoji title at the limit, then explain which count rule it exercises.</p>"
+        },
+        {
+          "id": "versions-and-evidence",
+          "title": "Versions and verification evidence",
+          "html": "<p>The model uses Foundation and Swift value semantics. The lab runner compiles all three Core files in Swift 6 language mode with TODO_HOST excluding Observation macros, whose plugin process was blocked by the recorded verification environment. The native source retains real Observation. The recorded toolchain and actual outcomes are recorded in the lab README. Compiler version, language mode, host OS and iOS deployment target are separate facts; they do not map to Kotlin or Java version numbers.</p><p>Host checks can prove normalization, identity preservation and duplicate rejection for the supplied fixtures. Native typechecking can prove that the adapter's source satisfies the selected SDK. Neither proves visible row continuity, screen-reader focus or durable storage under device interruption. The learner must add and run independent cases, then attach the exact commands and any remaining native observations.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Task A is renamed from Pack bag to Pack blue bag. Which value should remain unchanged?",
+          "options": [
+            "Its ID.",
+            "Its title.",
+            "Its complete Equatable value."
+          ],
+          "answer": 0,
+          "explanation": "The task remains the same entity. Title changes and complete-value equality can change without replacing identity."
+        },
+        {
+          "question": "Two decoded tasks have the same UUID but different titles. What should the collection boundary do?",
+          "options": [
+            "Keep both because the titles differ.",
+            "Reject the duplicate identity before publishing the collection.",
+            "Generate a fresh ID whenever the row renders."
+          ],
+          "answer": 1,
+          "explanation": "Titles do not disambiguate a duplicated stable identity. Reject and preserve the file so recovery can be deliberate."
+        },
+        {
+          "question": "Why validate after synthesized Codable decoding?",
+          "options": [
+            "Decoding always calls the public throwing initializer.",
+            "Successful decoding proves business rules.",
+            "Synthesized decoding can construct stored fields without the public initializer's validation."
+          ],
+          "answer": 2,
+          "explanation": "Decoding validates representation types; domain rules such as nonempty canonical titles and collection uniqueness still require explicit checks."
+        }
+      ],
+      "exercise": {
+        "brief": "Create three original task fixtures and add one behavioral case to a personal copy of TodoProject. Keep the course companion and client source unchanged.",
+        "steps": [
+          "Predict ID, title and equality for a rename and a failed whitespace rename before running code.",
+          "Use two equal titles with different IDs and one deliberately duplicated ID; state which collection is accepted.",
+          "Add an 80-Character composed-emoji title and an 81-Character title, then explain the UTF-16 comparison boundary.",
+          "Record the exact host command and output; leave native row continuity as a separate pending check."
+        ],
+        "acceptance": [
+          "Rename and toggle preserve the original ID; invalid rename preserves the original value.",
+          "Equal titles coexist, while duplicate IDs are rejected before display or save.",
+          "The limit case tests Swift Characters and explains why Kotlin length can differ.",
+          "Evidence includes a learner-created fixture and does not claim app or learner completion from the supplied answer."
+        ],
+        "solution": "<p>Use fixed IDs A and B in the independent fixture so expected output is easy to inspect. Build A with input consisting of two spaces, Pack bag, and a trailing newline. Its accepted title is Pack bag. Build B with the same title and a different ID. Both remain in the array. Rename A to Pack blue bag; A still has its original UUID while equality with its earlier snapshot becomes false.</p><p>Attempt a whitespace-only rename next. Capture A's full value beforehand and compare afterward. The operation throws emptyTitle, and title, completion and ID all stay unchanged. For a duplicated import, make the second record use A's ID while retaining another title. Todo.validate throws duplicateID. Do not assert merely that the array has two elements: the acceptance question is whether both identities remain distinguishable.</p><p>Construct the composed emoji string with String(repeating:count:), using 80 and 81 repeats. The 80-Character title is accepted; the 81-Character title throws titleTooLong. Explain that its scalar and encoded byte counts are larger. If adding a byte-size limit, test that separately and name it explicitly. A learner who copies the supplied fixture unchanged has read a worked answer but has not supplied independent practice.</p><p>Run the lab script from your own isolated copy and record compiler, language mode, exit code and PASS output. Also retain an ID-before/after note that a reviewer can verify. Opening a SwiftUI screen, renaming a row while preserving focus, and relaunching with the same stored ID remain native checks. An honest handoff names them as pending until the corresponding target and interaction have actually run.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Identifiable identity scope",
+          "url": "https://developer.apple.com/documentation/swift/identifiable"
+        },
+        {
+          "label": "Swift: Structures and classes",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/classesandstructures/"
+        },
+        {
+          "label": "Swift: Strings and characters",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/stringsandcharacters/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Task identity derives from the domain recommendation",
+          "path": "ios-client/Projects/Features/ZDWellGuide/Sources/ZDWellGuide/WellGuideRevamp/Views/WellGuideTaskListView.swift",
+          "line": 75,
+          "why": "TaskItem has separate status and a computed ID derived from the stable recommendation ID; sorting does not define identity."
+        }
+      ],
+      "checklist": [
+        "I can distinguish identity, equality and array position.",
+        "I can reject invalid titles and duplicate IDs without losing the previous value.",
+        "I can explain why decoding needs domain validation."
+      ],
+      "simple": {
+        "story": "Mira writes Pack bag on a paper card and attaches tag A. She writes the same words on another card with tag B, because two people have separate bags. Later she changes card A to Pack blue bag and moves it below card B. The words and position change, but its tag stays A. If both cards carried tag A, a helper asked to fetch card A would not know which one to bring.",
+        "meaning": "A task needs a stable identifier independent of its title and position.",
+        "example": {
+          "before": "A says Pack bag; B also says Pack bag; their IDs differ.",
+          "change": "Rename A to Pack blue bag and move it below B.",
+          "after": "A keeps ID A; B stays unchanged; order becomes B, A."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "A task needs a stable identifier independent of its title and position.",
+          "items": [
+            {
+              "label": "Create",
+              "text": "Allocate the ID once when accepting a new task."
+            },
+            {
+              "label": "Edit",
+              "text": "Change valid fields while retaining that ID."
+            },
+            {
+              "label": "Move",
+              "text": "Change order without changing any task ID."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Identity",
+            "meaning": "The key that names this particular task."
+          },
+          {
+            "term": "Invariant",
+            "meaning": "A rule every accepted value must satisfy."
+          },
+          {
+            "term": "Validation",
+            "meaning": "Checking a candidate before accepting it."
+          },
+          {
+            "term": "Equality",
+            "meaning": "Whether compared values have matching relevant contents."
+          }
+        ],
+        "remember": "Keep the name tag while the task's words change.",
+        "boundary": "Paper tags are only an analogy. Identifiable does not enforce unique IDs, save data or validate imported records."
+      }
+    },
+    {
+      "id": "114",
+      "title": "Let one owner handle task edits, moves and deletion",
+      "summary": "Connect an observable task owner to a SwiftUI list. Keep editor drafts separate and send commands with stable IDs.",
+      "duration": 150,
+      "level": "Project sequence",
+      "prerequisites": [
+        "075",
+        "076",
+        "077",
+        "113"
+      ],
+      "objectives": [
+        "Explain what Observation tracks and how State retains the view model.",
+        "Route validated add, rename, toggle, delete and reorder commands through one owner.",
+        "Translate list offsets from the correct snapshot and reject stale editor identities."
+      ],
+      "sections": [
+        {
+          "id": "one-owner",
+          "title": "Give the list one owner for accepted tasks",
+          "html": "<p>A view model is an object that owns the values and actions a screen needs. Picture one notebook containing the accepted task cards and several windows looking into it. Each window can request a change, but the notebook remains the source of accepted task state. In the companion, TodoViewModel owns items, remainingCount, validation errors and storage status. The form owns only unfinished text.</p><p>@MainActor isolates this owner to the main actor. Isolation coordinates access to its mutable state; it does not grant background execution or make disk reads asynchronous. @Observable is a macro that generates observation support for stored mutable properties. SwiftUI tracks properties read while computing a view's body and updates dependent presentation when those values change. Applying the macro does not automatically save tasks.</p><p>private(set) allows other code to read items while keeping direct assignment inside the type. A view cannot bypass commands by appending an invalid value to the collection. The store is injected through init, making an independent failure fixture possible. It is a let dependency and does not need observation. remainingCount is derived from items, so it cannot drift into a second conflicting count.</p><p>Android ViewModel and StateFlow suggest useful ownership questions, but @Observable is not a StateFlow stream and @State is not an Android retained ViewModelStore. SwiftUI identity determines state retention. Decide where the object should live before attaching property wrappers. Creating TodoViewModel repeatedly in body creates competing owners and can lose drafts or restart loading.</p>"
+        },
+        {
+          "id": "retained-and-borrowed",
+          "title": "Retain the owner and lend it to child views",
+          "html": "<pre><code class=\"language-swift\">@MainActor\nstruct TaskScreen: View {\n    @State private var model: TodoViewModel\n\n    init(store: any TodoStoring) {\n        _model = State(initialValue: TodoViewModel(store: store))\n    }\n\n    var body: some View {\n        Text(\"\\(model.remainingCount) tasks remaining\")\n    }\n}</code></pre><p>This target-required snippet imports SwiftUI and uses the companion's Core types. @State associates storage with this view's identity. _model names the property wrapper storage, allowing its initial value to be supplied in init. init receives a store instead of manufacturing an untestable global dependency. The stored reference is the observable owner; its properties are the values the body reads.</p><p>Before there are two incomplete tasks, remainingCount is 2. A valid toggle marks one complete, so items changes and remainingCount becomes 1. The text reads that computed value and can update. The plain let model used in TodoListScreen and TodoEditor borrows the parent's object; those child views do not allocate another owner. Their input reference is enough for reading observable state.</p><p>@Bindable supplies bindings to writable observable properties when a child needs a control bound directly to them. Our public items array has restricted writes and the form intentionally edits a draft, so no @Bindable is needed. TextField binds to @State draft through $draft. The dollar sign provides a Binding, a read/write connection; it does not copy accepted model state into storage automatically.</p><p>For older deployment support, ObservableObject with @Published and the appropriate @StateObject or @ObservedObject ownership can be valid. Do not combine wrappers by habit. The inspected WellGuideDetailViewModel uses that Combine-based pattern, while the medication list uses Observation. Those are current checkout examples of two mechanisms; converting an existing client requires a separate migration decision and tests.</p>"
+        },
+        {
+          "id": "draft-before-command",
+          "title": "Let Cancel discard the draft and Save send a command",
+          "html": "<p>A draft is text the user has not committed. When the editor opens for A, draft begins as Pack bag and the editor target retains A's ID. Typing Pack blue bag changes draft only. Cancel dismisses the form without renaming A or writing a file. Save asks model.rename(id:to:) to normalize and validate the candidate. Invalid input stays in the editor with a useful correction message.</p><p>A sheet session also has identity, but that identity names the editor presentation rather than the task. EditTarget generates its session UUID when the user taps Add or Edit. For an existing task it separately carries todoID. Avoid creating the session UUID inside body or using a task's mutable title as a sheet ID. A stable presentation keeps the draft and focus associated with the intended editor.</p><p>The companion returns Bool from mutation commands to indicate whether the requested domain change was accepted. A successful command can still have a failed disk write. isDirty and storageError report durability separately. The editor closes after an accepted command, while the list presents Retry Save and retains the changed values. Calling a single Bool saved would hide this distinction and mislead the user.</p><p>Stale selection is possible even with stable identity. If A was deleted while its editor stayed open, rename(A) rejects unknownID rather than recreating A or changing B. The supplied scratch app has a limited presentation surface, but the command boundary still defends against stale callers. Future multiwindow or asynchronous refresh work should preserve that rule and add explicit merge or conflict behavior.</p>"
+        },
+        {
+          "id": "offsets-and-order",
+          "title": "Translate positions only against the current list",
+          "html": "<p>An offset is a numeric position in one collection snapshot. SwiftUI onDelete supplies an IndexSet of offsets; onMove supplies offsets plus an insertion boundary in the original collection. The native list directly renders model.items without sorting or filtering. Its delete handler therefore translates those offsets into IDs from model.items immediately, then calls delete(ids:). Lookup and command are synchronous on the main actor.</p><p>A filtered list changes that mapping. Suppose underlying items are A incomplete, B complete, C incomplete, but the visible incomplete list is A, C. Visible offset 1 identifies C, not B. Capture the visible array used by ForEach and translate deletion there. For reorder in a filtered view, first decide whether the product means moving within that subset or changing full manual order; the simple companion avoids this ambiguous interaction.</p><p>The host move helper removes selected items, preserves their original relative order, and adjusts the destination by the number of removed offsets before it. With A, B, C, D, moving offsets 1 and 3 to boundary 0 gives B, D, A, C. Moving offset 0 of that result to original boundary 4 gives D, A, C, B. Task IDs and contents remain unchanged.</p><p>Validate all offsets and require destination in zero through count before indexing. Out-of-range input fails without publishing a partial move. IndexSet prevents repeated offsets, but it does not make them valid for another snapshot. No await occurs inside this companion's transformation. A future async command should carry semantic IDs and ordering intent rather than retaining an array index across suspension.</p>"
+        },
+        {
+          "id": "atomic-publication",
+          "title": "Build a candidate before changing accepted state",
+          "html": "<p>Publication means making a candidate collection the observable accepted value. change first calls its build closure, then validates the result, then assigns items. A failed title, missing ID or invalid move never reaches assignment. One place sets isDirty and invokes save, so commands share a consistent policy. This is a small transaction boundary in memory, not a database transaction across devices.</p><p>Deletion validates that every requested ID exists before removing any. If a request contains A and unknown X, it rejects the entire request. That explicit all-or-nothing policy is useful for spotting stale selection; an idempotent remove-if-present policy would also be possible in another feature. Teach the chosen semantics and test them rather than assuming all delete APIs behave identically.</p><p>Do not store task titles inside button closures as identity. Each row command receives item.id, which remains stable after reorder. Button action closures run in response to user interaction; body describes them and should remain free of mutations or load operations. A computed view body may be reevaluated for many reasons and is not an instruction to recreate the entire app lifecycle.</p><p>For tests, inject a FaultStore and assert observable facts: the collection after a move, the exact row toggled, unchanged values after rejection, and latest values after retry. A test that merely confirms save was called misses whether the wrong row was saved. The injected failure is deliberate test input, not evidence that the real disk or device failed.</p>"
+        },
+        {
+          "id": "versions-and-evidence",
+          "title": "Versions, source connection and verification evidence",
+          "html": "<p>SwiftUI Observation support begins with iOS 17 and macOS 14. The isolated native target uses iOS 17 or later and Swift 6 language mode. The recorded verification environment blocked the macro plugin process, so the host runner defines TODO_HOST to omit only observation annotations and import. It still compiles the same main-actor command, validation and store code. Host success cannot establish Observation invalidation.</p><p>The inspected medication list view model declares @MainActor and @Observable at lines 19–20, with a restricted state property at line 42 and injected dependencies. Its start method also owns a load task. Our store is synchronous and has no such async lifecycle. The client anchor illustrates real ownership decisions; it is neither compiled by this lab nor changed.</p><p>Native typechecking was attempted separately and failed at macro expansion under sandbox restrictions. Full target compilation, retained state across presentation, keyboard focus, list animation and screen-reader interaction remain pending. Keep the failure and command in the README. Do not erase the availability boundary or replace the real adapter with a model fixture just to report a broad pass.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why does the editor bind its text field to a separate draft?",
+          "options": [
+            "Cancel should discard uncommitted text without changing the task.",
+            "Observation cannot track strings.",
+            "Every keystroke must become a permanent rename."
+          ],
+          "answer": 0,
+          "explanation": "Draft state separates editing from acceptance. Save submits validation; Cancel can leave accepted tasks and storage unchanged."
+        },
+        {
+          "question": "A visible filtered list is A, C; the full array is A, B, C. Visible delete offset 1 means what?",
+          "options": [
+            "B because it is full-array offset 1.",
+            "C; map against the rendered snapshot.",
+            "Whatever title matches first."
+          ],
+          "answer": 1,
+          "explanation": "Offsets describe the rendered collection. Translating against the full collection would delete a different task."
+        },
+        {
+          "question": "A valid rename returns true, but saving throws. What should the UI claim?",
+          "options": [
+            "The change is in memory and still needs saving.",
+            "Everything is durable because the command returned true.",
+            "The task was automatically restored."
+          ],
+          "answer": 0,
+          "explanation": "Command validity and durability are separate. Keep the edited state, show the storage error and allow retry."
+        }
+      ],
+      "exercise": {
+        "brief": "In a personal isolated copy, add a select-two deletion action and test stale selection. Keep draft cancellation separate from accepted task edits.",
+        "steps": [
+          "Predict A, B, C, D after moving B and D to the front, then after moving B to the end.",
+          "Delete a set containing one existing ID and one missing ID; verify the chosen all-or-nothing policy.",
+          "Open an editor draft, change text and cancel; design a native observation for unchanged model and file.",
+          "Inject a save failure and explain why a valid edit is dirty even if its command returns true."
+        ],
+        "acceptance": [
+          "Moves preserve IDs and selected relative order, including a destination at the end.",
+          "A deletion request with an unknown ID changes no accepted tasks.",
+          "Cancel leaves the original title and persisted snapshot unchanged.",
+          "A save error stays visible and retry persists the latest accepted values."
+        ],
+        "solution": "<p>Begin with deterministic IDs A through D and distinct titles. After moving B and D to boundary zero, assert IDs B, D, A, C. Move B from offset zero to boundary four and expect D, A, C, B. These expectations test the original-array boundary adjustment; simply counting four elements would not detect a wrong move.</p><p>For select-two deletion, keep selected IDs in local UI state rather than selected indices. Submit a set containing A and missing X to the companion model. The subset guard fails, so every task remains. Submit A and C next; only D and B remain, in that order. Document that this strict policy rejects stale batches rather than silently removing the remaining selected tasks.</p><p>For the editor, retain the original file bytes and title before typing a changed draft. Cancel dismisses without calling rename. A native check should verify the title and file remain unchanged after dismissal, and that reopening starts from the accepted value. Host code alone cannot prove dismissal, keyboard focus or retained sheet state, so mark that observation pending until run.</p><p>Finally set failSave on the injected store, rename B, and inspect both values: B has the new title in model.items, while isDirty is true and storageError is present. load must refuse to overwrite those unsaved values. Clear the injected fault and call save; the stored snapshot must contain the latest title, and dirty clears only after success. Record the independent batch case and native limits with the command output.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Managing model data with Observation",
+          "url": "https://developer.apple.com/documentation/swiftui/managing-model-data-in-your-app"
+        },
+        {
+          "label": "Apple: DynamicViewContent.onMove",
+          "url": "https://developer.apple.com/documentation/swiftui/dynamicviewcontent/onmove(perform:)"
+        },
+        {
+          "label": "Apple: State",
+          "url": "https://developer.apple.com/documentation/swiftui/state"
+        }
+      ],
+      "repo": [
+        {
+          "label": "An injected main-actor observable list owner",
+          "path": "ios-client/Projects/Features/ZDMedicationReminders/Sources/ZDMedicationReminders/ViewModels/MedicationRemindersListViewModel.swift",
+          "line": 19,
+          "why": "Inspected MainActor/Observable declarations, restricted state and dependencies demonstrate ownership without proving this companion or client runtime behavior."
+        },
+        {
+          "label": "Existing Combine owner uses another observation mechanism",
+          "path": "ios-client/Projects/Features/ZDWellGuide/Sources/ZDWellGuide/WellGuideRevamp/WellGuideDetailViewModel.swift",
+          "line": 29,
+          "why": "ObservableObject and Published coexist with newer Observation elsewhere; the teaching comparison does not assert a migration."
+        }
+      ],
+      "checklist": [
+        "I can name the owner of accepted tasks and the owner of an editor draft.",
+        "I can map list positions to stable IDs using the correct snapshot.",
+        "I can distinguish command acceptance from durable saving."
+      ],
+      "simple": {
+        "story": "Dev keeps a notebook with four task cards. Lina opens a small pad to draft a new name for card A. While she writes, the notebook still says Pack bag. If she tears up the pad, nothing in the notebook changes. If she hands the draft to Dev, he checks the words and updates card A. He also tells everyone looking at the notebook that its contents changed. The pad and notebook have different jobs.",
+        "meaning": "A form owns unfinished input; the observable view model owns accepted tasks and commands.",
+        "example": {
+          "before": "A says Pack bag; the form draft also says Pack bag.",
+          "change": "Type Pack blue bag in the draft, then tap Cancel.",
+          "after": "The draft is discarded; A and its saved value remain Pack bag."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "A draft becomes accepted model state only through a validated command.",
+          "items": [
+            {
+              "label": "Draft",
+              "text": "Typing changes local form text."
+            },
+            {
+              "label": "Command",
+              "text": "Save identifies the task and validates the candidate."
+            },
+            {
+              "label": "Accepted state",
+              "text": "A valid change updates the shared owner and separately attempts persistence."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "View model",
+            "meaning": "The owner of a screen's accepted state and actions."
+          },
+          {
+            "term": "Draft",
+            "meaning": "Input that has not been accepted."
+          },
+          {
+            "term": "Binding",
+            "meaning": "A connection that reads and writes a value."
+          },
+          {
+            "term": "Offset",
+            "meaning": "A position in one particular collection snapshot."
+          }
+        ],
+        "remember": "Keep unfinished text local and send accepted changes through one owner.",
+        "boundary": "Observation tracks reads and changes; it is not a message broadcast stream, a save mechanism or Android's ViewModelStore."
+      }
+    },
+    {
+      "id": "115",
+      "title": "Save tasks without hiding failures or losing old files",
+      "summary": "Encode a versioned task file, distinguish first launch from a broken store, and migrate old records while preserving identity.",
+      "duration": 150,
+      "level": "Project sequence",
+      "prerequisites": [
+        "067",
+        "113",
+        "114"
+      ],
+      "objectives": [
+        "Distinguish missing, current, old, future and corrupt task files.",
+        "Keep failed-save changes in memory and protect unreadable stored data.",
+        "Write a migration that preserves ID, completion and order, with explicit validation and retry."
+      ],
+      "sections": [
+        {
+          "id": "bytes-and-values",
+          "title": "A saved file is a separate copy with its own failures",
+          "html": "<p>Persistence means retaining values beyond the lifetime of this running process. The view model's array disappears when the app stops unless it has been written somewhere durable. Think of the array as today's working notebook and the file as a stored copy. A screen can look correct while its latest edit has not reached the file. Show that difference instead of using one optimistic saved flag.</p><p>Serialization translates values into bytes; deserialization reconstructs values from bytes. Codable defines encoding and decoding contracts. JSONEncoder and JSONDecoder supply a JSON representation, not disk durability by themselves. FileTodoStore encodes a TodoEnvelope with version 2 and items. UUIDs, title, completion and array order are part of the saved contract. Loading those bytes must restore the same entities.</p><p>Use an injected URL in tests rather than the company's app directory or a learner's live store. The native scratch entry chooses its own Application Support subdirectory, TodoScratch. Application Support is appropriate for app-managed support data; the app does not promise a user-managed document here. Actual backup, protected-data and data-retention requirements are later product decisions.</p><p>Android's DataStore or a database can remind you to distinguish in-memory state from persisted state, but this synchronous JSON file has different guarantees. It has one owner and a tiny bounded dataset. It provides neither transactions across writers nor automatic reactive queries. Do not extrapolate its simple atomic replacement into a durable synchronization service.</p>"
+        },
+        {
+          "id": "format-version",
+          "title": "Give stored data an explicit version",
+          "html": "<pre><code class=\"language-swift\">struct TodoEnvelope: Codable {\n    let version: Int\n    let items: [Todo]\n}\n\n// Version-one fixture:\n// {\"version\":1,\"tasks\":[\n//   {\"id\":\"00000000-0000-0000-0000-000000000001\",\n//    \"name\":\"Pack bag\",\"done\":true}\n// ]}\n// Version two stores items with id, title and isComplete.</code></pre><p>A format version identifies the schema of stored bytes, independently of app marketing version or compiler language mode. Version one calls the array tasks and the fields name and done. Version two calls them items, title and isComplete. Renaming Swift properties without a migration does not teach the decoder how to read yesterday's keys. The envelope makes that decision visible.</p><p>Load a small VersionHeader first to select the representation. Switch version 1 to a dedicated old-format decoder, version 2 to the current decoder, and every other version to unsupportedVersion. A future version 99 is not an empty list and must not be overwritten by a version-two app. Rejecting it preserves a recovery opportunity after an accidental downgrade.</p><p>Do not treat a failed current decode as proof the file is an old format. The bytes may be truncated, contain wrong types or repeat IDs. Trying arbitrary fallback decoders can turn corruption into plausible but incomplete data. A declared version plus explicit schema helps separate supported migration from accidental repair. Missing or invalid version fields are also read failures.</p><p>Unknown JSON fields may be ignored by the decoder, so adding an optional field can have different compatibility behavior from renaming a required field. Decide what older readers may safely omit. A version alone is not a full compatibility policy: capture representative old fixtures, current constraints and downgrade behavior before expanding a real schema.</p>"
+        },
+        {
+          "id": "read-failure-policy",
+          "title": "Keep first launch different from an unreadable file",
+          "html": "<p>Missing means the intended file does not exist. Corrupt means a file exists but cannot be accepted. Permission failure means reading was not allowed or available. Only the Cocoa fileReadNoSuchFile case returns an empty first-launch result in this companion. Other I/O errors propagate. Using try? and defaulting every failure to an empty array would erase the distinction.</p><p>Suppose a file contains task A, but JSON decoding fails. If the app replaces state with empty and autosaves, the file can become a valid empty store, losing the original evidence and task data. TodoViewModel instead sets maySave false and displays a recovery message. add, rename and save remain blocked until an explicit successful load. The original bytes are left untouched.</p><p>Recovery needs a controlled choice. Copy the original file to a separate scratch location, inspect or repair that copy, validate it, then retry loading the intended scratch store. The app supplies Retry Load but does not implement an automatic repair editor or destructive reset. A product wanting Start Over must make its loss consequences explicit and preserve or export recoverable bytes.</p><p>Error presentation should communicate the next action without dumping file contents into logs. The companion uses bounded messages and synthetic titles. Source inspection of the client medication list shows corruptData becomes an error state and intentionally avoids logging private contents. That is evidence of a local policy, not a claim that this lab exercises company data protection.</p>"
+        },
+        {
+          "id": "write-failure-policy",
+          "title": "Retain valid edits when a write fails",
+          "html": "<p>A save first validates the collection, encodes the full current envelope, creates the parent directory if needed and writes with Data's atomic option. Atomic writing uses an auxiliary file and replacement so callers avoid intentionally publishing a partially written new representation. It is not a lock between two scene owners, a guarantee against every power-loss scenario or a substitute for a database.</p><p>The model accepts a valid change in memory before attempting the write. On success, isDirty becomes false and storageError clears. On failure, isDirty stays true and a Retry Save message appears. Before a rename A is Pack bag on screen and disk. After a failed save, screen A is Pack blue bag while disk A is still Pack bag. State this exact difference.</p><p>Reloading at that point would replace the user's unsaved edit with older disk data. load therefore refuses while isDirty is true. Retry save writes the latest current array, including any later accepted edits. A successful earlier snapshot must never clear the dirty flag for later state in an asynchronous extension. Such an extension needs snapshot revisions and serialized write ownership.</p><p>This lab performs small synchronous file operations on the main actor. That choice makes command order easy to reason about but can block UI with larger data or slow storage. Moving to async I/O requires explicit ownership, cancellation and stale-result rules; wrapping everything in Task does not automatically move synchronous work away from the main actor. Measure before choosing a more complex store.</p>"
+        },
+        {
+          "id": "migration-boundary",
+          "title": "Transform old values without changing their identity",
+          "html": "<p>Migration is an intentional transformation from a supported old representation to current valid values. VersionOneEnvelope decodes id, name and done. map creates a Todo for each old item, passing the original ID and completion flag and normalizing the old name. map preserves array order. The collection is then validated for duplicate IDs before the migration result is returned.</p><p>Loading never writes the file. LoadedTodos carries needsMigrationSave true so the view model marks the successfully migrated values dirty. Save Current Tasks or a later valid command writes version two. This gives a failed migration write the same recoverable semantics as any save failure. The native UI presents a pending-save message for successfully loaded migrations; independent capstone practice can make the migration-specific explanation more precise.</p><p>Before migration, A has name consisting of spaces around Pack bag and done true. After migration, A has title Pack bag and isComplete true, with the same UUID. Original bytes still use version one until a save succeeds. If the old title normalizes to empty or two records share A's ID, the entire load fails rather than dropping selected records silently.</p><p>Test both conversion and non-destruction. A passing check asserts ID, title, completion, order, migration status and original byte equality before save. A second check saves the result, reloads it as version two and confirms migration is no longer needed. Merely asserting decode did not throw would miss regenerated IDs, dropped tasks and premature overwrite.</p>"
+        },
+        {
+          "id": "versions-and-evidence",
+          "title": "Versions, source evidence and exact verification limits",
+          "html": "<p>The lab uses Foundation JSONEncoder, JSONDecoder and Data file operations with Swift 6 checking. Host tests run in a unique /private/tmp directory. TODO_HOST omits Observation macros because the recorded verification environment blocked their plugin process; it does not replace store or command logic. The README records the executed toolchain and results. No device interruption or oldest-supported-OS run is implied.</p><p>The inspected InsuranceReminders.performMigration checks for absence of an older stored value and installs a chosen initial value at line 57. It is a preference migration tied to that feature's historical policy, not this JSON envelope scheme. The comparison teaches that migration is explicit domain policy. Do not copy its dates, keys or user data into synthetic Todo practice.</p><p>Current tests cover disk round trip, missing file, migration, unsupported version, corrupt JSON, invalid title and duplicate IDs, plus injected save/load failures. Native bundle behavior, protected-data availability, actual disk-full errors, multiwindow coordination and process interruption remain separate work. An injected error verifies response policy, not the real OS failure mechanism.</p><p>Optional later reading: session 052 expands sandbox files, Unicode, locale and Foundation edge cases after this project. It is not a prerequisite. This lesson defines persistence, serialization, format version, app-managed Application Support, migration and dirty-state recovery locally so the task store can be built in the public beginner sequence.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "JSON decode fails for an existing file. Which default is safe for this lab?",
+          "options": [
+            "Return empty and autosave.",
+            "Preserve the file, block mutations and offer explicit load recovery.",
+            "Delete it because JSON is replaceable."
+          ],
+          "answer": 1,
+          "explanation": "Unreadable and missing are different states. Blocking save prevents a decode failure from becoming data loss."
+        },
+        {
+          "question": "A valid rename fails to save. What should Reload do under the chosen policy?",
+          "options": [
+            "Replace the edit with old disk values immediately.",
+            "Refuse while dirty so the user can retry saving.",
+            "Clear dirty because the new title is visible."
+          ],
+          "answer": 1,
+          "explanation": "Dirty memory may be newer than disk. Reload would erase the accepted edit; explicit save recovery comes first."
+        },
+        {
+          "question": "Which migration evidence matters beyond a successful decode?",
+          "options": [
+            "Only the new property names.",
+            "ID, completion and order preservation plus unchanged old bytes until an explicit save.",
+            "Regenerating every ID to avoid old formats."
+          ],
+          "answer": 1,
+          "explanation": "Migration changes representation while preserving entities and business values. Loading alone must not rewrite the old file."
+        }
+      ],
+      "exercise": {
+        "brief": "Add an independent two-record version-one fixture and a downgrade/corruption recovery note in a personal lab copy.",
+        "steps": [
+          "Give old tasks different IDs, opposite completion flags and a known order; predict the version-two values.",
+          "Verify load preserves original bytes and marks migration pending; then save and reload.",
+          "Create a version 99 file and ensure an attempted command cannot overwrite it.",
+          "Inject a save failure after two edits; retry and verify the latest entire snapshot, then state native interruption limits."
+        ],
+        "acceptance": [
+          "Migration preserves IDs, completion and order and trims only the supported old title representation.",
+          "The old file is unchanged before explicit save and remains recoverable if save fails.",
+          "Future and corrupt formats never become silently empty current stores.",
+          "Retry saves the latest memory state; evidence separates injected faults from real device storage failures."
+        ],
+        "solution": "<p>Use A named '  Fill bottle  ' with done false and B named 'Lock door' with done true, in order B, A. Loading produces titles Lock door, Fill bottle, completion true, false and IDs B, A. needsMigrationSave is true. Compare the bytes with a captured original before calling save. The file must still contain version one and its original whitespace.</p><p>After save, decode the new envelope and assert version 2. Reload and expect needsMigrationSave false while IDs, completion and order remain B, A. If save is injected to fail, keep the migration result in memory as dirty and keep the old bytes. This makes retry meaningful: it can write the same accepted transformation without reconstructing new IDs.</p><p>For downgrade behavior, store version 99 with otherwise plausible fields. load rejects it and the model blocks changes and writes. Capture byte equality after an attempted add and save. A recovery note explains that a compatible reader or reviewed migration is needed; deleting the file is a separate user choice. Repeat with truncated JSON to prove the same protection policy without pretending the data is supported.</p><p>For latest-save behavior, accept a rename and a toggle while failSave is true, then clear the fault. save must persist both effects. Dirty clears only after that operation succeeds. Attach output from the unique scratch run and the independent fixture diff. Leave power-loss durability, device file protection, real disk-full conditions and multiwriter behavior pending because this host contract does not exercise them.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: JSONDecoder.decode",
+          "url": "https://developer.apple.com/documentation/foundation/jsondecoder/decode(_:from:)"
+        },
+        {
+          "label": "Apple: NSData.WritingOptions.atomic (used by Data)",
+          "url": "https://developer.apple.com/documentation/foundation/nsdata/writingoptions/atomic"
+        },
+        {
+          "label": "Apple: FileManager.SearchPathDirectory.applicationSupportDirectory",
+          "url": "https://developer.apple.com/documentation/foundation/filemanager/searchpathdirectory/applicationsupportdirectory"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Explicit feature preference migration",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Insurance/Reminders/InsuranceReminders+Extensions.swift",
+          "line": 57,
+          "why": "Inspected absence-check and historical migration default illustrate deliberate policy; this is not evidence of a Codable task store."
+        },
+        {
+          "label": "Corrupt local data becomes an error state",
+          "path": "ios-client/Projects/Features/ZDMedicationReminders/Sources/ZDMedicationReminders/ViewModels/MedicationRemindersListViewModel.swift",
+          "line": 106,
+          "why": "The load catches corrupt data rather than logging contents; the lab only tests synthetic store policy."
+        }
+      ],
+      "checklist": [
+        "I can keep missing and unreadable files separate.",
+        "I can explain dirty memory, retry and reload protection.",
+        "I can migrate old bytes without changing task identity or silently rewriting the file."
+      ],
+      "simple": {
+        "story": "Nora copies her task notebook into an envelope each evening. One morning the envelope is torn and she cannot read a page. She keeps it instead of assuming the notebook was empty. On another day her new copy cannot be delivered, so she keeps the changed notebook on the desk and marks it Needs copying. The older envelope still exists. She must finish copying before replacing her current notebook with that old envelope.",
+        "meaning": "Memory and stored bytes are different copies. Read and write failures need different recovery rules.",
+        "example": {
+          "before": "Disk A says Pack bag; memory A also says Pack bag.",
+          "change": "Rename A to Pack blue bag while the store rejects writes.",
+          "after": "Memory has Pack blue bag and is dirty; disk retains Pack bag; Retry Save is needed."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "A valid edit can reach memory before it reaches the stored file.",
+          "items": [
+            {
+              "label": "Accept edit",
+              "text": "Validation produces the new current task values."
+            },
+            {
+              "label": "Try write",
+              "text": "The file operation may succeed or fail independently."
+            },
+            {
+              "label": "Report result",
+              "text": "Clear dirty only on success; otherwise keep memory and retry."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Persistence",
+            "meaning": "Keeping values beyond this running process."
+          },
+          {
+            "term": "Serialization",
+            "meaning": "Translating values into stored bytes."
+          },
+          {
+            "term": "Migration",
+            "meaning": "An intentional conversion of an older format."
+          },
+          {
+            "term": "Dirty",
+            "meaning": "Current values still need a successful save."
+          }
+        ],
+        "remember": "Keep unreadable bytes and unsaved edits until recovery is deliberate.",
+        "boundary": "An envelope is only a copy analogy. Atomic file replacement does not coordinate multiple writers or prove device crash durability."
+      }
+    },
+    {
+      "id": "116",
+      "title": "Build an accessible Todo app and hand off honest evidence",
+      "summary": "Assemble the task model, owner and store in an isolated target, then independently extend and check real user journeys.",
+      "duration": 180,
+      "level": "Project sequence",
+      "prerequisites": [
+        "082",
+        "084",
+        "113",
+        "114",
+        "115"
+      ],
+      "objectives": [
+        "Create a separate iOS target containing the actual companion source.",
+        "Describe completion, editing, order and save status in accessible controls.",
+        "Deliver an independent feature with behavior checks, native observations and clear remaining limits."
+      ],
+      "sections": [
+        {
+          "id": "vertical-slice",
+          "title": "Make one complete path work from control to storage",
+          "html": "<p>A vertical slice is one user action implemented through all necessary layers. For Pocket Tasks, a user enters Fill bottle, validation accepts the title, the owner appends a task, the store writes its UUID and fields, and the list describes the result. The action crosses UI, command, model and file boundaries. A console model fixture alone completes only part of that path.</p><p>Keep responsibilities small. Todo is a value with title rules and stable identity. TodoViewModel owns accepted tasks and commands. FileTodoStore translates the versioned representation and file errors. TodoEditor owns unfinished text and focus. TodoListScreen renders current state and routes row actions. These boundaries are enough for this project; adding a coordinator, reducer and database at once would obscure the first path.</p><p>Read the files before creating a target. The native entry is a real @main SwiftUI App, separate from the @main host checks. Including both entries in one target produces a conflict. Use only Core/Todo.swift, Core/TodoStore.swift, Core/TodoViewModel.swift and Native/TodoApp.swift for the app. The host executable instead combines Core with Checks/TodoChecks.swift.</p><p>Android project experience transfers as questions about application entry, source sets and resource membership. Xcode target membership is its own configuration, and a file beside an app project is not automatically compiled. An isolated scratch target keeps company dependencies and signing choices out of this practice. The course supplies source and creation steps, not a claim that an app bundle was installed.</p>"
+        },
+        {
+          "id": "isolated-target",
+          "title": "Create the scratch target and connect its files",
+          "html": "<p>Create a unique /private/tmp directory, then choose Xcode New Project, iOS App, SwiftUI interface and Swift language. Name it TodoScratch and use a fictional organization identifier such as example.invalid.learning. Save the project there, outside this checkout. Select no team for simulator practice, keep signing separate, and choose deployment target iOS 17 or newer. Set Swift language version to Swift 6.</p><p>Remove the generated app entry and ContentView from that target, then add copies of the four app source files with Copy items enabled and target membership checked. Do not add the host checks. Build for an available simulator destination. The macro-enabled native file must compile here; defining TODO_HOST for an app would remove observation and would not verify the intended UI update mechanism.</p><p>Run and add a task, rename it, toggle it, move it and delete another task. Relaunch the same scratch installation and compare IDs and order in its Application Support file. Reinstalling after deleting the app is a different data transition and may discard its container. Record which operation you performed rather than calling any second launch persistence testing.</p><p>Use the supplied typecheck-ios.sh for a separate source check when the environment supports macro expansion. It does not generate an Xcode project or app bundle. A target build, simulator launch, UI interaction and device installation each add different evidence. Native typechecking encountered the sandbox macro failure; the target workflow remains an independent integration check.</p>"
+        },
+        {
+          "id": "accessible-actions",
+          "title": "Tell users what each control does and what changed",
+          "html": "<pre><code class=\"language-swift\">Button { model.toggle(id: item.id) } label: {\n    Image(systemName: item.isComplete ? \"checkmark.circle.fill\" : \"circle\")\n}\n.buttonStyle(.borderless)\n.accessibilityLabel(item.title)\n.accessibilityValue(item.isComplete ? \"Complete\" : \"Incomplete\")\n.accessibilityHint(\"Double tap to change completion\")</code></pre><p>Accessibility gives assistive technologies useful meaning and operable actions. This target-required row snippet uses an image for completion, so its label states the task title, value states current completion and hint describes the action. Before tapping, Fill bottle is Incomplete. After an accepted toggle it is Complete. Color or a checkmark alone cannot communicate that state to every user.</p><p>The neighboring text button opens editing and has a separate label, Edit Fill bottle. Two controls mean two actions; do not combine them into an unlabeled row gesture that makes completion and editing indistinguishable. Borderless button style helps preserve separate button behavior inside the list, but actual hit regions and assistive interaction still require testing.</p><p>Dynamic Type is the system's adjustable text size. Use semantic text styles, allow titles and messages to wrap, and avoid fixed-height rows that clip larger text. The companion aligns row controls at the top and gives the title flexible width. Test long accepted titles, multiline drafts and storage messages at the largest relevant accessibility sizes.</p><p>VoiceOver is Apple's screen reader. Check navigation order, current completion value, edit action and focus after delete or reorder. An accessibility identifier used by a UI test is not a spoken label or proof that a control is understandable. Likewise Android content descriptions suggest the intent but do not establish equivalent VoiceOver traits, rotor behavior or focus rules.</p>"
+        },
+        {
+          "id": "focus-and-errors",
+          "title": "Keep the editor usable during validation and recovery",
+          "html": "<p>Focus names which control currently receives keyboard input. @FocusState connects the title field to the editor's local focus state, and onAppear requests title focus. A failed Save leaves the form open and displays validation text. The learner must check whether VoiceOver users can discover that error and whether keyboard input remains usable. A source annotation alone cannot establish the focus experience.</p><p>Cancel discards the draft; Save sends a command. Submission from the keyboard uses the same commit function as the toolbar action. If a task disappeared, the editor reports that it no longer exists. If saving fails after a valid edit, the list reports unsaved changes and offers Retry Save. Explain these different outcomes so a user does not repeatedly add the same task trying to recover a write.</p><p>After successful migration, current values are dirty until saved. The native list presents Save Current Tasks even without a storage error. This is a persistence action, not a new task mutation. If initial load fails, Retry Load is offered while changes remain blocked. There is no Start Over shortcut that silently overwrites the existing file.</p><p>For larger screens, test that navigation and the presented form use space sensibly and remain reachable with a keyboard or pointer. This small app uses NavigationStack rather than a specialized split-view architecture. Repeated windows would currently share a file without coordinated ownership, so multiwindow writing is outside the completed store contract and needs a separate design.</p>"
+        },
+        {
+          "id": "independent-capstone",
+          "title": "Choose one extension and keep its semantics testable",
+          "html": "<p>An independent capstone adds behavior the supplied answer has not already completed. Add an Incomplete Only filter or a duplicate-task action in your personal copy. For a filter, keep the full manual array as authority, render a derived visible snapshot, map delete offsets through that snapshot and explicitly disable reorder while filtering. That gives users a clear meaning instead of guessing where hidden rows should move.</p><p>For duplicate-task, allocate a new UUID, retain a validated title and choose whether completion resets to false. Declare that policy first. Duplicating A must create B rather than copy A's identifier. A filename or array copy is not enough evidence: assert independent mutation of B, no duplicate-ID rejection, and preserved order after a later save/load cycle.</p><p>Write one successful journey and one adversarial journey. A filter success deletes visible C while hidden completed B survives. Its adversarial case attempts a stale editor update after C was deleted. A duplicate success edits B without changing A; its adversarial case tries an invalid title or injected save failure. Include exact before/change/after values in the review note.</p><p>Do not turn the supplied checks into a learner completion stamp. The supplied tests establish a baseline contract for the supplied code. Your extension needs a new expectation and actual output, while the UI needs native observations. A staff-level handoff assigns remaining ownership, explains why the bounded store was chosen and states when a database or coordinated async writer becomes necessary.</p>"
+        },
+        {
+          "id": "versions-and-evidence",
+          "title": "Versions, source anchors and review evidence",
+          "html": "<p>The companion native source requires an iOS 17+ SwiftUI target and uses Observation. Host checks passed with Apple Swift 6.4.2 and Swift 6 language mode, with TODO_HOST removing macro annotations only. Native typechecking was attempted against iOS Simulator SDK 27.2 for arm64 iOS 17 and failed because macro plugin sandboxing was unavailable. No macro-enabled native success is claimed.</p><p>The inspected ZDWellGuide Project.swift at line 12 declares iOS 17 deployment and source membership at line 13. It illustrates target configuration, not evidence that Pocket Tasks belongs in that production target. WellGuideTaskListView at line 28 supplies identified items to a composed list; its domain ordering differs from manual Todo order. Both anchors remain read-only.</p><p>Submit the exact source set, independent change, behavior outputs, target/destination settings and native observation ledger. Keep target compilation, simulator journeys, VoiceOver, large text, relaunch and device storage interruption separate. The README records the exact baseline checks. No production app, signing, remote dependency, client migration or learner approval is part of this capstone.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which files belong in the isolated Todo app target?",
+          "options": [
+            "Both @main entries and every lab script.",
+            "The three Core Swift files plus Native/TodoApp.swift.",
+            "Only the host checks because they print PASS."
+          ],
+          "answer": 1,
+          "explanation": "The app entry and host executable entry belong to separate targets. Core is shared source; checks are not app membership."
+        },
+        {
+          "question": "What makes the completion button understandable to a screen reader?",
+          "options": [
+            "A green icon alone.",
+            "A task label, current completion value and understandable action, verified in use.",
+            "An internal test identifier only."
+          ],
+          "answer": 1,
+          "explanation": "Visual color and test selectors do not supply spoken meaning or prove interaction. Actual assistive testing remains required."
+        },
+        {
+          "question": "A learner adds a filter. Where should visible delete offsets be mapped?",
+          "options": [
+            "Against the exact visible snapshot rendered by the list.",
+            "Against the full array regardless of filtering.",
+            "Against title text because titles are unique."
+          ],
+          "answer": 0,
+          "explanation": "The visible coordinate system can differ from the full collection. Map through the rendered snapshot to stable IDs."
+        }
+      ],
+      "exercise": {
+        "brief": "Create an isolated app target and implement one original extension in a personal copy. Submit behavior and native evidence separately.",
+        "steps": [
+          "Add the four app files to a new scratch iOS 17+ target without the host @main file.",
+          "Choose filtering or duplication, write its product policy and implement it without changing stable identities.",
+          "Add an adversarial host case and run it with exact expected before/after state.",
+          "Build and run the target when possible; check keyboard Save/Cancel, VoiceOver, largest text and relaunch; mark unrun rows pending."
+        ],
+        "acceptance": [
+          "The source set has exactly one app entry and no company dependencies or credentials.",
+          "The new behavior handles hidden or duplicated tasks by stable identity and has an independent failure case.",
+          "Accessible actions communicate completion and editing separately; validation and save recovery are discoverable when actually tested.",
+          "The ledger distinguishes passed host logic from native build and observed UI/runtime results."
+        ],
+        "solution": "<p>For the filter option, derive visibleItems from model.items and the local filter flag. Render visibleItems in ForEach, map deletion offsets through that same value, then call delete with IDs. Disable move while filtering. With A incomplete, B complete and C incomplete, visible A, C maps offset one to C. After delete, full state is A, B, so hidden B survives.</p><p>Add a host assertion for that mapping and another for editing C after deletion. The stale rename returns false and does not recreate C. Then inject a write failure during a valid change to A; the changed memory stays dirty, and retry persists the latest full collection including hidden B. These cases prove your extension integrates with the existing identity and failure policy.</p><p>In Xcode, keep generated and supplied entry points from competing by removing the generated target members. Build the actual macro-enabled source and record the target, destination, language mode and result. If macro expansion or runtime access is blocked, retain the exact error and mark the remaining rows pending. Do not use TODO_HOST in the app to convert a typecheck into an observation claim.</p><p>A native submission records separate observations for keyboard submit, Cancel, completion announcement, edit action, focus after deletion, wrapping at large text, and relaunch preserving ID/order. Source inspection can motivate those checks but cannot substitute for them. The handoff also names single-writer storage and synchronous I/O limits, supplies the independent diff and avoids claiming that reading the worked answer completed the learner's project.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Creating an Xcode project for an app",
+          "url": "https://developer.apple.com/documentation/xcode/creating-an-xcode-project-for-an-app"
+        },
+        {
+          "label": "Apple: View.accessibilityLabel",
+          "url": "https://developer.apple.com/documentation/swiftui/view/accessibilitylabel(_:)"
+        },
+        {
+          "label": "Apple: FocusState",
+          "url": "https://developer.apple.com/documentation/swiftui/focusstate"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Feature deployment and explicit source membership",
+          "path": "ios-client/Projects/Features/ZDWellGuide/Project.swift",
+          "line": 12,
+          "why": "Inspected iOS 17 deployment and source glob demonstrate configuration boundaries, not permission to add the scratch app to the client."
+        }
+      ],
+      "checklist": [
+        "I can create an isolated native target with one correct app entry.",
+        "I can describe and verify accessible completion, editing and recovery.",
+        "I can submit an independent change without overstating host or native evidence."
+      ],
+      "simple": {
+        "story": "Isha builds a small cupboard from a plan. First she checks that each hinge moves on the workbench. Then she attaches the doors to the actual cupboard and tries opening them. Her friend checks whether the handles are reachable and whether the labels can be read. A hinge test is useful, but the cupboard is not ready merely because a loose hinge worked. Each check answers a different question about the finished object.",
+        "meaning": "Host logic, native compilation and accessible user journeys provide different evidence for the same app.",
+        "example": {
+          "before": "Shared task logic passes host checks; the native screen has not run.",
+          "change": "Create a separate iOS target and attempt an actual build and accessible journey.",
+          "after": "Record each real outcome separately; blocked or unrun native rows remain pending."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Follow the project from shared behavior to native source to user observations.",
+          "items": [
+            {
+              "label": "Host behavior",
+              "text": "Check identities, edits and file recovery with controlled inputs."
+            },
+            {
+              "label": "Native target",
+              "text": "Compile the actual SwiftUI and Observation source."
+            },
+            {
+              "label": "User journey",
+              "text": "Observe editing, accessible actions and relaunch in the running target."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Vertical slice",
+            "meaning": "One user action completed through all required layers."
+          },
+          {
+            "term": "Target membership",
+            "meaning": "Which files Xcode includes in a particular build target."
+          },
+          {
+            "term": "Dynamic Type",
+            "meaning": "System-adjustable text sizes."
+          },
+          {
+            "term": "Evidence",
+            "meaning": "An actual result tied to a specific command or observation."
+          }
+        ],
+        "remember": "A passing piece is evidence for that piece; check the assembled experience separately.",
+        "boundary": "The cupboard story does not model SwiftUI lifetime or OS storage. Host passes and source annotations cannot prove native accessibility or durability."
+      }
+    }
+  ]
+}

@@ -1,0 +1,186 @@
+{
+  "workshops": [
+    {
+      "id": "todo-project",
+      "title": "Todo workshop: build and test a recoverable local task app",
+      "summary": "Run actual shared task/store checks, create a separate SwiftUI target, and add an independent feature with accessible recovery.",
+      "kind": "Native implementation",
+      "sessions": [
+        "113",
+        "114",
+        "115",
+        "116"
+      ],
+      "sections": [
+        {
+          "id": "setup-and-scope",
+          "title": "Set up the shared logic and the separate native target",
+          "html": "<p>A companion is source you can inspect and run independently of the client. TodoProject contains a small Foundation model/store, a main-actor view model, a host entry and a separate real SwiftUI App entry. It installs no packages and contacts no services. The host runner creates a unique /private/tmp directory for its binary, compiler cache and task file, retaining that directory for evidence.</p><p>Read Core/Todo.swift first, then TodoStore.swift and TodoViewModel.swift. Run the command below from the ios-learning workspace. The runner uses Swift 6 language mode and TODO_HOST, which omits Observation annotations because the recorded verification environment blocked the macro process. This is the same mutation and storage implementation, not a replacement model. It does not exercise SwiftUI observation.</p><p>The native source keeps @Observable and requires a separate iOS 17+ target. Follow README creation steps, include all three Core files plus Native/TodoApp.swift, and exclude Checks/TodoChecks.swift. An app target must have one @main entry. The provided source is actual framework integration, with app bundle creation and installation still pending.</p><pre><code class=\"language-shell\">zsh course/labs/TodoProject/run-checks.sh\nzsh course/labs/TodoProject/typecheck-ios.sh</code></pre>"
+        },
+        {
+          "id": "read-the-code",
+          "title": "Trace a command from input to a saved snapshot",
+          "html": "<p>Todo's initializer normalizes edge whitespace and validates a nonempty title no longer than 80 Swift Characters. Its stored UUID is allocated once and survives rename, toggle, order changes and load. Two equal titles with different IDs are allowed. Todo.validate additionally rejects duplicate IDs and noncanonical current titles. Synthesized Codable decoding needs that explicit domain check.</p><p>TodoViewModel.change builds a candidate collection, validates it, then assigns items and attempts save. The Bool result reports command validity; isDirty and storageError report durability. A failed rename does not publish partial values. A valid rename with a failed write remains visible in memory and dirty. load refuses to replace dirty values with an older file.</p><p>FileTodoStore selects a schema by version. Version one maps name/done into title/isComplete using the old UUIDs and original order. Loading does not rewrite bytes. It reports needsMigrationSave, and the native screen offers Save Current Tasks. Version 99, corrupt JSON, invalid titles and duplicate IDs are read failures; only known file absence is first launch.</p><p>This single-owner synchronous file is intentionally bounded. Atomic replacement limits partial new-file publication but does not coordinate writers or prove every interruption scenario. Kotlin DataStore and Room provide different ownership and durability mechanisms. The transferable skill is making before/after values and failure policy explicit rather than claiming equivalent framework guarantees.</p>"
+        },
+        {
+          "id": "meaningful-checks",
+          "title": "Understand the baseline checks before extending them",
+          "html": "<p>The supplied checks test behavior that can be wrong despite compiling: noncontiguous moves retain selected order, end destinations are adjusted, invalid offsets preserve the old array, stable-ID toggles hit the intended row and stale edits create no replacement. They also inject load/write faults and compare real temporary file bytes across migration and corruption cases.</p><p>Read each expectation before running. For A, B, C, D, moving B and D to boundary zero produces B, D, A, C. Moving B from that result to the end produces D, A, C, B. Completion and titles do not change during a move. A count-only assertion would miss an incorrect order or identity change.</p><p>FaultStore is a deterministic test double, not actual disk failure. Its failed write verifies dirty state and latest-save retry. Real FileTodoStore checks verify round trip and preservation of old, future and corrupt fixture bytes on this host. Neither case proves device protected-data handling, disk-full behavior, background suspension or multiwindow storage coordination.</p><p>The recorded passed host output is documented in README, alongside the failed macro-enabled native typecheck. Learner evidence requires an independent input or feature and actual execution. A copied check and the supplied PASS line show reading, not completion of the requested practice.</p>"
+        },
+        {
+          "id": "native-journeys",
+          "title": "Observe the actual form, list and accessible actions",
+          "html": "<p>Create a new SwiftUI App in a unique scratch directory, set iOS 17+ and Swift 6, remove generated conflicting entry files, then add the four app sources with target membership. Use the real macro-enabled source without TODO_HOST. Attempt a simulator build and record the exact target, destination and result before describing anything as running.</p><p>Add an original task, type a changed draft and cancel. The accepted title and file should remain unchanged. Save a valid edit, toggle completion, reorder, delete and relaunch the same installation. Compare task IDs and manual order. Deleting and reinstalling an app is a different container transition and must not substitute for relaunch evidence.</p><p>Test spoken task label, completion value and separate edit action with VoiceOver. At large Dynamic Type sizes, titles and recovery messages must wrap without concealing controls. Verify keyboard submit uses the same validation as toolbar Save, and examine focus after errors, deletion and reorder. Host assertions and accessibility annotations cannot establish these interactions.</p><p>The recorded native typecheck produced sandbox_apply: Operation not permitted and malformed Observation macro-plugin responses during native typecheck. Keep that concrete failure in the ledger. Building and observing the target on a suitable environment is outstanding integration, not a completed native result hidden behind the workshop's implementation category.</p>"
+        },
+        {
+          "id": "independent-feature",
+          "title": "Add a feature with one new adversarial case",
+          "html": "<p>Choose a filter or duplicate action. For Incomplete Only, derive the exact visible snapshot, translate delete offsets there to stable IDs and disable reorder while filtering unless you write a different explicit product rule. With A incomplete, B complete, C incomplete, visible offset one must delete C and preserve hidden B. Add a stale-C edit case afterward.</p><p>For duplicate, choose whether completion resets and allocate a new UUID. Duplicating A must create an independent B; editing B must not change A. Save/reload must retain both identities and order. Add a validation or write-failure case for the duplicate operation. Neither extension is pre-completed in the supplied source.</p><p>Submit source changes, predictions, host outputs and native ledger. Explain when synchronous I/O or one writer stops being enough and who owns a future coordinated store. Preserve original corrupt bytes during recovery and unsaved memory during write retry. The handoff should be concrete and reviewable, with unrun native rows still pending.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Implement one independent Todo extension in a personal scratch copy and hand off behavior plus native evidence.",
+        "steps": [
+          "Run and explain the baseline host checks; record toolchain and scratch location.",
+          "Implement filtering or duplication with explicit identity/order policy.",
+          "Add and run a new adversarial host case, including a storage failure or stale selection.",
+          "Create and build the actual isolated native target when available, then observe accessible editing and relaunch; retain exact errors for blocked rows."
+        ],
+        "acceptance": [
+          "Stable IDs, accepted titles and manual ordering survive the extension and round trip.",
+          "An independent failure case leaves the appropriate previous values or dirty memory intact.",
+          "The real app source stays separate from host entry and is built without TODO_HOST when native verification occurs.",
+          "Host, native build, simulator, accessibility and storage-interruption evidence are separate; no supplied answer marks learner completion."
+        ],
+        "solution": "<p>For a filter, keep accepted model.items unchanged and derive visibleItems in the view. Map the callback offsets through visibleItems, then delete the resulting ID set. Disable moves while the filter is active. Assert that A, B, C becomes A, B after deleting visible offset one, and that a later rename of C is rejected without adding a task.</p><p>Inject a save failure during a valid change to A. Confirm the new value remains in memory, dirty is true and reload refuses to overwrite it. Clear the injected fault and save; the latest full snapshot must include hidden B. This new integrated fixture goes beyond the supplied direct command checks.</p><p>In the native target, compile the three Core files and native App with real Observation. Record the result even if blocked. For an available run, inspect Cancel, valid Save, completion meaning, keyboard submission, large text and relaunch preserving ID/order separately. Do not infer them from compilation. Deliver the independent diff and exact outputs, then leave device interruption, protected-data and multiwriter guarantees outside the verified contract.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Managing model data in your app",
+          "url": "https://developer.apple.com/documentation/swiftui/managing-model-data-in-your-app"
+        },
+        {
+          "label": "Apple: Data atomic writing",
+          "url": "https://developer.apple.com/documentation/foundation/nsdata/writingoptions/atomic"
+        },
+        {
+          "label": "Apple: View.accessibilityLabel",
+          "url": "https://developer.apple.com/documentation/swiftui/view/accessibilitylabel(_:)"
+        }
+      ],
+      "files": [
+        {
+          "label": "Task values and move semantics",
+          "path": "labs/TodoProject/Core/Todo.swift"
+        },
+        {
+          "label": "Versioned local store and migration",
+          "path": "labs/TodoProject/Core/TodoStore.swift"
+        },
+        {
+          "label": "Shared commands with real native Observation",
+          "path": "labs/TodoProject/Core/TodoViewModel.swift"
+        },
+        {
+          "label": "Host behavioral checks",
+          "path": "labs/TodoProject/Checks/TodoChecks.swift"
+        },
+        {
+          "label": "Actual target-required SwiftUI App",
+          "path": "labs/TodoProject/Native/TodoApp.swift"
+        },
+        {
+          "label": "Isolated host runner",
+          "path": "labs/TodoProject/run-checks.sh"
+        },
+        {
+          "label": "Separate macro-enabled native typecheck",
+          "path": "labs/TodoProject/typecheck-ios.sh"
+        },
+        {
+          "label": "Setup, baseline evidence and outstanding native work",
+          "path": "labs/TodoProject/README.md"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does TODO_HOST deliberately exclude?",
+          "options": [
+            "The shared command and store implementation.",
+            "Observation macro annotations/import, because the macro process was blocked in the recorded environment.",
+            "Every validation check."
+          ],
+          "answer": 1,
+          "explanation": "Shared domain and persistence logic runs unchanged, but host PASS does not verify Observation or SwiftUI."
+        },
+        {
+          "question": "A store load fails on an existing corrupt file. What must the extension preserve?",
+          "options": [
+            "The original bytes and blocked save state until explicit recovery.",
+            "A new empty file.",
+            "Only its filename."
+          ],
+          "answer": 0,
+          "explanation": "Overwriting unreadable data with empty values destroys recovery evidence. Commands remain blocked until a successful load."
+        },
+        {
+          "question": "Which evidence completes an accessible native journey?",
+          "options": [
+            "A read-through of the code.",
+            "Actual target/run observations for labels, actions, focus and text sizes, with exact remaining limits.",
+            "The supplied host PASS alone."
+          ],
+          "answer": 1,
+          "explanation": "Native accessibility is interaction evidence, separate from host logic and compilation."
+        }
+      ],
+      "simple": {
+        "story": "A team builds a small task cupboard. One person checks that each card has a unique tag. Another checks whether cards can be moved without swapping their tags. A third tests the cupboard doors and reads its labels aloud. They keep a list of which checks actually happened. When a door test cannot run, they write Pending instead of pretending the card tests covered it. They then add one new shelf and test that separately.",
+        "meaning": "The workshop combines shared behavior and real native source while keeping each verification boundary explicit.",
+        "example": {
+          "before": "The supplied host logic passes; native macro expansion is blocked.",
+          "change": "Add a new filtered-delete case in a personal copy and attempt the real target separately.",
+          "after": "New host results and actual native outcomes are recorded independently."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Independent work needs behavior evidence and separate native observations.",
+          "items": [
+            {
+              "label": "Read baseline",
+              "text": "Understand identity, command and file contracts."
+            },
+            {
+              "label": "Extend",
+              "text": "Implement a new feature and adversarial case."
+            },
+            {
+              "label": "Verify",
+              "text": "Record host results and native checks at their actual boundaries."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Companion",
+            "meaning": "Isolated source that can be inspected and run beside the lesson."
+          },
+          {
+            "term": "Test double",
+            "meaning": "A controlled substitute used to provide predictable faults or values."
+          },
+          {
+            "term": "Native target",
+            "meaning": "An Apple-platform build with the actual framework source."
+          },
+          {
+            "term": "Pending evidence",
+            "meaning": "A check that has not produced a verified result yet."
+          }
+        ],
+        "remember": "Test the new shelf and record which cupboard checks actually ran.",
+        "boundary": "The story does not equate host logic with a native app. Macro exclusion does not verify observation, focus, rendering or device storage."
+      }
+    }
+  ]
+}

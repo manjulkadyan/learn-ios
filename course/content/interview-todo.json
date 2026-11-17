@@ -1,0 +1,204 @@
+{
+  "questions": [
+    {
+      "id": "iq-113-a",
+      "lesson": "113",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Explain identity, equality and position for a task renamed after a reorder.",
+      "scenario": "Tasks A and B have equal titles. A moves below B and is renamed Pack blue bag.",
+      "minutes": 6,
+      "androidBridge": "A Room key and Compose list key suggest stable identity; Swift struct assignment has value semantics unlike ordinary Kotlin object assignment.",
+      "rubric": [
+        "Keeps A's UUID across rename and reorder.",
+        "Allows equal titles with different IDs.",
+        "Distinguishes full Equatable comparison from identity.",
+        "Treats offsets as coordinates in a particular snapshot."
+      ],
+      "answerHTML": "<p>A's UUID identifies the same entity before and after the change. Reorder changes only the collection position; rename changes the title. A can therefore differ from its earlier Equatable value while retaining the same identity. B may have the same title because this product has no unique-title rule. The collection must instead reject duplicate IDs.</p><p>Identifiable exposes an ID but does not enforce uniqueness or persist it. Store the UUID once and include it in saved data. A computed UUID on every read would repeatedly identify a different entity. An array index can locate an element for immediate mutation, but it is unsafe as an editor's durable selection after reorder or deletion. Swift struct copies behave independently as values; Kotlin data-class copy is an analogy, while simple Kotlin variable assignment usually aliases an object.</p>",
+      "followUps": [
+        "What changes if imported records repeat A's UUID?",
+        "When is a domain-provided server key preferable to a locally allocated UUID?"
+      ],
+      "pitfalls": [
+        "Using the title or row index as durable identity.",
+        "Assuming Identifiable guarantees database uniqueness."
+      ]
+    },
+    {
+      "id": "iq-113-b",
+      "lesson": "113",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Find the validation hole when a Codable task's initializer rejects empty titles but decoded tasks can still be empty.",
+      "scenario": "A developer marks title private(set), adds Codable and assumes every decoded record calls the throwing initializer.",
+      "minutes": 9,
+      "androidBridge": "Kotlin serializers and constructors have their own behavior; do not transfer a constructor-validation guarantee without checking the actual decoder.",
+      "rubric": [
+        "Explains synthesized decoding can bypass the public initializer.",
+        "Validates every decoded title and the collection's IDs.",
+        "Separates canonical current records from supported old normalization.",
+        "Preserves unreadable bytes instead of silently dropping records."
+      ],
+      "answerHTML": "<p>private(set) restricts source-level mutation from outside the type. It does not force synthesized Decodable initialization through the custom throwing initializer. Successful decoding proves that the JSON representation supplied expected field types, not that the task satisfies every domain invariant. Validate the complete decoded collection before publishing or saving it.</p><p>Check nonempty normalized titles, the 80-Character rule and unique IDs. Under this lab's policy, a current record must already contain a canonical title; a supported version-one migration may normalize an old name deliberately. A corrupt or invalid collection should become a recoverable read failure, preserving original bytes. Test a current whitespace-only title and two different records with the same UUID. Also explain that Swift Character counting differs from Kotlin's UTF-16 String.length, so the input limit needs its own exact acceptance cases.</p>",
+      "followUps": [
+        "Would silently trimming current files be a product choice or a corruption fix?",
+        "How would you add a separate encoded-byte limit?"
+      ],
+      "pitfalls": [
+        "Treating decode success as domain validity.",
+        "Deleting invalid records without an explicit recovery policy."
+      ]
+    },
+    {
+      "id": "iq-114-a",
+      "lesson": "114",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Describe the owner and bindings for a task editor whose Cancel action must undo no accepted edits.",
+      "scenario": "An iOS 17 list owns a TodoViewModel; a sheet edits A's title.",
+      "minutes": 7,
+      "androidBridge": "Android ViewModel/StateFlow suggests separation of accepted and draft state; Observation does not have StateFlow's stream semantics or ViewModelStore lifetime.",
+      "rubric": [
+        "Retains an observable owner at the appropriate SwiftUI identity.",
+        "Uses local draft State and a Binding for text input.",
+        "Sends an ID-based command only on Save.",
+        "Explains MainActor isolation separately from observation and persistence."
+      ],
+      "answerHTML": "<p>Keep accepted tasks in one @MainActor @Observable TodoViewModel retained by the parent with @State. Child views can borrow that observable reference for reading. The editor separately owns @State draft initialized from the selected task and binds TextField through $draft. Typing changes the draft; Cancel simply discards it. Save sends rename with A's stable ID.</p><p>Observation tracks the properties read by body and updates dependent presentation when those values change. It neither saves files nor establishes the object's lifetime independently of SwiftUI identity. MainActor controls isolation, not storage durability or background execution. A binding to the accepted title would make each keystroke mutate the shared task and require an explicit rollback policy for Cancel. If A was deleted, reject the stale command and preserve the rest of the collection. Older ObservableObject ownership is another mechanism, not a wrapper to add automatically.</p>",
+      "followUps": [
+        "When would @Bindable be appropriate?",
+        "What happens if the owner is recreated inside body?"
+      ],
+      "pitfalls": [
+        "Binding the form directly to accepted state without a Cancel policy.",
+        "Describing MainActor as automatic background I/O."
+      ]
+    },
+    {
+      "id": "iq-114-b",
+      "lesson": "114",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Explain why deleting visible offset one removes the wrong task after filtering, and design a stable command.",
+      "scenario": "Full tasks are A incomplete, B complete, C incomplete; the visible list contains A and C.",
+      "minutes": 10,
+      "androidBridge": "Compose and RecyclerView also have snapshot coordinates; neither UI position is a persistent domain key.",
+      "rubric": [
+        "Maps offsets through the exact visible snapshot.",
+        "Passes stable IDs to deletion.",
+        "Defines reorder behavior when items are hidden.",
+        "Checks stale batches and failed save behavior independently."
+      ],
+      "answerHTML": "<p>Visible offset one names C, while full-array offset one names B. The bug comes from translating a coordinate in the visible collection against a different collection. Capture the derived visibleItems used to render ForEach and map its delete offsets to stable IDs immediately. Send those IDs to the owner; do not keep an index across asynchronous work or later array changes.</p><p>For filtered reorder, choose a product meaning explicitly. A simple extension disables reorder while filtering so hidden rows cannot create ambiguous insertion targets. The lab's strict delete command verifies every ID exists before removing any, making a stale mixed batch fail without partial deletion. After a valid deletion, saving can still fail: keep the accepted memory state dirty and show retry rather than claiming durability. Test that deleting visible C preserves hidden B, then test a stale C command after deletion.</p>",
+      "followUps": [
+        "How would subset-only reorder differ from full manual order?",
+        "Would idempotent deletion be preferable for a remote sync API?"
+      ],
+      "pitfalls": [
+        "Assuming index one always names the same entity.",
+        "Clearing save errors just because deletion was accepted."
+      ]
+    },
+    {
+      "id": "iq-115-a",
+      "lesson": "115",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Explain why a missing task file and an existing undecodable file must not both become an empty array.",
+      "scenario": "The app autosaves after accepted edits and receives truncated JSON on startup.",
+      "minutes": 8,
+      "androidBridge": "DataStore/database corruption handlers have explicit policy; a Codable try? default is not equivalent to those systems.",
+      "rubric": [
+        "Treats only known missing-file state as first launch.",
+        "Preserves corrupt or future-format bytes.",
+        "Blocks commands and saving until successful load recovery.",
+        "Explains why empty fallback plus autosave loses data."
+      ],
+      "answerHTML": "<p>A missing file can represent first launch, so an empty accepted collection is reasonable. An existing undecodable file means data is present but cannot be accepted. Returning empty for both hides the failure and lets autosave replace potentially recoverable data with a valid empty file. Catch only the intended missing-file error; propagate syntax, validation, permission and unsupported-version failures.</p><p>The view model should display a bounded recovery message and keep maySave false after failed load. Commands and save stay blocked until an explicit successful load. Repair or migrate a copy, validate it, then retry; destructive Start Over would require its own deliberate user choice. A version header distinguishes supported migration from future formats but cannot make corrupt bytes valid. Tests should compare original bytes after attempted commands and saves, proving no overwrite. Injected read failures verify response policy, not real device file protection behavior.</p>",
+      "followUps": [
+        "How should an app downgrade handle version 99?",
+        "What evidence is needed before offering Start Over?"
+      ],
+      "pitfalls": [
+        "Treating every I/O failure as file absence.",
+        "Logging or silently dropping unreadable task data."
+      ]
+    },
+    {
+      "id": "iq-115-b",
+      "lesson": "115",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Design save and migration recovery for a small single-owner Todo store, and state when its contract must grow.",
+      "scenario": "A valid rename fails to write; startup later finds a supported version-one file.",
+      "minutes": 14,
+      "androidBridge": "Android persistence intuition transfers as durability and single-writer questions; atomic JSON replacement is not Room transactions or DataStore coordination.",
+      "rubric": [
+        "Keeps valid memory dirty on failed save and blocks destructive reload.",
+        "Writes the latest snapshot on retry.",
+        "Preserves migration IDs, completion and order without rewriting during load.",
+        "Names single-writer, synchronous-I/O and native interruption limits with an owner for extension."
+      ],
+      "answerHTML": "<p>Accept valid domain changes in memory, then attempt persistence. A write failure leaves isDirty true with visible retry; reload refuses to replace those newer values. Retry saves the latest full snapshot and clears dirty only after success. If I/O becomes asynchronous, add serialized writer ownership and revision checks so an old successful write cannot mark later edits saved.</p><p>Decode version one through its dedicated representation, preserve UUIDs, completion and order, normalize the supported old names, then validate the full collection. Loading returns a migration-needed flag without overwriting original bytes. Explicit saving writes version two; a failed migration write keeps recoverable old data. Assign one store owner for this small app. Multiple scenes, large data or protected-data interruptions require coordinated storage and additional native tests. Compare a database or async actor-backed writer against the simple file's cost, and name who will verify crash, protection and upgrade behavior before extending the claim.</p>",
+      "followUps": [
+        "What revision rule prevents an old save clearing newer dirty state?",
+        "Which signals would justify replacing the JSON file with a database?"
+      ],
+      "pitfalls": [
+        "Calling atomic replacement a multiwriter transaction.",
+        "Inventing device interruption evidence from a mock error."
+      ]
+    },
+    {
+      "id": "iq-116-a",
+      "lesson": "116",
+      "level": "Senior",
+      "kind": "Code",
+      "prompt": "Explain the files and checks needed to turn the host Todo logic into an actual accessible scratch app.",
+      "scenario": "The folder contains a host @main check entry and a separate SwiftUI @main App.",
+      "minutes": 10,
+      "androidBridge": "Gradle source-set membership is a useful comparison; Xcode target membership and Apple SDK requirements are independent.",
+      "rubric": [
+        "Includes three Core files plus native App and excludes host checks.",
+        "Uses a separate iOS 17+ Swift 6 target with real Observation.",
+        "Provides completion label/value and separate edit action.",
+        "Separates compilation, simulator, VoiceOver, large text and relaunch evidence."
+      ],
+      "answerHTML": "<p>Create a separate iOS App target outside the checkout. Include Core/Todo.swift, Core/TodoStore.swift, Core/TodoViewModel.swift and Native/TodoApp.swift. Remove the generated competing App entry and exclude Checks/TodoChecks.swift so the target has one @main. Use iOS 17 or later and compile the actual macro-enabled Observation source; TODO_HOST exists only to check shared logic when the macro process is blocked.</p><p>Give the completion control the task title as label and Complete or Incomplete as value, with an understandable toggle action. Keep editing separately named. Test long text, validation messages, keyboard Save/Cancel, VoiceOver focus after deletion and relaunch preserving ID/order. A compiler pass cannot prove these interactions. Record target build and each runtime observation separately. The recorded host checks passed, but native macro typechecking failed under sandbox restrictions, so no app bundle, simulator or accessibility verification is claimed.</p>",
+      "followUps": [
+        "Why does an accessibility identifier not replace a label?",
+        "What happens if the native target defines TODO_HOST?"
+      ],
+      "pitfalls": [
+        "Including both @main entries in one target.",
+        "Claiming host PASS proves native accessibility."
+      ]
+    },
+    {
+      "id": "iq-116-b",
+      "lesson": "116",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Plan an independent filtered-list capstone and a reviewable handoff with clear evidence and recovery.",
+      "scenario": "A learner wants Incomplete Only while preserving manual order and hidden completed tasks.",
+      "minutes": 15,
+      "androidBridge": "Cross-platform feature reviews need stable entity rules and accessibility evidence; platform UI tooling is not interchangeable.",
+      "rubric": [
+        "Defines filtered deletion via visible snapshot and disables or explicitly defines reorder.",
+        "Adds a new adversarial case beyond supplied fixtures.",
+        "Keeps failure recovery and accessible state in the acceptance contract.",
+        "Assigns owners and separates host/native/runtime evidence."
+      ],
+      "answerHTML": "<p>Keep the full task array as authority and derive the filtered snapshot for rendering. Map deletion through that exact snapshot to IDs. Disable reorder while filtering unless the product defines how hidden tasks affect manual order. With A incomplete, B complete and C incomplete, deleting visible offset one must remove C while retaining hidden B. Add stale-editor and failed-save cases to test integration with existing rules.</p><p>The handoff includes the independent source diff, exact candidate behavior, host commands and native ledger. Build the real target, then observe keyboard, Cancel, completion meaning, large text, focus and relaunch separately. Blocked rows remain pending; supplied output and a copied solution do not complete learner work. Name the owner of multiwindow/synchronous-I/O limits and the trigger for a coordinated store. Explain recovery through preserved file bytes and retry, then request actual reviewer judgment rather than marking a template approved.</p>",
+      "followUps": [
+        "How would a duplicate-task capstone prove identity independence?",
+        "What native evidence would support focus behavior after deletion?"
+      ],
+      "pitfalls": [
+        "Pre-completing approval from supplied fixtures.",
+        "Treating hidden rows as disposable or inventing multiwindow safety."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,700 @@
+{
+  "unit": {
+    "id": "git-course",
+    "title": "Practice Git for iOS projects",
+    "summary": "Use disposable local repositories to learn snapshots, branches, conflicts, recovery and app-input review without real remotes.",
+    "order": 21
+  },
+  "lessons": [
+    {
+      "id": "117",
+      "title": "Make useful local commits and read the right diff",
+      "summary": "Create a disposable repository, compare working files with staged and committed snapshots, and ignore only files that should remain local.",
+      "duration": 120,
+      "level": "Project sequence",
+      "prerequisites": [
+        "057",
+        "071"
+      ],
+      "objectives": [
+        "Create a local repository in a unique scratch directory with fictional identity and no remotes.",
+        "Predict working-tree, index and HEAD values after staging and later editing.",
+        "Write meaningful commit messages and inspect ignore rules without hiding required app inputs."
+      ],
+      "sections": [
+        {
+          "id": "three-places",
+          "title": "A commit records the staged copy, not every visible edit",
+          "html": "<p>Git is a version-control tool that records snapshots and their relationships. Think of a desk, a selected pile for the next photograph, and an album. The working tree is the files on the desk. The index, also called the staging area, is the selected snapshot for the next commit. HEAD usually names the current branch's latest commit. These are separate values even when their contents happen to match.</p><p>Start with Tasks.txt saying Pack bag: incomplete in HEAD, index and working tree. Edit it to Pack bag: complete, then stage it. The index now contains complete while HEAD remains incomplete. Edit the working file again to Pack blue bag: complete. The index still says Pack bag: complete. A commit at this point records the staged completion without the later rename.</p><p>git diff compares working tree with index by default. git diff --cached compares index with HEAD. A clean working diff does not prove there are no staged changes, and a clean staged diff does not prove there are no unstaged changes. git status --short shows both boundaries; MM means a tracked path differs in both index and working tree.</p><p>Android engineers may know IDE changelists, but a changelist is not automatically Git's index. Xcode's source-control interface also sits above the same repository mechanisms. Learn terminal predictions so an IDE action has a checkable meaning. A commit is not a deployment, a test pass or an upload. In this course all actual operations stay in new disposable repositories.</p>"
+        },
+        {
+          "id": "scratch-setup",
+          "title": "Create a repository that cannot change the client checkout",
+          "html": "<pre><code class=\"language-shell\">scratch_dir=$(mktemp -d /private/tmp/my-git-learning.XXXXXX)\ngit -C \"$scratch_dir\" init --initial-branch=main\ngit -C \"$scratch_dir\" config user.name \"Scratch Learner\"\ngit -C \"$scratch_dir\" config user.email \"learner@example.invalid\"\ngit -C \"$scratch_dir\" remote\n# The last command prints nothing: this repository has no remotes.</code></pre><p>This is zsh or another compatible shell snippet. mktemp creates a unique directory; the command substitution returns its path into scratch_dir. The variable is specific to this task. Every git command uses -C to select that directory, so it cannot accidentally operate on the current course checkout. Before your first mutation, inspect the path and confirm it is your newly created /private/tmp directory.</p><p>init creates local repository metadata; --initial-branch names the first branch main. config without --global writes these identity choices only in the scratch repository. The fictional email is not a real account. User name and email label commits, but they do not authenticate a person or establish organizational approval. No remote is added and nothing is fetched, pushed or published.</p><p>The supplied Python runner is stricter: it checks that each Git directory is inside the run's unique root, drops inherited GIT_ variables, disables system/global configuration and hooks for that synthetic run, and provides per-command fictional identity. This makes supplied checks independent of a machine's normal signing and aliases. It does not rewrite the learner's normal configuration.</p><p>Git objects and branch state belong to this scratch repository. Use the explicit scratch path for every mutation and verify it before a recovery command. Understanding -C keeps experiments inside the intended repository. Record the branch and tip before changing them so the operation has a checkable before state.</p>"
+        },
+        {
+          "id": "small-commit",
+          "title": "Select a complete, reviewable behavior change",
+          "html": "<p>A meaningful commit has one understandable purpose and a snapshot that supports it. Complete the existing task without renaming it is more useful than Updates because it states the behavior reviewers can inspect. A subject need not list every filename. Add explanatory body text when the reason, migration or tradeoff cannot be understood from the diff alone.</p><p>Stage an explicit path with git add -- Tasks.txt, then inspect git diff --cached -- Tasks.txt. The first -- ends option parsing; a path beginning with a dash is then a path, not a flag. Avoid blindly staging all files when generated artifacts, personal settings or unrelated edits are present. git add captures current content at the moment it runs.</p><p>After committing the staged completion, use git show HEAD:Tasks.txt to inspect the recorded file and read the working file independently. The commit contains Pack bag: complete while the working file retains Pack blue bag: complete. That is successful separation, not a missing commit. The learner decides whether to commit the rename next or deliberately discard that synthetic change.</p><p>Use git log --oneline to see concise commit subjects and git show --stat HEAD for a bounded summary. A short object ID is convenient within one repository, while an exact full commit ID is better for an evidence ledger. Do not describe commit count as code quality. Two coherent commits can be easier to review than many tiny broken snapshots or one unrelated bundle.</p>"
+        },
+        {
+          "id": "ignore-policy",
+          "title": "Ignore generated files without hiding source inputs",
+          "html": "<p>An ignore rule tells Git which otherwise untracked paths should normally stay out of status and add operations. Our scratch rule ignores .build, DerivedData, xcuserdata and personal xcuserstate files. These are generated or user-specific outputs for this exercise. Required source, shared schemes, resources and application dependency resolution inputs need an explicit tracked policy.</p><p>Adding a rule does not untrack a file already committed. If Tasks.txt is tracked and later matches .gitignore, edits remain visible in git diff. git rm --cached removes a path from the index while leaving its working copy, but that changes the repository's tracked policy and belongs in review. Do not use it casually to hide an inconvenient change.</p><p>git check-ignore -v -- path explains which rule matched an ignored path. Negated rules beginning with ! can reinclude selected descendants, but excluded parent directories can prevent traversal and require careful parent exceptions. Rule order matters within an ignore source. Test an actual path rather than assuming a generic rule name describes all nested behavior.</p><p>The inspected ios-client/.gitignore ignores Package.resolved broadly at line 12, then provides exceptions for Tuist and selected workspace resolution files at lines 17–21. It also ignores generated feature/infra Xcode projects later. That is this checkout's policy during tooling coexistence, not a universal recommendation to ignore all projects or all pins. Read the authoritative build manifests before changing such rules.</p>"
+        },
+        {
+          "id": "diff-reading",
+          "title": "Read changes as claims about behavior",
+          "html": "<p>A textual diff shows removed and added lines relative to a selected base. A plus sign means added text, not proved correctness. Inspect which files changed, then connect their edits to the intended behavior. Renaming a title constant without updating its fixture can break a test; adding a resource file without target membership can leave the built app unable to read it.</p><p>Separate your own edits from generated churn. In a hand-managed Xcode project, project.pbxproj can be a required source input. In a generated-project repository, a manifest may be authoritative instead. Never delete a large project diff just because it looks noisy. Ask which generator or target owns it and reproduce the generation in an authorized scratch context if needed.</p><p>Before sharing a snapshot, record what was actually checked. The Git runner proves staged/unstaged differences, commit content and ignore behavior in synthetic repositories. It does not build SwiftUI or run the real client's generator. A Git commit stores whatever bytes you chose, including incorrect code, so a clean status does not substitute for compiler or behavior evidence.</p><p>Make your review note concrete: base commit, candidate commit, one trigger, expected output and commands run. For the completion example, the trigger is changing incomplete to complete, and the committed output is exactly Pack bag: complete. The later unstaged rename is intentionally outside that snapshot. This precision helps reviewers and makes recovery decisions easier.</p>"
+        },
+        {
+          "id": "versions-and-evidence",
+          "title": "Versions and verification evidence",
+          "html": "<p>Recorded verification used Git 2.54.0 (Apple Git-157) and Python 3 in four unique scratch repositories, without remotes. The runner uses modern switch and restore commands, available since Git 2.23. Older Git workflows can use checkout with different meanings, but this exercise expects the documented commands. Tool availability and repository contents are separate requirements.</p><p>Actual evidence is recorded under the run's /private/tmp root and summarized in labs/GitProject/README.md. The checks leave scratch history available for inspection. They do not mutate this checkout, create a real pull request or run CI. Learners must add their own predicted snapshot case and execute it; the supplied PASS output is baseline evidence, not learner completion.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "You stage a completion change, then rename the working file's task. What does the next commit contain?",
+          "options": [
+            "Both changes automatically.",
+            "The staged completion snapshot only.",
+            "The original HEAD snapshot only."
+          ],
+          "answer": 1,
+          "explanation": "Staging captures content at that moment. Later unstaged edits remain in the working tree until explicitly staged."
+        },
+        {
+          "question": "Which command shows the proposed next commit relative to HEAD?",
+          "options": [
+            "git diff --cached",
+            "git diff without options",
+            "git remote"
+          ],
+          "answer": 0,
+          "explanation": "The cached/staged diff compares index with HEAD. The default diff compares working files with the index."
+        },
+        {
+          "question": "A tracked file now matches .gitignore. What happens?",
+          "options": [
+            "It stops being tracked automatically.",
+            "Its tracked changes remain visible.",
+            "Its historical commits are deleted."
+          ],
+          "answer": 1,
+          "explanation": "Ignore rules govern untracked discovery; they do not remove existing index entries or history."
+        }
+      ],
+      "exercise": {
+        "brief": "Create your own unique scratch repository and demonstrate a two-stage edit with a generated-file ignore and a required tracked resource.",
+        "steps": [
+          "Create a /private/tmp repository with fictional local identity; confirm remote lists no entries.",
+          "Commit one synthetic task, stage a completion edit, then make a different unstaged title edit.",
+          "Capture both diffs, commit only the staged change and compare HEAD content with the working file.",
+          "Add an ignored generated file and a tracked JSON resource; explain what the ignore rule can and cannot change."
+        ],
+        "acceptance": [
+          "Every mutation targets the new scratch directory, and no remote exists.",
+          "The captured index and working tree differ as predicted; the commit records the index.",
+          "Ignored generated output stays untracked while the required resource is tracked.",
+          "The evidence includes exact commit IDs and commands, with native build and remote review explicitly unrun."
+        ],
+        "solution": "<p>Use a new task, such as Check desk lamp, so the learner's result differs from the supplied example. Commit its incomplete state. Change completion to true and stage Tasks.txt. Change only the title afterward. The staged diff should add Check desk lamp: complete, while the working diff should add the renamed title relative to that staged value. status shows MM for the tracked path.</p><p>Commit with a subject naming completion. git show HEAD:Tasks.txt returns the completed original title. Reading Tasks.txt returns the later renamed title. Record those exact lines and the full HEAD ID. This proves what commit recorded. Do not run restore until you have decided that discarding the synthetic later edit is intended; it is an independent change still on the desk.</p><p>Create DerivedData/output.txt under a matching ignore rule and inspect check-ignore's explanation. Create Resources/Theme.json and stage it explicitly. ls-files must list the resource and omit generated output. Now add Tasks.txt to .gitignore and edit it: the tracked diff still shows the change. That independent case demonstrates the boundary between ignored discovery and existing tracking.</p><p>The note states Git version, scratch root and result without uploading anything. A resource being tracked proves bytes belong to the repository, not that Xcode copied them into an app bundle. A meaningful commit subject helps explanation, not correctness. Native compilation, resource lookup, remote PR and organizational review remain separate pending evidence.</p>"
+      },
+      "references": [
+        {
+          "label": "Git: git-add and index content",
+          "url": "https://git-scm.com/docs/git-add"
+        },
+        {
+          "label": "Git: git-diff comparisons",
+          "url": "https://git-scm.com/docs/git-diff"
+        },
+        {
+          "label": "Git: gitignore rules",
+          "url": "https://git-scm.com/docs/gitignore"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Specific generated-file and resolution-file policy",
+          "path": "ios-client/.gitignore",
+          "line": 11,
+          "why": "Inspected .build/Package.resolved rules and later exceptions explain why source tracking is repository policy, not a universal Xcode ignore recipe."
+        }
+      ],
+      "checklist": [
+        "I can predict working tree, index and HEAD independently.",
+        "I can inspect a staged diff before committing a meaningful snapshot.",
+        "I can explain why ignore rules do not untrack existing files."
+      ],
+      "simple": {
+        "story": "Sam has a desk, a tray and a photo album. He writes Complete on a task card and places a copy in the tray for the next photograph. He then changes the card on the desk to say Pack blue bag. The tray still has the earlier copy. When he photographs the tray, the album records completion with the old title. The desk keeps the newer title until Sam chooses another photograph.",
+        "meaning": "Git commits the index snapshot; working files may contain later unstaged edits.",
+        "example": {
+          "before": "HEAD, index and working file all say Pack bag: incomplete.",
+          "change": "Stage Pack bag: complete, then edit working text to Pack blue bag: complete.",
+          "after": "A commit records Pack bag: complete; the renamed working text remains unstaged."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Staging selects bytes and committing records that selection.",
+          "items": [
+            {
+              "label": "Working tree",
+              "text": "Files can keep changing on the desk."
+            },
+            {
+              "label": "Index",
+              "text": "Staging captures the chosen next snapshot."
+            },
+            {
+              "label": "Commit",
+              "text": "The recorded snapshot comes from the index."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Working tree",
+            "meaning": "The files currently visible in the repository directory."
+          },
+          {
+            "term": "Index",
+            "meaning": "The selected snapshot for the next commit."
+          },
+          {
+            "term": "HEAD",
+            "meaning": "The current checked-out commit, usually through a branch."
+          },
+          {
+            "term": "Ignore rule",
+            "meaning": "A policy that keeps matching untracked paths out of normal discovery."
+          }
+        ],
+        "remember": "Inspect the tray before taking the photograph.",
+        "boundary": "The tray analogy does not describe Git's object storage. Commits are content snapshots with parent relationships, and staging can select parts of a file."
+      }
+    },
+    {
+      "id": "118",
+      "title": "Resolve a deliberate branch conflict with a clear decision",
+      "summary": "Create diverging local branches, inspect conflict stages, abort safely and merge an intentional behavior rather than choosing a side blindly.",
+      "duration": 150,
+      "level": "Project sequence",
+      "prerequisites": [
+        "117"
+      ],
+      "objectives": [
+        "Explain branch references, merge bases, fast forwards and two-parent merges.",
+        "Inspect base/ours/theirs values during a deliberate content conflict.",
+        "Choose and verify a resolution, or abort to the pre-merge state without changing the client checkout."
+      ],
+      "sections": [
+        {
+          "id": "branch-pointer",
+          "title": "A branch names a movable point in the history",
+          "html": "<p>A branch is a named reference to a commit. It is not a second physical copy of every file. When you switch branches, Git updates the checked-out snapshot and HEAD's branch relationship. A new commit on the selected branch moves that branch's reference. Existing commits remain immutable objects. Branch names communicate intent but do not create permission boundaries or protect a production environment.</p><p>Start with a shared base saying limit=80. Create feature/longer-title and commit limit=100 there. Switch to main and commit limit=60. Both branch tips now descend from the same base through different changes. The graph diverged even though each working tree can be clean. Looking only at the newest timestamp will not tell you which behavior should be kept.</p><p>A fast-forward merge is possible when one tip already descends from the other: Git can move the branch reference to the descendant without creating a merge commit by default. A true divergent merge combines histories and normally creates a commit with two parents. The companion conflict case intentionally diverges, so the resolved merge must record both main and feature tips as parents.</p><p>Android and Xcode IDEs visualize this graph, but its semantics are the same local Git object relationships. A checkout of a branch is not Gradle flavor selection or Xcode scheme selection. Those configuration choices can be recorded in files, while Git chooses which version of those files is present. Keep build variants and source history separate.</p>"
+        },
+        {
+          "id": "deliberate-conflict",
+          "title": "Make both branches change the same line",
+          "html": "<pre><code class=\"language-shell\"># Run ONLY in your newly created scratch repository.\ngit -C \"$scratch_dir\" switch -c feature/longer-title\n# Write limit=100 to TaskPolicy.txt, then add and commit it.\ngit -C \"$scratch_dir\" switch main\n# Write limit=60 to TaskPolicy.txt, then add and commit it.\ngit -C \"$scratch_dir\" merge --no-edit feature/longer-title\ngit -C \"$scratch_dir\" status --short\ngit -C \"$scratch_dir\" ls-files -u -- TaskPolicy.txt</code></pre><p>The comment lines are required learner actions, not shell commands that secretly edit files. Use a text editor or your own bounded fixture writer. Before merging, status should be clean and both changes should have meaningful commits. Starting with unrelated uncommitted work complicates abort and makes recovery harder to explain. The runner constructs exactly this clean scenario in a new repository.</p><p>A merge conflict means Git could not automatically combine a path under its chosen merge strategy. It is an unresolved integration request, not proof that either branch is wrong. Here both branches replace the same base line with different limits. The product decision may be 60, 100, the original 80 or a new policy. Source comparison alone cannot choose a safe title limit.</p><p>The working file gets conflict markers such as <<<<<<<, ======= and >>>>>>>. These delimit candidate sides for editing. The index retains unmerged stages: stage 1 is base, stage 2 is ours and stage 3 is theirs for this ordinary merge. ls-files -u shows those entries. A conflicted path is not ready for a normal committed snapshot.</p><p>Do not equate ours with correct or yours. In this merge, ours is the checked-out main side and theirs is the feature being merged. The terms describe operation roles. During rebase those roles can surprise people because commits are replayed onto another base. Read exact operation context and object values before choosing a side.</p>"
+        },
+        {
+          "id": "inspect-intent",
+          "title": "Compare all three values and choose behavior",
+          "html": "<p>Inspect the base and both branch values, not just marker text. The base is 80, main is 60 and feature is 100. Ask why each contributor chose the number, what constraints matter and which tests depend on it. In the synthetic exercise the reviewed agreement is 80. That returns the original value but still integrates both experiments into the history.</p><p>A semantic conflict is a disagreement in behavior that may exist even when text merges cleanly. One branch can change a validator limit while another changes a form's displayed count. If they touch different lines, Git may merge automatically while the resulting app contradicts itself. Tests and review must check the relationship, not just the absence of conflict markers.</p><p>Edit the complete desired file, remove every marker and inspect the diff. Stage TaskPolicy.txt to record the resolved stage-zero entry. Staging marks the path resolved from Git's perspective; it does not prove that the policy is correct. The next commit must explain why the chosen limit satisfies the agreed behavior.</p><p>For an actual Xcode project conflict, do not choose an entire side simply to make a property-list parse pass. Verify source references, target membership, resource phases and shared schemes after combining intended additions. If the repository generates projects, resolve the authoritative manifests and reproduce generated output as required. The course teaches this boundary but does not run the company generator.</p>"
+        },
+        {
+          "id": "abort-and-retry",
+          "title": "Abort an unresolved merge before trying another decision",
+          "html": "<p>Abort ends an in-progress merge and attempts to restore pre-merge state. In the clean scratch scenario, git merge --abort returns main to limit=60 with its prior tip unchanged. Capture that expected tip before starting. Aborting is a recovery tool for an uncompleted merge; it does not undo a merge commit already recorded.</p><p>Git warns that abort may not reconstruct pre-existing uncommitted changes in every situation. That is why the exercise begins clean and uses known fixtures. Preserve important uncommitted work before deliberately conflicting histories. A scratch sandbox makes repetition inexpensive without requiring destructive commands against this checkout.</p><p>After abort, merge the feature again, choose the intended limit, stage it and commit. Check ls-files -u prints nothing and status is clean. Inspect the resulting commit's parents: the main tip is first, the feature tip second in this ordinary merge. Both experiments remain reachable through the merge graph even though the final file contains one agreed value.</p><p>Record what you tried and why you changed direction. A useful recovery note says the first unresolved merge was aborted before any integration commit, then the agreed value was applied and verified. It need not preserve an essay about every edit. The difference between unfinished operation and committed history becomes important in the next lesson's revert choices.</p>"
+        },
+        {
+          "id": "test-the-result",
+          "title": "Check content and graph independently",
+          "html": "<p>A graph check asks whether the intended histories were integrated. A content check asks whether the result behaves as agreed. The runner asserts two expected parents, empty unmerged stages, clean status and exact limit=80. None alone is sufficient: a clean tree can contain the wrong value, and a correct line can exist in a commit that omitted the feature history.</p><p>For your independent case, use two related files: validator limit and form message. Let both branches modify one line so there is a deliberate textual conflict, and let the other file expose a clean semantic mismatch. Resolve to one agreed policy and check both values. This practices reading intent instead of counting marker removals.</p><p>Keep binary resources and project metadata in the review plan. Textual merging is inappropriate for many binary assets; choose an authoritative asset version or regenerate from a reviewed source rather than treating a conflict tool preview as semantic approval. LFS or other storage tooling is further study here and is not installed by the companion.</p><p>A merge is a team integration decision, even in local rehearsal. At staff level, name the owner of the product policy, who validates target packaging and which release evidence is needed. This local lab has no remote collaborators, protected branches or PR checks. It produces a reviewable synthetic integration, not organizational approval.</p>"
+        },
+        {
+          "id": "versions-and-evidence",
+          "title": "Versions, source connection and evidence limits",
+          "html": "<p>The recorded Git checks passed actual divergent merge, unmerged index inspection, abort and two-parent resolution on Git 2.54.0 in a unique /private/tmp repository. The underlying file is a synthetic policy fixture, not the production app validator. No remote or checkout mutation occurred.</p><p>The inspected ZDWellGuide Project.swift declares target sources at line 13 and dependencies below. A conflict in those authoritative declarations can affect build ownership even when source text is unchanged. The anchor supports configuration review, not an executed build. Xcode project generation, native resource packaging, CI and team review remain unrun and separate.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "After divergent branches merge successfully, what should an ordinary merge commit record?",
+          "options": [
+            "Only the branch with the newer timestamp.",
+            "Both integrated tips as parents.",
+            "A new copy of the repository."
+          ],
+          "answer": 1,
+          "explanation": "A two-parent merge records the relationship to both histories. Final content is still a separate verification question."
+        },
+        {
+          "question": "What does staging a resolved conflict prove?",
+          "options": [
+            "The path is no longer unmerged in the index.",
+            "The app's business behavior is necessarily correct.",
+            "All semantic conflicts were detected."
+          ],
+          "answer": 0,
+          "explanation": "Staging resolves Git's path bookkeeping. Review and behavior checks must verify the actual decision."
+        },
+        {
+          "question": "When can git merge --abort be used here?",
+          "options": [
+            "During the unresolved clean-start merge.",
+            "To remove any historical merge commit automatically.",
+            "Only after pushing to a real remote."
+          ],
+          "answer": 0,
+          "explanation": "Abort applies to an in-progress operation. A committed integration needs another recovery mechanism, such as a reviewed revert."
+        }
+      ],
+      "exercise": {
+        "brief": "Create a different policy conflict in a personal scratch repository, abort once, then resolve both a textual and a semantic disagreement.",
+        "steps": [
+          "Commit a shared base and clean divergent branches with different limits.",
+          "Inspect base, both tips and unmerged stages before touching the conflict markers.",
+          "Abort and verify the pre-merge tip/content; start again and choose a written agreement.",
+          "Update both validator and form-message fixtures, stage, commit and verify content plus two parents."
+        ],
+        "acceptance": [
+          "The conflict is intentional and every mutation remains inside a unique scratch repository.",
+          "Abort restores the captured clean pre-merge state.",
+          "The chosen policy is explained and both related fixtures agree.",
+          "The final index has no unmerged entries; commit parents and clean status are recorded."
+        ],
+        "solution": "<p>Use a label-length limit of 30 at the base, 24 on main and 40 on the feature. Add a form-message fixture that still says Maximum 30 on one side. Explain the agreement before resolving: this synthetic product chooses 24, so both validation and user instruction must reflect 24. A clean text merge of the message would not guarantee that relationship.</p><p>Start the merge from clean main, capture the three stage values with ls-files -u and compare their blobs or branch file contents. Abort before committing. The main tip must equal the captured ID and the policy file must say 24. This demonstrates a known pre-operation recovery, not arbitrary reconstruction of unrelated unstaged work.</p><p>Merge again, edit the desired final files, remove markers and stage explicit paths. Confirm unmerged entries are absent, inspect the staged diff and commit the explained choice. Assert policy limit=24 and message Maximum 24. The commit must have the captured main tip and feature tip as its two parents.</p><p>Record the exact commands, IDs and content assertions. For an app change, source membership, packaging and actual form behavior would require native build and interaction evidence. Leave those pending in this synthetic rehearsal. The worked choice is one example of a product decision; the learner must supply their own conflicting fixtures and reasoning to complete the exercise.</p>"
+      },
+      "references": [
+        {
+          "label": "Git: git-merge conflict and abort behavior",
+          "url": "https://git-scm.com/docs/git-merge"
+        },
+        {
+          "label": "Git: git-ls-files unmerged stages",
+          "url": "https://git-scm.com/docs/git-ls-files"
+        },
+        {
+          "label": "Git: git-switch",
+          "url": "https://git-scm.com/docs/git-switch"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Authoritative feature target declaration",
+          "path": "ios-client/Projects/Features/ZDWellGuide/Project.swift",
+          "line": 13,
+          "why": "Inspected source membership and dependency declarations provide a real configuration-review anchor; no client merge or generation was performed."
+        }
+      ],
+      "checklist": [
+        "I can explain branch references and merge parents.",
+        "I can inspect base/ours/theirs without assuming one side is correct.",
+        "I can abort an unfinished clean-start merge and validate an intentional resolution."
+      ],
+      "simple": {
+        "story": "Two editors copy the same notice, which says the hall holds 80 chairs. One changes it to 60, the other to 100. A clerk cannot paste both numbers into the final notice. She keeps the original and both proposals, then asks for a decision. The group chooses 80 and she writes one final notice. She records that both proposals were considered, even though the final number equals the original.",
+        "meaning": "A merge combines histories, but people must choose coherent behavior when edits disagree.",
+        "example": {
+          "before": "Base limit is 80; main says 60; feature says 100.",
+          "change": "Merge the diverged branches and resolve to the agreed limit 80.",
+          "after": "Final file says 80; the merge records both branch tips as parents."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "A conflict requires comparison, a decision and explicit resolution.",
+          "items": [
+            {
+              "label": "Compare",
+              "text": "Read base and both changed values."
+            },
+            {
+              "label": "Decide",
+              "text": "Choose a policy and its acceptance checks."
+            },
+            {
+              "label": "Integrate",
+              "text": "Stage the resolved content and record both histories."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Branch",
+            "meaning": "A named reference to a commit that can move."
+          },
+          {
+            "term": "Merge base",
+            "meaning": "A shared ancestor used to compare divergent histories."
+          },
+          {
+            "term": "Conflict",
+            "meaning": "A change Git could not automatically combine."
+          },
+          {
+            "term": "Semantic conflict",
+            "meaning": "Behavior that disagrees even if text combines cleanly."
+          }
+        ],
+        "remember": "Removing markers finishes bookkeeping; checking intent finishes the decision.",
+        "boundary": "The notice story does not model Git's merge algorithms. A clean automatic merge can still have behavior conflicts."
+      }
+    },
+    {
+      "id": "119",
+      "title": "Recover local work and choose revert or reset deliberately",
+      "summary": "Identify whether work is uncommitted, private or shared, preserve a rescue reference, and predict the exact effects of recovery commands.",
+      "duration": 150,
+      "level": "Project sequence",
+      "prerequisites": [
+        "117",
+        "118"
+      ],
+      "objectives": [
+        "Distinguish restore, revert, reset and operation abort by what they change.",
+        "Predict soft, mixed and hard reset effects on HEAD, index and working files.",
+        "Recover a known local commit with a named reference while explaining reflog limits."
+      ],
+      "sections": [
+        {
+          "id": "classify-before-command",
+          "title": "Locate the work before choosing a recovery tool",
+          "html": "<p>Recovery means returning to an intended state without losing work you still need. First identify where the unwanted or missing change lives: working tree, index, a private commit, an in-progress merge, or history already used by others. The same phrase Undo my change can describe all five situations, but they require different operations. Do not choose a command solely because an IDE labels it Undo.</p><p>Capture status, relevant diffs and exact commit IDs before mutation. If valuable uncommitted work exists, copy it to an independent scratch location or preserve a suitable patch and verify the copy. A patch of tracked changes does not automatically include untracked or ignored files. A named rescue branch protects a committed snapshot; it does not capture files that were never committed.</p><p>In this lesson shared history is a decision concept, not an invitation to contact a remote. The actual runner has no remotes and uses known disposable values. For a team repository, shared includes commits another collaborator or automation may already depend on. Rewriting them changes identities and coordination requirements even when the final source looks the same.</p><p>Treat the first diagnostic step like investigating a Gradle or Xcode regression: determine the exact candidate and boundary before modifying configuration. Git status does not tell you whether a candidate ran successfully, and build failures do not identify which recovery operation preserves history. Keep content correctness and history ownership as separate questions.</p>"
+        },
+        {
+          "id": "restore-vs-revert",
+          "title": "Restore files or record an inverse change",
+          "html": "<p>restore copies selected path content from a chosen source into the index or working tree. By default, git restore -- path restores working content from the index and can discard unstaged tracked edits. git restore --staged -- path restores index content from HEAD by default, leaving working changes available. These are path operations; they do not create a commit.</p><p>revert computes an inverse change for an existing commit and records it as a new commit when successful. The original commit remains in history. If a shared change set limit=8 instead of 80, a reviewed revert can restore 80 while retaining an audit trail of the mistake and its correction. A revert can conflict with later edits, so it still requires content review.</p><p>Reverting a merge needs an explicit mainline choice because there are multiple parents. git revert -m selects which parent is treated as mainline; its value is a parent number, not a merge commit ID. This affects later integration semantics. The runner reverts a simple non-merge commit only. Do not generalize that case into an automatic safe command for every merge.</p><p>Undoing a mistake does not erase knowledge of it or revoke published secrets. This course uses fictional content and no credentials. In a real incident, rotation and access review would be separate actions. Here the useful distinction is mechanical: restore changes selected current copies, while revert adds a historical correction without pretending the original snapshot never existed.</p>"
+        },
+        {
+          "id": "reset-three-copies",
+          "title": "Predict exactly what each reset mode moves",
+          "html": "<pre><code class=\"language-shell\"># Disposable scratch repository; preserve a named commit first.\ngit -C \"$scratch_dir\" branch rescue/private-notes HEAD\ngit -C \"$scratch_dir\" reset --soft HEAD~1\ngit -C \"$scratch_dir\" diff --cached --stat\ngit -C \"$scratch_dir\" reset --mixed HEAD\ngit -C \"$scratch_dir\" status --short\n# Do not use --hard until you intend to discard known scratch edits.</code></pre><p>Commit-form reset moves the selected branch/HEAD to a target and updates other copies according to its mode. HEAD~1 means the first parent of the current commit; it is not the previous command or yesterday's timestamp. Before moving the reference, rescue/private-notes retains the current committed snapshot under a stable name. The learner should also record the exact full ID.</p><p>--soft moves HEAD while preserving index and working tree. If the private tip added Notes.txt, resetting to its parent leaves that file staged as an addition. You can refine the staged change or recommit with a better boundary. This is a private-history editing operation, not a new historical inverse like revert.</p><p>--mixed is the default commit-form mode: it moves HEAD and resets the index to the target, retaining working files. In the runner, mixed HEAD after the soft reset clears the staged difference without moving HEAD again. The added Notes.txt becomes untracked because it is absent from the target snapshot, yet its working bytes still exist.</p><p>--hard resets tracked working content as well as index and HEAD, discarding relevant local edits. It can also remove untracked files or directories that obstruct writing tracked paths; it is not a universal promise to preserve every untracked file. The runner uses it only to discard one known synthetic tracked edit at the current HEAD. It never runs against this checkout.</p>"
+        },
+        {
+          "id": "rescue-and-reflog",
+          "title": "Name recoverable commits instead of relying on luck",
+          "html": "<p>A reflog records local reference movements, including branch or HEAD changes. After a reset, it can show the old tip so you can inspect and name it. git reflog --format=%H produces recorded commit IDs. Once you identify the intended snapshot, create a branch at that exact ID and inspect its files before restoring them.</p><p>Reflogs are local bookkeeping and may expire. Unreachable objects can later be pruned. Another machine is not guaranteed to have your local reflog, and it does not include every uncommitted edit. A named reference created before an experiment is a stronger deliberate recovery anchor, though it remains part of that repository rather than an independent backup.</p><p>In the runner, rescue/private-notes names the private tip before reset. git show rescue/private-notes:Notes.txt proves the desired content remains. restore --source=rescue/private-notes --staged --worktree -- Notes.txt brings that selected file into the current snapshot, then a new meaningful commit records recovery. The recovered source can match without giving the new commit the old ID.</p><p>Detached HEAD means HEAD names a commit directly rather than a branch. New commits made there can become hard to find after switching away unless named. An independent exercise creates a branch before leaving a useful detached commit and verifies its reachability. The supplied runner does not currently execute detached-HEAD practice, so do not claim that case passed.</p>"
+        },
+        {
+          "id": "review-and-recovery-plan",
+          "title": "Choose recovery according to ownership and evidence",
+          "html": "<p>For a private unfinished experiment, reset or a local rebase may organize history when all dependent work is yours and recoverable. For an accepted shared change, a reviewed revert usually communicates a correction without changing existing IDs. Those are defaults based on coordination cost, not absolute laws. Team policy, release lineage and dependent branches can change the choice.</p><p>Operation abort belongs to unfinished work: merge --abort or rebase --abort ends the current integration/replay attempt. After a successful commit, those commands are no longer the history-level undo you need. Keep a note of whether the operation was committed, whether later commits depend on it and which reference names the pre-operation tip.</p><p>An Xcode resource regression may require restoring more than a Swift file. The resource, target membership, scheme or dependency resolution file can all belong to the behavior change. Use a complete reviewed recovery patch. Reverting source while leaving a changed project manifest can produce a different package than the expected baseline.</p><p>The inspected feature manifest shows explicit target and dependency configuration. It is a concrete reminder to review recovery scope beyond UI source. This lesson performs no actual client recovery. A staff handoff includes exact candidate and recovery IDs, commands, behavior checks, affected owners and the conditions under which the original change can be retried.</p>"
+        },
+        {
+          "id": "versions-and-evidence",
+          "title": "Versions and exact verification limits",
+          "html": "<p>Git 2.54.0 passed the runner's revert ancestry, soft reset, mixed reset, reflog presence, named rescue, selected-file restore and bounded hard-reset checks. All mutated data was synthetic in a unique /private/tmp repository. The README identifies actual outputs and leaves the root for inspection. No current-checkout Git mutation or remote operation is part of the recorded verification.</p><p>The tests prove the stated local transitions under this clean fixture. They do not prove long-term object retention, recovery of uncommitted deleted files, merge-revert behavior, detached-HEAD recovery or team agreement. Learners add at least one independent case and state what was preserved before attempting it. Recovery is an evidence-based choice, not a promise that every mistaken command can be undone.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which operation preserves the original bad commit in ancestry while adding a correction?",
+          "options": [
+            "A successful revert.",
+            "A soft reset to its parent.",
+            "Deleting the working file."
+          ],
+          "answer": 0,
+          "explanation": "Revert records an inverse commit. Reset moves references and changes which commits the branch names."
+        },
+        {
+          "question": "A private commit added Notes.txt. After soft reset to its parent and mixed reset to HEAD, what is Notes.txt?",
+          "options": [
+            "Necessarily deleted.",
+            "An untracked working file if absent from the parent snapshot.",
+            "Still committed at HEAD."
+          ],
+          "answer": 1,
+          "explanation": "Mixed resets the index to the target but retains working bytes. The new path is no longer tracked by that snapshot."
+        },
+        {
+          "question": "Why create a named rescue reference before an experiment?",
+          "options": [
+            "It captures all ignored and unstaged files.",
+            "It intentionally retains the known committed tip instead of relying only on an expiring local reflog.",
+            "It creates a remote backup."
+          ],
+          "answer": 1,
+          "explanation": "A reference protects a committed snapshot's reachability locally. Uncommitted work and independent backups need separate preservation."
+        }
+      ],
+      "exercise": {
+        "brief": "Rehearse recovery of one private commit and one historical correction in a fresh scratch repository, then add a detached-HEAD preservation case.",
+        "steps": [
+          "Capture baseline and bad commit IDs, revert the bad non-merge commit and verify both corrected content and preserved ancestry.",
+          "Create a private Notes.txt commit and a rescue branch before soft/mixed resets; predict each copy.",
+          "Restore Notes.txt from the named rescue reference and commit a new recovery snapshot.",
+          "Make a useful detached-HEAD commit, name it before switching away and document uncommitted-work/reflog limits."
+        ],
+        "acceptance": [
+          "Revert corrects the fixture while the bad commit remains an ancestor.",
+          "Soft and mixed outcomes for HEAD, index and working tree match predictions.",
+          "The named rescue provides the original committed file after reference movement.",
+          "The independent detached commit remains reachable by a branch; no real checkout or remote is used."
+        ],
+        "solution": "<p>Introduce a synthetic limit=8 from baseline 80 and commit it. Revert that exact non-merge commit, then assert the file says 80 and the bad commit remains an ancestor of HEAD. The correction gets a new ID. A content-only assertion would miss the history distinction the exercise is trying to teach.</p><p>Commit Notes.txt, record the ID and create rescue/private-notes. Soft reset to the parent leaves the new notes staged. Mixed reset to the current HEAD clears that index addition while leaving Notes.txt untracked. Compare status and both diffs with your predictions. Use the named source to restore just Notes.txt to index and working tree, then record a new recovery commit.</p><p>For the independent case, switch --detach to a known committed ID inside the same scratch repository, add a different synthetic note and commit. Before switching away, create rescue/detached-note at HEAD. After returning to main, inspect that branch's file with show. This additional case must be actually run by the learner; it is not in the supplied runner's passed group.</p><p>Write which bytes and references were preserved, and distinguish committed recovery from lost uncommitted data. Reflog visibility today does not guarantee indefinite retention. Leave remote coordination, merge mainline reversal and actual app regression verification pending. The plan chooses historical correction for shared use and private rewriting only under explicit ownership, with a known recovery path.</p>"
+      },
+      "references": [
+        {
+          "label": "Git: git-reset modes and examples",
+          "url": "https://git-scm.com/docs/git-reset"
+        },
+        {
+          "label": "Git: git-revert",
+          "url": "https://git-scm.com/docs/git-revert"
+        },
+        {
+          "label": "Git: git-reflog",
+          "url": "https://git-scm.com/docs/git-reflog"
+        },
+        {
+          "label": "Git: git-restore",
+          "url": "https://git-scm.com/docs/git-restore"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Recovery may include target dependencies",
+          "path": "ios-client/Projects/Features/ZDWellGuide/Project.swift",
+          "line": 14,
+          "why": "Inspected dependency declarations show why undoing an app change requires reviewing configuration as well as Swift source; no client recovery was performed."
+        }
+      ],
+      "checklist": [
+        "I can choose recovery based on where work lives and who depends on it.",
+        "I can predict reset modes for HEAD, index and working files.",
+        "I can preserve committed work with a named reference and state reflog limits."
+      ],
+      "simple": {
+        "story": "A librarian records a mistaken shelf label in a permanent catalog. She can add a correction entry so readers see both the mistake and the fix. At her own desk she also has an unfinished draft catalog; she may move its bookmark back and rearrange pages. Before experimenting, she puts a named tab on the useful draft page. The catalog correction and moving a private bookmark solve different problems, even if the final shelf label is the same.",
+        "meaning": "Revert adds a historical correction; reset moves local references and may change selected or working copies.",
+        "example": {
+          "before": "A bad committed change says limit 8 instead of 80.",
+          "change": "Revert the bad non-merge commit.",
+          "after": "A new correction restores 80 while the bad commit remains in history."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Recovery starts with locating work and preserving what must remain.",
+          "items": [
+            {
+              "label": "Locate",
+              "text": "Identify working, staged, private or shared history."
+            },
+            {
+              "label": "Preserve",
+              "text": "Name useful commits and copy valuable uncommitted bytes."
+            },
+            {
+              "label": "Recover",
+              "text": "Choose a command and verify both content and history."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Revert",
+            "meaning": "Recording a new inverse change for an existing commit."
+          },
+          {
+            "term": "Reset",
+            "meaning": "Moving a reference and updating copies according to the selected mode."
+          },
+          {
+            "term": "Reflog",
+            "meaning": "Local records of reference movements."
+          },
+          {
+            "term": "Rescue reference",
+            "meaning": "A branch name deliberately retaining a useful commit."
+          }
+        ],
+        "remember": "Preserve first, then choose the undo that matches the work's location.",
+        "boundary": "The catalog story does not guarantee recoverability. Reflogs can expire, and discarded uncommitted bytes may not be recoverable."
+      }
+    },
+    {
+      "id": "120",
+      "title": "Review app inputs and rebase only an owned local branch",
+      "summary": "Rehearse a complete local review of source, resources and configuration, compare a private rebased patch series, and write a team decision with recovery.",
+      "duration": 180,
+      "level": "Project sequence",
+      "prerequisites": [
+        "117",
+        "118",
+        "119"
+      ],
+      "objectives": [
+        "Review source, target membership, resources, schemes and dependency pins as related inputs.",
+        "Explain how private rebase changes commit identities and compare the replayed series.",
+        "Write a review and recovery proposal with actual local evidence and pending native/remote checks."
+      ],
+      "sections": [
+        {
+          "id": "review-contract",
+          "title": "A review explains the change and its evidence",
+          "html": "<p>A pull request is a collaboration artifact asking others to review proposed history against a target branch. Our exercise writes a local review note with the same useful information but creates no real PR or remote. Lead with the problem and resulting behavior: for example, the synthetic theme changes from blue to orange while native resource loading remains pending. A reviewer should not need this conversation to understand it.</p><p>Record exact base and candidate commits. Include the trigger, expected behavior, affected source and configuration, actual commands run and remaining checks. Avoid implying a host script validated a packaged app. A source file, resource and manifest can jointly define one behavior, so reviewing only the visible Swift diff may miss the change's most important failure mode.</p><p>Review comments should ask for observable outcomes rather than personal preferences disguised as blockers. A concrete concern is that Theme.json is tracked but not included in the owning target's resource copy phase. A useful resolution verifies package membership and a scratch bundle lookup. Saying Looks good is not evidence that either step occurred.</p><p>Android review experience transfers through source/resource/build-input ownership. Gradle source sets and Xcode targets differ mechanically. A staff reviewer asks which file is authoritative, which generator runs, who validates release packaging and what recovery preserves users' data. This small Git unit rehearses those decisions without changing the client's build system.</p>"
+        },
+        {
+          "id": "xcode-inputs",
+          "title": "Review the inputs Xcode actually needs",
+          "html": "<p>Target membership defines which files participate in a build target. A file can be tracked in Git yet absent from that target. A Swift source addition usually needs compilation membership; an ordinary JSON resource needs copying into the correct bundle. Swift packages can instead process resources in a package target and use Bundle.module. Correct lookup depends on the bundle that owns the resource.</p><p>Shared schemes describe repeatable build/test actions and can be useful tracked inputs. xcuserdata usually contains personal state and should not be promoted into a shared workflow by accident. Assets include an asset catalog's Contents.json and actual asset files; committing only metadata can leave references unresolved. Renamed resources can also differ by case, which deserves explicit cross-filesystem review.</p><p>Dependency resolution records selected versions or revisions. An app repository often tracks its intended pins for reproducible resolution, while reusable package policies may differ. Never delete a resolution change merely because a generic ignore template mentions it. Read the checkout's declared policy, inspect intentional changes and separate remote dependency resolution from an offline review.</p><p>The active client ignores many generated feature/infra Xcode projects while tracking exceptions for particular resolution files. ZDWellGuide's Project.swift declares sources and dependencies. These inspected anchors support reviewing authoritative manifests in this checkout. They do not establish that every app project is generated, or authorize regeneration here. The companion's TargetResources.txt is explicitly a review fixture, not an Xcode project file.</p>"
+        },
+        {
+          "id": "rebase-mechanism",
+          "title": "Rebase replays commits onto another base",
+          "html": "<p>Rebase takes a series of commits and replays their changes onto a chosen base, normally creating new commits. Suppose feature/theme has two private commits after base A, while main independently adds build policy at B. Rebasing feature/theme onto main produces a series descending from B. Even if the theme patch is unchanged, parent relationships change, so the new commits have different identities.</p><p>Merge preserves the divergent lineage with an integration commit; rebase can present a linear series. Neither automatically makes code more correct. Choose according to review clarity, ownership and team policy. Rewriting a branch already used by others requires coordination because their references still name old commits. The actual exercise rewrites only a private branch inside a disposable repository.</p><p>Create rescue/before-rebase before starting and require a clean working tree. If replay conflicts, inspect the operation's roles and intended content, stage a deliberate resolution and use rebase --continue; rebase --abort returns to the pre-operation state. Do not mechanically use ours/theirs based on the earlier merge terminology. During replay, the checked-out upstream side and replayed commit have different roles.</p><p>An interactive rebase can reorder, squash or edit commits, but its extra controls are further independent practice here. The runner performs ordinary rebase onto main and compares a two-commit series. It does not teach force-pushing by executing one, and it does not claim a successful local replay satisfies remote branch protection or CI.</p>"
+        },
+        {
+          "id": "compare-series",
+          "title": "Compare patch intent after commit IDs change",
+          "html": "<pre><code class=\"language-shell\"># Existing private branches inside the scratch repository only.\ngit -C \"$scratch_dir\" branch rescue/before-rebase\ngit -C \"$scratch_dir\" rebase main\ngit -C \"$scratch_dir\" diff --name-only main...HEAD\ngit -C \"$scratch_dir\" range-diff \"$base_id\"..rescue/before-rebase main..HEAD\ngit -C \"$scratch_dir\" remote</code></pre><p>The rescue reference retains the old tip. rebase main chooses the new base. In git diff, main...HEAD compares the merge base of main and HEAD with HEAD, which is useful for feature review after independent target changes. It differs from comparing tip-to-tip trees. In git log, two-dot and three-dot ranges select sets of commits with different semantics; do not assume diff and log dots mean identical operations.</p><p>range-diff compares two commit series, matching corresponding patches and highlighting changes in the replay. Here base_id names the old shared base, so the first range selects the old feature series and main..HEAD selects the new series. Quoted variables prevent shell word splitting. The learner must set base_id to the captured exact scratch commit, not a production reference.</p><p>Verify both graph and content after replay. main must be an ancestor of the new feature tip; the tip must differ from the old ID; the reviewed paths should contain Theme.json and Review.md, excluding main's independent BuildPolicy.md addition. Parse the resource and confirm accent orange. A range-diff summary is useful but does not replace the behavior assertion.</p><p>The last command still prints no remote entries. The runner stores range-diff and exact IDs in its local evidence JSON. No server-side review, branch policy or native build is inferred. Commit identities changing is expected under this rebase; unexpected patch changes require explanation, validation and possibly recovery using the preserved old series.</p>"
+        },
+        {
+          "id": "team-decision",
+          "title": "Make ownership, alternatives and recovery explicit",
+          "html": "<p>Write a decision comparing merge, private rebase and a fresh corrective commit. Choose private rebase only when the series remains owned and its purpose is clearer on the updated base. Choose merge when preserving shared lineage is important. Choose revert or a new fix for accepted shared behavior needing correction. Give the decision's cost, not just a preference for a clean graph.</p><p>Bind review evidence to the exact candidate. Tests run before a rebase may not cover the rebased combination with updated main. Re-run the checks affected by integration, and record whether resource packaging or app behavior remains pending. A clean local status and a matching patch series say useful things about history; neither proves the release artifact.</p><p>Recovery has an owner and a trigger. If the local replay changes behavior unexpectedly, abort while in progress or compare and recover from rescue/before-rebase after completion. If the reviewed change later becomes shared and breaks resource lookup, prepare a reviewed correction or revert containing the full required input set. Do not instruct collaborators to rewrite history without agreement.</p><p>A local review can be concrete without performing a remote action. Fill ReviewTemplate.md with base/candidate IDs, problem, resulting behavior, checks, an independent adversarial case and pending native/remote rows. Leave approval blank until a reviewer actually decides. Copying a template or passing supplied tests does not approve the learner's work or complete a production PR.</p>"
+        },
+        {
+          "id": "versions-and-evidence",
+          "title": "Versions and exact verification boundaries",
+          "html": "<p>The recorded checks passed Git 2.54.0 private rebase, ancestry, changed tip, expected feature diff, range-diff output, JSON resource value, tracked fixture paths and no-remotes checks. It uses fictional source and an empty Package.resolved fixture elsewhere; it resolves no third-party package. ReviewTemplate remains unfilled for learner work.</p><p>The companion App.swift is actual target-required SwiftUI source, but the runner only copies and reviews bytes. TargetResources.txt models required input paths and is not executable Xcode membership. Creating a separate target, adding its JSON resource to Copy Bundle Resources, compiling, performing Bundle lookup, running simulator UI, remote PR/CI and organizational review all remain pending.</p><p>The Todo companion offers a separate real SwiftUI integration exercise with its own macro failure noted in the README. Do not borrow that host success as evidence for this resource fixture. Review input completeness and actual packaged behavior remain separate evidence even when the local history is clean.</p><p>Optional later reading: session 043 examines configurations, schemes and environments in depth; session 046 expands generated assets, localization and resource tooling. Neither is required here. This lesson defines target membership, shared schemes, resource bundles, authoritative manifests and dependency resolution records before asking for a local review.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why can an unchanged patch get a new commit ID after rebase?",
+          "options": [
+            "Commits include parent relationships and are replayed onto a new base.",
+            "Git randomly renames files.",
+            "The resource must have changed color."
+          ],
+          "answer": 0,
+          "explanation": "Replayed commits have different history context. Matching source does not imply identical commit identity."
+        },
+        {
+          "question": "Theme.json is tracked. What remains unproved?",
+          "options": [
+            "Whether it exists in Git.",
+            "Whether the actual target packages it in the correct bundle and can read it.",
+            "Whether JSON can contain strings."
+          ],
+          "answer": 1,
+          "explanation": "Repository tracking and native packaging are separate boundaries; actual target membership and bundle lookup require native evidence."
+        },
+        {
+          "question": "Which branch is appropriate for this lab's actual rebase?",
+          "options": [
+            "A private branch inside the newly created scratch repository.",
+            "The current production checkout without asking.",
+            "A shared protected branch requiring a real force push."
+          ],
+          "answer": 0,
+          "explanation": "The exercise owns only disposable local history. Team coordination is taught as a decision and no remote operations are performed."
+        }
+      ],
+      "exercise": {
+        "brief": "Prepare a local review for an original resource change, rebase a private scratch series and add a resource-ownership failure case.",
+        "steps": [
+          "Copy the supplied fixtures into a personal scratch repository and choose a different synthetic theme value.",
+          "Create two feature commits and an independent main change, preserve the feature tip and rebase locally.",
+          "Compare old/new series and feature diff; test a missing path in the resource-review fixture.",
+          "Write a review decision with exact evidence, recovery owner and native/remote checks marked pending unless actually performed."
+        ],
+        "acceptance": [
+          "The private replay preserves intended behavior while creating a tip descended from updated main.",
+          "Review diff excludes independent main changes, and range-diff is recorded against exact ranges.",
+          "A missing required resource is rejected by the learner's additional review check.",
+          "The review distinguishes tracked bytes, actual native packaging and remote/team approval; no real remote is used."
+        ],
+        "solution": "<p>Change accent from blue to violet in your own resource fixture and commit that change. Add a second commit describing the native lookup check. On main, independently commit a build-policy note. Preserve the old feature tip, then rebase onto main. Confirm violet remains the parsed resource value and main is an ancestor of the new tip. The new ID should differ from the preserved tip.</p><p>Compare the old feature range with the new range using range-diff and list main...HEAD paths. The intended feature paths are the resource and review note; the independent main policy should not appear in that feature diff. If patch matching reveals altered intent, inspect and explain it rather than declaring the rebase successful because the command exited zero.</p><p>For the independent failure, add Resources/Missing.json to TargetResources.txt without creating or tracking it. Your bounded review check should fail with that path. Remove the mistaken fixture entry or add the intended file deliberately, then repeat the check. This verifies review-input completeness only. Xcode resource membership and Bundle lookup remain separate native checks.</p><p>The written decision explains why a private local rebase was appropriate, which rescue reference enables recovery and who will validate target packaging. Record actual Git outputs and candidate IDs. Mark no remote configured, no PR created, no CI run and no native bundle lookup unless performed in a separate scratch target. Those honest limits make the proposal reviewable without claiming team approval.</p>"
+      },
+      "references": [
+        {
+          "label": "Git: git-rebase replay and abort",
+          "url": "https://git-scm.com/docs/git-rebase"
+        },
+        {
+          "label": "Git: git-range-diff",
+          "url": "https://git-scm.com/docs/git-range-diff"
+        },
+        {
+          "label": "Apple: Creating an Xcode project for an app",
+          "url": "https://developer.apple.com/documentation/xcode/creating-an-xcode-project-for-an-app"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Generated projects and pin exceptions are explicit policy",
+          "path": "ios-client/.gitignore",
+          "line": 56,
+          "why": "Inspected generated-project exclusions must be understood together with authoritative manifests and earlier Package.resolved exceptions."
+        },
+        {
+          "label": "Target source and dependency ownership",
+          "path": "ios-client/Projects/Features/ZDWellGuide/Project.swift",
+          "line": 13,
+          "why": "The active feature manifest declares sources and dependencies; source tracking alone does not prove packaging or build success."
+        }
+      ],
+      "checklist": [
+        "I can review app source, configuration and resources as one behavior change.",
+        "I can explain private rebase identity changes and compare the old/new patch series.",
+        "I can write a team decision with concrete evidence, alternatives and recovery."
+      ],
+      "simple": {
+        "story": "An editor has two private notes written after an old handbook page. Another editor adds a new rule to the handbook. The first editor copies the two notes onto the updated handbook and gives the copies new page numbers. She keeps a named copy of the old notes so she can compare them. Their advice should stay the same unless she deliberately changes it, and someone still needs to check the combined instructions.",
+        "meaning": "Rebase replays an owned patch series on a new base, changing identities and requiring renewed comparison.",
+        "example": {
+          "before": "Feature has two private commits; main has an independent new build-policy commit.",
+          "change": "Preserve the old feature tip and rebase feature onto main.",
+          "after": "Feature descends from updated main with new commit IDs; theme behavior must still match."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Private replay preserves an old reference and verifies a new candidate.",
+          "items": [
+            {
+              "label": "Preserve",
+              "text": "Name the old series before rewriting."
+            },
+            {
+              "label": "Replay",
+              "text": "Apply its changes onto the selected updated base."
+            },
+            {
+              "label": "Review",
+              "text": "Compare patches, behavior and pending integration checks."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Rebase",
+            "meaning": "Replaying a commit series onto a selected base."
+          },
+          {
+            "term": "Patch series",
+            "meaning": "The ordered changes represented by a set of commits."
+          },
+          {
+            "term": "Target membership",
+            "meaning": "Which files participate in a particular native build target."
+          },
+          {
+            "term": "Review evidence",
+            "meaning": "Actual outputs tied to the candidate being reviewed."
+          }
+        ],
+        "remember": "New history needs a comparison and a verified combined result.",
+        "boundary": "Page copying is only an analogy. Rebase can conflict or alter patches, and local replay cannot establish remote or organizational approval."
+      }
+    }
+  ]
+}

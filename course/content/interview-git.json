@@ -1,0 +1,204 @@
+{
+  "questions": [
+    {
+      "id": "iq-117-a",
+      "lesson": "117",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Predict HEAD, index and working content after a staged completion and a later unstaged rename.",
+      "scenario": "The initial file says Pack bag: incomplete; completion is staged before the title changes.",
+      "minutes": 6,
+      "androidBridge": "IDE changelists do not automatically equal Git's index; Android Studio and Xcode still operate on these Git boundaries.",
+      "rubric": [
+        "Names the three separate snapshots.",
+        "Predicts both staged and unstaged diffs.",
+        "Explains the next commit uses index content.",
+        "Verifies committed content independently of the working file."
+      ],
+      "answerHTML": "<p>HEAD begins with Pack bag: incomplete. After staging completion, the index says Pack bag: complete. A later working edit to Pack blue bag: complete does not update the index. The next commit therefore records the completed original title while leaving the renamed working file unstaged. git diff --cached compares index with HEAD; the default git diff compares working files with index.</p><p>status --short shows MM because the tracked path differs at both boundaries. After commit, inspect git show HEAD:Tasks.txt and read the working file separately. One contains the staged value and the other the later value. This is expected separation, not a lost rename. Use explicit path staging and a meaningful completion subject. A clean status or commit creation does not establish build correctness, deployment or upload; the exercise remains a local scratch snapshot check.</p>",
+      "followUps": [
+        "What changes if git add runs again after the rename?",
+        "How would you preserve the unstaged edit before discarding it?"
+      ],
+      "pitfalls": [
+        "Assuming commit records all visible working changes.",
+        "Using only the default diff to review a staged commit."
+      ]
+    },
+    {
+      "id": "iq-117-b",
+      "lesson": "117",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Investigate why an ignored tracked file still shows changes and why a required resource is absent from the commit.",
+      "scenario": "A generic ignore template hides resources and the developer expects .gitignore to remove already tracked personal settings.",
+      "minutes": 9,
+      "androidBridge": "Build outputs and source inputs need explicit policies in either Gradle or Xcode projects; ignoring is not target configuration.",
+      "rubric": [
+        "Explains ignore affects untracked discovery rather than existing tracking.",
+        "Uses check-ignore to inspect a matching rule.",
+        "Stages required resource inputs explicitly under a reviewed policy.",
+        "Distinguishes Git tracking from native target membership."
+      ],
+      "answerHTML": "<p>A tracked file remains tracked after a matching ignore rule is added. Inspect ls-files and the relevant diff before assuming the rule failed. Removing it from the index with rm --cached would change repository policy while leaving a working copy; that decision belongs in a reviewed change rather than an automatic cleanup.</p><p>For the missing resource, inspect check-ignore -v and the actual path. Narrow the synthetic rule so required source and resource inputs are included, then stage the intended file and review the cached diff. The client has specific generated-project and resolution-file exceptions, so a universal template is not authoritative. Verify source ownership and target membership separately: a tracked JSON file can still be missing from the app bundle. Keep generated output and personal settings local while retaining the inputs needed for repeatable builds.</p>",
+      "followUps": [
+        "Why can reincluding a file need parent-directory exceptions?",
+        "How would an application pin policy differ from a reusable package policy?"
+      ],
+      "pitfalls": [
+        "Expecting ignore rules to erase history or index entries.",
+        "Assuming tracked resource bytes prove Xcode packaging."
+      ]
+    },
+    {
+      "id": "iq-118-a",
+      "lesson": "118",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Explain the three conflict stages and the final two-parent merge for the synthetic limit conflict.",
+      "scenario": "Base is 80, main chooses 60 and feature chooses 100; the agreed final limit is 80.",
+      "minutes": 7,
+      "androidBridge": "IDE conflict panes visualize the same base/branch values; they do not decide product policy.",
+      "rubric": [
+        "Identifies stage one/base, two/ours and three/theirs for this merge.",
+        "Explains diverged tips and the merge base.",
+        "Stages one intentional resolved result.",
+        "Checks final content and both parents separately."
+      ],
+      "answerHTML": "<p>The branches share a base containing 80, then diverge to main 60 and feature 100. Git cannot automatically choose one replacement for the same line. In this ordinary merge, unmerged index stage one is the base, stage two the checked-out main side and stage three the feature being merged. Working conflict markers expose candidate content but do not establish the desired policy.</p><p>Choose the agreed value 80, remove markers and stage the complete resolved file. Staging clears Git's unmerged entries; it does not prove policy correctness. Commit the explained resolution and verify both the final line and the two expected parents. The value can equal the original base while the merge still records both experiments. Ours and theirs name operation roles, not correct versus incorrect contributors, and rebase replay changes the context for those terms.</p>",
+      "followUps": [
+        "When could integration fast-forward instead?",
+        "What is a semantic conflict with no textual markers?"
+      ],
+      "pitfalls": [
+        "Choosing a side because its name sounds authoritative.",
+        "Checking only marker absence without content or graph evidence."
+      ]
+    },
+    {
+      "id": "iq-118-b",
+      "lesson": "118",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Resolve a source/project conflict without silently losing either feature's build input.",
+      "scenario": "Two branches add Swift files and related resource membership while changing the same policy line.",
+      "minutes": 10,
+      "androidBridge": "Gradle manifest review transfers as ownership reasoning, but Xcode project IDs and build phases have different mechanics.",
+      "rubric": [
+        "Starts clean and captures pre-merge state for abort.",
+        "Inspects intent in source and authoritative configuration.",
+        "Combines membership deliberately and checks related behavior.",
+        "Separates local textual resolution from actual build/resource evidence."
+      ],
+      "answerHTML": "<p>Begin from a clean scratch snapshot and record the pre-merge tip. Inspect base and both changes, including which source, resource and configuration files jointly implement each feature. A whole-file ours/theirs choice can remove an otherwise intended addition. Resolve the product policy first, then preserve the required membership and relationships in the authoritative project or generator manifest.</p><p>Stage explicit resolved paths and verify unmerged entries are gone. Check content consistency, both integrated parents and clean status. If the choice is unclear, abort the unfinished clean-start merge and confirm the original tip/content before retrying. Actual Xcode compilation and resource lookup remain separate checks: a parsable project file or clean Git merge cannot prove packaging. The client anchor illustrates target source/dependency declarations, while this lab executes only synthetic policy conflicts and no company generator.</p>",
+      "followUps": [
+        "How do you handle a binary asset conflict?",
+        "What does abort fail to guarantee with pre-existing uncommitted changes?"
+      ],
+      "pitfalls": [
+        "Choosing an entire project side just to remove markers.",
+        "Calling a syntactically merged manifest a verified app."
+      ]
+    },
+    {
+      "id": "iq-119-a",
+      "lesson": "119",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Compare soft reset, mixed reset and revert for a private notes commit and a bad policy commit.",
+      "scenario": "One private commit adds Notes.txt; another committed policy change sets 8 instead of 80.",
+      "minutes": 9,
+      "androidBridge": "IDE Undo labels can hide whether they change files, staged state or branch history; inspect the actual Git operation.",
+      "rubric": [
+        "Predicts soft keeps index/working content after HEAD movement.",
+        "Predicts mixed resets index and retains working bytes.",
+        "Explains revert adds an inverse commit while keeping ancestry.",
+        "Preserves a named rescue tip and uncommitted bytes separately."
+      ],
+      "answerHTML": "<p>Soft reset to the private commit's parent moves HEAD while retaining the index and working tree, leaving Notes.txt staged as an addition. Mixed reset to the current HEAD then clears that index addition while keeping Notes.txt in the working directory; because the parent lacks the path, it becomes untracked. A named rescue branch created beforehand retains the original committed notes.</p><p>Revert of the bad non-merge policy commit records a new inverse change, restoring 80 while the bad commit remains an ancestor. That distinction matters when others depend on the history. Restore is a selected-path copy operation; hard reset also overwrites tracked working content and can remove obstructing untracked paths. No reset reference preserves all uncommitted bytes automatically. Diagnose location and ownership first, then verify both content and graph. The runner uses only disposable scratch data.</p>",
+      "followUps": [
+        "What changes for a merge revert with a mainline parent?",
+        "Why is reset --hard unsafe as a generic cleanup habit?"
+      ],
+      "pitfalls": [
+        "Describing soft reset as deleting working changes.",
+        "Claiming rescue branches capture untracked edits."
+      ]
+    },
+    {
+      "id": "iq-119-b",
+      "lesson": "119",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Plan recovery after an owned local experiment is rewritten, and compare the choice for accepted shared history.",
+      "scenario": "The old tip is in the local reflog, and a resource regression involves source and target configuration.",
+      "minutes": 14,
+      "androidBridge": "Cross-platform incident work needs exact candidate identity and full build-input scope; a Git object is not a release artifact.",
+      "rubric": [
+        "Names and inspects the recoverable exact commit.",
+        "States reflog locality, expiry and uncommitted-work limits.",
+        "Chooses private rewrite or shared correction based on ownership.",
+        "Includes complete source/configuration scope, evidence, owner and retry conditions."
+      ],
+      "answerHTML": "<p>Locate the intended old tip in the local reflog, inspect its exact file content and create a named rescue reference before further experimentation. Reflogs are local records that can expire; unreachable objects may be pruned, and lost uncommitted edits are not guaranteed to appear there. Prefer a pre-created named reference plus independent preservation for valuable uncommitted bytes.</p><p>For private owned history, restoring a selected path or reorganizing local commits can be appropriate. For accepted shared history, prepare a reviewed corrective commit or revert that preserves existing IDs. Include resources and target configuration along with source; a partial recovery can keep the packaging regression. Bind checks to the recovered candidate, name the owner of native build/resource lookup and define retry conditions. This exercise performs no remote actions or client recovery. Local reflog and scratch tests support a bounded plan, not indefinite backup or organizational approval.</p>",
+      "followUps": [
+        "How would recovery differ for an unfinished rebase?",
+        "Which evidence distinguishes restored source from a verified packaged app?"
+      ],
+      "pitfalls": [
+        "Assuming another machine shares the local reflog.",
+        "Rewriting shared history without coordination or omitting resource configuration."
+      ]
+    },
+    {
+      "id": "iq-120-a",
+      "lesson": "120",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Explain why private rebase changes commit IDs and how you compare the old and new feature series.",
+      "scenario": "Two feature commits are replayed onto main's independent build-policy commit.",
+      "minutes": 10,
+      "androidBridge": "History replay is independent of Android flavor or Xcode scheme selection; build settings are versioned inputs, not branches.",
+      "rubric": [
+        "Preserves the old feature tip before replay.",
+        "Explains parent changes and new commit identities.",
+        "Uses feature diff and range-diff with explicit bases.",
+        "Checks ancestry and intended resource value after replay."
+      ],
+      "answerHTML": "<p>Rebase replays a commit series onto a selected new base. The new parent relationships normally produce new commit identities even when a patch's intent is unchanged. Preserve rescue/before-rebase at the old feature tip and require clean local state. Replay only the owned private branch; shared downstream use adds coordination costs the scratch exercise does not incur.</p><p>Compare the old base-to-rescue series with main-to-new-HEAD using range-diff. Inspect main...HEAD in git diff to review feature changes from the merge base, excluding an independent main policy addition. Check main is an ancestor, the tip changed, expected feature paths remain and the parsed theme value matches the agreed behavior. A successful command and similar subjects cannot establish correctness alone. The fixture checks tracked bytes; native bundle lookup, CI and real PR review remain pending.</p>",
+      "followUps": [
+        "How would merge preserve lineage differently?",
+        "Why do dots in git log and git diff need separate explanations?"
+      ],
+      "pitfalls": [
+        "Equating unchanged patch text with unchanged commit identity.",
+        "Borrowing pre-rebase test results for an unverified combined candidate."
+      ]
+    },
+    {
+      "id": "iq-120-b",
+      "lesson": "120",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Write a review decision for a resource change that needs history integration and native packaging evidence.",
+      "scenario": "Theme.json changes from blue to orange; the private feature branch is behind main, and no remote is configured.",
+      "minutes": 16,
+      "androidBridge": "Gradle resource and dependency-input review suggests the questions; Xcode bundle ownership and target membership require platform-specific proof.",
+      "rubric": [
+        "Leads with problem, resulting behavior and exact candidate/base.",
+        "Reviews source, membership, resources, schemes and pins as applicable.",
+        "Compares merge/private rebase/corrective commit with costs and recovery.",
+        "Separates actual local evidence from native packaging, remote PR/CI and approval."
+      ],
+      "answerHTML": "<p>The proposal should state the color behavior and whether actual resource loading is implemented. Record exact base/candidate IDs, feature paths, commands and outputs. Review source together with target membership, resource copy ownership, shared schemes and intentional dependency pins. A tracked file and the companion's TargetResources.txt prove only local input completeness, not an executable Xcode resource configuration.</p><p>Compare preserving lineage with merge, replaying an owned private series with rebase and adding a correction for already accepted behavior. Choose based on ownership and review clarity, preserve a rescue tip and name a recovery trigger. Re-run affected checks against the combined candidate. Assign who will build an isolated target and verify Bundle lookup; mark that work pending until observed. Keep remote PR, CI and reviewer approval unperformed because the rehearsal has no remotes. A filled template is a concrete review request, not a self-approved delivery record.</p>",
+      "followUps": [
+        "What failure case proves missing resource-input detection?",
+        "When should a recovery patch include project or pin changes?"
+      ],
+      "pitfalls": [
+        "Presenting a text membership fixture as a built native project.",
+        "Treating a clean graph or template as team approval."
+      ]
+    }
+  ]
+}

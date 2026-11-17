@@ -1,0 +1,186 @@
+{
+  "workshops": [
+    {
+      "id": "git-course",
+      "title": "Git workshop: inspect local history, recovery and app inputs",
+      "summary": "Run real disposable Git scenarios, add an independent conflict or recovery case, and prepare a local resource review with exact evidence.",
+      "kind": "Tool investigation",
+      "sessions": [
+        "117",
+        "118",
+        "119",
+        "120"
+      ],
+      "sections": [
+        {
+          "id": "setup-and-isolation",
+          "title": "Inspect the runner's isolation before starting",
+          "html": "<p>An isolated repository is a new history and working tree reserved for the exercise. This workshop runs actual Git, not a simulated graph model. scratch_checks.py creates a unique /private/tmp/git-project-* root and four independent repositories beneath it. Every Git call verifies its directory is inside that root. It never configures a remote or runs commands against this checkout.</p><p>Read the runner before executing it. It supplies fictional per-command name/email, disables hooks and signing for its synthetic operations, ignores global/system configuration, and drops inherited GIT_ variables that could redirect repository ownership. It does not modify the machine's normal configuration. Python 3.9 or newer and Git 2.23 or newer are required for its Path helpers, switch and restore.</p><p>Run the command below from ios-learning. It retains the root and prints the evidence JSON path so you can inspect actual commits and diffs afterward. A failed assertion raises an error rather than printing an optimistic final PASS. Recorded verification used Python 3 and Git 2.54.0; exact environment/results are in README.</p><p>These supplied checks establish baseline behavior. Your independent work belongs in a personal copy and new scratch repositories. Do not run a printed reset, restore, merge or rebase against the course checkout. No remote PR, push or CI activity is necessary for the workshop.</p><pre><code class=\"language-shell\">python3 course/labs/GitProject/scratch_checks.py</code></pre>"
+        },
+        {
+          "id": "snapshots-and-ignores",
+          "title": "Compare three copies and the input policy",
+          "html": "<p>The first repository commits Pack bag: incomplete, stages completion, then changes the working title. The runner captures both cached and working diffs and asserts MM status. It commits the staged completion and checks HEAD content remains Pack bag: complete while the working rename survives. The staged snapshot and desk copy have different jobs.</p><p>It deliberately discards that known synthetic rename with restore only after proving the distinction. It creates generated .build/DerivedData/xcuserdata fixtures and checks they are ignored. It also commits a JSON resource and an empty application Package.resolved fixture. Those are input-policy examples; no package is downloaded or resolved.</p><p>Finally it adds Tasks.txt to .gitignore and edits the already tracked file. The diff still contains Tasks.txt. That failure-shaped case proves ignored discovery is not automatic untracking. A meaningful check inspects behavior at a boundary rather than merely asserting a .gitignore file exists.</p><p>Add your own snapshot case, such as staging a rename before an unstaged completion change. Predict the three exact strings first. Verify the commit includes only the staged rename. If partial-file staging interests you, it is a separate exercise requiring an explicit selection; this baseline runner stages entire paths.</p>"
+        },
+        {
+          "id": "conflict-and-recovery",
+          "title": "Inspect actual conflict stages and recovery effects",
+          "html": "<p>The conflict repository creates a base limit of 80, feature limit 100 and main limit 60. merge returns an expected conflict status. The runner asserts marker presence and three unmerged index stages, aborts, and checks the pre-merge tip/content. It merges again and commits the agreed 80 with both expected parents. Content and graph are checked separately.</p><p>The recovery repository introduces a bad limit of 8, reverts it and proves both corrected content and preserved ancestry. It commits private notes, names a rescue branch, then performs soft/mixed resets. The notes move from committed to staged to untracked working bytes without disappearing. Reflog and named-reference checks demonstrate their different roles.</p><p>It restores selected notes from the named rescue and records a new recovery commit. A bounded hard reset discards one known tracked synthetic edit at current HEAD. No arbitrary repository cleanup occurs. Hard reset can remove obstructing untracked paths and should never be described as harmless to all working data.</p><p>For independence, add a second related fixture that textually merges but disagrees with the chosen policy, or preserve a useful detached-HEAD commit under a new branch before switching away. The supplied runner does not execute detached recovery, merge revert or long-term reflog expiry. Mark those limits explicitly.</p>"
+        },
+        {
+          "id": "rebase-and-resource-review",
+          "title": "Compare an owned replay and its required files",
+          "html": "<p>The review repository copies actual target-required App.swift plus Theme.json and TargetResources.txt from Fixtures. TargetResources.txt is a text list for input review, not an Xcode project or resource copy phase. The SwiftUI entry does not load the JSON; native resource lookup is intentionally independent learner implementation.</p><p>A private feature changes the theme and adds a review note. Main adds an independent build-policy note. The runner preserves rescue/before-rebase, rebases feature onto main and verifies a new tip descended from main. main...HEAD lists feature paths without the independent main addition. range-diff records the old and replayed patch series.</p><p>Parsing Theme.json proves its synthetic accent is orange after replay. Comparing required fixture paths with tracked files proves those input bytes exist locally. Neither proves app bundle membership, resource lookup or rendered color. Do not label this group a native app build because it contains SwiftUI source.</p><p>An actual resource exercise creates a separate scratch iOS App target, includes App.swift as its only entry, adds Theme.json to the owning target's resources and implements a Bundle lookup with missing-file and decoding errors. Compile and run that target separately when available. No company source or dependency setup is needed.</p>"
+        },
+        {
+          "id": "independent-review",
+          "title": "Make the learner's local review concrete",
+          "html": "<p>Choose one new conflict/recovery case and one resource-input failure. For the resource case, list a nonexistent Resources/Missing.json in your review fixture and add a check that reports that path rather than passing. Repair the intended input deliberately and rerun. This establishes a new failure behavior beyond the baseline's successful resource list.</p><p>Fill ReviewTemplate.md with problem, resulting behavior, base/candidate IDs, changed inputs, actual command results and recovery owner. Compare merge, private rebase and corrective commit according to who uses the history. The presence of a rescue reference supports private experiments; shared recovery generally favors a visible correction under reviewed policy.</p><p>Leave native target, bundle lookup, simulator, remote PR/CI and organizational approval pending unless actually performed. The local runner's no-remotes assertion is part of its evidence. A review template is not a self-approved PR, and supplied output is not the learner's independent submission. Keep the result inspectable without uploading anything.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Add a new local history behavior and a missing-resource rejection to a personal copy, then write a review decision without creating a remote.",
+        "steps": [
+          "Run and explain each baseline group and retain the unique evidence JSON.",
+          "Create an independent semantic conflict or detached-HEAD rescue case with predicted content/graph outcomes.",
+          "Add a failing required-resource path check and verify its rejection before deliberate repair.",
+          "Fill a local review note with actual evidence, alternatives, recovery and pending native/remote work."
+        ],
+        "acceptance": [
+          "Every Git mutation is inside a newly created unique scratch root with no remotes.",
+          "The new case verifies a content and history boundary beyond the supplied checks.",
+          "Missing required inputs are detected with the exact path; repaired input is explicit.",
+          "The note distinguishes tracked fixtures from native packaging and does not fabricate reviewer approval or learner completion."
+        ],
+        "solution": "<p>For a semantic conflict, make validator and form-message fixtures share a base value 30. Let the branches choose different validator values while one message remains Maximum 30. Resolve to 24 and assert both files match that decision. Check two parents and empty unmerged stages in addition to content. That extends the baseline from marker handling into behavioral agreement.</p><p>For resource failure, add Resources/Missing.json to the fixture list. Your review check should fail because it is absent or untracked, reporting the path. Correct the list or create/stage the intended file, then repeat. This verifies input completeness only; a target can still omit an existing file from its bundle.</p><p>Prepare the local note with exact old/new IDs and range-diff when replaying a private branch. Choose private rebase only for owned history and preserve a rescue tip. For an accepted shared regression, propose a reviewed corrective change including source and configuration. Assign actual native resource lookup to a named future check. The submission leaves remote PR, CI, simulator and approval unrun and stays fully local.</p>"
+      },
+      "references": [
+        {
+          "label": "Git: git-diff",
+          "url": "https://git-scm.com/docs/git-diff"
+        },
+        {
+          "label": "Git: git-merge",
+          "url": "https://git-scm.com/docs/git-merge"
+        },
+        {
+          "label": "Git: git-reset",
+          "url": "https://git-scm.com/docs/git-reset"
+        },
+        {
+          "label": "Git: git-rebase",
+          "url": "https://git-scm.com/docs/git-rebase"
+        },
+        {
+          "label": "Git: git-range-diff",
+          "url": "https://git-scm.com/docs/git-range-diff"
+        }
+      ],
+      "files": [
+        {
+          "label": "Actual isolated Git behavior runner",
+          "path": "labs/GitProject/scratch_checks.py"
+        },
+        {
+          "label": "Target-required SwiftUI source fixture",
+          "path": "labs/GitProject/Fixtures/App.swift"
+        },
+        {
+          "label": "Synthetic resource input",
+          "path": "labs/GitProject/Fixtures/Resources/Theme.json"
+        },
+        {
+          "label": "Text-only resource review contract",
+          "path": "labs/GitProject/Fixtures/TargetResources.txt"
+        },
+        {
+          "label": "Unfilled learner review template",
+          "path": "labs/GitProject/ReviewTemplate.md"
+        },
+        {
+          "label": "Commands, isolation and exact evidence limits",
+          "path": "labs/GitProject/README.md"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What makes this Git lab an actual tool investigation?",
+          "options": [
+            "It runs real Git commands in newly created disposable repositories and checks their results.",
+            "It draws a graph without invoking Git.",
+            "It pushes the course checkout."
+          ],
+          "answer": 0,
+          "explanation": "Snapshots, conflicts and recovery are observed using real local Git. The root guard and absence of remotes bound the operation."
+        },
+        {
+          "question": "What does TargetResources.txt establish?",
+          "options": [
+            "Executable Xcode resource membership.",
+            "A text fixture listing local review inputs, whose existence/tracking can be checked.",
+            "A compiled Bundle.module implementation."
+          ],
+          "answer": 1,
+          "explanation": "It models review input completeness only. Native resource packaging and lookup are separate work."
+        },
+        {
+          "question": "A rebase passes locally. Which claim is justified?",
+          "options": [
+            "Remote reviewers and CI approved it.",
+            "The checked local replay satisfied its recorded assertions; other boundaries remain pending.",
+            "The app now renders the resource."
+          ],
+          "answer": 1,
+          "explanation": "Local history/content checks have a bounded scope. Native behavior, server checks and organizational approval are independent."
+        }
+      ],
+      "simple": {
+        "story": "A carpenter practices repairs on four spare drawers. She checks that a selected piece stays selected, that two conflicting labels can be resolved, that a saved spare part can be recovered and that a revised plan still lists all needed parts. Each drawer has a unique label saying Practice. She writes the actual results beside each one and never removes parts from the customer's cupboard. Her new exercise adds a missing-part case.",
+        "meaning": "The workshop uses actual disposable Git repositories and records the scope of each checked behavior.",
+        "example": {
+          "before": "The course checkout stays untouched; no scratch repository exists yet.",
+          "change": "Run the isolated runner, then add one independent missing-resource case in a personal copy.",
+          "after": "New scratch history and evidence are produced locally; native and remote checks remain separate."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Isolate, observe and review actual local tool behavior.",
+          "items": [
+            {
+              "label": "Isolate",
+              "text": "Create unique repositories under the run's private temporary root."
+            },
+            {
+              "label": "Observe",
+              "text": "Assert exact snapshots, conflict stages and recovery relationships."
+            },
+            {
+              "label": "Review",
+              "text": "Add independent failures and record pending native/team work."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Scratch repository",
+            "meaning": "A disposable local history created only for this practice."
+          },
+          {
+            "term": "Ancestry",
+            "meaning": "Which commits are reachable through parent relationships."
+          },
+          {
+            "term": "Range diff",
+            "meaning": "A comparison between two commit series."
+          },
+          {
+            "term": "Resource input",
+            "meaning": "A file a build or review expects to include."
+          }
+        ],
+        "remember": "Practice in a named spare drawer and keep the customer cupboard untouched.",
+        "boundary": "The drawer story does not model Git storage. Local PASS output cannot establish Xcode packaging, remote checks or team approval."
+      }
+    }
+  ]
+}
