@@ -2,7 +2,7 @@
 window.IOS_COURSE = {
   "version": 1,
   "title": "Across the Stack",
-  "generatedAt": "2026-11-17T09:31:02.209Z",
+  "generatedAt": "2026-11-17T09:44:21.795Z",
   "units": [
     {
       "id": "foundations",
@@ -30751,6 +30751,414 @@ window.IOS_COURSE = {
           "Which simpler mechanism could meet the need?",
           "Which provider, device and account tests remain?"
         ]
+      }
+    ]
+  },
+  "videos": {
+    "version": 1,
+    "reviewedAt": "2026-11-17",
+    "title": "Watch, build and explain",
+    "channel": {
+      "title": "Swiftful Thinking",
+      "url": "https://www.youtube.com/@SwiftfulThinking/courses"
+    },
+    "referenceVideo": {
+      "title": "Learn SwiftUI online for FREE | Bootcamp #0",
+      "url": "https://www.youtube.com/watch?v=-Yp0LS61Nxk"
+    },
+    "scope": "These links were matched using Swiftful Thinking's public catalogue, its explanation of progressive learning, and searchable YouTube titles/descriptions. Your reference is the SwiftUI Bootcamp introduction. Videos and transcripts were not watched or copied, and paid lessons were not accessed. Topic links support the named concepts; playlists support a whole stage rather than an exact episode for every lesson. Our practice routine, examples and projects are original.",
+    "sources": [
+      {
+        "title": "Public course order",
+        "url": "https://www.swiftful-thinking.com/store"
+      },
+      {
+        "title": "Progressive learning explained by the creator",
+        "url": "https://www.swiftful-thinking.com/faq"
+      },
+      {
+        "title": "Bootcamp topics followed by app practice",
+        "url": "https://www.swiftful-thinking.com/blog/what-is-swiftful-thinking"
+      },
+      {
+        "title": "User-selected introduction and chapter metadata",
+        "url": "https://www.youtube.com/watch?v=-Yp0LS61Nxk"
+      }
+    ],
+    "routine": [
+      {
+        "title": "See one small result",
+        "instruction": "Name the behavior you want before opening the editor. A caption, a button or one saved item is enough for the first attempt."
+      },
+      {
+        "title": "Watch one concept",
+        "instruction": "Use the matching topic link or stage playlist. Watch a short section, pause, and say what you think the next code change will do."
+      },
+      {
+        "title": "Follow, then predict",
+        "instruction": "Work through our small example one step at a time. Explain each name and symbol. Compare your prediction with the actual output or visible state."
+      },
+      {
+        "title": "Make your own change",
+        "instruction": "Close the worked answer and change an input or requirement yourself. Reuse the rule you just learned before adding a new concept."
+      },
+      {
+        "title": "Check the result",
+        "instruction": "Use the lesson's acceptance points. Keep an actual run, test or observation, including a failing case and the reason for your repair."
+      },
+      {
+        "title": "Explain it in your words",
+        "instruction": "Describe the Swift rule first, then compare it with Kotlin or Java. Answer the quiz and interview prompt, and save the next question in your notes."
+      }
+    ],
+    "stages": [
+      {
+        "stageId": "swift",
+        "focus": "Start with a tiny Swift program. Learn one rule about values, choices or types, then use it in the next example.",
+        "resources": [
+          {
+            "id": "swift-playlist",
+            "kind": "playlist",
+            "title": "Swift Basics (Beginner Level)",
+            "url": "https://www.youtube.com/playlist?list=PLwvDm4VfkdpiLvzZFJI6rVIBtdolrJBVB",
+            "lessons": [],
+            "watchFor": "Choose the episode whose topic matches the current session. Build the course's own example after watching.",
+            "reviewBasis": "Public playlist link identified from Swiftful Thinking's course catalogue; page metadata reviewed, videos and transcripts not watched."
+          },
+          {
+            "id": "swift-variables",
+            "kind": "video",
+            "title": "How to use Variables and Constants | Swift Basics #3",
+            "url": "https://www.youtube.com/watch?v=jRNa6hYTJLo",
+            "lessons": [
+              "057",
+              "058",
+              "001"
+            ],
+            "watchFor": "Notice which values can be assigned again. Predict a counter's next value before running your own Swift caption.",
+            "reviewBasis": "YouTube search result identifies Swiftful Thinking as creator and provides this title and topic description. Metadata reviewed; no transcript or audiovisual review."
+          },
+          {
+            "id": "swift-functions",
+            "kind": "video",
+            "title": "How to use Functions in Swift | Swift Basics #5",
+            "url": "https://www.youtube.com/watch?v=kr3SSplrJlw",
+            "lessons": [
+              "060"
+            ],
+            "watchFor": "Follow a function's input into its result. Give your own function one clear job and check a changed argument.",
+            "reviewBasis": "YouTube search result identifies Swiftful Thinking as creator and provides this title and topic description. Metadata reviewed; no transcript or audiovisual review."
+          },
+          {
+            "id": "swift-optionals",
+            "kind": "video",
+            "title": "How to use Optionals in Swift | Swift Basics #6",
+            "url": "https://www.youtube.com/watch?v=PDWNf4pBI64",
+            "lessons": [
+              "058",
+              "001"
+            ],
+            "watchFor": "Distinguish a missing value from an empty value. Try your own fallback and early-return examples.",
+            "reviewBasis": "YouTube search result identifies Swiftful Thinking as creator and provides this title and topic description. Metadata reviewed; no transcript or audiovisual review."
+          },
+          {
+            "id": "swift-structs",
+            "kind": "video",
+            "title": "How to use Structs in Swift | Swift Basics #9",
+            "url": "https://www.youtube.com/watch?v=gRKlprUj-I8",
+            "lessons": [
+              "064",
+              "065"
+            ],
+            "watchFor": "Predict what an edit does to a copied value. Follow the properties and initializer before adding another rule.",
+            "reviewBasis": "YouTube search result identifies Swiftful Thinking as creator and provides this title and topic description. Metadata reviewed; no transcript or audiovisual review."
+          },
+          {
+            "id": "swift-enums",
+            "kind": "video",
+            "title": "How to use Enums in Swift | Swift Basics #10",
+            "url": "https://www.youtube.com/watch?v=YPUCML__Md8",
+            "lessons": [
+              "067",
+              "002"
+            ],
+            "watchFor": "Name the possible outcomes. Explain which case you have and what information travels with it.",
+            "reviewBasis": "YouTube search result identifies Swiftful Thinking as creator and provides this title and topic description. Metadata reviewed; no transcript or audiovisual review."
+          },
+          {
+            "id": "swift-classes",
+            "kind": "video",
+            "title": "How to use Classes in Swift | Swift Basics #11",
+            "url": "https://www.youtube.com/watch?v=xJgtknc-7CA",
+            "lessons": [
+              "066"
+            ],
+            "watchFor": "Draw two names pointing to one object. Predict which reader sees a property change before considering subclasses.",
+            "reviewBasis": "YouTube search result identifies Swiftful Thinking as creator and provides this title and topic description. Metadata reviewed; no transcript or audiovisual review."
+          },
+          {
+            "id": "swift-arrays-sets",
+            "kind": "video",
+            "title": "How to use Arrays and Sets in Swift | Swift Basics #13",
+            "url": "https://www.youtube.com/watch?v=_SRaZjPuYOQ",
+            "lessons": [
+              "061",
+              "062"
+            ],
+            "watchFor": "Compare an ordered collection with unique membership. Check your own additions, removals and duplicate inputs.",
+            "reviewBasis": "YouTube search result identifies Swiftful Thinking as creator and provides this title and topic description. Metadata reviewed; no transcript or audiovisual review."
+          },
+          {
+            "id": "swift-protocols",
+            "kind": "video",
+            "title": "What is a Protocol in Swift and SwiftUI View protocol | Swift Basics #17",
+            "url": "https://www.youtube.com/watch?v=nJmrkRlRu88",
+            "lessons": [
+              "069",
+              "003"
+            ],
+            "watchFor": "Start with a small required behavior. Use our lesson for the deeper any, some and associated-type rules.",
+            "reviewBasis": "YouTube search result identifies Swiftful Thinking as creator and provides this title and topic description. Metadata reviewed; no transcript or audiovisual review."
+          }
+        ]
+      },
+      {
+        "stageId": "swiftui",
+        "focus": "Put something simple on the screen first. Change its layout, then add a button and make the screen react to state.",
+        "resources": [
+          {
+            "id": "swiftui-playlist",
+            "kind": "playlist",
+            "title": "SwiftUI Bootcamp (Beginner Level)",
+            "url": "https://www.youtube.com/playlist?list=PLwvDm4VfkdphqETTBf-DdjCoAvhai1QpO",
+            "lessons": [],
+            "watchFor": "Choose the episode whose topic matches the current session. Build the course's own example after watching.",
+            "reviewBasis": "Public playlist link identified from Swiftful Thinking's course catalogue; page metadata reviewed, videos and transcripts not watched."
+          },
+          {
+            "id": "swiftui-introduction",
+            "kind": "video",
+            "title": "Learn SwiftUI online for FREE | Bootcamp #0",
+            "url": "https://www.youtube.com/watch?v=-Yp0LS61Nxk",
+            "lessons": [
+              "071"
+            ],
+            "watchFor": "This is your chosen reference. Learn what the course builds before following the first Xcode setup lesson.",
+            "reviewBasis": "YouTube search result identifies Swiftful Thinking as creator and provides this title and topic description. Metadata reviewed; no transcript or audiovisual review."
+          },
+          {
+            "id": "swiftui-text",
+            "kind": "video",
+            "title": "Adding Text in SwiftUI | Bootcamp #2",
+            "url": "https://www.youtube.com/watch?v=RKfkG01x79w",
+            "lessons": [
+              "072"
+            ],
+            "watchFor": "Put one Text view on a screen. Change one property and compare the visible result before adding more controls.",
+            "reviewBasis": "YouTube search result identifies Swiftful Thinking as creator and provides this title and topic description. Metadata reviewed; no transcript or audiovisual review."
+          },
+          {
+            "id": "swiftui-stacks",
+            "kind": "video",
+            "title": "VStack, HStack, and ZStack in SwiftUI | Bootcamp #10",
+            "url": "https://www.youtube.com/watch?v=pv-vbUEzimk",
+            "lessons": [
+              "073"
+            ],
+            "watchFor": "Predict where each child will appear. Rebuild the small layout and change its spacing or alignment.",
+            "reviewBasis": "YouTube search result identifies Swiftful Thinking as creator and provides this title and topic description. Metadata reviewed; no transcript or audiovisual review."
+          },
+          {
+            "id": "swiftui-binding",
+            "kind": "video",
+            "title": "How to use @Binding property wrapper in SwiftUI | Bootcamp #22",
+            "url": "https://www.youtube.com/watch?v=btDMzB5x2Gs",
+            "lessons": [
+              "075"
+            ],
+            "watchFor": "Follow an edit from a child control to the parent's state. Explain why a binding is access to a value rather than a second stored copy.",
+            "reviewBasis": "YouTube search result identifies Swiftful Thinking as creator and provides this title and topic description. Metadata reviewed; no transcript or audiovisual review."
+          },
+          {
+            "id": "swiftui-state",
+            "kind": "video",
+            "title": "How to use @State property wrapper in SwiftUI | Bootcamp #19",
+            "url": "https://www.youtube.com/watch?v=LgJ9r_VWdSI",
+            "lessons": [
+              "075",
+              "009"
+            ],
+            "watchFor": "Identify the state value a button changes. Predict the next screen and compare it with the actual update.",
+            "reviewBasis": "YouTube search result identifies Swiftful Thinking as creator and provides this title and topic description. Metadata reviewed; no transcript or audiovisual review."
+          },
+          {
+            "id": "swiftui-foreach",
+            "kind": "video",
+            "title": "How to use ForEach loops in SwiftUI | Bootcamp #14",
+            "url": "https://www.youtube.com/watch?v=CKmsqRN-VM0",
+            "lessons": [
+              "077"
+            ],
+            "watchFor": "Follow data into repeated views. Use our stable-identity examples when rows can be edited, moved or removed.",
+            "reviewBasis": "YouTube search result identifies Swiftful Thinking as creator and provides this title and topic description. Metadata reviewed; no transcript or audiovisual review."
+          }
+        ]
+      },
+      {
+        "stageId": "todo",
+        "focus": "Carry your state and list skills into a complete Todo feature. Add editing and persistence after the first list works.",
+        "resources": [
+          {
+            "id": "todo-playlist",
+            "kind": "playlist",
+            "title": "SwiftUI Todo List (Beginner Level)",
+            "url": "https://www.youtube.com/playlist?list=PLwvDm4VfkdpheGqemblOIA7v3oq0MS30i",
+            "lessons": [],
+            "watchFor": "Choose the episode whose topic matches the current session. Build the course's own example after watching.",
+            "reviewBasis": "Public playlist link identified from Swiftful Thinking's course catalogue; page metadata reviewed, videos and transcripts not watched."
+          }
+        ]
+      },
+      {
+        "stageId": "git",
+        "focus": "Keep a small change, inspect what changed, and practice recovery in your scratch repository before working with a team.",
+        "resources": [
+          {
+            "id": "git-playlist",
+            "kind": "playlist",
+            "title": "Git & Source Control (Beginner Level)",
+            "url": "https://www.youtube.com/playlist?list=PLwvDm4VfkdpiALKk34l9mUS2f4mdJPvXq",
+            "lessons": [],
+            "watchFor": "Choose the episode whose topic matches the current session. Build the course's own example after watching.",
+            "reviewBasis": "Public playlist link identified from Swiftful Thinking's course catalogue; page metadata reviewed, videos and transcripts not watched."
+          }
+        ]
+      },
+      {
+        "stageId": "map",
+        "focus": "Start with one fictional place and a map. Add selection, search and routes while keeping each request's owner clear.",
+        "resources": [
+          {
+            "id": "map-playlist",
+            "kind": "playlist",
+            "title": "SwiftUI Map App (Beginner Level)",
+            "url": "https://www.youtube.com/playlist?list=PLwvDm4Vfkdpha5eVTjLM0eRlJ7-yDDwBk",
+            "lessons": [],
+            "watchFor": "Choose the episode whose topic matches the current session. Build the course's own example after watching.",
+            "reviewBasis": "Public playlist link identified from Swiftful Thinking's course catalogue; page metadata reviewed, videos and transcripts not watched."
+          }
+        ]
+      },
+      {
+        "stageId": "continued",
+        "focus": "Reuse your screen and state skills when a service provides data. Follow a request into a view and explain who keeps its work alive.",
+        "resources": [
+          {
+            "id": "continued-playlist",
+            "kind": "playlist",
+            "title": "SwiftUI Continued Learning (Intermediate Level)",
+            "url": "https://www.youtube.com/playlist?list=PLwvDm4VfkdpiagxAXCT33Rkwnc5IVhTar",
+            "lessons": [],
+            "watchFor": "Choose the episode whose topic matches the current session. Build the course's own example after watching.",
+            "reviewBasis": "Public playlist link identified from Swiftful Thinking's course catalogue; page metadata reviewed, videos and transcripts not watched."
+          }
+        ]
+      },
+      {
+        "stageId": "market",
+        "focus": "Follow the progression from a list to services and detail screens. Our companion uses made-up assets and exact Decimal amounts; a live feed is unnecessary.",
+        "resources": [
+          {
+            "id": "market-playlist",
+            "kind": "playlist",
+            "title": "SwiftUI Crypto App (Intermediate Level)",
+            "url": "https://www.youtube.com/playlist?list=PLwvDm4Vfkdphbc3bgy_LpLRQ9DDfFGcFu",
+            "lessons": [],
+            "watchFor": "Choose the episode whose topic matches the current session. Build the course's own example after watching.",
+            "reviewBasis": "Public playlist link identified from Swiftful Thinking's course catalogue; page metadata reviewed, videos and transcripts not watched."
+          }
+        ]
+      },
+      {
+        "stageId": "concurrency",
+        "focus": "Begin with one awaited result. Then overlap requests, cancel old work, and explain which result is allowed to change the screen.",
+        "resources": [
+          {
+            "id": "concurrency-playlist",
+            "kind": "playlist",
+            "title": "Swift Concurrency (Intermediate Level)",
+            "url": "https://www.youtube.com/playlist?list=PLwvDm4Vfkdphr2Dl4sY4rS9PLzPdyi8PM",
+            "lessons": [],
+            "watchFor": "Choose the episode whose topic matches the current session. Build the course's own example after watching.",
+            "reviewBasis": "Public playlist link identified from Swiftful Thinking's course catalogue; page metadata reviewed, videos and transcripts not watched."
+          }
+        ]
+      },
+      {
+        "stageId": "firebase",
+        "focus": "Trace one account-owned note through authentication and storage. Add listeners and media after you can explain the access rules.",
+        "resources": [
+          {
+            "id": "firebase-playlist",
+            "kind": "playlist",
+            "title": "SwiftUI + Firebase (Intermediate Level)",
+            "url": "https://www.youtube.com/playlist?list=PLwvDm4Vfkdphl8ly0oi0aHx0v2B7UvDK0",
+            "lessons": [],
+            "watchFor": "Choose the episode whose topic matches the current session. Build the course's own example after watching.",
+            "reviewBasis": "Public playlist link identified from Swiftful Thinking's course catalogue; page metadata reviewed, videos and transcripts not watched."
+          }
+        ]
+      },
+      {
+        "stageId": "packages",
+        "focus": "Watch how a package is consumed, then build our local library and separate consumer. Review a dependency's contract before adopting it.",
+        "resources": [
+          {
+            "id": "packages-playlist",
+            "kind": "playlist",
+            "title": "Swift Packages (Intermediate Level)",
+            "url": "https://www.youtube.com/playlist?list=PLwvDm4VfkdphPRGbtiY-X3IZsUXFi6595",
+            "lessons": [],
+            "watchFor": "Choose the episode whose topic matches the current session. Build the course's own example after watching.",
+            "reviewBasis": "Public playlist link identified from Swiftful Thinking's course catalogue; page metadata reviewed, videos and transcripts not watched."
+          }
+        ]
+      },
+      {
+        "stageId": "interface",
+        "focus": "Build a small interface from reusable parts. Give each part a clear input, then add focus, motion and adaptation to our original notebook screen.",
+        "resources": [
+          {
+            "id": "interface-playlist",
+            "kind": "playlist",
+            "title": "SwiftUI in Practice (Intermediate Level)",
+            "url": "https://www.youtube.com/playlist?list=PLwvDm4VfkdpiT7mKzjxfCYn_zaMC3Fmkz",
+            "lessons": [],
+            "watchFor": "Choose the episode whose topic matches the current session. Build the course's own example after watching.",
+            "reviewBasis": "Public playlist link identified from Swiftful Thinking's course catalogue; page metadata reviewed, videos and transcripts not watched."
+          }
+        ]
+      },
+      {
+        "stageId": "advanced",
+        "focus": "Extend a working screen with a custom behavior. Explain the layout, ownership and testing cost before adding another abstraction.",
+        "resources": [
+          {
+            "id": "advanced-playlist",
+            "kind": "playlist",
+            "title": "SwiftUI Advanced Learning (Advanced Level)",
+            "url": "https://www.youtube.com/playlist?list=PLwvDm4Vfkdphc1LLLjCaEd87BEg07M97y",
+            "lessons": [],
+            "watchFor": "Choose the episode whose topic matches the current session. Build the course's own example after watching.",
+            "reviewBasis": "Public playlist link identified from Swiftful Thinking's course catalogue; page metadata reviewed, videos and transcripts not watched."
+          }
+        ]
+      },
+      {
+        "stageId": "architecture",
+        "focus": "Evolve our original Field Notes app only after its basic features work. Give each module one responsibility and test cross-feature changes.",
+        "resources": [],
+        "fallback": "Swiftful Thinking's catalogue links Advanced Architecture to paid access. No public playlist was verified for this stage. Use our original architecture project, worked examples and official references below."
       }
     ]
   },
