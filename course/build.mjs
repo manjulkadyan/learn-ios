@@ -5,6 +5,7 @@ import { buildCatalogue } from './inventory.mjs';
 import { createHash } from 'node:crypto';
 import { simpleIssues, teachingIdentity, interviewIdentity } from './teaching.mjs';
 import { curriculumIssues } from './curriculum.mjs';
+import { videoCompanionIssues } from './videos.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const workspace = path.resolve(root, '../..');
@@ -258,6 +259,11 @@ try {
   curriculum = JSON.parse(await fs.readFile(path.join(root, 'content/curriculum.json'), 'utf8'));
   errors.push(...curriculumIssues(curriculum, { lessons, workshops, guides: essentials?.guides || [], paths: learningPaths?.paths || [] }));
 } catch (error) { errors.push(`curriculum.json: ${error.message}`); }
+let videos;
+try {
+  videos = JSON.parse(await fs.readFile(path.join(root, 'content/video-companions.json'), 'utf8'));
+  if (curriculum) errors.push(...videoCompanionIssues(videos, curriculum));
+} catch (error) { errors.push(`video-companions.json: ${error.message}`); }
 const allowedTags = new Set('p h3 h4 ul ol li strong em code pre table thead tbody tr th td blockquote details summary a br caption'.split(' '));
 const allowedAttributes = new Set(['class', 'href', 'title', 'scope', 'colspan', 'rowspan']);
 for (const { label, html } of htmlBlocks) {
@@ -365,7 +371,7 @@ try {
 if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1; }
 else {
   const catalogue = await buildCatalogue(workspace);
-  const data = { version: 1, title: 'Across the Stack', generatedAt: new Date().toISOString(), units, lessons, curriculum, paths: learningPaths.paths, workshops, artifacts: [...artifacts.values()], reference: reference.reference, syntax: reference.syntax, coverage, catalogue, essentials: essentials.guides, interview: { questions: interviewQuestions, rounds: interviewRounds } };
+  const data = { version: 1, title: 'Across the Stack', generatedAt: new Date().toISOString(), units, lessons, curriculum, videos, paths: learningPaths.paths, workshops, artifacts: [...artifacts.values()], reference: reference.reference, syntax: reference.syntax, coverage, catalogue, essentials: essentials.guides, interview: { questions: interviewQuestions, rounds: interviewRounds } };
   if (!checkOnly) await fs.writeFile(path.join(root, 'data.js'), `/* Generated from course/content by build.mjs. */\nwindow.IOS_COURSE = ${JSON.stringify(data, null, 2).replace(/</g, '\\u003c')};\n`);
   console.log(`${checkOnly ? 'Validated' : 'Built'} ${lessons.length} detailed sessions, ${lessons.reduce((total, lesson) => total + lesson.wordCount, 0).toLocaleString()} lesson teaching words, ${essentials.guides.length} Swift supplementary guides, ${learningPaths.paths.length} learning paths, ${workshops.length} implementation/tool/review workshops, ${artifacts.size} offline companion source files, ${coverage.groups.flatMap(group => group.topics).length} coverage topics, ${catalogue.packages.length} remote dependency entries, ${interviewQuestions.length} interview prompts and ${interviewRounds.length} mock rounds. Repository anchors and companion paths resolve.`);
 }

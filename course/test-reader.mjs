@@ -91,6 +91,12 @@ for (const lesson of reader.env.IOS_COURSE.lessons) {
   check((reader.html().match(/class="repo-link"/g) || []).length === lesson.repo.length, `Repository anchors ${lesson.id}`);
   check(reader.html().includes('Worked solution & mentor commentary') && reader.html().includes('data-note='), `Practice and notes ${lesson.id}`);
   check(reader.html().includes(`id="interview-${lesson.id}"`) && reader.html().includes(`#interviews/quiz/${lesson.id}`), `End-of-lesson interview and recap ${lesson.id}`);
+  check(reader.html().includes(`id="guided-${lesson.id}"`) && reader.html().includes('Make your own change') && reader.html().includes('Compare your prediction'), `Every session offers a guided predict/change/check routine ${lesson.id}`);
+  const sourceStage = reader.env.IOS_COURSE.curriculum.stages.find(stage => stage.lessons.includes(lesson.id));
+  const companion = reader.env.IOS_COURSE.videos.stages.find(stage => stage.stageId === sourceStage?.id);
+  for (const resource of companion?.resources || []) check(reader.html().includes(`href="${decode(resource.url)}"`) === (resource.kind === 'playlist' || resource.lessons.includes(lesson.id)), `Only relevant topic videos and the broader stage playlist appear ${lesson.id}/${resource.id}`);
+  reader.route(`#lesson/${lesson.id}/guided`);
+  check(reader.get(`guided-${lesson.id}`).scrolled, `Guided session is reachable from its contents link ${lesson.id}`);
   reader.route(`#lesson/${lesson.id}/${lesson.sections[0].id}`);
   check(reader.get(`s-${lesson.id}-${lesson.sections[0].id}`).scrolled, `Section route ${lesson.id}`);
 }
@@ -167,6 +173,20 @@ for (const stage of allStages) {
   check(reader.get(`course-stage-${stage.id}`).scrolled && stage.workshops.every(id => reader.html().includes(`#workshops/${id}`)), `Project links and navigable stage ${stage.id}`);
 }
 check(JSON.stringify(reader.state()) === beforeCurriculum, 'Reading the course outline cannot complete lessons or reset progress');
+const beforeVideos = JSON.stringify(reader.state());
+reader.route('#videos');
+check(reader.env.document.title === `${reader.env.IOS_COURSE.videos.title} · Across the Stack` && reader.html().includes('-Yp0LS61Nxk'), 'Video route has a title and the user-selected reference');
+check(!reader.html().includes('<iframe') && reader.html().includes('Videos and transcripts were not watched'), 'Video companions preserve offline reading and describe their actual research scope');
+for (const companion of reader.env.IOS_COURSE.videos.stages) {
+  reader.route(`#videos/${companion.stageId}`);
+  check(reader.get(`video-stage-${companion.stageId}`).scrolled, `Video stage anchor ${companion.stageId}`);
+  check(companion.resources.every(resource => reader.html().includes(`href="${resource.url}"`) && decode(reader.html()).includes(resource.watchFor)), `Verified links and observation prompts ${companion.stageId}`);
+}
+check(JSON.stringify(reader.state()) === beforeVideos, 'Reading video companions preserves notes, answers and completion');
+reader.route('#videos/missing-stage');
+check(reader.html().includes('Video stage not found.'), 'Unknown video stage has a useful fallback');
+reader.get('search-input').dispatch('input', { target: { value: 'Bootcamp #19' } });
+check(reader.get('search-results').innerHTML.includes('#videos/swiftui'), 'A video title is searchable offline');
 reader.route('#curriculum/missing-stage');
 check(reader.html().includes('Course stage not found.'), 'Invalid course stage has a fallback');
 reader.route('#lesson/116');

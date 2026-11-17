@@ -51,6 +51,7 @@ try {
   await page.goto(`${base}#lesson/128`);
   if (!(await page.locator('.lesson-pagination a[href="#lesson/011"]').count())) throw new Error('Project reading order does not continue from market to concurrency');
   await page.goto(`${base}#lesson/001`);
+  await page.locator('#guided-001').waitFor();
   await page.locator('#lesson-notes').fill('Ownership comparison: Kotlin reference versus Swift value.');
   await page.locator('[data-bookmark]').click();
   await page.reload();
@@ -70,8 +71,12 @@ try {
   await page.locator('[data-reviewed]').click();
   if (!(await page.locator('[data-reviewed]').textContent()).includes('undo')) throw new Error('Review did not save');
   await page.locator('[data-reviewed]').click(); // Smoke checks leave no reviewed completion behind.
-  await page.locator('details.solution summary').click();
-  if (!(await page.locator('details.solution').getAttribute('open') !== null)) throw new Error('Solution did not open');
+  await page.locator('#exercise-001 details.solution summary').click();
+  if (await page.locator('#exercise-001 details.solution').getAttribute('open') === null) throw new Error('Solution did not open');
+  await page.goto(`${base}#videos/swiftui`);
+  await page.locator('#video-stage-swiftui').waitFor();
+  if (!(await page.locator('a[href="https://www.youtube.com/watch?v=-Yp0LS61Nxk"]').count())) throw new Error('User-selected introduction is missing');
+  if (await page.locator('iframe').count()) throw new Error('The offline reader unexpectedly embeds a remote video player');
   await page.locator('#top-search').click();
   await page.locator('#search-input').fill('coroutine');
   if (!(await page.locator('.search-result').count())) throw new Error('Full-text search found no concurrency content');
@@ -164,7 +169,7 @@ try {
     await checkSimple(`simple-${lesson.id}`, lesson.simple);
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2)) throw new Error(`Mobile overflow in ${lesson.id}`);
   }
-  for (const route of ['curriculum', ...stages.map(stage => `curriculum/${stage.id}`), 'coverage', 'libraries', 'interviews', 'interviews/iq-001-a', 'interviews/quiz', 'interviews/round/staff-design', ...data.essentials.map(guide => `essentials/${guide.id}`), ...data.paths.map(item => `path/${item.id}`), ...data.workshops.map(item => `workshops/${item.id}`), ...data.artifacts.map(item => `artifact/${encodeURIComponent(item.path)}`)]) {
+  for (const route of ['curriculum', ...stages.map(stage => `curriculum/${stage.id}`), 'videos', ...data.videos.stages.map(stage => `videos/${stage.stageId}`), 'coverage', 'libraries', 'interviews', 'interviews/iq-001-a', 'interviews/quiz', 'interviews/round/staff-design', ...data.essentials.map(guide => `essentials/${guide.id}`), ...data.paths.map(item => `path/${item.id}`), ...data.workshops.map(item => `workshops/${item.id}`), ...data.artifacts.map(item => `artifact/${encodeURIComponent(item.path)}`)]) {
     await page.goto(`${base}#${route}`);
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2)) throw new Error(`Mobile overflow in ${route}`);
   }

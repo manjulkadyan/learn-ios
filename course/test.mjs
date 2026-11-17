@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { handleRequest } from './serve.mjs';
 import { simpleIssues, teachingIdentity, interviewIdentity } from './teaching.mjs';
 import { curriculumIssues } from './curriculum.mjs';
+import { videoCompanionIssues } from './videos.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const context = vm.createContext({ window: {} });
@@ -80,6 +81,20 @@ for (const item of plainContract.interviews) {
 }
 for (const [key, item] of teaching) check(simpleIssues(item.simple, key).length === 0, `Every original and new page has a story, example, picture and vocabulary ${key}`);
 check(curriculumIssues(course.curriculum, { lessons, workshops: course.workshops, guides: course.essentials, paths: course.paths }).length === 0, 'Complete course order, projects and public-outline attribution agree');
+check(videoCompanionIssues(course.videos, course.curriculum).length === 0, 'Video companions account for every source stage and validate external links and topic matches');
+assert.deepEqual(JSON.parse(JSON.stringify(course.videos)), JSON.parse(await fs.readFile(path.join(root, 'content/video-companions.json'), 'utf8')), 'Bundled video metadata matches its reviewed source'); checks++;
+const badVideoURL = JSON.parse(JSON.stringify(course.videos));
+badVideoURL.stages[0].resources[0].url = 'https://www.youtube.com.evil.example/playlist?list=guessed';
+check(videoCompanionIssues(badVideoURL, course.curriculum).some(message => message.includes('canonical HTTPS')), 'A lookalike video host is rejected');
+const unmatchedVideo = JSON.parse(JSON.stringify(course.videos));
+unmatchedVideo.stages[0].resources.find(resource => resource.kind === 'video').lessons = ['148'];
+check(videoCompanionIssues(unmatchedVideo, course.curriculum).some(message => message.includes('outside this stage')), 'A beginner video cannot silently claim an unrelated architecture lesson match');
+const absentPlaylist = JSON.parse(JSON.stringify(course.videos));
+absentPlaylist.stages.find(stage => stage.stageId === 'architecture').fallback = '';
+check(videoCompanionIssues(absentPlaylist, course.curriculum).some(message => message.includes('unverified/unavailable')), 'An unavailable public playlist requires an explicit explanation');
+const badReference = JSON.parse(JSON.stringify(course.videos));
+badReference.referenceVideo.url = 'javascript:alert(1)';
+check(videoCompanionIssues(badReference, course.curriculum).some(message => message.includes('reference video')), 'A reference-video URL cannot execute script');
 const sequence = [...course.curriculum.stages, ...course.curriculum.extensions].flatMap(stage => stage.lessons);
 check(sequence.length === lessons.length && new Set(sequence).size === lessons.length && sequence[0] === '057', 'Every lesson appears exactly once and a fresh course begins with Swift');
 const prematureLesson = lessons.map(lesson => lesson.id === '057' ? { ...lesson, prerequisites: ['148'] } : lesson);
