@@ -1,0 +1,1477 @@
+{
+  "unit": {
+    "id": "firebase-course",
+    "title": "Firebase notebook and services",
+    "summary": "Build an original account-owned notebook, protect its data, and separate offline contracts from real Firebase integrations.",
+    "order": 24
+  },
+  "lessons": [
+    {
+      "id": "129",
+      "title": "Set up Firebase with clear environments",
+      "summary": "Create an isolated local notebook target, understand its configuration, and separate host checks from SDK and emulator work.",
+      "duration": 100,
+      "level": "Foundation",
+      "prerequisites": [
+        "071",
+        "084",
+        "018"
+      ],
+      "objectives": [
+        "Explain which configuration selects an app and which rules grant access.",
+        "Plan an isolated iOS target and local emulator connection.",
+        "Record a sourced SDK compatibility choice and honest verification evidence."
+      ],
+      "sections": [
+        {
+          "id": "one-project-three-boundaries",
+          "title": "Start with a notebook and three boundaries",
+          "html": "<p>Imagine a notebook kept in a locked cupboard. The cupboard address says where the notebook lives. A key identifies the visitor. The cupboard's rules say which shelves that visitor may open. Firebase separates those jobs across configuration, Authentication, and product authorization. Knowing a project ID does not grant permission to read someone else's notes.</p><p>Our original project is a small personal notebook with the synthetic accounts Alice and Bob. It is deliberately narrower than a social network. Alice creates a note called Paper lantern; Bob must not read or edit it. Later lessons add listening, media, operational tools, and recovery while preserving that same account boundary.</p><p>An Android engineer may recognize a Firebase application object and a build variant's configuration resource. On iOS, the target bundles configuration and constructs Firebase service objects. A target is the buildable application or library; a scheme chooses build and run actions. Neither of these concepts is a server-side authorization policy.</p><p>Keep three evidence boundaries in view. The offline Swift program checks our own policy. The SDK adapters call actual Firebase APIs when linked in a separate iOS target. The Node fixtures submit requests to local emulators running the real rules interpreter. Passing one boundary does not prove the other two.</p>"
+        },
+        {
+          "id": "configuration-values",
+          "title": "Read configuration before initialization",
+          "html": "<p>A Firebase project groups backend resources. A registered Apple app has its own Firebase app ID and bundle ID. The bundle ID identifies the installed application to Apple; the Firebase app ID identifies a registration within a Firebase project. They are different strings with different owners. Record both rather than naming every identifier an API key.</p><p>For an eventual remote integration, register the exact target bundle ID in the Firebase console, download that app's GoogleService-Info.plist, and include it in that target's resources. Confirm the resource appears in the built app. Similar filenames in a folder do not prove correct target membership. Review the project ID inside the file before configuring any client.</p><p>The configuration file is not a service-account credential. Client configuration selects services; rules and backend permissions still enforce rights. Administrative credentials belong on trusted infrastructure. Never put an Admin SDK service-account JSON, provider private key, or APNs authentication key into an application bundle.</p><p>Our local bootstrap uses programmatic FirebaseOptions with a demo project and synthetic values. LabEnvironment accepts only demo-firebase-course and 127.0.0.1. A wrong project or remote host throws before service use. This guard makes a local teaching intent concrete, but it cannot constrain unrelated SDKs added to the target later.</p>"
+        },
+        {
+          "id": "first-offline-run",
+          "title": "Run a policy before adding a remote dependency",
+          "html": "<p>A host program runs directly on the development computer. It needs the Swift compiler and Foundation but no Firebase package. Open Host/Policy.swift and Host/Checks.swift in the companion. The first defines our decisions; the second checks adversarial inputs. Read the inputs and predict outcomes before executing the supplied baseline.</p><p>LabEnvironment's initializer uses guard to reject a condition early. Two equality checks require the exact demo project and loopback host. The initializer is marked throws because rejection is part of the contract. Calling it with try makes that possible failure visible to the caller. This is ordinary Swift, independent of any Firebase API.</p><pre><code class=\"language-swift\">let allowed = try LabEnvironment(\n    projectID: \"demo-firebase-course\",\n    host: \"127.0.0.1\"\n)\n// allowed.host is \"127.0.0.1\".\n// \"production-notebook\" throws invalidEnvironment.</code></pre><p>Compile only the two Host files using the README command, with the output under a scratch directory. The baseline produces 30 passing checks. That result means the supplied policy behaved as asserted on this host. It is neither learner completion nor a claim that a Firebase security rule, provider login, or iOS view ran.</p><p>In Kotlin, a require check can reject an invalid constructor input. Our Swift throwing initializer instead exposes a recoverable typed failure. Both can encode intent, but neither replaces a service's security boundary. An attacker can bypass client validation; this is why lesson 131 also supplies server rules.</p>"
+        },
+        {
+          "id": "isolated-target",
+          "title": "Create the actual iOS target deliberately",
+          "html": "<p>The integration source is a real SwiftUI app entry plus Firebase repository classes. It is outside the host compile list. To integrate later, create a new scratch iOS App project named FirebaseNotebookLab, choose SwiftUI and Swift, and use a made-up bundle ID. Do not add these files or packages to the company client.</p><p>Use an iOS 17 deployment target for this teaching app. Include Host/Policy.swift and the four SDK notebook files listed in the README; exclude Host/Checks.swift, which already has a command-line entry point. Include only one @main app entry. A second generated App struct would produce a duplicate entry problem.</p><p>After dependencies have been provisioned in a separately authorized environment, attach FirebaseCore, FirebaseAuth, FirebaseFirestore, and FirebaseStorage to that target. Set FIREBASE_SDK_LAB in Active Compilation Conditions. The SDK files emit a compile-time error when accidentally included without their gate. This is a visible separation, not a silent no-op mock.</p><p>Set the scratch target's Swift language mode to Swift 5 for this adapter exercise and keep default actor isolation nonisolated. The host is checked in Swift 6 mode. These are distinct choices, not claims about Firebase's compiler requirement. Typecheck the target against the actual resolved SDK and record any concurrency diagnostics before running it.</p>"
+        },
+        {
+          "id": "local-emulators",
+          "title": "Connect each product before the first operation",
+          "html": "<p>An emulator is a local service that imitates a Firebase backend for development. It has a host address and a port. The companion assigns Auth port 9099, Firestore port 8080, and Storage port 9199, all on loopback. The project ID must agree between bootstrap, CLI, and rules fixtures.</p><p>The named FirebaseCourseEmulator app prevents this notebook from silently borrowing a default app configured elsewhere. Auth receives useEmulator before account calls. Firestore receives a loopback host, disabled TLS for that local connection, and MemoryCacheSettings before any query. Storage receives its emulator endpoint before upload or download.</p><p>Memory cache is a lab isolation choice. It avoids treating data left on disk by a prior emulator session as current service evidence. It also means this app configuration does not exercise durable Firestore offline persistence. A future disk-cache test requires a deliberate alternate configuration and restart observations.</p><p>In an iOS simulator, 127.0.0.1 reaches the development Mac. On a physical phone it identifies the phone itself. This bootstrap intentionally refuses non-loopback endpoints and therefore does not support phone-to-Mac emulator access. Android's emulator host alias is another platform-specific detail; do not copy it into the iOS target.</p>"
+        },
+        {
+          "id": "environment-workflow",
+          "title": "Separate development, staging, and production work",
+          "html": "<p>An environment is a named set of endpoints, registrations, policies, and operational owners. A Debug build is not automatically a development backend. If Debug bundles production configuration, it can still access production. Keep an explicit mapping from target/configuration to project ID and check it in a built artifact.</p><p>For remote use, define separate development and production Firebase projects when the product's isolation needs justify it. Document bundle IDs, database locations, Storage buckets, provider redirect URLs, and APNs environments for each. Location and data movement deserve a decision before real data exists. These steps are learner planning here; no console change is performed.</p><p>Use one reviewed configuration resource per target or a controlled build-time selection with an assertion. A copy script needs clear inputs and failure behavior when a file is missing. Avoid a script that silently falls back to production. Treat the resulting app bundle as evidence: inspect the resource actually shipped.</p><p>Keep optional telemetry and operational SDKs outside the emulator notebook target. They do not share the notebook's Auth/Firestore/Storage emulator routing merely because they use Firebase. The separate ProductionServices source describes those integrations and requires another compile gate. Remote Config, messaging delivery, and uploaded crash reports remain remote integration exercises.</p>"
+        },
+        {
+          "id": "version-evidence",
+          "title": "Record compatibility and evidence accurately",
+          "html": "<p>Compatibility means a particular SDK release can resolve, compile, link, and run under a chosen toolchain and deployment target. It is not established by writing import FirebaseAuth. On 17 November 2026, Firebase's official Apple release notes were inspected. The Firebase 13.0.0 entry documents iOS 15 minimum support, Xcode 26.2 minimum support, Swift tools 6.2.1, and Swift compiler 6.2.3 for its Swift package.</p><p>That entry also documents the end of CocoaPods distribution for Firebase 13 and later. These are release-specific sourced facts, not an assertion that any version was downloaded or that the checkout uses Firebase. Before choosing an exact release, inspect its release notes and package manifest, assess providers separately, and save the resolved graph.</p><p>The client dependency manifest inspected for this lesson does not declare Firebase. It declares other production services, including Auth0, Braze, and Sentry. Our source connection is about dependency ownership and configuration responsibility. Adding a learning target does not establish approval to replace these systems.</p><p>The README records a successful host compile/run and syntax-only parsing of adapter source. Syntax parsing does not resolve imported modules, check SDK signatures, link frameworks, or launch the app. Emulator execution is pending; no dependencies were downloaded, no accounts authenticated, and no service deployed during authoring.</p>"
+        },
+        {
+          "id": "first-handoff",
+          "title": "Make the next engineer's setup checkable",
+          "html": "<p>A useful setup handoff states what to run, what to inspect, and what a failure means. Record the compiler output, the included source list, the chosen SDK release, the project ID, and the emulator ports. Keep credentials out of the report. A screenshot saying Connected cannot prove which backend served a request.</p><p>Before an authorized emulator run, ensure the required binaries and Node modules already exist. Starting Firebase emulators can download missing binaries, so do not use startup as a discovery command under a no-download constraint. Use the README's gated command only after that provisioning has been confirmed elsewhere.</p><p>The app's Connect local services button configures objects. Its synthetic account button then calls the Auth emulator, and Add paper lantern note calls a Firestore transaction. These are separate observable milestones. A configured app is not necessarily connected; a stopped emulator should yield a recoverable message rather than a false success.</p><p>Create an evidence table with host, rules, SDK build, simulator, and remote provider rows. Mark each as passed, failed, or pending with a command or reason. This simple habit prevents a later reader from converting a passing mock policy into a security claim. Lesson 136 extends the table into an upgrade and operations handoff.</p><p>Optional later reading: lessons 043 and 044 deepen build configurations and package resolution after this Firebase stage. This lesson defines target, scheme, environment and SDK compatibility locally, so those later lessons are not required to begin.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What grants Bob access to Alice's Firestore notes?",
+          "options": [
+            "Knowing the project ID",
+            "An authorization rule that permits the request",
+            "Choosing a Debug scheme"
+          ],
+          "answer": 1,
+          "explanation": "Configuration selects a backend. Product authorization evaluates the request; a scheme or public client identifier does not grant rights."
+        },
+        {
+          "question": "The host policy checks pass. What is established?",
+          "options": [
+            "Firebase rules deny Bob",
+            "FCM registration works",
+            "The supplied Swift policy passed its declared host checks"
+          ],
+          "answer": 2,
+          "explanation": "The host compile contains no Firebase module or rules interpreter. Native and emulator verification remain separate."
+        },
+        {
+          "question": "Why configure Firestore's emulator settings before a query?",
+          "options": [
+            "Service settings must be established before client use",
+            "It uploads rules to production",
+            "It changes the bundle ID"
+          ],
+          "answer": 0,
+          "explanation": "Construct and configure the correct service before operations begin. This neither deploys rules nor changes application identity."
+        }
+      ],
+      "exercise": {
+        "brief": "Write a setup evidence record for a second synthetic target without contacting any remote service.",
+        "steps": [
+          "Run the supplied host baseline using the README command.",
+          "Change a local copy to attempt projectID production-notebook and predict the rejection.",
+          "List the exact notebook source files, package products, compile condition and emulator ports.",
+          "Explain how you would inspect a built app's configuration and distinguish five evidence boundaries."
+        ],
+        "acceptance": [
+          "The invalid project throws invalidEnvironment and no service is initialized.",
+          "Host checks and pending SDK/rules checks are reported separately.",
+          "The target plan includes one @main entry and excludes optional production services.",
+          "No real account, dependency download or deployment is performed."
+        ],
+        "solution": "<p>Start with demo-firebase-course and 127.0.0.1; the constructor returns a value. Replace the project ID with production-notebook in a scratch copy. The first guard fails and throws invalidEnvironment. Catch that typed error to present Setup refused. Do not catch it and create a production default app as a fallback.</p><p>The notebook target includes Policy.swift, FirebaseBootstrap.swift, FirebaseNotesRepository.swift, FirebaseMediaRepository.swift, and FirebaseCourseApp.swift. It excludes Checks.swift and ProductionServices.swift. Its compile condition is FIREBASE_SDK_LAB and its products are Core, Auth, Firestore, and Storage. Ports are 9099, 8080, and 9199 respectively. The iOS target and Swift language settings are explicit lab choices.</p><p>An evidence row can read: host baseline, 30 policy checks passed, Apple Swift 6.4.2 on arm64 macOS; rules interpreter, pending because required runtime was not provisioned for execution; SDK build and simulator run, pending; provider behavior, pending. If you later inspect a bundle, record the target, build configuration and selected project ID. A record of intended values alone does not prove the built artifact contains them.</p><p>This worked answer shows the reasoning and the supplied baseline. Your own evidence record, altered input, predicted failure and independently checked result are still the learner task.</p>"
+      },
+      "references": [
+        {
+          "label": "Firebase Apple setup and target configuration",
+          "url": "https://firebase.google.com/docs/ios/setup"
+        },
+        {
+          "label": "Firebase Apple release notes and compatibility",
+          "url": "https://firebase.google.com/support/release-notes/ios"
+        },
+        {
+          "label": "Firestore emulator connections and cache settings",
+          "url": "https://firebase.google.com/docs/emulator-suite/connect_firestore"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Active dependency manifest",
+          "path": "ios-client/Tuist/Package.swift",
+          "line": 52,
+          "why": "The inspected manifest declares the client's current dependencies without Firebase. The isolated Firebase notebook is a learning target, not an implied production migration."
+        }
+      ],
+      "checklist": [
+        "I can distinguish configuration, identity and authorization.",
+        "I can explain the separate host, SDK and emulator gates.",
+        "I can cite the exact SDK compatibility evidence I used."
+      ],
+      "simple": {
+        "story": "Mira has a notebook in a cupboard at school. The cupboard has an address label, and every visitor has a name card. The label helps Mira find the cupboard. It does not let her open every shelf. The caretaker reads the name card and follows the shelf rules. Mira first practices with cardboard shelves at home. That practice can reveal a mistake in her plan, but it cannot prove the school's real lock works.",
+        "meaning": "Firebase configuration selects the backend, Authentication identifies a user, and product rules decide access. Our host policy is a practice model; real rules and SDK calls need separate checks.",
+        "example": {
+          "before": "The lab accepts projectID demo-firebase-course and host 127.0.0.1.",
+          "change": "Try to create LabEnvironment with projectID production-notebook.",
+          "after": "The initializer throws invalidEnvironment before any Firebase service operation."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "The local setup checks identity values before service creation.",
+          "items": [
+            {
+              "label": "Proposed setup",
+              "text": "A project ID and host enter the constructor."
+            },
+            {
+              "label": "Local guard",
+              "text": "Only the exact demo project and loopback host are accepted."
+            },
+            {
+              "label": "Refused setup",
+              "text": "The production-notebook input throws a typed error."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Configuration",
+            "meaning": "Values that choose an application registration and backend."
+          },
+          {
+            "term": "Emulator",
+            "meaning": "A locally running service used to exercise backend behavior."
+          },
+          {
+            "term": "Authorization",
+            "meaning": "A decision about whether a request may access a resource."
+          },
+          {
+            "term": "Evidence boundary",
+            "meaning": "The limited set of claims a particular check can support."
+          }
+        ],
+        "remember": "A correct address does not grant access, and a host check does not test Firebase rules.",
+        "boundary": "The cupboard story omits tokens, caches, transport and server administration. The host guard is client policy, not a defense against a modified client."
+      }
+    },
+    {
+      "id": "130",
+      "title": "Own authentication and the account session",
+      "summary": "Model signed-out and signed-in states, connect providers deliberately, and cancel account-owned work when a user leaves.",
+      "duration": 110,
+      "level": "Senior",
+      "prerequisites": [
+        "129",
+        "068",
+        "081",
+        "015"
+      ],
+      "objectives": [
+        "Use an authentication state listener as a long-lived session boundary.",
+        "Keep provider credentials, Firebase UID and product rights distinct.",
+        "Reject late results across signout and relogin.",
+        "Plan reauthentication, linking and account deletion with recoverable cleanup."
+      ],
+      "sections": [
+        {
+          "id": "session-story",
+          "title": "Treat a session like a named tray",
+          "html": "<p>A workshop gives Alice a tray for unfinished work. When Alice leaves, the tray must leave the shared desk too. Bob should never receive Alice's unfinished drawing simply because the desk is the same. An account session is the app's named container for user-owned data, listeners, requests, drafts and token bindings.</p><p>Authentication establishes who is making a request. Authorization establishes what that person may do. A Firebase UID is the stable identifier for a Firebase user in a project. It is not an email address, role, payment status, or permission to read all documents. A successful sign-in still needs product rules.</p><p>Start the UI with loading, signedOut, signedIn, and recoverableError states. Loading means the client is determining its initial session; signedOut means it currently has no accepted user. Showing a protected screen from a stale Boolean called loggedIn skips this distinction and makes startup behavior difficult to reason about.</p><p>In Android, you may expose an authentication listener as StateFlow and collect it under a lifecycle owner. On iOS, Firebase provides an auth-state listener handle. The app retains the handle and explicitly removes it when its owner ends. A SwiftUI view appearing does not itself provide an enduring authentication lifetime.</p>"
+        },
+        {
+          "id": "first-auth-flow",
+          "title": "Follow one concrete credential flow",
+          "html": "<p>Use a synthetic email/password account in the local Auth emulator for the first integration. The scratch app constructs a unique example.invalid email and a local-only password when the learner presses its account button. No provider window, real email, or production account is involved. This authoring session did not execute that button.</p><p>createUser returns an authentication result or throws. The result identifies the created user, but the session owner still reacts to auth-state changes rather than assuming the sign-up screen is the only place a user can change. A restored session, signout, or later provider action must converge on the same account boundary.</p><p>The adapter installs addStateDidChangeListener after constructing the emulator Auth object. It retains AuthStateDidChangeListenerHandle. Each accepted account change disconnects the old notes repository, clears its visible data, and creates the next account query. The scope owner must invoke stop and remove the handle on teardown.</p><p>Treat provider errors as recoverable product states. Preserve non-sensitive form input where appropriate, disable duplicate submissions, and explain a retry without printing credentials or raw tokens. If the user leaves while a request is pending, its eventual success must not repopulate the departed screen. Cancelling a Task is a request, not proof the SDK stopped.</p>"
+        },
+        {
+          "id": "generation-check",
+          "title": "Reject a reply from a previous account lifetime",
+          "html": "<p>A generation is a local counter identifying one lifetime of the session. It changes when account ownership changes, including a return to the same UID. A request captures both UID and generation before starting. Publication compares that captured stamp with the current stamp. A matching UID alone cannot distinguish Alice's first login from her later login.</p><pre><code class=\"language-swift\">var session = SessionModel()\nsession.switchAccount(to: \"alice\")\nlet old = session.stamp!\nsession.switchAccount(to: \"bob\")\nsession.switchAccount(to: \"alice\")\nlet accepted = try session.accept(\n    [Note(id: \"n1\", ownerID: \"alice\", title: \"Lantern\", revision: 0)],\n    from: old\n)\n// accepted is false; rows stay empty.</code></pre><p>switchAccount increments generation and clears rows before new data arrives. stamp packages the current UID with that generation. accept first compares the captured stamp; because old belongs to generation 1 and the current session is generation 3, it returns false. It does not decode or display the old payload.</p><p>The force unwrap in this short host walkthrough is justified by the immediately preceding synthetic non-nil switch. Production composition should use guard let because session changes are possible between independent actions. Kotlin can implement the same request-generation policy. Neither language's null safety or coroutine cancellation alone prevents stale publication.</p>"
+        },
+        {
+          "id": "provider-boundaries",
+          "title": "Connect Apple and Google without confusing identities",
+          "html": "<p>A provider proves an identity through its own sign-in flow. Firebase converts a supported provider credential into a Firebase session. Provider subject IDs and Firebase UIDs are distinct. Keep raw provider credentials out of app logs and Firestore documents. A display name supplied once is profile data, not durable authorization evidence.</p><p>For Apple integration, enable Sign in with Apple for the isolated target and matching developer registration, configure the Firebase provider, obtain a cryptographically random nonce, send its hash in the Apple request, and supply the matching raw nonce with the credential exchange. Handle cancellation separately from failure. The official Apple-provider guide supplies the exact credential API.</p><p>For Google integration, enable the provider, configure the reviewed Google client IDs and reversed-client-ID URL scheme, install the separately selected GoogleSignIn SDK, choose the presenting view controller, and exchange the returned ID/access credential through Firebase. Check callback handling in the actual app lifecycle. This path has a dependency compatibility decision beyond Firebase itself.</p><p>Account linking attaches another provider to an already authenticated Firebase user. Signing in independently may instead select a different Firebase user. Decide which account's notes survive before linking, detect credential collisions, and obtain explicit user intent for a merge. Never merge data merely because two providers report the same email string.</p>"
+        },
+        {
+          "id": "token-and-rights",
+          "title": "Separate restored identity from current server rights",
+          "html": "<p>An ID token is signed evidence used to authenticate requests. It expires and can be refreshed. An auth-state listener is useful for sign-in/signout ownership; a token-change listener serves a different need when freshness of token evidence matters. Choose the event source for the question you are answering rather than treating every callback as equivalent.</p><p>A custom claim is server-issued token data, such as a role, created by trusted administration. Do not let clients grant themselves claims by writing a profile field. Claims can remain stale until token refresh, so role removal needs a documented propagation and backend enforcement policy. An app's visible role badge is not the server's final authorization check.</p><p>Local signout removes the current client session. It does not automatically revoke every session on every device or delete all user data. For stronger account-wide revocation, use a reviewed server flow with explicit rights and recovery. Document what a disconnected device can still display from cache and how the UI limits that exposure.</p><p>The notebook sample clears rows and uses memory cache, but it does not prove a durable-cache isolation scheme. A production app must stop listeners, cancel uploads, discard account-owned drafts according to policy, remove token associations, and reconcile any queued writes. Do this before enabling the next account's protected UI.</p>"
+        },
+        {
+          "id": "account-lifetime",
+          "title": "Make deletion a recoverable workflow",
+          "html": "<p>Reauthentication means obtaining fresh credentials for a security-sensitive action. Firebase documents recent-login requirements for actions such as deleting an account, changing a primary email, or changing a password. A stored user object is not always sufficient. Present a deliberate credential step when the backend reports that the login is too old.</p><p>Account deletion and data deletion are different operations. Deleting a Firebase Auth user does not constitute a coordinated removal of Firestore documents, Storage objects, notification registrations and application-owned exports. Inventory those resources before implementing the button. Define legal retention separately from user-visible deletion; this lesson does not invent a universal retention rule.</p><p>A trusted cleanup workflow can accept an authenticated deletion request, create a durable job, revoke or restrict access according to policy, delete owned resources in bounded batches, and record progress so retries resume. Decide whether the user identity is removed before or after cleanup and how the worker retains sufficient authority.</p><p>A failure must have a named state: requested, cleanupPending, completed, or retryNeeded. Showing Account deleted immediately after hiding a screen is misleading. Keep a non-sensitive support reference and ownership of stuck jobs. Our companion has no deployed deletion function; the lesson supplies a concrete integration design and independent acceptance task.</p>"
+        },
+        {
+          "id": "evidence-and-failures",
+          "title": "Check the cases a happy path misses",
+          "html": "<p>Run the host schedules that switch Alice to Bob, deliver Alice's old success, then sign Alice in again and deliver the same old reply. Both old results are rejected. Also try a snapshot containing Bob's document under Alice's active stamp; the whole snapshot fails instead of displaying a partially trusted mixture.</p><p>For emulator integration, create two synthetic users, write Alice's note, sign out, and sign in as Bob. Read the account path directly as well as through the screen. Rules must deny the cross-account request. An empty UI alone is weak evidence because a UI bug may simply avoid making the forbidden request.</p><p>Provider integration needs an actual target build and device/provider observations: cancellation, rejected credentials, an existing linked account, callback delivery, and recent-login recovery. The local Auth emulator does not prove Apple nonce exchange, Google redirect registration, email delivery, MFA, or account-wide revocation behavior.</p><p>Version facts live in lesson 129 and the README evidence ledger. No GoogleSignIn/Firebase compatibility is claimed from an old release note or from these snippets. Inspect the selected releases and build their graph. The client anchor's explicit MFA and throttling outcomes illustrate state design; it does not establish Firebase use in the company app.</p><p>Optional later reading: lesson 099 deepens Keychain and authentication recovery after the Firebase stage. This lesson teaches the session, token and reauthentication terms needed for the notebook without requiring that later material.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why compare UID and generation before publishing a result?",
+          "options": [
+            "A generation signs the token",
+            "The same UID can return in a later session lifetime",
+            "UIDs change on every request"
+          ],
+          "answer": 1,
+          "explanation": "A local generation distinguishes account lifetimes even when Alice signs in again with the same Firebase UID."
+        },
+        {
+          "question": "What does local signout establish?",
+          "options": [
+            "The current client session ends",
+            "Every user's data is deleted",
+            "Every device's credentials are revoked"
+          ],
+          "answer": 0,
+          "explanation": "Account-wide revocation and data cleanup require additional server workflows; they are not implied by client signout."
+        },
+        {
+          "question": "Two provider credentials use the same email. What should the app do?",
+          "options": [
+            "Automatically merge all notes",
+            "Ignore Firebase UIDs",
+            "Use a deliberate linking or collision flow with explicit intent"
+          ],
+          "answer": 2,
+          "explanation": "Email equality does not establish that two Firebase users should be merged or that the current user owns both."
+        }
+      ],
+      "exercise": {
+        "brief": "Extend a scratch session model with an error result and prove that old success and old failure cannot overwrite a newer account.",
+        "steps": [
+          "Capture Alice's first stamp, then switch to Bob and accept Bob's current note.",
+          "Deliver Alice's old success and a new error case carrying Alice's old stamp.",
+          "Sign Alice in again and deliver the first-login result.",
+          "Write a deletion workflow table covering identity, notes, images and token associations."
+        ],
+        "acceptance": [
+          "Bob's rows and status remain unchanged after Alice's stale success or failure.",
+          "The same-UID relogin rejects the first-login reply.",
+          "Listener removal and generation checks have distinct stated purposes.",
+          "Deletion has recoverable cleanup states and does not equate Auth deletion with resource cleanup."
+        ],
+        "solution": "<p>Keep the stamp comparison outside both success and failure publication. Introduce an acceptError method that first tests self.stamp == captured, returns false when it differs, and updates a non-sensitive error state only for a current stamp. Clearing rows during switchAccount means Bob starts with an empty tray until his own result is accepted.</p><p>Consider generation 1 for Alice, generation 2 for Bob, and generation 3 for Alice's return. A success or failure tagged generation 1 cannot update generation 2 or 3. Removing the listener reduces future work; the generation comparison protects against already enqueued callbacks. The two mechanisms address different races.</p><p>The deletion table assigns a trusted cleanup worker to notes and images, a registry operation to token associations, and an authenticated recent-login flow to identity removal. Include a durable deletion command ID, progress state, retry ownership, and an observable completion criterion. No deployed worker exists in the companion, so label server execution pending.</p><p>Use the existing host checks as baseline evidence, then implement and test the independent error case yourself. A copied answer or a passing baseline does not demonstrate the new learner behavior.</p>"
+      },
+      "references": [
+        {
+          "label": "Firebase user management and reauthentication",
+          "url": "https://firebase.google.com/docs/auth/ios/manage-users"
+        },
+        {
+          "label": "Firebase Apple identity integration",
+          "url": "https://firebase.google.com/docs/auth/ios/apple"
+        },
+        {
+          "label": "Firebase Google provider setup",
+          "url": "https://firebase.google.com/docs/auth/ios/google-signin"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client login outcomes",
+          "path": "ios-client/Projects/Features/ZDAuthentication/Sources/ZDAuthentication/Services/EmailLoginService.swift",
+          "line": 44,
+          "why": "PasswordLoginResult distinguishes success, MFA, invalid credentials and throttling. Compare that explicit state design with Firebase session handling; this file does not use Firebase Auth."
+        }
+      ],
+      "checklist": [
+        "I can reject stale success and failure across account lifetimes.",
+        "I can distinguish a provider credential, Firebase UID and product right.",
+        "I can plan linking, reauthentication and cleanup without claiming they ran."
+      ],
+      "simple": {
+        "story": "Alice works on a paper boat at a shared desk. She leaves, and the helper puts her tray away. Bob sits down with his own tray. A courier then arrives with a drawing Alice requested earlier. The helper checks the tray's name and visit number before adding it. Even when Alice returns later, the drawing belongs to her earlier visit. The helper asks for a fresh reply for the new visit instead of mixing unfinished work from different visits.",
+        "meaning": "Each account lifetime has a UID and local generation. A result must match both before changing visible data or errors.",
+        "example": {
+          "before": "Alice captures generation 1; Bob then owns generation 2.",
+          "change": "Alice's generation-1 note callback arrives.",
+          "after": "The callback is rejected, and Bob's rows stay unchanged. Alice's later generation-3 login also rejects it."
+        },
+        "picture": {
+          "kind": "timeline",
+          "caption": "An old callback cannot enter a later account lifetime.",
+          "items": [
+            {
+              "label": "Alice visit 1",
+              "text": "The request captures Alice and generation 1."
+            },
+            {
+              "label": "Bob visit 2",
+              "text": "The app clears Alice's display and changes the stamp."
+            },
+            {
+              "label": "Late reply",
+              "text": "Generation 1 differs from generation 2, so publication is refused."
+            },
+            {
+              "label": "Alice visit 3",
+              "text": "The old generation still differs even though the UID matches again."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Session",
+            "meaning": "One account's current ownership of app work and visible data."
+          },
+          {
+            "term": "Generation",
+            "meaning": "A local number that distinguishes successive account lifetimes."
+          },
+          {
+            "term": "Reauthentication",
+            "meaning": "Obtaining fresh credentials before a sensitive action."
+          },
+          {
+            "term": "Provider linking",
+            "meaning": "Attaching another sign-in provider to an existing Firebase user."
+          }
+        ],
+        "remember": "A result belongs to one account lifetime, not just one account name.",
+        "boundary": "The tray story explains publication ownership, not token cryptography or server revocation. Cancellation requests and listener removal cannot guarantee that an already queued callback disappears."
+      }
+    },
+    {
+      "id": "131",
+      "title": "Save Firestore notes with rules and conflict checks",
+      "summary": "Define a document model, implement CRUD, use transactions for stale edits, and authorize requests with actual Firebase rules fixtures.",
+      "duration": 125,
+      "level": "Senior",
+      "prerequisites": [
+        "130",
+        "064",
+        "067",
+        "018"
+      ],
+      "objectives": [
+        "Map stable Swift identity to a Firestore document path.",
+        "Explain create, read, update and delete outcomes.",
+        "Keep transaction retries free of visible side effects.",
+        "Review rules for identity, payload shape, revision and timestamps."
+      ],
+      "sections": [
+        {
+          "id": "documents-and-paths",
+          "title": "Give each note a stable address",
+          "html": "<p>A document is a named record containing fields. A collection groups documents. Firestore paths alternate collection and document segments. Our path users/alice/notes/n1 names a note in Alice's notes collection under her user document path. The containing user document need not exist merely for its subcollection to contain documents.</p><p>Stable identity lets an edit continue referring to the same note when its title changes. The note's ID is n1; its title starts as Lantern and later becomes Paper boat. A title is editable content and should not become the document ID. Kotlin data-class equality does not decide backend identity either.</p><p>Keep ID in the Swift model, but choose one authoritative source for it. The adapter decodes documentID from the snapshot instead of trusting a second id field in the payload. ownerID is also stored and checked against the path owner. Redundant ownership fields deserve explicit consistency checks.</p><p>The host Note is a value with id, ownerID, title and revision. The actual document also has updatedAt, a server timestamp. The adapter uses an explicit dictionary mapping so readers can inspect every written field. Codable is a useful later option, but a Codable conformance alone does not validate untrusted backend data.</p>"
+        },
+        {
+          "id": "validated-crud",
+          "title": "Walk through create, read, update, and delete",
+          "html": "<p>CRUD means create, read, update and delete. Create introduces a new identity; read fetches existing state; update changes an existing identity; delete removes the named record. Their failure cases differ. A missing note cannot be decoded as a valid empty note, and a failed delete should not be hidden behind a successful screen dismissal.</p><p>The adapter normalizes the title in NotePolicy.title before submission. It trims surrounding whitespace, rejects an empty result, and limits the title to 120 Swift characters. NotePolicy.validID accepts a small ASCII identifier alphabet and rejects path separators. These checks give helpful local errors, while rules remain responsible for service authorization.</p><p>create reads the chosen document inside a transaction and refuses an existing identity. That makes a repeated call with the same ID fail visibly instead of replacing an unrelated record. The caller should retain its draft ID across a retry and reconcile an ambiguous acknowledgement by reading that ID.</p><p>read decodes a snapshot; delete calls the named document's delete API. The app entry demonstrates create and listening. Read, revision edit, pagination, and delete adapters are supplied separately for learner integration into controls. Their presence in source is not a claim that each screen interaction was executed.</p>"
+        },
+        {
+          "id": "revision-conflict",
+          "title": "Make a stale edit visible",
+          "html": "<p>A revision is a monotonically increasing document version in our teaching contract. An editor remembers the revision it loaded. Alice and a second device both load revision 0. Alice changes Lantern to Paper boat and writes revision 1. The second device's expected revision is still 0, so its attempted edit must be refused.</p><pre><code class=\"language-swift\">let original = Note(id: \"n1\", ownerID: \"alice\", title: \"Lantern\", revision: 0)\nlet newer = try NotePolicy.revise(\n    original, uid: \"alice\", expected: 0, title: \"Paper boat\"\n)\n// newer.title == \"Paper boat\"; newer.revision == 1\n// revise(newer, expected: 0, ...) throws conflict.</code></pre><p>revise first checks ownership. It then compares expected with the stored revision and protects against integer overflow. Only after those checks does it normalize the new title and increment revision. Because Note is a struct, the returned value is a new copy; the original remains Lantern at revision 0.</p><p>The SDK revision method repeats the same decision inside a Firestore transaction. A client edit conflict is a product choice: preserve the draft, show the newer note, and let the user review or merge. Automatically overwriting the expected revision with whatever just arrived hides a potentially meaningful conflict.</p>"
+        },
+        {
+          "id": "transaction-retries",
+          "title": "Keep transaction bodies repeatable",
+          "html": "<p>A transaction combines reads and writes under an atomic commit condition. Firestore can retry its transaction body when a concurrent change affects a document read. Read documents before scheduling writes. A retry is not a second user action, so the body must not show a toast, mutate a view model, or send a notification.</p><p>The Swift adapter reads the reference with transaction.getDocument, decodes it, compares the expected revision, and schedules updateData. On error it assigns an NSError through the callback error pointer. A successful transaction then returns to the outer async caller. That outer boundary owns user-visible completion.</p><p>Consider a retry after another device moves the note to revision 1. Our expected revision remains 0, so the retried body throws conflict. This is useful rather than a defect: the user edited an old version. For a commutative counter, a different transaction policy may recompute from the newest value.</p><p>A batched write groups writes without a read-dependent decision. It is appropriate when all intended values are already known; it cannot independently prove that an edit was based on the current revision. Transactions fail offline. Design the UI so an offline transactional edit remains a draft, instead of pretending that a cached snapshot proves commit success.</p>"
+        },
+        {
+          "id": "rule-contract",
+          "title": "Authorize the request and validate the new record",
+          "html": "<p>A security rule is server-evaluated code that permits or rejects a request. Our real firestore.rules begins with a default deny posture and grants operations only under users/{uid}/notes/{noteID}. owner(uid) requires a non-null authenticated request whose UID equals that path segment. A profile document's owner field cannot impersonate request.auth.</p><p>validNote requires exactly ownerID, title, revision and updatedAt. It rejects extra admin fields, wrong title types, empty or oversized titles, non-integer revisions, and timestamps that differ from request.time. The SDK supplies FieldValue.serverTimestamp so the write's authoritative timestamp is resolved by the service rather than a phone clock.</p><p>Create requires revision 0. Update requires old ownerID to agree with the path, new revision to equal old revision plus one, and the changed-key set to contain only title, revision and updatedAt. Deleting is a separate operation because there is no proposed replacement record to validate.</p><p>The rules require a bounded list query of 1–25 documents. A direct get has a separate permission. The catch-all deny does not override a more specific allow; Firebase grants a request if an applicable allow expression succeeds. Review every overlapping match block rather than assuming a final deny statement neutralizes earlier broad rules.</p>"
+        },
+        {
+          "id": "validation-boundaries",
+          "title": "State where the host and rules differ",
+          "html": "<p>The host policy and server rules share ownership and revision intent, but they are different programs. The host checks Swift Character count after trimming. The rules check the stored string's size and do not trim it. A whitespace-only stored title is therefore a documented rule-hardening exercise, not a claim that both validators are equivalent.</p><p>The rules also enforce exact keys and request-time timestamps, which the small host Note does not represent. Conversely, the host restricts note ID syntax; the current Firestore rules do not constrain noteID. A modified client can choose another document ID under its own path. That difference does not grant cross-account access, but it belongs in the contract.</p><p>Rule tests must send malformed requests directly, bypassing friendly client validation. The supplied Node fixtures try forged owner, extra admin key, wrong title type, empty and 121-character title, fractional revision, skipped initial revision, and an old client timestamp. These are real emulator requests when the separate runtime is available.</p><p>The fixtures mock authenticated token identities using rules-unit-testing. That is not production sign-in, but it executes the rules interpreter against those identities. The offline Swift authorization checks do neither. The author executed the host and syntax checks only; actual rules outcomes remain pending until the fixture command is run.</p>"
+        },
+        {
+          "id": "failure-and-recovery",
+          "title": "Separate denial, conflict, decode failure, and outage",
+          "html": "<p>A permission-denied response means the service rejected authorization or validation. A stale-edit conflict in our adapter means the product's expected revision disagreed with current state. A malformed snapshot means decoding failed. A network outage means the service could not complete the operation now. Preserve these distinctions in a repository error model.</p><p>Do not endlessly retry permission denial; it can repeat a broken payload or amplify cost. Do not silently delete a draft on conflict. Offer a refresh and compare old and new title. For malformed data, preserve the last trusted display and report a non-sensitive diagnostic; a decoder defaulting missing revision to zero can turn corruption into an apparently valid edit.</p><p>Before a remote schema change, add a compatible reader, then write the new shape only after reader adoption. Rules, adapters and fixtures need coordinated rollout. Older clients may still write their old payload. A rule change that instantly requires a new field can break those clients even when the latest build works.</p><p>The inspected client URLSession boundary is a useful comparison for request/error ownership. It does not supply Firestore transactions or rules. The source ledger records exact Firebase API references and the lack of SDK typechecking. Review the selected release's Swift concurrency diagnostics before considering the adapter ready for a native target.</p><p>Optional later reading: lesson 098 explores durable outbox replay after this stage. The notebook's revision and retry contracts are defined here; a durable outbox is a future design exercise rather than an assumed prerequisite.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Where should a toast be shown for a successful transaction?",
+          "options": [
+            "Inside every transaction-body invocation",
+            "After the outer transaction completes successfully",
+            "Before the first read"
+          ],
+          "answer": 1,
+          "explanation": "The body can retry. Visible effects belong after acknowledged completion, outside the retried function."
+        },
+        {
+          "question": "A note title changes. Which value should continue identifying it?",
+          "options": [
+            "Its stable document ID",
+            "The new title text",
+            "Its current array position"
+          ],
+          "answer": 0,
+          "explanation": "Content and list position can change. A stable ID preserves edit and rendering identity."
+        },
+        {
+          "question": "Does the offline authorize function establish actual Firebase rule enforcement?",
+          "options": [
+            "Yes, because both compare UID",
+            "Yes, if Swift compiles",
+            "No; the rules interpreter must execute the rules fixtures separately"
+          ],
+          "answer": 2,
+          "explanation": "Two implementations can disagree. The host has no request-time timestamp or rules engine and cannot prove service authorization."
+        }
+      ],
+      "exercise": {
+        "brief": "Add a revision-edit control in a scratch target plan, then extend the rules fixtures for one real validation gap.",
+        "steps": [
+          "Write the before/after state for two editors starting at revision 0.",
+          "Plan an editor that retains expected revision and preserves its draft on conflict.",
+          "Choose a whitespace-title or note-ID rule improvement and specify allowed/rejected fixtures.",
+          "Run only the offline baseline here; record SDK and rules execution as pending until provisioned."
+        ],
+        "acceptance": [
+          "The second revision-0 edit cannot overwrite revision 1.",
+          "The transaction body has no notification, analytics or UI effects.",
+          "The chosen rule improvement has both positive and adversarial fixture cases.",
+          "Host validation differences and unexecuted rules checks are explicit."
+        ],
+        "solution": "<p>The first editor submits expected 0 with Paper boat. The server transaction reads Lantern revision 0 and schedules Paper boat revision 1. The second editor submits expected 0 with Red kite. Its transaction sees revision 1 and throws conflict. Keep Red kite in the editor and show Paper boat as the newer version; do not silently raise expected to 1 and resubmit.</p><p>For an ID improvement, require an agreed ASCII pattern for noteID in the rule's create condition. Add a valid case such as note_2 and rejected cases with unexpected punctuation or excessive length. This is a policy choice to align with the host helper, not an existing fixture outcome. Keep direct malformed writes in the rule tests so UI normalization cannot hide the gap.</p><p>For whitespace improvement, decide exactly which character classes count as meaningful content in the rules language and test spaces, tabs, newlines and ordinary text. Do not claim Swift Character counting and rules string-size behavior are identical for every Unicode string. Document the intended stored representation.</p><p>Record the baseline's passing host checks and the separate pending rule/native checks. Your independently authored validation fixtures and their eventual interpreter result are the acceptance evidence; the supplied worked answer is reference material.</p>"
+      },
+      "references": [
+        {
+          "label": "Firestore transactions and retry contracts",
+          "url": "https://firebase.google.com/docs/firestore/manage-data/transactions"
+        },
+        {
+          "label": "Firestore rules data validation",
+          "url": "https://firebase.google.com/docs/firestore/security/rules-fields"
+        },
+        {
+          "label": "Firestore authorization and query boundaries",
+          "url": "https://firebase.google.com/docs/firestore/security/rules-query"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client request boundary",
+          "path": "ios-client/Projects/Infra/ZDNetworking/Sources/ZDUrlSessionExtension/UrlSession+ApiOperationDispatcher.swift",
+          "line": 38,
+          "why": "The active URLSession adapter owns a data task and callback. Compare its request lifetime with a Firestore listener without claiming the client has Firestore."
+        }
+      ],
+      "checklist": [
+        "I can predict CRUD and stale-revision outcomes.",
+        "I can explain why transaction bodies must avoid visible side effects.",
+        "I can distinguish host validation from actual security rules."
+      ],
+      "simple": {
+        "story": "Two people borrow copies of a notice marked version zero. Alice changes Lantern to Paper boat and the keeper saves version one. Ben brings his version-zero copy with Red kite written on it. The keeper notices that Ben started from an old copy and returns it for review. Ben keeps his idea instead of losing it. The keeper also checks whose shelf the notice belongs on; a matching version does not let a stranger edit Alice's shelf.",
+        "meaning": "Document identity, ownership and expected revision answer different questions. The transaction reads current state and refuses an edit based on an older revision.",
+        "example": {
+          "before": "n1 has title Lantern and revision 0; both editors expect 0.",
+          "change": "Alice saves Paper boat, then the second editor attempts Red kite with expected 0.",
+          "after": "The note stays Paper boat at revision 1, and the second editor receives conflict."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "A revision check preserves the newer note.",
+          "items": [
+            {
+              "label": "Read version 0",
+              "text": "Both editors capture the same expected revision."
+            },
+            {
+              "label": "First save",
+              "text": "Paper boat becomes revision 1."
+            },
+            {
+              "label": "Second save",
+              "text": "Expected 0 differs from current 1, so the draft is preserved for review."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Document",
+            "meaning": "A named backend record containing fields."
+          },
+          {
+            "term": "Revision",
+            "meaning": "Our increasing version number for a note."
+          },
+          {
+            "term": "Transaction",
+            "meaning": "A read-dependent operation whose writes commit together when its condition holds."
+          },
+          {
+            "term": "Security rule",
+            "meaning": "Service-evaluated permission and validation code."
+          }
+        ],
+        "remember": "Check the owner and the current revision before changing a named document.",
+        "boundary": "A paper notice cannot model Firestore retry scheduling, request-time transforms or offline caches. The host fixture checks a policy; only an emulator or service can execute Firebase rules."
+      }
+    },
+    {
+      "id": "132",
+      "title": "Listen, page, and explain offline Firestore state",
+      "summary": "Own live listener lifetimes, paginate with stable cursors, plan indices, and distinguish cached, pending and acknowledged data.",
+      "duration": 120,
+      "level": "Senior",
+      "prerequisites": [
+        "131",
+        "017",
+        "081"
+      ],
+      "objectives": [
+        "Remove a listener when its screen/account owner ends.",
+        "Use snapshot metadata to describe cache and write state.",
+        "Keep live first-window updates separate from historical pages.",
+        "Plan bounded queries, cursor identity, indices and offline conflict recovery."
+      ],
+      "sections": [
+        {
+          "id": "live-window",
+          "title": "A live window is a maintained result set",
+          "html": "<p>A listener is a long-lived registration that receives updated snapshots. A snapshot describes a result set at a particular observation. It differs from a single HTTP response: the client retains work and can receive later changes without asking again from the UI. Someone must own that lifetime.</p><p>Our notebook listens to the ten most recently updated notes in one account path. This is a live first window, not the entire notebook. If an older note becomes recent, it can enter the window and displace another note. A missing row in that window does not prove that the displaced document was deleted.</p><p>FirebaseNotesRepository stores ListenerRegistration and calls remove before connecting another account. It captures the session stamp and checks it before publishing either data or failure. Removing a registration reduces ongoing work; the stamp rejects callbacks already queued during the change. Both belong to the same owner.</p><p>On Android, callbackFlow plus awaitClose can adapt a listener into a Flow lifetime. On iOS, AsyncStream can also wrap callbacks, but simply yielding snapshots does not solve ownership. A wrapper still needs termination cleanup and account checks. The supplied adapter uses explicit registration ownership so the mechanism remains visible.</p>"
+        },
+        {
+          "id": "metadata",
+          "title": "Explain what cache and pending mean",
+          "html": "<p>Cache means previously obtained local state. A cached snapshot can be useful immediately, but it may not reflect a recent remote deletion or another device's change. Pending writes means local changes have not yet received backend acknowledgement. These describe different dimensions and should not be collapsed into one loading Boolean.</p><p>The adapter requests metadata changes. It publishes isFromCache as Cache result or Server result and hasPendingWrites as a separate property. A local optimistic result can have pending writes before the server accepts it. When rules reject a write, the app must reconcile the local view and preserve the user's intended draft appropriately.</p><p>Treat a server result without pending writes as evidence about that observation, not a guarantee that no future change will occur. A later request may fail, and a cached result may remain visible while disconnected. Show non-blocking freshness information when it helps users decide whether to trust a current value.</p><p>MemoryCacheSettings is deliberately used in the emulator notebook. It still allows in-process cache behavior, but it does not test a persisted cache across restart. An experiment claiming durable offline support must change the test configuration, restart the app, and observe actual recovered data and queued-write behavior under that SDK.</p>"
+        },
+        {
+          "id": "decode-and-publish",
+          "title": "Decode a whole trusted snapshot before display",
+          "html": "<p>Decode means convert untyped backend fields into the app's typed model. A valid snapshot for Alice must contain Alice-owned notes with stable IDs and valid revisions. The repository maps all documents, then accepts the complete array. A bad document leaves the previous trusted display in place and changes the status.</p><p>Do not replace malformed fields with convenient defaults such as ownerID = currentUID or revision = 0. That invents evidence. A real application can quarantine a bad document and expose a recoverable diagnostics state, but it needs a documented policy for whether partial results are acceptable.</p><p>The host checks reject a foreign-account snapshot atomically. They also reject duplicate IDs in one accepted snapshot. These are our publication contracts rather than a reproduction of Firebase decoding internals. Rules should prevent bad writes from ordinary clients, while readers must still handle administrative data, migrations, or legacy content.</p><p>MainActor keeps visible state mutation within one isolation boundary. It does not make backend snapshots inherently Sendable or choose a dedicated operating-system thread for each repository. The SDK callback wrapper must be typechecked against the selected Firebase release and Swift isolation settings; syntax parsing does not establish those transfer contracts.</p>"
+        },
+        {
+          "id": "cursor-pages",
+          "title": "Use a real cursor and stable ordering",
+          "html": "<p>A cursor records the boundary after the last item of a page. The adapter orders by updatedAt descending, limits the page to ten, and uses the last DocumentSnapshot in start(afterDocument:). A complete document cursor preserves ordering identity better than a title or a timestamp reconstructed from display text.</p><p>Two documents can share the same timestamp. A cursor based only on that field can make the intended boundary ambiguous. Firestore's ordered document identity participates in snapshot cursor behavior. Preserve the actual query shape and cursor, and reset both when the account, filter or ordering changes.</p><p>Historical paging is a one-shot browsing operation in this lab. Live first-window rows are maintained separately. Blindly appending every live snapshot to old pages duplicates rows and can leave deleted or displaced records forever. Decide whether the product offers a frozen history snapshot, live multi-window pages, or a refreshable mixed experience.</p><p>PagePolicy.merge deduplicates by ID and keeps a newer revision when an overlapping older page arrives. If the same ID and revision carry different content, it throws duplicatePayload rather than choosing arbitrary arrival order. It preserves first-seen ordering for the host fixture; it does not model Firestore sorting or account-aware cursor creation.</p><pre><code class=\"language-swift\">let latest = Note(id: \"n1\", ownerID: \"alice\", title: \"Boat\", revision: 1)\nlet old = Note(id: \"n1\", ownerID: \"alice\", title: \"Lantern\", revision: 0)\nlet rows = try PagePolicy.merge([latest], [old, latest], owner: \"alice\")\n// One row remains: n1, Boat, revision 1.</code></pre>"
+        },
+        {
+          "id": "indices-and-query-rights",
+          "title": "Plan a query before asking for an index",
+          "html": "<p>An index is a backend structure that supports efficient query ordering and filtering. It is not a permission grant. Firestore can require a composite index for a combination of fields. Record the exact query, why the product needs it, the allowed page size, and the authorization path before adding backend resources.</p><p>The base notebook query uses one account collection and updatedAt ordering. The supplied index fixture is for a deliberate later extension: revision greater than zero, ordered first by revision ascending and then by updatedAt descending. It is not evidence that the base notebook needs or has deployed that index.</p><p>Use the SDK's missing-index diagnostic during a separately authorized remote integration to verify the requested definition. Review that definition rather than blindly opening every suggested creation link. The emulator does not enforce production composite-index requirements, so a local query passing is insufficient evidence for deployed index readiness.</p><p>The rules limit list queries to at most 25 documents. A query must have rights for its possible result set; security rules are not a filter that quietly removes unauthorized rows. Our account path makes ownership structural. A future collection-group query needs its own rules design and fixtures before broadening access.</p>"
+        },
+        {
+          "id": "offline-and-conflicts",
+          "title": "Choose what an offline edit promises",
+          "html": "<p>Firestore's mobile offline support can cache reads and queue supported writes. The official offline guide describes last-write-wins behavior for multiple changes to a document. That transport behavior does not implement a user-visible merge policy. A title edited independently on two devices can lose an idea unless the product handles it.</p><p>Our revision-edit transaction requires a server read-dependent commit and fails offline. Keep the editor draft with its expected revision, label it unsaved, and retry or compare after connection returns. Do not show the transaction as queued just because ordinary nontransactional Firestore writes can be queued.</p><p>If the product later adopts an outbox, define a durable command identity, account ownership, expected version and reconciliation rules. A network acknowledgement can be ambiguous after a disconnect. Re-reading the stable note ID and revision helps distinguish a committed write from a safe retry, but account cancellation must still guard publication.</p><p>Cached authorization evidence can also be stale. A user may have lost a role remotely while offline. Decide which actions require fresh server approval and which cached content can remain visible. Signing out should clear protected UI immediately; it must not claim that every SDK cache or queued write on disk was securely erased.</p>"
+        },
+        {
+          "id": "listener-failures-and-evidence",
+          "title": "Test races and record remaining limits",
+          "html": "<p>A listener error should move the screen to a recoverable state and release or replace failed ownership deliberately. Avoid an immediate unbounded retry loop. Use a bounded retry policy, a user-triggered retry or connection observation, and stop all retries when the account or screen owner ends.</p><p>Independent page requests need their own request identity in addition to account generation. Start page B after page A, complete B first, then deliver A's late error. A failure from the older request must not replace B's successful state. The page adapter returns data; its caller still owns these request-generation checks.</p><p>Run host cases for overlap, older revisions, duplicate payload disagreement and account switches. For native integration, additionally observe listener removal, metadata transitions, local writes rejected by rules, disconnect/reconnect, and tied timestamp pages. For persisted cache, add a separate restart and account-boundary matrix.</p><p>The README records only actual host and syntax evidence. No emulator, index deployment, native cache restart, billing observation or simulator interaction ran here. The inspected URLSession source connects the familiar one-request lifetime to this maintained-listener problem; it does not prove production Firestore adoption.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A note disappears from a limited live first window. What can be concluded?",
+          "options": [
+            "The note is definitely deleted",
+            "It is outside this current query window; deletion needs other evidence",
+            "The user lost authentication"
+          ],
+          "answer": 1,
+          "explanation": "Ordering and a limit can displace a document without deleting it."
+        },
+        {
+          "question": "What should the paging adapter retain as its next cursor?",
+          "options": [
+            "The displayed title",
+            "An array offset",
+            "The last document snapshot from the matching query"
+          ],
+          "answer": 2,
+          "explanation": "A snapshot cursor preserves the query boundary and document identity; reset it when query ownership changes."
+        },
+        {
+          "question": "A query passes in the emulator. Has its production composite index been verified?",
+          "options": [
+            "No, production index readiness is a separate check",
+            "Yes, automatically",
+            "Yes, if the query has a limit"
+          ],
+          "answer": 0,
+          "explanation": "The emulator does not enforce production composite-index requirements. Limits bound workload but do not establish index availability."
+        }
+      ],
+      "exercise": {
+        "brief": "Design a notebook that has one live first window and a refreshable historical page, then add a stale-page error schedule.",
+        "steps": [
+          "Draw separate state owners for the live window and one historical query.",
+          "Give the historical query an account stamp and request generation.",
+          "Complete page B before page A's failure and specify which state survives.",
+          "Plan tied timestamps, disconnect/reconnect and durable-cache restart checks."
+        ],
+        "acceptance": [
+          "Live displacement is distinguished from document deletion.",
+          "Page overlap retains one stable ID and does not regress a higher revision.",
+          "An older failure cannot overwrite the latest successful page.",
+          "The plan marks native cache and production index checks pending."
+        ],
+        "solution": "<p>Keep liveRows and historyRows separate. A listener replaces only liveRows from its complete bounded snapshot. Loading history captures the current account stamp, query shape and a monotonically increasing page request number. Publication requires both the account and latest page request to match. An old page can be cancelled, but publication still checks identity.</p><p>For a synthetic sequence, request A captures page generation 1; request B captures 2. B returns Boat revision 1 and becomes visible. A then fails. Because its page generation is 1, the failure is ignored. The visible history remains B's result and its success state. Applying a global error without that comparison would regress a valid screen.</p><p>Merge overlapping IDs using PagePolicy only under the agreed history-refresh semantics. The host policy preserves first-seen order; a real refresh should rebuild query order from actual snapshots rather than pretending this helper sorts by Firestore timestamps.</p><p>Record pending native observations for two equal updatedAt values, a server rejection following a local optimistic update, persisted cache after restart, and account switching with queued work. Record deployed-index readiness separately from emulator rules execution. Your new stale-error behavior needs independently executed evidence; the baseline only covers the supplied cases.</p>"
+      },
+      "references": [
+        {
+          "label": "Firestore listeners and snapshot metadata",
+          "url": "https://firebase.google.com/docs/firestore/query-data/listen"
+        },
+        {
+          "label": "Firestore query cursors",
+          "url": "https://firebase.google.com/docs/firestore/query-data/query-cursors"
+        },
+        {
+          "label": "Firestore offline persistence and conflicts",
+          "url": "https://firebase.google.com/docs/firestore/manage-data/enable-offline"
+        },
+        {
+          "label": "Firestore index management",
+          "url": "https://firebase.google.com/docs/firestore/query-data/indexing"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client request boundary",
+          "path": "ios-client/Projects/Infra/ZDNetworking/Sources/ZDUrlSessionExtension/UrlSession+ApiOperationDispatcher.swift",
+          "line": 38,
+          "why": "The active URLSession adapter owns a data task and callback. Compare its request lifetime with a Firestore listener without claiming the client has Firestore."
+        }
+      ],
+      "checklist": [
+        "I can describe cache, pending and acknowledged states separately.",
+        "I can own and remove a live listener.",
+        "I can distinguish host merging, real cursors and production index readiness."
+      ],
+      "simple": {
+        "story": "A shop window shows its ten newest drawings. When Alice updates an older drawing, it moves into the window and another drawing moves to a back shelf. The drawing that left the window still exists. A visitor browsing the back shelves keeps a bookmark at the last drawing seen. The keeper keeps that bookmark separate from the changing window, because copying the window into every shelf page would repeat some drawings and lose track of others.",
+        "meaning": "A bounded live query maintains one result window. Historical paging has a separate cursor and lifetime; leaving the window is not proof of deletion.",
+        "example": {
+          "before": "The live query holds ten recent notes, including n1.",
+          "change": "An older n11 is updated and enters the ten-note window.",
+          "after": "One old window row may leave because of the limit. It can still exist in Firestore and in a historical page."
+        },
+        "picture": {
+          "kind": "comparison",
+          "caption": "A live window and a historical page have different owners.",
+          "items": [
+            {
+              "label": "Live window",
+              "text": "The listener maintains the current bounded query result."
+            },
+            {
+              "label": "History page",
+              "text": "A one-shot query uses its matching document cursor."
+            },
+            {
+              "label": "Refresh decision",
+              "text": "The product decides when to rebuild historical state as data changes."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Snapshot",
+            "meaning": "The data and metadata returned by one observation."
+          },
+          {
+            "term": "Cursor",
+            "meaning": "A saved query boundary for requesting the next page."
+          },
+          {
+            "term": "Pending write",
+            "meaning": "A local change that has not received backend acknowledgement."
+          },
+          {
+            "term": "Composite index",
+            "meaning": "A backend structure supporting a query over multiple fields."
+          }
+        ],
+        "remember": "Own the listener, retain the real cursor, and explain what the snapshot can prove.",
+        "boundary": "The shelf story does not simulate query concurrency or billing. The host merger does not implement Firestore ordering, persistent caching or index enforcement."
+      }
+    },
+    {
+      "id": "133",
+      "title": "Upload media with ownership and cleanup",
+      "summary": "Prepare bounded image bytes, upload and download through Storage, enforce media rights, and recover when metadata publication fails.",
+      "duration": 110,
+      "level": "Senior",
+      "prerequisites": [
+        "131",
+        "132"
+      ],
+      "objectives": [
+        "Separate photo access, product consent and server media rights.",
+        "Use stable immutable Storage paths and explicit metadata.",
+        "Own upload cancellation and bounded download memory.",
+        "Plan recovery for a cross-service upload/manifest failure."
+      ],
+      "sections": [
+        {
+          "id": "three-rights",
+          "title": "A photo has several different permissions",
+          "html": "<p>A person may let an app choose one photo without agreeing to publish it. An account may be signed in without owning a particular stored image. Separate device photo access, user intent to upload, and backend authorization. They answer different questions and should have separate UI and service checks.</p><p>Use made-up notebook images, such as an original drawing of a lantern. Avoid real people or sensitive documents. A system picker can return a chosen asset under its platform contract; that does not make every byte ready for upload. Decode safely, correct orientation when needed, resize to the product's dimensions, and encode a known format.</p><p>Rights belong to an account and resource, not a download button. Our private Storage path is users/alice/media/p1.jpg. Rules allow Alice to get or delete that object and deny Bob. A signed-in user cannot choose ownerID = alice in metadata and thereby become Alice.</p><p>Android photo-picker experience helps separate selection from storage, but the Apple picker, transfer representation and lifecycle differ. The companion begins after image preparation, at a Data value containing JPEG bytes. It supplies an actual Storage adapter, not a completed photo-picker or image-editor app.</p><p>A picker is a system-provided interface for selecting media. Selection grants access under that picker's contract; it is distinct from broad photo-library authorization. In a later native exercise, handle cancel, unavailable representations, read failure and limited access where applicable. Optional later reading: lesson 055 deepens Apple capability and permission services; it is not a prerequisite here.</p>"
+        },
+        {
+          "id": "prepare-bytes",
+          "title": "Bound memory and describe the payload",
+          "html": "<p>Data is a byte buffer. contentType is a declared MIME type telling the receiver what format the bytes claim to use. A filename ending in .jpg is another declaration. Neither proves that the file is a valid JPEG or that its contents are safe. A service rule can inspect metadata without decoding image pixels.</p><p>The adapter accepts already prepared JPEG data, checks that the size is positive and no more than 1,048,576 bytes, and writes contentType = image/jpeg. customMetadata contains only ownerID. Large images should be downsampled before this buffer exists; rejecting a large buffer after allocating it does not avoid the allocation.</p><p>For larger media, a file-based upload can avoid retaining an entire payload in memory. The product still needs size, format, cancellation and cleanup policy. A temporary local file must outlive the upload that reads it and be deleted when its owner finishes. Do not remove it immediately after starting an asynchronous transfer.</p><p>The inspected client FormData.Part separately stores bytes, filename and MIME type. That is a useful responsibility comparison, although multipart HTTP and Firebase Storage have different wire protocols. A StorageMetadata object is not a multipart header collection, and our source does not migrate the client's existing upload transport.</p>"
+        },
+        {
+          "id": "immutable-path",
+          "title": "Use one identity for one object",
+          "html": "<p>An immutable object is one whose contents are never replaced in this contract. Editing an image creates a new media ID and path; it does not overwrite p1.jpg. This helps caches, retries and cleanup refer to one known payload. It also means a retried upload to an existing path may fail and require reconciliation.</p><p>MediaPolicy.path validates owner and mediaID against a restricted ASCII alphabet. It rejects ../bob because slashes and dots can turn an intended identity into path structure. Firebase-generated UIDs and our UUID media IDs fit this lab alphabet. Decide and test a different alphabet deliberately if a product needs it.</p><pre><code class=\"language-swift\">let path = try MediaPolicy.path(owner: \"alice\", mediaID: \"p1\")\n// \"users/alice/media/p1.jpg\"\nlet allowed = MediaPolicy.canUpload(\n    uid: \"alice\", owner: \"alice\", bytes: 1_048_576,\n    contentType: \"image/jpeg\"\n)\n// allowed is true; 1_048_577 bytes is false.</code></pre><p>The inclusive boundary is part of the contract: one mebibyte is accepted and one byte more is rejected. The rules fixture tests both. A limit expressed as less-than instead of less-than-or-equal would disagree at the boundary. Use exact values in acceptance evidence instead of saying the upload is reasonably small.</p><p>The Swift helper does not perform authentication. Passing uid = alice is a synthetic host input. The SDK attaches authenticated request evidence; the rules interpreter checks it. Server enforcement remains necessary even when local validation and path construction behave correctly.</p>"
+        },
+        {
+          "id": "transfer-lifetime",
+          "title": "Keep upload ownership visible",
+          "html": "<p>StorageUploadTask represents an in-flight upload. The adapter retains one active task, cancels it when a replacement begins, and exposes cancel for account or screen teardown. Cancellation is a request to the transfer; a completion may already be queued. The caller must compare its account and request stamp before showing success or failure.</p><p>A progress observer can drive a progress bar, but its registration also needs lifetime cleanup. Do not let multiple screen appearances install duplicate observers. Give accessibility a meaningful status such as Uploading drawing, 50 percent, rather than relying on a changing colored ring alone.</p><p>putData completes with uploaded metadata or an error. A successful callback is permission to proceed to the next stage of this workflow; it is not evidence that the image has been linked to a Firestore note. Keep the UI in uploading or publishing states until the actual intended effect is complete.</p><p>The supplied adapter's download uses data(maxSize:) with a one-mebibyte bound. A larger-download design should stream to a file and downsample for display. Validate the returned media and constrain image decoding too; network size limits alone cannot guarantee acceptable decoded memory use or correct image content.</p>"
+        },
+        {
+          "id": "rules-and-sharing",
+          "title": "Enforce private media rights at Storage",
+          "html": "<p>The real storage.rules permits get and delete for the authenticated path owner. It denies list and denies all updates. Create additionally requires the agreed filename pattern, positive byte count, the inclusive size limit, MIME type image/jpeg, and exactly one ownerID metadata key matching the path. Metadata cannot transfer object ownership.</p><p>Updates are denied because our immutable-path policy creates a new identity for new bytes or changed metadata. Delete has a separate owner condition because request.resource is not an uploaded replacement on deletion. Combining upload validation into every write operation can accidentally reject cleanup or dereference nonexistent new metadata.</p><p>Some download URLs act as bearer capabilities: anyone holding a valid tokenized URL may be able to retrieve that object. Do not assume that publishing such a URL preserves the same account checks as an authenticated SDK get. For private notebook media, prefer authenticated SDK access and persist an object path under reviewed rights.</p><p>If a product later shares media, define which account can grant or revoke access, how old URLs and caches behave, and how the backend verifies membership. A read permission tied to a Firestore membership document is possible, but introduces cross-service rule reads and associated operational costs. It is a separate design, absent from this private lab.</p>"
+        },
+        {
+          "id": "cross-service-recovery",
+          "title": "Recover when upload and publication disagree",
+          "html": "<p>A manifest is a record describing an uploaded object and its relationship to application data. An upload to Storage and a write to Firestore do not share one atomic transaction. Upload may succeed while manifest publication fails, leaving an orphan object. Publishing metadata first may instead leave a dangling reference to a failed upload.</p><p>Use explicit states: prepared, uploading, uploadedUnpublished, complete, cleanupPending and abandoned. Assign a stable media ID before transfer. If publication fails temporarily, retain uploadedUnpublished and retry the manifest step with the same identity. If the user abandons the draft, queue removal of the owned orphan.</p><p>MediaPolicy.recovery returns publishManifest for uploaded = true, published = false, abandoned = false. With abandoned = true it returns removeOrphan. It returns a plan; it does not delete anything or persist a cleanup job. A durable production implementation must save the job and replay it after a process restart.</p><p>Firestore's current notebook rules intentionally do not allow media manifests. The learner must design and fixture a manifest schema before adding publication. The optional server cleanup sources demonstrate account-owned cleanup jobs separately. Their dependencies, emulator runtime and remote deployment remain unexecuted. Avoid describing the notebook as an integrated photo app.</p>"
+        },
+        {
+          "id": "failure-cases-evidence",
+          "title": "Check declarations, recovery and account changes",
+          "html": "<p>The emulator fixtures upload three synthetic bytes marked image/jpeg. This is deliberate: a rules test evaluates declarations and ownership, not image decoding. The resulting object is not a usable photo. Native image preparation and rendering require a separate valid synthetic image and target/device evidence.</p><p>Rules cases include wrong account reads, anonymous reads, wrong MIME, forged or extra metadata, zero bytes, one byte beyond the maximum, exact-maximum success, forbidden overwrite, ownership-transfer metadata update, and cross-account delete. These assertions are meaningful interpreter fixtures, but they were not executed during authoring.</p><p>Host checks cover path traversal, MIME and size policy, foreign ownership and cleanup decisions. Extend them independently with a stale upload completion after account change and an upload-success/manifest-failure schedule. Keep the newer account's status unchanged when old transfer completion arrives.</p><p>Optional later reading: lesson 039 studies image-decoding memory and lesson 098 studies durable replay after this stage. This lesson locally defines byte bounds, MIME, cancellation and cleanup terms. The evidence ledger separates host execution, SDK syntax parsing, actual transfer behavior and persisted recovery; only the first two were performed here.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Does contentType = image/jpeg prove the bytes contain a valid JPEG?",
+          "options": [
+            "No; it is a declared type and pixel decoding is separate",
+            "Yes, automatically",
+            "Only when the filename ends in jpg"
+          ],
+          "answer": 0,
+          "explanation": "Rules inspect metadata. The fixture intentionally uses synthetic non-image bytes to test that authorization boundary."
+        },
+        {
+          "question": "Upload succeeds but manifest publication fails. Which state is useful?",
+          "options": [
+            "Always completed",
+            "Uploaded but unpublished, with retry or cleanup ownership",
+            "Silently forgotten"
+          ],
+          "answer": 1,
+          "explanation": "The two services are not one transaction. Preserve the object identity and a recoverable next step."
+        },
+        {
+          "question": "What should a changed image do under this lab's rules?",
+          "options": [
+            "Overwrite the old path",
+            "Transfer ownerID metadata",
+            "Create a new immutable object identity"
+          ],
+          "answer": 2,
+          "explanation": "Storage updates are denied. A new image gets a new media ID so retries, caches and cleanup refer to known contents."
+        }
+      ],
+      "exercise": {
+        "brief": "Design a recoverable media draft without uploading anything here.",
+        "steps": [
+          "Choose a stable media ID and predict valid/invalid paths.",
+          "Schedule upload success followed by manifest failure, then abandonment.",
+          "Add a host assertion for stale upload publication after signout.",
+          "Specify manifest rules and a valid-image native check as separately pending integration."
+        ],
+        "acceptance": [
+          "The orphan has a stable ID and an explicit cleanup owner.",
+          "One-mebibyte and one-byte-over boundaries are exact.",
+          "A late callback cannot update another account's screen.",
+          "Rules declarations are distinguished from actual image validation and rendering."
+        ],
+        "solution": "<p>Let Alice prepare p1 and store its path as users/alice/media/p1.jpg. An upload success moves the draft to uploadedUnpublished. Manifest failure preserves p1 and the prepared draft; it does not create p2 merely to retry metadata. If Alice abandons the draft, recovery selects removeOrphan and a durable job should own that effect.</p><p>Retain a session/request stamp for the upload and compare it before updating either progress or completion. Clearing the old display and calling cancel reduces work; the publication check handles a completion already queued. Add a controlled old-success and old-error schedule rather than relying on a sleep.</p><p>Use real rules fixtures for the byte boundaries and metadata cases. Design the new manifest schema with owner, media identity, note identity and state, then authorize direct malformed attempts. Since the current rules deny manifest paths, a successful manifest write cannot be claimed from the existing notebook.</p><p>Native verification later uses a valid original synthetic JPEG, confirms preparation, upload, bounded download and rendering, and records account-change behavior. The supplied synthetic rules bytes and the offline recovery helper do not prove any of those native behaviors.</p>"
+      },
+      "references": [
+        {
+          "label": "Storage uploads and task control on Apple platforms",
+          "url": "https://firebase.google.com/docs/storage/ios/upload-files"
+        },
+        {
+          "label": "Storage rules metadata and authorization conditions",
+          "url": "https://firebase.google.com/docs/storage/security/rules-conditions"
+        },
+        {
+          "label": "Storage downloads and memory bounds",
+          "url": "https://firebase.google.com/docs/storage/ios/download-files"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client media payload metadata",
+          "path": "ios-client/Projects/Infra/ZDNetworking/Sources/ZDMultipartFormData/FormData.swift",
+          "line": 63,
+          "why": "FormData.Part keeps bytes, filename and MIME type separate. The Firebase media exercise transfers that responsibility to an isolated Storage adapter; the transport APIs differ."
+        }
+      ],
+      "checklist": [
+        "I can separate selected-photo access from upload intent and backend rights.",
+        "I can bound bytes and reject path traversal.",
+        "I can recover an orphan without pretending Storage and Firestore share a transaction."
+      ],
+      "simple": {
+        "story": "Alice gives a courier a drawing in envelope p1. The courier puts it in Alice's cupboard, but the desk clerk fails to add it to the notebook's contents list. The drawing exists even though visitors cannot find it from the list. Alice can ask the clerk to retry with the same envelope number. If she abandons the drawing, someone must collect that envelope instead of leaving it in the cupboard forever.",
+        "meaning": "Storage upload and application metadata publication are separate steps. A stable media identity lets a retry or cleanup refer to the exact uploaded object.",
+        "example": {
+          "before": "p1 has uploaded = true, published = false and abandoned = false.",
+          "change": "Alice abandons that draft.",
+          "after": "MediaPolicy.recovery returns removeOrphan. This is a cleanup plan, not an executed deletion."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "An abandoned uploaded draft needs owned cleanup.",
+          "items": [
+            {
+              "label": "Upload succeeds",
+              "text": "The object has a stable private path."
+            },
+            {
+              "label": "Publication fails",
+              "text": "The notebook manifest does not yet reference it."
+            },
+            {
+              "label": "Abandon draft",
+              "text": "The policy selects removal of that specific orphan."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "MIME type",
+            "meaning": "A declaration of the payload's intended format."
+          },
+          {
+            "term": "Immutable object",
+            "meaning": "A stored object whose contents are not replaced in this contract."
+          },
+          {
+            "term": "Manifest",
+            "meaning": "A record connecting stored media to application data."
+          },
+          {
+            "term": "Orphan",
+            "meaning": "An uploaded object left without its intended application reference."
+          }
+        ],
+        "remember": "Give media an identity, bound its bytes, and own the step after upload.",
+        "boundary": "The envelope story omits asynchronous transfer, tokenized URLs and decoded memory. The recovery function returns a decision and provides neither durable storage nor Firebase authorization."
+      }
+    },
+    {
+      "id": "134",
+      "title": "Own notifications, consent, crashes, and traces",
+      "summary": "Connect FCM to APNs, bind tokens to the current account, control telemetry collection, and match crash reports to symbols.",
+      "duration": 130,
+      "level": "Senior",
+      "prerequisites": [
+        "130",
+        "132"
+      ],
+      "objectives": [
+        "Explain notification permission, APNs registration and FCM token ownership separately.",
+        "Plan token rotation and account detachment with server reconciliation.",
+        "Apply explicit telemetry consent before initialization and after changes.",
+        "Match dSYMs to a binary and define a bounded performance trace."
+      ],
+      "sections": [
+        {
+          "id": "separate-services",
+          "title": "Name each operational service's job",
+          "html": "<p>A notification is a message delivered to an app or presented to a person. APNs is Apple's push transport. Firebase Cloud Messaging, or FCM, can route messages through APNs for Apple apps. Notification permission, remote registration and account ownership are related but separate states. An FCM token is not proof that the user allowed visible alerts.</p><p>Analytics records selected product events. Crashlytics groups crash and nonfatal diagnostics. Performance Monitoring records timing and other performance signals. Each service has its own purpose and collection settings. Installing them does not mean the product has user consent or that the notebook's local emulator routing covers them.</p><p>The optional ProductionServices file is excluded from the emulator notebook target. It requires FIREBASE_PRODUCTION_SERVICES and additional Firebase products in a separate target. Even initialization of optional services can have remote effects, so this assignment provides source and steps without configuring or executing them.</p><p>Android Firebase experience helps with token refresh, event hygiene and operational ownership. Apple adds APNs entitlements, developer registration and dSYM symbol files. Define those terms locally rather than assuming an earlier release-engineering course. No performance investigation or symbol upload has been performed during authoring.</p>"
+        },
+        {
+          "id": "apns-setup",
+          "title": "Connect FCM to the correct APNs registration",
+          "html": "<p>An entitlement is a capability carried by a signed app. For real push integration, enable Push Notifications for the isolated app's bundle ID and target, and obtain matching signing/provisioning. For background remote-update work, assess the Remote notifications background mode separately. It does not promise unlimited execution or guaranteed silent delivery.</p><p>In Firebase project settings, select the matching Apple app and upload an APNs authentication key with its key ID and team ID through an authorized account. The private key stays outside the application bundle and this repository. Check the development/production environment expected by the built app and the server sender.</p><p>Provide a UIApplicationDelegate through SwiftUI's UIApplicationDelegateAdaptor. Choose one delegate integration strategy. Our bridge demonstrates explicit assignment of Messaging.messaging().apnsToken from didRegisterForRemoteNotificationsWithDeviceToken. If automatic delegate proxying is disabled, the required forwarding becomes your responsibility; do not disable it without implementing the documented callbacks.</p><p>Ask for visible-alert permission after a user action that explains the benefit, then register for remote notifications as appropriate. Handle registration failure and denied permission separately. A successful permission prompt is not evidence of end-to-end message delivery. Record actual device registration, backend token association, APNs route and received payload in a later device check.</p><p>Registration asks Apple for this installation's remote-notification route. Authorization asks whether the system may present the requested kinds of notification to the person. An app delegate receives application callbacks; an entitlement is signed capability data. This section defines those concepts locally. Optional later reading: lesson 050 expands background execution and notification delivery after the Firebase stage.</p>"
+        },
+        {
+          "id": "token-ownership",
+          "title": "A token belongs to an installation and a current account",
+          "html": "<p>A registration token is an address for a particular app installation's messaging service. It can rotate. A single device can also change accounts. Store token association on trusted backend infrastructure with installation identity, current account ownership and last-seen evidence, then reconcile rotations and signout.</p><p>TokenOwnership in the host returns detach and attach effects. Effects are planned operations, not executed network requests. It compares desired binding with current binding and returns nothing for a duplicate update. A change first detaches the previous account/token association and then attaches the new one.</p><pre><code class=\"language-swift\">var ownership = TokenOwnership()\nlet effects = ownership.reconcile(\n    uid: \"alice\", token: \"t1\",\n    installation: \"device1\", optedIn: true\n)\n// attach(device1, alice, t1)\nlet departure = ownership.reconcile(\n    uid: nil, token: \"t1\",\n    installation: \"device1\", optedIn: true\n)\n// detach(device1, alice, t1)</code></pre><p>The server registry must apply these effects idempotently and safely when acknowledgements are ambiguous. Our host updates its local binding immediately, so it does not prove durable server delivery or atomic detachment. Production requires a persisted pending effect or authoritative server reconciliation before declaring the old association gone.</p><p>Never write a registry that lets clients submit arbitrary victim UIDs. Authenticate the registry request and derive ownership from the verified caller. Remove invalid/stale tokens under a documented policy and interpret sender errors according to FCM guidance. Tokens should not appear in analytics properties, crash logs or visible screenshots.</p>"
+        },
+        {
+          "id": "notification-routing",
+          "title": "Treat delivery as a hint to revalidate",
+          "html": "<p>A push payload can tell the app that a note changed, but it should not bypass account checks or become the authoritative note body. Carry a minimal resource identity and fetch the current authorized document when the app can do so. Handle signout, deleted resources and malformed payloads before navigation.</p><p>Foreground presentation and a tap that launches the app have different entry points. A user may tap an old notification after switching accounts. Route through the session gate and refuse content that the current account cannot access. Do not show Alice's cached detail merely because the payload contains Alice's note ID.</p><p>Background delivery is best-effort and subject to operating-system policy. It is not a reliable queue for every data mutation. Reconcile state when the app becomes active, using bounded queries and current ownership. Any required guaranteed workflow needs a durable backend contract rather than assuming every notification reaches a device.</p><p>The sample bridge handles token mapping and registration callbacks but does not implement notification payload routing, server sends, token persistence or foreground presentation. The README lists those integration tasks and acceptance cases. The actual client anchor reads Apple authorization; it illustrates one boundary without implying this client uses FCM.</p>"
+        },
+        {
+          "id": "collection-consent",
+          "title": "Apply collection policy before data escapes",
+          "html": "<p>Consent here is a product decision authorizing a particular collection purpose; it is not a universal platform permission. Decide separate defaults for analytics, crash reporting and performance monitoring. A user agreeing to visible notifications has not automatically agreed to send analytics events or crash attachments.</p><p>For a consent-first remote target, configure initial collection flags in Info.plist before FirebaseApp.configure. Analytics uses FIREBASE_ANALYTICS_COLLECTION_ENABLED; Crashlytics uses FirebaseCrashlyticsCollectionEnabled; Performance uses firebase_performance_collection_enabled. The README links each official settings guide. Runtime setters must also reapply the actual user's stored choices.</p><p>Analytics' runtime collection setting persists and can override the initial plist value. Test revoke-and-relaunch behavior; changing a default in a new build may not reset an existing user's stored runtime setting. Do not wait until after initialization to set false and claim that no collection could occur before consent.</p><p>Define an allowlist of event names and properties. A note title, email, photo path, token or arbitrary backend error can contain sensitive data. Prefer bounded event outcomes such as save_conflict rather than a document's text. Review nonfatal diagnostics too; a stack trace and custom key are data exports, not harmless console print statements.</p><p>Crashlytics documents that an opt-out override applies on the next app launch and persists. Disabled reporting can still retain crash information locally; enabling it later can send retained reports. Decide how stored reports are handled before re-enabling, and test that lifecycle explicitly. A collection setter is not proof that already retained diagnostics were erased.</p>"
+        },
+        {
+          "id": "crash-symbols",
+          "title": "Match a crash report to its exact binary",
+          "html": "<p>A dSYM is a bundle of debug symbols mapping machine addresses back to meaningful function and source information. Symbolication is the process of using those symbols to interpret a crash. A Crashlytics dashboard with missing symbols does not prove that the crash is impossible to investigate; it identifies a missing artifact relationship.</p><p>Retain the archived app binary and matching dSYMs under the release's exact build identity. Compare UUIDs using dwarfdump --uuid on the binary and symbol files. Same version label or branch name is not enough; rebuilding can produce different UUIDs. Do not substitute symbols from a nearby Debug build.</p><p>Firebase's official guide documents the Crashlytics run script and Xcode input files. The README lists the symbol bundle, DWARF executable, symbol Info.plist, app GoogleService-Info.plist and built executable inputs, plus the conditional debug-dylib input. An eventual upload requires authorized remote integration and is not run here.</p><p>For a later synthetic test crash, use a scratch target and follow the documented debugger-detachment and relaunch process. Record app build, symbol UUID and report arrival separately. Neither a local assertion nor a successful run-script configuration proves a received, readable remote crash report.</p>"
+        },
+        {
+          "id": "trace-boundary",
+          "title": "Measure one operation and stop on every exit",
+          "html": "<p>A trace measures a named interval. Define its start and end before adding instrumentation. For notebook_save, start immediately before the selected repository operation and stop when that operation returns success, conflict, cancellation or another error. State whether this interval includes validation, waiting for network and UI rendering.</p><p>The optional traceSave helper uses defer to stop the trace on normal return and thrown error. defer schedules cleanup at scope exit. The helper is generic so it can return the operation's original result. It does not swallow failures or change repository behavior merely to produce a successful metric.</p><p>Use bounded, low-cardinality metrics such as retry count and cache hit count. Do not place note IDs or user text into trace names or attributes. A collected interval describes the chosen boundary; it cannot prove first usable frame or whole-app responsiveness when those events were outside the trace.</p><p>Optional later reading: lessons 036 and 026 deepen performance evidence and release artifacts after this stage. Here, define trace, dSYM, UUID and collection flags locally. Host token-policy checks and adapter syntax parsing passed; APNs, consent persistence, report symbolication, uploaded traces and device routing remain unexecuted integration checks.</p><p>A diagnostic is information used to explain a failure or behavior. A metric is a numerical observation with a defined unit and population. An error count and a duration answer different questions. Keep an operation's observed outcome with its bounded timing and avoid turning synthetic values into performance claims. Optional later reading: lesson 024 expands reliability and observability after this stage.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Does an FCM registration token establish visible-alert permission?",
+          "options": [
+            "Yes",
+            "No; token registration and Apple alert authorization are separate",
+            "Only for a signed-in account"
+          ],
+          "answer": 1,
+          "explanation": "Registration supplies a transport address. UNUserNotificationCenter authorization and product notification intent remain separate."
+        },
+        {
+          "question": "Which dSYM should symbolicate a release crash?",
+          "options": [
+            "The latest Debug dSYM",
+            "Any file with the same version label",
+            "The dSYM whose UUID matches the exact crashed binary"
+          ],
+          "answer": 2,
+          "explanation": "Symbol addresses must correspond to the actual binary. Build labels alone cannot establish that match."
+        },
+        {
+          "question": "Why use defer around a custom trace?",
+          "options": [
+            "To stop the interval on success and thrown exits",
+            "To guarantee remote upload",
+            "To turn errors into success"
+          ],
+          "answer": 0,
+          "explanation": "Scope cleanup gives a balanced trace lifetime. It proves neither collection consent nor remote report arrival."
+        }
+      ],
+      "exercise": {
+        "brief": "Write an operational integration checklist and extend token reconciliation with a failed-server-acknowledgement case.",
+        "steps": [
+          "Describe Alice t1 to Bob t2 on one installation, followed by signout.",
+          "State which effects must be durably retried and which account derives from server authentication.",
+          "List initial plist flags and a revoke/relaunch consent case.",
+          "Define notebook_save boundaries and a binary/dSYM UUID check without uploading."
+        ],
+        "acceptance": [
+          "The old token association has an owner and recoverable detachment.",
+          "Permission, token, login and consent are separate facts.",
+          "The symbol plan matches UUIDs rather than version labels.",
+          "No APNs send, telemetry upload or remote crash test is claimed."
+        ],
+        "solution": "<p>The planned transition is detach(device1, alice, t1), attach(device1, bob, t2), then detach(device1, bob, t2) on signout. If the first detachment acknowledgement is lost, a durable registry command must be retried with the same identity or reconciled authoritatively. Do not infer that the old server binding vanished from TokenOwnership.binding becoming Bob locally.</p><p>Initialize collection as disabled in the reviewed target configuration, then reapply each stored purpose choice. Test consent true, revocation false, process restart, and persisted false. Notification authorization is another state and does not select the analytics setting. Prefer minimal outcome events and keep tokens, content and email out of diagnostics.</p><p>For the trace, define repository-call-start to repository-return as the measured boundary. Stop on conflict and error too. For symbol evidence, retain the exact binary and dSYM and record matching dwarfdump UUIDs. Remote upload and dashboard readability remain separate pending observations.</p><p>The source provides mechanisms for these integrations but no executed device/provider evidence. Your independent failed-acknowledgement policy and its tests are required learner work; the supplied host baseline establishes only the current deterministic effect plans.</p>"
+      },
+      "references": [
+        {
+          "label": "FCM Apple setup, APNs and delegate forwarding",
+          "url": "https://firebase.google.com/docs/cloud-messaging/ios/get-started"
+        },
+        {
+          "label": "FCM registration ownership and freshness",
+          "url": "https://firebase.google.com/docs/cloud-messaging/manage-tokens"
+        },
+        {
+          "label": "Analytics initial and persisted collection settings",
+          "url": "https://firebase.google.com/docs/analytics/ios/configure-data-collection"
+        },
+        {
+          "label": "Crashlytics dSYMs and Xcode input files",
+          "url": "https://firebase.google.com/docs/crashlytics/ios/get-deobfuscated-reports"
+        },
+        {
+          "label": "Firebase custom performance trace contracts",
+          "url": "https://firebase.google.com/docs/perf-mon/custom-code-traces"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client notification authorization",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Utility/Permissions/PushNotificationPrompt+StatusChecker.swift",
+          "line": 19,
+          "why": "The client reads Apple notification authorization independently from account state. Compare that platform permission with FCM token ownership; the client source does not establish FCM integration."
+        }
+      ],
+      "checklist": [
+        "I can keep APNs, FCM and account token ownership separate.",
+        "I can explain initial and persisted telemetry consent.",
+        "I can match symbols to a binary and define an honest trace interval."
+      ],
+      "simple": {
+        "story": "A library sends Alice a card when her reserved book arrives. The delivery address belongs to the phone currently at the desk, but the reservation belongs to Alice. When Bob uses that phone, the library must update the reservation association rather than send Alice's cards to Bob. The library also asks separately whether visitors agree to anonymous usage counts. Agreeing to receive a book card does not answer that second question.",
+        "meaning": "Messaging tokens identify an installation route; the server must reconcile current account ownership. Notification permission and each telemetry purpose have separate decisions.",
+        "example": {
+          "before": "device1 is bound to Alice with token t1.",
+          "change": "Reconcile Bob with token t2 on device1.",
+          "after": "The host returns detach Alice/t1, then attach Bob/t2. No server request is executed."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "A changed account/token requires removal of the old association.",
+          "items": [
+            {
+              "label": "Old binding",
+              "text": "device1 currently points to Alice and t1."
+            },
+            {
+              "label": "Detach",
+              "text": "The policy plans removal of the old association."
+            },
+            {
+              "label": "Attach",
+              "text": "The policy plans Bob and t2 as the desired binding."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "APNs",
+            "meaning": "Apple's service for delivering remote notifications."
+          },
+          {
+            "term": "Registration token",
+            "meaning": "A messaging address associated with an app installation."
+          },
+          {
+            "term": "dSYM",
+            "meaning": "Debug-symbol files that help interpret addresses from the matching app binary."
+          },
+          {
+            "term": "Trace",
+            "meaning": "A measured interval with an explicitly chosen beginning and end."
+          },
+          {
+            "term": "Consent",
+            "meaning": "A product choice authorizing a particular collection purpose."
+          }
+        ],
+        "remember": "Transport addresses, account rights and collection choices are separate facts.",
+        "boundary": "The library story does not guarantee delivery or revocation timing. The host returns planned token effects, not durable registry updates, and synthetic policies are not uploaded telemetry."
+      }
+    },
+    {
+      "id": "135",
+      "title": "Use remote controls, trusted functions, and presence",
+      "summary": "Apply safe Remote Config defaults, distinguish App Check from authorization, design idempotent callable work, and choose Realtime Database for presence.",
+      "duration": 130,
+      "level": "Senior",
+      "prerequisites": [
+        "129",
+        "130",
+        "131",
+        "133",
+        "134",
+        "016"
+      ],
+      "objectives": [
+        "Validate Remote Config values before activating product behavior.",
+        "Explain the different questions answered by Auth, App Check, rules and trusted code.",
+        "Design a recoverable callable cleanup command with stable identity.",
+        "Use connection-aware presence without claiming it is proof of attention."
+      ],
+      "sections": [
+        {
+          "id": "four-controls",
+          "title": "Give every control one clear responsibility",
+          "html": "<p>Remote Config distributes product parameters. App Check supplies evidence about the calling app environment. Authentication supplies user identity. A callable Function runs trusted server code. They are complementary tools, not four ways to grant the same permission. Decide which question each mechanism is allowed to answer.</p><p>Use the notebook as the concrete example. Remote Config can propose notes_page_size. App Check can help protect the backend from unauthorized client environments. Auth identifies Alice. Security rules let Alice edit her notes. A trusted Function can accept Alice's request to clean up one owned media object.</p><p>A remote parameter must not contain a secret or grant administrative rights. A downloaded flag is visible to a client and can be modified by a modified client. If a feature needs a paid entitlement or restricted resource, the server still verifies that entitlement on the protected operation.</p><p>Android engineers may know Remote Config and Play Integrity. On Apple platforms the App Attest/DeviceCheck provider choices and integration differ. The product's desired trust boundary can be analogous while the evidence sources, deployment requirements and failure behavior are platform-specific.</p>"
+        },
+        {
+          "id": "safe-config",
+          "title": "Keep a usable default and validate the proposal",
+          "html": "<p>A default is a safe value compiled into the app. A fetched value is a downloaded candidate. Activation makes fetched configuration visible through the SDK. Keep those states separate when a parameter could disrupt an ongoing editor, query or animation. The right activation moment is a product decision.</p><p>The optional source sets notes_page_size to a local default of 10, calls fetchAndActivate, then passes the resulting number through ConfigPolicy.pageSize. Values from 1 through 25 are accepted. Missing, zero, negative or oversized inputs select 10. The rules still enforce their own upper limit of 25.</p><pre><code class=\"language-swift\">let absent = ConfigPolicy.pageSize(remote: nil) // 10\nlet small = ConfigPolicy.pageSize(remote: 5)    // 5\nlet huge = ConfigPolicy.pageSize(remote: 300)  // 10\n// Apply the chosen size to a newly owned query.\n// Do not reuse a cursor from a differently sized or filtered query.</code></pre><p>Fetching can fail or be throttled. Preserve the default or last accepted configuration and explain the selected value in a non-sensitive diagnostic. Avoid zero minimum fetch intervals in a production polling loop. Real-time config updates also need a retained listener and activation policy; this lab does not implement that listener.</p><p>Use a staged rollout with an owner, a bounded cohort and recovery conditions. A kill switch may disable optional UI work, but it cannot retroactively undo a committed transaction or replace backend enforcement. Keep a local fallback for a malformed payload and a reviewed server rollback procedure for a bad published value.</p>"
+        },
+        {
+          "id": "app-check",
+          "title": "Attestation complements identity and rules",
+          "html": "<p>Attestation is evidence about the app or device environment under a provider's contract. App Check can attach such evidence to supported backend requests. A valid App Check token does not identify Alice and does not grant rights to Bob's document. A valid Auth token likewise does not prove an unmodified client environment.</p><p>The real optional source implements AppCheckProviderFactory returning AppAttestProvider. It installs that factory before FirebaseApp.configure. In a later remote target, register the app with the appropriate provider in Firebase, configure Apple capabilities and the provider's environment as documented, then observe request metrics before enabling enforcement.</p><p>Debug providers support development where normal attestation is unavailable. Keep debug tokens outside commits and release targets, and revoke leaked test tokens. A simulator debug-provider success cannot prove physical-device App Attest behavior. Do not relax rules because an attestation check appears to work.</p><p>Define failure behavior for unavailable attestation, temporary outages and unsupported devices. Start with monitoring, verify expected client coverage, then enforce according to the reviewed product policy. The notebook's Auth/Firestore/Storage emulator target excludes App Check, so its local synthetic account flow is not an attestation test.</p>"
+        },
+        {
+          "id": "callable-contract",
+          "title": "A callable is an authenticated command boundary",
+          "html": "<p>A callable Function is a server endpoint with Firebase's callable request/response protocol. The client SDK can carry supported authentication and App Check evidence. The server must still validate request.auth, request data and product rights. An arbitrary HTTP function is not interchangeable with a callable without matching the protocol.</p><p>The supplied Swift requestCleanup sends mediaID and commandID to abandonMedia in us-central1. The server derives UID from request.auth rather than trusting an owner supplied by the client. It validates restricted ASCII IDs and accepts a command only under that caller's namespace.</p><p>A command ID distinguishes retries of one intended operation. Store the command payload with that ID. Repeating the same ID and payload returns the existing acceptance state; repeating the ID with a different mediaID is a failed precondition. This prevents a retry identity from silently changing meaning.</p><p>Admin SDK operations bypass client security rules and instead depend on trusted server authority. Therefore the Function must perform its own ownership and input checks. App Check enforcement reduces one class of abuse but does not repair a Function that lets Alice choose Bob's UID or an arbitrary object path.</p>"
+        },
+        {
+          "id": "cleanup-job",
+          "title": "Separate accepted work from completed work",
+          "html": "<p>The real Functions source writes a cleanup command transactionally, then returns accepted = true. Accepted means the durable job exists; it does not mean deletion is complete. A separate onDocumentCreated worker deletes the derived owned Storage path and marks the job completed.</p><p>Deletion can succeed while marking the job completed fails. A retried worker treats a missing object as an acceptable already-deleted result and updates the same job. This is an idempotent external effect: executing the same cleanup identity again does not create another object or transfer rights.</p><p>Client rules deny all cleanupCommands paths; trusted Functions own them. The supplied source is a private-media cleanup example, not a deployed account-deletion workflow or a media-manifest engine. Published references require a coordinated invalidation policy. Cross-service cleanup still needs observability, bounded retries and support ownership.</p><p>Before a separately authorized local Functions test, provision compatible Functions/Admin SDK dependencies and a Functions emulator entry, point Admin Firestore and Storage to matching local services, and configure the demo bucket. The README specifies the gates and remaining integration. No installation, Function invocation or deployment occurred here.</p>"
+        },
+        {
+          "id": "presence-choice",
+          "title": "Choose Realtime Database for connection-aware presence",
+          "html": "<p>Presence means an observed connection state, not proof that a person is reading a screen. Realtime Database provides .info/connected and server-registered onDisconnect actions. These are useful for a small connection-aware presence feature. Firestore listeners alone do not offer the same disconnect-registration mechanism.</p><p>Use a private presence/{uid}/{connectionID} entry for each installation or connection lifetime. Register onDisconnectRemoveValue and wait for registration success before writing online state with ServerValue.timestamp. If the network disappears, the server can remove that entry without a final client message.</p><p>One user's two connections need separate entries. A phone disconnecting should not mark an active tablet offline. Aggregate presence according to the product contract and account for the delay in detecting disconnects. Avoid promising immediate offline state or assuming a foreground app is proof of current human attention.</p><p>The optional PresenceOwner source observes connection state, registers removal, and advertises online. Its rules fixture permits only the owner account and validates online plus a server-time value. It is separate from the notebook's Firestore model. No Realtime Database emulator is included in the core emulator command.</p>"
+        },
+        {
+          "id": "presence-recovery",
+          "title": "Own reconnect, signout and disconnect registrations",
+          "html": "<p>On reconnect, a connection owner must re-register its onDisconnect behavior before publishing online again. A previous connection's cleanup registration does not guarantee every future connection has one. Keep handles for .info/connected and remove the observer during teardown.</p><p>A signout can race with disconnect registration and its completion. The supplied adapter checks a local generation before advertising online. Its composition owner must call stop before replacing Auth credentials and verify removal acknowledgement and the old disconnect registration's lifetime under those credentials. This native lifecycle case remains an explicit independent exercise.</p><p>Realtime Database rules are a different language and data model from Firestore rules. Do not paste firestore.rules into database.rules.json. The fixture validates the private presence shape, denies extra children, and allows owner deletion; validation does not run on a deleted node. Plan direct unauthorized writes and stale-time cases for a separately gated rules run.</p><p>Optional later reading: lessons 091 and 108 deepen controlled clocks and operational adoption after this stage. Locally, this lesson defines attestation, activation, callable, command identity and presence. The author checked Swift/Node syntax and host defaults; remote configuration, App Check, Functions worker behavior and presence lifecycle remain unexecuted.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "A valid App Check token arrives. What does it not establish?",
+          "options": [
+            "The caller's right to edit Alice's note",
+            "Evidence from the configured attestation provider",
+            "A supported request protection signal"
+          ],
+          "answer": 0,
+          "explanation": "User identity and product authorization remain separate; attestation cannot replace them."
+        },
+        {
+          "question": "Why store a command ID with its mediaID payload?",
+          "options": [
+            "To use the ID as a secret",
+            "To distinguish same-operation retries from conflicting reuse",
+            "To bypass server authentication"
+          ],
+          "answer": 1,
+          "explanation": "Idempotency depends on stable intent. Reusing one identity with different payload must fail rather than change the operation."
+        },
+        {
+          "question": "When should presence online state be advertised?",
+          "options": [
+            "Before asking for disconnect cleanup",
+            "Whenever a local Boolean is true",
+            "After server-side disconnect cleanup registration succeeds"
+          ],
+          "answer": 2,
+          "explanation": "Register cleanup first to avoid advertising online and then disconnecting before cleanup exists."
+        }
+      ],
+      "exercise": {
+        "brief": "Add a controlled presence lifetime policy and review a cleanup command's retry contract without invoking services.",
+        "steps": [
+          "Model a connection generation captured before disconnect registration.",
+          "End the account lifetime, then deliver registration success and show that it cannot advertise online.",
+          "Describe command c1 for media p1 retried with p1 and then incorrectly reused for p2.",
+          "Plan direct RTDB rules checks and an App Check monitoring-to-enforcement rollout."
+        ],
+        "acceptance": [
+          "A late registration completion after signout produces no online write.",
+          "Same command/payload reuse is idempotent, while different payload reuse fails.",
+          "Default config remains within rule limits when remote input is invalid.",
+          "All attestation, Function and RTDB runtime evidence is marked pending."
+        ],
+        "solution": "<p>Give the presence owner a generation that increments on start, stop and account replacement. Registration captures that generation and the account stamp. On completion, compare both before advertising online. Stopping removes the connection observer and arranges cleanup of the old connection under the chosen credential policy. Cancelling the observer alone cannot invalidate a completion already queued.</p><p>For cleanup, c1 with p1 writes one pending job under Alice's namespace. Retrying c1 with p1 reuses the job. Reusing c1 with p2 is a failed precondition. A worker that deletes p1 and loses its final acknowledgement can safely repeat the same deletion, treating not-found as success, then mark the job completed.</p><p>Remote page size 300 falls back to 10, which stays below the list-rule maximum of 25. This is client validation, not authorization. App Check metrics, debug/physical device coverage, provider outages and supported-client adoption determine a staged enforcement decision; do not enable enforcement from a syntax check.</p><p>The RTDB plan includes owner create/delete, anonymous and cross-account denial, extra-child rejection and reconnect cleanup. The supplied database rules have not run in an interpreter. Your generation helper and eventual native/RTDB evidence are independent work rather than a completed production presence implementation.</p>"
+      },
+      "references": [
+        {
+          "label": "Remote Config defaults, fetching and activation on iOS",
+          "url": "https://firebase.google.com/docs/remote-config/ios/get-started"
+        },
+        {
+          "label": "App Check App Attest setup and provider factory",
+          "url": "https://firebase.google.com/docs/app-check/ios/app-attest-provider"
+        },
+        {
+          "label": "Callable Functions protocol and authentication context",
+          "url": "https://firebase.google.com/docs/functions/callable"
+        },
+        {
+          "label": "Realtime Database connection and disconnect behavior",
+          "url": "https://firebase.google.com/docs/database/ios/offline-capabilities"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client experiment boundary",
+          "path": "ios-client/Projects/Features/ZDOptimizely/Sources/ZDOptimizely/ABTestingClient.swift",
+          "line": 22,
+          "why": "ABTestingClient exposes asynchronous activation and typed defaults. Compare default/activation ownership with Remote Config, without asserting a one-to-one SDK replacement."
+        }
+      ],
+      "checklist": [
+        "I can validate remote configuration without using it as authorization.",
+        "I can distinguish attestation from user identity and product rights.",
+        "I can explain idempotent accepted work and connection-aware presence limits."
+      ],
+      "simple": {
+        "story": "A caretaker sends a note asking a workshop to display five drawings instead of ten. The workshop checks that five fits its shelf before using it. A visitor then asks to remove envelope p1 and supplies request number c1. The caretaker writes c1 beside p1 so a repeated request means the same job. A separate connection bell says whether a visitor's desk is connected; it does not prove the visitor is watching or authorize another person's shelf.",
+        "meaning": "Remote parameters are validated proposals. Callable work needs authenticated intent and stable command identity. Presence is a connection signal with separate authorization.",
+        "example": {
+          "before": "The local default page size is 10 and allowed remote sizes are 1 through 25.",
+          "change": "The remote candidate is 300.",
+          "after": "ConfigPolicy returns 10; the candidate cannot expand the query beyond the locally allowed range."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "A remote candidate is validated before affecting a new query.",
+          "items": [
+            {
+              "label": "Candidate 300",
+              "text": "Remote configuration proposes a number."
+            },
+            {
+              "label": "Range check",
+              "text": "The allowed range is 1 through 25."
+            },
+            {
+              "label": "Default 10",
+              "text": "Invalid input selects the usable local value."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Activation",
+            "meaning": "Making fetched configuration available as current SDK values."
+          },
+          {
+            "term": "Attestation",
+            "meaning": "Evidence about an app or device environment under a provider's contract."
+          },
+          {
+            "term": "Callable",
+            "meaning": "A Firebase-protocol server command endpoint."
+          },
+          {
+            "term": "Idempotency",
+            "meaning": "Repeating the same intended operation does not repeat or change its effect."
+          },
+          {
+            "term": "Presence",
+            "meaning": "An observed connection state, not proof of human attention."
+          }
+        ],
+        "remember": "Validate remote proposals, authorize server commands, and treat presence as connection evidence.",
+        "boundary": "The caretaker story omits token validation, retries, disconnect delays and server administration. Host defaults prove none of App Check, callable execution or RTDB rules behavior."
+      }
+    },
+    {
+      "id": "136",
+      "title": "Test authorization and hand off a recoverable Firebase feature",
+      "summary": "Run the correct verification gates, review failures and cost exposure, assess an SDK upgrade, and produce a defensible integration handoff.",
+      "duration": 135,
+      "level": "Staff",
+      "prerequisites": [
+        "129",
+        "130",
+        "131",
+        "132",
+        "133",
+        "134",
+        "135",
+        "120"
+      ],
+      "objectives": [
+        "Distinguish host policy checks from actual Firebase rules execution.",
+        "Design adversarial authorization fixtures and a recovery matrix.",
+        "Estimate a bounded synthetic workload without inventing Firebase prices.",
+        "Review upgrades with sourced compatibility and provider evidence.",
+        "Name operational owners, rollout criteria and pending checks."
+      ],
+      "sections": [
+        {
+          "id": "evidence-ladder",
+          "title": "State exactly what each check establishes",
+          "html": "<p>Verification is evidence that a particular behavior met a stated expectation under a stated environment. The test's name should reveal that environment. An offline policy check, a rules interpreter fixture, an SDK build, a simulator interaction and a remote provider observation are different checks with different conclusions.</p><p>The author compiled the two Host files in Swift 6 mode and executed 30 policy checks. The Swift adapter sources passed syntax-only parsing; Node fixtures and Functions source passed node --check. These results support the declared host behaviors and parseable syntax. They do not validate Firebase signatures, rules semantics or actual service behavior.</p><p>The SDK sources require a distinct iOS target and compile condition. The rules fixtures require provisioned Node modules and local Auth/Firestore/Storage emulator binaries. The optional operational services require another target/configuration and remote integration. A passing local build still would not prove APNs delivery or physical-device attestation.</p><p>Use a table with expected behavior, command, toolchain, observed result and remaining limit. Mark a pending row honestly rather than calling it pass because source exists. A future reviewer must be able to tell whether the rules engine ever evaluated the authorization expressions.</p>"
+        },
+        {
+          "id": "rule-fixtures",
+          "title": "Try forbidden requests directly",
+          "html": "<p>An adversarial fixture sends an input that a friendly UI would normally reject. That is essential for security because a modified client can bypass local validation. The supplied rules fixtures import rules-unit-testing and Firebase's client APIs, create named authenticated contexts, and issue requests against the emulator.</p><p>initializeTestEnvironment loads the actual Firestore and Storage rule text. authenticatedContext supplies mocked token identity, and unauthenticatedContext supplies no identity. These contexts do not authenticate real accounts, but their requests execute the configured rules interpreter. assertFails and assertSucceeds compare the service result with the fixture expectation.</p><p>Firestore cases cover owner CRUD, anonymous and Bob reads, forged owner, extra keys, wrong types, invalid sizes, client timestamp, skipped or stale revisions, ownership transfer, unknown paths and list bounds. Storage cases cover owner get/delete, cross-account and anonymous access, MIME, metadata, zero/excess/exact-boundary bytes and forbidden overwrite.</p><p>beforeEach clears Firestore and Storage state; after cleans up the environment. Isolation prevents a prior fixture's object from turning a create into an update unexpectedly. Keep all submitted data synthetic. The fixture's three bytes marked JPEG intentionally test declarations rather than valid image rendering.</p>"
+        },
+        {
+          "id": "gated-execution",
+          "title": "Provision first, then execute the local suite",
+          "html": "<p>Provisioning means arranging the required tools and dependencies before a test starts. Under this assignment, dependencies and missing emulator binaries must not be downloaded. A Firebase CLI executable existing on disk is insufficient: startup may fetch an emulator jar, and Node imports may fail if their packages are missing.</p><p>Once a separately authorized environment has compatible binaries and modules already available, change to FirebaseProject/Emulator and run the exact gated README command. It selects demo-firebase-course, auth/firestore/storage only, and the local config. Environment assertions require the explicit gate and expected loopback endpoints.</p><p>The Firebase CLI sets relevant emulator endpoints for the command it executes. The fixture validates those values before initializing the suite. A wrong host or missing gate should fail visibly rather than falling through to a real backend. There is no production fallback, login command or deploy command in the lab workflow.</p><p>Official emulator documentation notes differences from production transactions, index enforcement and service limits. Java runtime requirements are also evolving; the evidence ledger cites the documented Java 21 migration notice rather than inventing a installed version. Record the exact provisioned CLI, Java, Node and package releases when actually running the suite.</p>"
+        },
+        {
+          "id": "recovery-matrix",
+          "title": "Name every partial success and its next owner",
+          "html": "<p>A recovery matrix maps an interrupted state to a safe next action. For an ambiguous create, preserve the draft ID and read that identity before retrying. For stale revision, preserve the edit and compare with the newer document. For listener failure, release or replace registration under a bounded retry policy.</p><p>For media uploaded without publication, retry the manifest or remove the abandoned orphan. For a token detachment with lost acknowledgement, retain a durable idempotent registry effect or reconcile the authoritative association. For account deletion, keep a trusted cleanup job with progress rather than treating local screen clearing as completion.</p><p>Include corrupted backend fields, cancelled tasks with late success, a late error after a newer success, same-UID relogin and unexpected permission denial. Account-owned requests carry a stamp. Before publishing after await or a callback hop, recheck ownership even if cancellation was requested.</p><p>A process restart is a different failure boundary from an in-memory schedule. Our host models hold state in memory; they do not prove atomic disk persistence or replay. A durable implementation must persist command intent, recover without duplicating effects and test restart between each external effect and its acknowledgement.</p>"
+        },
+        {
+          "id": "quotas-and-costs",
+          "title": "Bound workload before estimating money",
+          "html": "<p>A quota is a service limit on a resource or operation. Cost is money charged under a product's pricing model. An emulator passing does not establish either. Check current official usage and pricing documents for the selected Firebase products, edition, region and plan before a real rollout.</p><p>Bound notebook queries, listener count, upload bytes, retry rate and cleanup batch size. Keep a small number of listeners under named owners and remove them when no longer useful. A leaked listener or a broad reconnect can produce work long after the user leaves the screen.</p><p>Use synthetic arithmetic to reason about workload without claiming a bill. If 100 sessions each read three ten-note pages, the simplified estimate is 100 × 3 × 10 = 3000 document appearances. It omits reconnects, empty queries, index-entry billing, rule-dependent reads, writes, storage and egress; it is not an exact Firestore billing calculator.</p><pre><code class=\"language-swift\">let reads = ConfigPolicy.readEstimate(\n    sessions: 100, pageSize: 10, pages: 3\n)\n// Optional(3000): a synthetic workload estimate.\n// Invalid sizes or arithmetic overflow return nil.</code></pre><p>Set budget alerts, usage monitoring and operational thresholds in an eventual remote project. Firebase documents that a budget alert is not a hard spending cap. Name who responds, what optional workload can be disabled, and how critical user operations remain recoverable. Do not fabricate currency values or promise that a rules limit alone prevents every abuse cost.</p>"
+        },
+        {
+          "id": "upgrade-review",
+          "title": "Treat an SDK upgrade as a compatibility change",
+          "html": "<p>An SDK upgrade changes a dependency graph and sometimes platform requirements, APIs, initialization or runtime behavior. Read official release notes for both the current and candidate releases. Record the compiler, Swift package tools requirement, Xcode support, deployment targets and transitive dependencies. A latest label is not a test plan.</p><p>The evidence ledger cites the inspected Firebase 13.0.0 compatibility entry and the observed release-note page, while making no downloaded-version claim. Recheck the exact release chosen later. GoogleSignIn compatibility, App Check provider support and Functions/Admin runtime requirements are separate decisions; a Firebase package resolving does not prove them.</p><p>Run host contracts first, then rule fixtures with the same intended policies, then typecheck/build the isolated iOS target. Exercise Auth restoration and signout, Firestore transaction conflict and metadata, Storage cancellation/bounds, optional-service consent, and provider callbacks. Keep baseline and candidate evidence for comparison.</p><p>A binary rollback cannot necessarily undo a server schema/rules change or erase queued writes from newer clients. Use compatible readers and rules during adoption, gate new writes, and retain an old-client acceptance matrix. Optional later reading: lessons 044, 105 and 106 deepen graph and release-artifact review after this stage.</p>"
+        },
+        {
+          "id": "handoff-and-ownership",
+          "title": "Leave an auditable handoff with unresolved rows",
+          "html": "<p>A handoff names the next owner of work, not merely a collection of source files. Assign owners for rules review, identity/provider configuration, device delivery, cleanup jobs, consent, symbols, quotas and incident response. Write the rollback trigger and the safe reduced-function behavior for each external dependency.</p><p>Use acceptance evidence that someone else can reproduce: exact host command and output count, fixture command and rules digest when run, target/source list and resolved SDK graph, device/provider observations, and retained binary/symbol identifiers. Never include secret keys or raw tokens in that report.</p><p>List deliberate boundaries: no account authentication, console configuration, SDK download, emulator execution, target typecheck, simulator interaction, real image rendering, APNs send, telemetry upload, App Check validation, Function invocation or RTDB runtime occurred during authoring. These are pending integration tasks rather than failures hidden behind a host pass.</p><p>The original notebook teaches the full assigned Firebase sequence through concrete mechanisms and operational plans. It is not a claim to reproduce paid course material or to exhaust every Firebase product. Keep the learner's independent modifications and evidence pending; supplying a worked answer does not complete their practice.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which check actually executes the Firebase rule expressions?",
+          "options": [
+            "Swift NotePolicy.authorize",
+            "The provisioned emulator suite using rules-unit-testing",
+            "Reading firestore.rules in an editor"
+          ],
+          "answer": 1,
+          "explanation": "The emulator interpreter evaluates rules for submitted requests. The host policy is a distinct implementation."
+        },
+        {
+          "question": "What does 3000 in the workload example mean?",
+          "options": [
+            "A precise currency bill",
+            "A production quota",
+            "A simplified synthetic count before pricing and other billable work"
+          ],
+          "answer": 2,
+          "explanation": "The estimate omits multiple pricing and runtime factors and is deliberately not a billing measurement."
+        },
+        {
+          "question": "Does rolling back only the app binary reverse a server rule/schema change?",
+          "options": [
+            "No; backend compatibility and queued writes need their own recovery plan",
+            "Yes, always",
+            "Only if the version label is unchanged"
+          ],
+          "answer": 0,
+          "explanation": "Client and backend releases are independent. Old-client compatibility and data effects must be planned explicitly."
+        }
+      ],
+      "exercise": {
+        "brief": "Produce a reviewable Firebase handoff and change one adversarial host case independently.",
+        "steps": [
+          "Run the supplied host baseline and record the actual toolchain/output.",
+          "Add either a stale failure-publication or failed token-detachment acknowledgement policy with a controlled schedule.",
+          "Create an evidence table for rules, native SDK, simulator, provider and optional services.",
+          "Write one upgrade proposal with current/candidate source evidence, old-client compatibility and rollback owners."
+        ],
+        "acceptance": [
+          "The new behavior has an executed host result and a predicted state.",
+          "Host authorization is never labeled as Firebase rules execution.",
+          "The upgrade has specific compatibility sources rather than invented version support.",
+          "Pending service/runtime rows name concrete next steps and owners.",
+          "No deploy, login or dependency download is performed."
+        ],
+        "solution": "<p>Record the host command from the README with Apple Swift 6.4.2 and its 30 passing baseline checks. Your added controlled case gets a separate result and description, so it is not mixed into the baseline count. For stale failure, deliver old request A's error after current request B succeeds and verify B's visible state survives.</p><p>Use pending rows for rule interpreter, SDK typecheck/build, simulator interaction, real providers and optional operational services. Each row names its required provisioned runtime or target and an acceptance behavior. For example, rules execution requires the gated Node command and must deny Bob's direct request to Alice's path, not merely hide a UI button.</p><p>An upgrade proposal cites current and candidate release requirements, selected product graph, provider compatibility and retained evidence. It plans compatible backend readers/rules before new writes, a bounded adoption cohort and an owner who can disable optional workload. Rolling back the binary is one action in a larger recovery plan.</p><p>This worked handoff explains the evidence shape. It does not manufacture a completed rules run, approved upgrade or learner submission. Retain your independently changed policy, command, observation and limitations for review.</p>"
+      },
+      "references": [
+        {
+          "label": "Firebase rules unit testing and test contexts",
+          "url": "https://firebase.google.com/docs/rules/unit-tests"
+        },
+        {
+          "label": "Firestore emulator differences and requirements",
+          "url": "https://firebase.google.com/docs/emulator-suite/connect_firestore"
+        },
+        {
+          "label": "Firestore billing dimensions",
+          "url": "https://firebase.google.com/docs/firestore/pricing"
+        },
+        {
+          "label": "Firebase budget alerts and cost controls",
+          "url": "https://firebase.google.com/docs/projects/billing/avoid-surprise-bills"
+        },
+        {
+          "label": "Firebase Apple SDK upgrade evidence",
+          "url": "https://firebase.google.com/support/release-notes/ios"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Active dependency manifest",
+          "path": "ios-client/Tuist/Package.swift",
+          "line": 52,
+          "why": "The inspected manifest declares the client's current dependencies without Firebase. The isolated Firebase notebook is a learning target, not an implied production migration."
+        }
+      ],
+      "checklist": [
+        "I can report exactly which engine and runtime a test exercised.",
+        "I can name recovery for partial success and account changes.",
+        "I can estimate synthetic workload without inventing prices.",
+        "I can hand off a sourced upgrade and pending integration matrix."
+      ],
+      "simple": {
+        "story": "A workshop tests a cardboard lock on a model cupboard. It then writes tests for the real cupboard's lock, but the real cupboard has not arrived yet. The keeper records the cardboard test as passed and the real test as waiting. She also counts how many shelf visits a planned day might require. That count helps plan work, but it is not a bill. Another keeper can now see what was observed and what still needs equipment.",
+        "meaning": "Evidence must identify its runtime and limits. Offline policy checks, real rules execution, native builds and service observations are separate; synthetic workload arithmetic is not measured cost.",
+        "example": {
+          "before": "The host code is compiled without Firebase modules or emulator processes.",
+          "change": "Execute its 30 declared policy checks.",
+          "after": "The host policy checks pass. Rules interpreter, SDK typecheck and provider behavior remain pending."
+        },
+        "picture": {
+          "kind": "comparison",
+          "caption": "Each verification gate supports a different conclusion.",
+          "items": [
+            {
+              "label": "Host",
+              "text": "Executes our Swift policy under synthetic inputs."
+            },
+            {
+              "label": "Rules emulator",
+              "text": "Would execute actual rule expressions for mocked identities."
+            },
+            {
+              "label": "Native/services",
+              "text": "Would verify linked SDK behavior and platform/provider interactions."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Fixture",
+            "meaning": "A controlled input and expected result used for a check."
+          },
+          {
+            "term": "Quota",
+            "meaning": "A service limit on some resource or operation."
+          },
+          {
+            "term": "Compatibility",
+            "meaning": "A particular version combination meeting stated build and runtime needs."
+          },
+          {
+            "term": "Handoff",
+            "meaning": "A reproducible record of behavior, owners, evidence and remaining work."
+          }
+        ],
+        "remember": "Say what ran, what it proved, and what still needs its own runtime.",
+        "boundary": "The cardboard story does not describe the Firebase implementation. A passing host policy cannot authenticate users, execute rules, price actual workload or establish native reliability."
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+    match /users/{uid}/media/{fileName} {
+      allow get: if owner(uid);
+      allow list: if false;
+      allow create: if owner(uid) && fileName.matches('[A-Za-z0-9_-]+[.]jpg')
+        && request.resource.size > 0 && request.resource.size <= 1048576
+        && request.resource.contentType == 'image/jpeg'
+        && request.resource.metadata.keys().hasAll(['ownerID'])
+        && request.resource.metadata.keys().hasOnly(['ownerID'])
+        && request.resource.metadata.ownerID == uid;
+      // Immutable objects: a changed image gets a new ID; metadata cannot transfer rights.
+      allow update: if false;
+      allow delete: if owner(uid);
+    }
+    match /{path=**} { allow read, write: if false; }
+  }
+}
