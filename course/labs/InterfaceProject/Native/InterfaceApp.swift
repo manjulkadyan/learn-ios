@@ -66,6 +66,7 @@ struct NotebookTile: View {
 
 struct DashboardView: View {
     @State private var board = Board.sample
+    @State private var pinMessage: String?
     @Environment(\.dynamicTypeSize) private var textSize
 
     var body: some View {
@@ -77,10 +78,14 @@ struct DashboardView: View {
                             HStack { Text("Notebook board").font(.title); Spacer(); total }
                             VStack(alignment: .leading) { Text("Notebook board").font(.title); total }
                         }
+                        if let pinMessage {
+                            Text(pinMessage).foregroundStyle(.red)
+                                .accessibilityIdentifier("pin-error")
+                        }
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .top), count:
                             InteractionPolicy.columns(width: max(0, region.size.width - 32), accessibilityText: textSize.isAccessibilitySize)), spacing: DesignTokens.gap) {
                             ForEach(board.cards) { card in
-                                NotebookTile(card: card) { board.togglePin(id: card.id) }
+                                NotebookTile(card: card) { togglePin(id: card.id) }
                             }
                         }
                         Text("Notebook feed").font(.title2).accessibilityAddTraits(.isHeader)
@@ -103,6 +108,17 @@ struct DashboardView: View {
     private var total: some View {
         Text("\(board.totalMinutes) minutes planned").font(.body)
             .accessibilityIdentifier("board-total")
+    }
+
+    private func togglePin(id: String) {
+        switch board.togglePin(id: id) {
+        case .toggled:
+            pinMessage = nil
+        case .missing:
+            pinMessage = "This notebook was removed. No pin change was saved."
+        case .revisionExhausted:
+            pinMessage = "This notebook's revision limit was reached. No pin change was saved."
+        }
     }
 }
 
@@ -192,6 +208,9 @@ struct NotebookEditor: View {
             message = "This notebook changed. Your draft is retained. Cancel and reopen to review the current version."
         case .missing:
             message = "This notebook was removed. Your draft is retained so you can copy its text."
+        case .revisionExhausted:
+            focused = nil
+            message = "This notebook's revision limit was reached. Your draft is retained so you can copy its text. No changes were saved."
         }
     }
 }

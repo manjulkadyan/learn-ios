@@ -31,6 +31,12 @@ public enum SaveOutcome: Equatable, Sendable {
     case invalid(Field)
     case missing
     case conflict
+    case revisionExhausted
+}
+public enum PinOutcome: Equatable, Sendable {
+    case toggled
+    case missing
+    case revisionExhausted
 }
 public enum BoardError: Error, Equatable { case duplicateID, invalidCard }
 
@@ -57,19 +63,28 @@ public struct Board: Sendable {
     public mutating func save(_ draft: CardDraft) -> SaveOutcome {
         guard let index = cards.firstIndex(where: { $0.id == draft.id }) else { return .missing }
         guard cards[index].revision == draft.baseRevision else { return .conflict }
+        let (nextRevision, overflow) = cards[index].revision.addingReportingOverflow(1)
+        guard !overflow else { return .revisionExhausted }
         let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return .invalid(.title) }
         guard let minutes = Int(draft.minutesText), (1...240).contains(minutes) else { return .invalid(.minutes) }
-        cards[index].title = title
-        cards[index].minutes = minutes
-        cards[index].revision += 1
+        var candidate = cards[index]
+        candidate.title = title
+        candidate.minutes = minutes
+        candidate.revision = nextRevision
+        cards[index] = candidate
         return .saved
     }
 
-    public mutating func togglePin(id: String) {
-        guard let index = cards.firstIndex(where: { $0.id == id }) else { return }
-        cards[index].pinned.toggle()
-        cards[index].revision += 1
+    public mutating func togglePin(id: String) -> PinOutcome {
+        guard let index = cards.firstIndex(where: { $0.id == id }) else { return .missing }
+        let (nextRevision, overflow) = cards[index].revision.addingReportingOverflow(1)
+        guard !overflow else { return .revisionExhausted }
+        var candidate = cards[index]
+        candidate.pinned.toggle()
+        candidate.revision = nextRevision
+        cards[index] = candidate
+        return .toggled
     }
     public mutating func remove(id: String) { cards.removeAll { $0.id == id } }
 }

@@ -44,7 +44,28 @@ Executed successfully on 17 November 2026. The script prints exact `xcrun swiftc
 
 To obtain actual app evidence, create a new scratch Xcode iOS App with SwiftUI/Swift, no storage template, minimum iOS 17, and an unrelated scratch bundle identifier. Save it outside the company client. Add this local package through Xcode's local package option and select the **WorkshopKit** product for the app target. Remove the generated app entry and ContentView from target membership. Add copies of **both** `Native/PackageDemoApp.swift` and `Native/PackageCard.swift` to the app target. Do not add Sources/WorkshopKit or Tests to app membership: SwiftPM supplies the library and its resource rule. There must be exactly one `@main`, PackageDemoApp.
 
-Build for a selected simulator without distribution signing. Launch and verify two rows, Blue=15, Green=25, and combined static accessibility labels. In a scratch resource experiment, remove or corrupt the JSON and verify a visible error/retry path rather than an empty success. Xcode project generation, app bundle assembly, launch, simulator interaction, accessibility inspection, and iOS resource load are **pending**, not covered by the command-line typecheck.
+Build for a selected simulator without distribution signing. Launch and verify two rows, Blue=15, Green=25, and combined static accessibility labels. In a separate scratch resource experiment, rename `Sources/WorkshopKit/Resources/cards.json` to `renamed-cards.json` inside the same processed directory. The populated resource bundle and accessor still exist, but the requested `cards.json` URL is absent: `Catalog.bundled()` throws `missingResource`. Restore the filename, then separately corrupt its JSON bytes to exercise `invalidJSON`. Restore the valid fixture afterward. Observe the visible error/retry path only in an actual app run. Xcode project generation, app bundle assembly, launch, simulator interaction, accessibility inspection, and iOS resource load are **pending**, not covered by the command-line typecheck.
+
+The URL guard assumes `Bundle.module` has already located its bundle. Removing the sole processed resource can prevent accessor generation and cause a build failure. If the generated accessor cannot locate the entire bundle at runtime, the inspected accessor calls `fatalError` before the URL guard; `do/catch` cannot turn that trap into `missingResource`. Treat complete bundle delivery as a packaging requirement, distinct from missing a filename inside an existing bundle. The shipped resource has not been renamed or corrupted by this correction.
+
+## Lesson 138 private-access diagnostic
+
+The lesson defines a named `private func resourceDebugLabel() -> String` in a scratch `Catalog` extension, then attempts `print(catalog.resourceDebugLabel())` in the separate consumer. A public consumer control must build first. The failing attempt must report private protection, rather than a nonexistent member or missing module.
+
+```sh
+python3 course/labs/PackageProject/check-private-access.py
+```
+
+This check reads the exact lesson snippets, copies the local package into a temporary directory, appends the helper there, and builds the normal consumer before adding the deliberate private call. It prints its exact commands and diagnostic. All dependencies remain local, and the original package/resource/consumer files remain unchanged. This is a compiler access-control check, not an app interaction or resource-failure run.
+
+Executed on 17 November 2026 with the Swift 6.4.2 host toolchain recorded above: the script exited **0**. Its public consumer build control exited **0** with the private helper present. After appending the lesson's attempted call, the consumer build exited **1**, as expected, with this specific diagnostic:
+
+```text
+error: 'resourceDebugLabel' is inaccessible due to 'private' protection level
+note: 'resourceDebugLabel()' declared here
+```
+
+The script required that diagnostic and removed its temporary copy. It did not execute the consumer or any native resource-failure interaction. The original consumer's two-card/40-minute runtime evidence remains the earlier recorded run.
 
 ## Independent practice and third-party boundary
 
