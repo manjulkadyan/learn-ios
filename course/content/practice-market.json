@@ -1,0 +1,189 @@
+{
+  "workshops": [
+    {
+      "id": "market-project",
+      "title": "Build and verify an original synthetic asset explorer",
+      "summary": "Run domain and intercepted URLSession checks, assemble real SwiftUI/service/image adapters separately, and supply an independent read-only capstone with exact evidence limits.",
+      "kind": "Native implementation",
+      "sessions": [
+        "125",
+        "126",
+        "127",
+        "128"
+      ],
+      "sections": [
+        {
+          "id": "setup-and-target",
+          "title": "Create separate host and native environments",
+          "html": "<p>The companion provides one portable Foundation model, two host executables and four native App files. The model owns checked synthetic assets, request state and preferences. The actual App source implements SwiftUI, Combine, URLSession, UIKit image integration and Swift Charts. A host fixture alone is not described as a native application.</p><p>Read the README commands first. Compile Core plus Host/Checks for domain/storage behavior. Compile Core, App/MarketServices and Host/ServiceChecks for actual service adapter behavior against the offline URLProtocol. Each host source has its own main entry and belongs in a separate executable, not in the iOS target.</p><p>Create a scratch iOS App target named MarketProjectLab, SwiftUI interface, minimum iOS seventeen, Swift six language mode and Nonisolated default actor isolation. Remove generated app/ContentView membership and add Core plus the four App files. No remote package, company client change, real account or secret is required.</p><p>The default screen loads in-source made-up Luma/Pebble data, with no icon URLs. Local search, Favorites only and failure simulation are also offline. An approved HTTPS endpoint can be deliberately injected into the separately supplied real service adapters; the default app never constructs one or places trades.</p>"
+        },
+        {
+          "id": "input-and-decimals",
+          "title": "Predict response and amount acceptance",
+          "html": "<p>The input contract is a JSON array with bounded lowercase IDs, symbol/name, decimal-string priceUSD and points containing Int64 second and decimal-string amount. IDs must be unique and point seconds strictly increasing. Malformed root JSON, missing fields, repeated IDs and duplicate times fail different boundaries.</p><p>Check accepted HTTP status and application/json MIME before decoding. A 503 JSON response is not success. A 200 HTML page is not the array schema. Even a status accepted by the 200-through-299 policy may fail the body contract, as an empty 204 would. The one-megabyte cap checks buffered data; it is not a streaming memory guarantee.</p><p>Amounts are unsigned decimal strings with up to eight fractional digits and bounded total length. Parse directly with Decimal using the fixed input locale. Never round-trip through Double to create authoritative amounts. Decimal 0.10 plus Decimal 0.20 yields Decimal 0.30 in the supplied arithmetic check, while malformed numeric prefixes are rejected by grammar.</p><p>Formatting chooses the declared USD display and two currency digits; Chart converts only a copy into approximate geometry. Decimal remains bounded precision, unlike arbitrary-precision BigDecimal. The exercise implements no balance, fee, quantity or settlement rounding policy.</p><p>Keep the two-digit currency overview, but use canonicalDecimalText and exactSampleText for detail/sample precision. Accepted 0.00000001 must render USD 0.00000001, and 12.345678 must render USD 12.345678. The canonical formatter uses POSIX NSDecimalString directly on Decimal; it may remove redundant zeroes but must not round away accepted digits. The host checks assert text and a decode-format-decode equality round-trip.</p>"
+        },
+        {
+          "id": "service-and-state",
+          "title": "Explain delivery, ownership and relevance",
+          "html": "<p>MarketService returns a one-output publisher contract of accepted Asset arrays or Error. FixtureMarketService supplies local bytes. HTTPMarketService uses real dataTaskPublisher, while AsyncHTTPMarketService uses real async data(for:). ServiceChecks executes both against identical intercepted local responses, proving adapter behavior without external networking.</p><p>Retain AnyCancellable in the view model. receive(on:) schedules downstream delivery; it does not move earlier parsing automatically. The model explicitly hops to MainActor for visible state. @Published announces observation, MainActor isolates access, and a generation checks whether the result still belongs to current intent. Those mechanisms are different.</p><p>A new refresh replaces the old subscription and advances the generation. Current failure retains accepted rows with a message; valid empty success replaces them. Old success, error and queued actor commits fail the relevance rule. Cancel invalidates before handle release so late work cannot publish.</p><p>A direct async alternative needs an owned Task, cancellation request and post-await cancellation/generation checks. Hiding an unowned Task inside Future does not wire subscription cancellation to it. Deferred changes creation timing, not that missing ownership. These concepts are taught locally; later concurrency lessons are optional follow-up, not silent prerequisites.</p><pre><code class=\"language-swift\">var snapshot = MarketSnapshot()\nlet older = snapshot.begin()\nlet current = snapshot.begin()\nsnapshot.complete(.success([]), token: older) // ignored\nsnapshot.cancel()\nsnapshot.complete(.failure(MarketError.status(503)), token: current) // ignored</code></pre>"
+        },
+        {
+          "id": "ui-and-persistence",
+          "title": "Keep one catalog and honest favorite choices",
+          "html": "<p>Visible rows derive from accepted assets, local query and the favorite ID set. Filtering hides records rather than deleting them. Navigation carries an asset ID and resolves it against current data, so refreshed detail is current and absent assets receive an explicit message instead of a substituted row index.</p><p>FavoritesStore encodes a versioned document of unique sorted IDs. A missing file starts empty. Corrupt or future-version input remains preserved and disables unsafe writes. A change builds next IDs, encodes and saves before publishing. Injecting a writer failure leaves the previous visible choice and catalog intact.</p><p>The native store lives under the app's Application Support sandbox. Host checks use a unique temporary directory and remove it afterward. Ordinary reopen establishes basic persistence, not crash durability, file coordination or correctness among simultaneous scenes/processes. Small synchronous IO is an explicit teaching limit.</p><p>A detail button exposes the favorite task without relying only on swipe actions. Exact sample text accompanies the synthetic chart. Empty history and absent detail are ordinary visible states. Large text, VoiceOver focus, locale appearance and process restoration require actual native interaction rather than a passing domain executable.</p><p>The overview continues calling priceText, while the exact detail price and each sample row call the shared exactSampleText helper. A rounded $0.00 summary therefore does not replace a tiny accepted amount. Test formatter behavior independently of chart geometry and native locale presentation; no screenshot or assistive-technology result is inferred from these checks.</p>"
+        },
+        {
+          "id": "resources-and-failures",
+          "title": "Treat optional images as an independent dependency",
+          "html": "<p>RemoteIcon has its own loader, cancellable and generation. nil URL starts no work. Appearance loads a deliberately supplied HTTPS URL; URL change replaces it; disappearance requests cancellation and invalidates old authority. Both data and error check the captured token inside their final actor commit.</p><p>An icon failure shows a decorative placeholder while name, price and favorites remain usable. Image ownership never erases accepted asset state. Add an independent resource/snapshot schedule to prove that stopping one lane leaves the other current.</p><p>The loader caps accepted encoded bytes at 262,144 after URLSession buffers them. This does not bound transfer or decoded pixel memory. A 32-point frame is rendering geometry, not image downsampling. The real teaching adapter has no dimension inspection, downsampling, bitmap cache or request coalescing; system URL caching is a different layer.</p><p>Production image work requires explicit dimension and target-size policies, an appropriate processing owner and measured device evidence. No icon was downloaded during author verification. Keep such runtime work separate from the default fully synthetic task instead of pretending the host test measured a device pipeline.</p>"
+        },
+        {
+          "id": "evidence-and-capstone",
+          "title": "Submit a changed fixture and exact evidence",
+          "html": "<p>Author commands and actual toolchain are in README: Swift 6.4.2, five passing domain/storage behavior groups and two passing intercepted-service groups, plus native Swift six typechecking with the iOS seventeen simulator target and SDK 27.2. The typecheck includes actual App and Core source.</p><p>No linked/installed/launched app, live provider, remote TLS, icon download, VoiceOver, physical device memory or performance trace was verified. Offline URLProtocol checks execute real adapters but cannot prove remote feed semantics. Synthetic prices and history are not measurements or advice.</p><p>For independent work, add fictional Ember, valid decimal-string amounts and new ordered history. Predict symbol search, Favorites only inclusion, removed-detail behavior, current failure and obsolete error. Inject a failing writer and an independent resource cancellation schedule. Compare both service boundaries against a new local malformed response.</p><p>Submit paths, exact commands/output, expected/actual state and pending runtime rows. The supplied checks are reference evidence, not learner completion. Later lessons 018 and 024 extend production HTTP and reliability after this project; the required acceptance/recovery rules already appear here. No client, learner-state or remote account needs modification.</p><p>The added fifth group verifies tiny/high-precision canonical sample strings, USD labels, zero normalization and unchanged Decimal values after a round-trip. These actual host outcomes support exact-sample claims; native rendering and provider behavior remain separate pending evidence.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Deliver an independently modified Ember explorer with a service-boundary comparison and separate resource/persistence failures.",
+        "steps": [
+          "Predict existing host and intercepted-service outcomes, then run documented commands.",
+          "Author Ember with new exact Decimal input and ordered samples.",
+          "Add removed-detail, failed-write and independent resource/snapshot schedules.",
+          "Compare both real adapters against a changed intercepted failure.",
+          "Assemble the isolated target and record performed or pending interaction/accessibility/provider checks."
+        ],
+        "acceptance": [
+          "Changed valid data has stable IDs, exact accepted amounts and ordered history.",
+          "Search/detail/favorites derive from current data without unintended deletion.",
+          "Failure and cancellation retain useful independent state; old successes/errors cannot commit.",
+          "Both adapters accept/reject the same local contract with no remote endpoint.",
+          "Evidence distinguishes host, intercepted adapter, typecheck, runtime and provider claims."
+        ],
+        "solution": "<p>Add ember with symbol EMB and a distinct decimal-string price and ordered points. A local EMB query returns it; Favorites only excludes it until the save succeeds. After accepted removal, the detail route explains absence while its preference may remain. These predictions use one catalog rather than copied arrays.</p><p>Inject a writer that throws before mutation. Saved favorites and accepted rows remain unchanged with a failure message. Use separate snapshot and icon gates, invalidating only the icon; its old success/error cannot publish while the snapshot remains current. Cancellation is a request, not proof of instant remote shutdown.</p><p>Run both real service adapters through FixtureURLProtocol with an additional malformed MIME/JSON case. Record their actual outputs and rejection boundary. Those calls use intercepted local responses, not a feed. Typecheck the native source separately and create the documented target for any actual interaction.</p><p>Report buffered-cap and basic UIImage limits, absent bitmap caching/downsampling, ordinary storage evidence and pending device/provider checks. The learner's changed fixture and schedules still need implementation and recorded outcomes. This worked answer describes expected behavior without certifying copied code or unperformed native practice.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: URLSession.DataTaskPublisher",
+          "url": "https://developer.apple.com/documentation/foundation/urlsession/datataskpublisher"
+        },
+        {
+          "label": "Apple: Decimal",
+          "url": "https://developer.apple.com/documentation/foundation/decimal"
+        },
+        {
+          "label": "Apple: Chart",
+          "url": "https://developer.apple.com/documentation/charts/chart"
+        }
+      ],
+      "files": [
+        {
+          "label": "README.md",
+          "path": "labs/MarketProject/README.md"
+        },
+        {
+          "label": "Core/MarketDomain.swift",
+          "path": "labs/MarketProject/Core/MarketDomain.swift"
+        },
+        {
+          "label": "Host/Checks.swift",
+          "path": "labs/MarketProject/Host/Checks.swift"
+        },
+        {
+          "label": "App/MarketServices.swift",
+          "path": "labs/MarketProject/App/MarketServices.swift"
+        },
+        {
+          "label": "App/RemoteIcon.swift",
+          "path": "labs/MarketProject/App/RemoteIcon.swift"
+        },
+        {
+          "label": "App/MarketScreen.swift",
+          "path": "labs/MarketProject/App/MarketScreen.swift"
+        },
+        {
+          "label": "App/MarketProjectApp.swift",
+          "path": "labs/MarketProject/App/MarketProjectApp.swift"
+        },
+        {
+          "label": "Host/ServiceChecks.swift",
+          "path": "labs/MarketProject/Host/ServiceChecks.swift"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does the offline adapter executable run?",
+          "options": [
+            "A live feed.",
+            "Actual URLSession adapters against local intercepted responses.",
+            "Only a chart model."
+          ],
+          "answer": 1,
+          "explanation": "It executes real Combine/async service code with URLProtocol, establishing no remote networking or TLS."
+        },
+        {
+          "question": "Which state should a failed favorite write publish?",
+          "options": [
+            "The attempted IDs regardless of disk.",
+            "The previous saved IDs plus a failure message.",
+            "An empty asset catalog."
+          ],
+          "answer": 1,
+          "explanation": "Publishing follows successful save; preference failure does not own catalog state."
+        },
+        {
+          "question": "Does the icon's small frame enforce a small decoded bitmap?",
+          "options": [
+            "Yes.",
+            "No, downsampling and dimension checks are separate.",
+            "Only with Combine."
+          ],
+          "answer": 1,
+          "explanation": "View geometry does not constrain source image decoding. The teaching adapter's encoded cap is also checked after buffering."
+        }
+      ],
+      "simple": {
+        "story": "Jules builds a catalog board using two fictional assets. A delivery helper checks new card envelopes, a notebook stores favorite labels, and another helper fetches optional pictures. If a picture or notebook operation fails, Jules keeps the readable catalog. He checks each helper's request number before accepting delayed results. Drawing a line through approximate chart positions never rewrites the original printed amounts. He also writes down which checks actually happened and which still need a real screen.",
+        "meaning": "The explorer keeps accepted data, preferences, resources and verification evidence independently owned.",
+        "example": {
+          "before": "Luma and Pebble are accepted; icon A is waiting.",
+          "change": "Cancel icon A and inject a failed snapshot refresh.",
+          "after": "Old icon results are ignored; accepted assets remain with a failed-refresh message."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "A bounded offline project retains useful state and reports exact evidence.",
+          "items": [
+            {
+              "label": "Accept",
+              "text": "Validate synthetic snapshot input."
+            },
+            {
+              "label": "Own",
+              "text": "Separate refresh, preferences and icon lifetimes."
+            },
+            {
+              "label": "Verify",
+              "text": "Report host, adapter and native/runtime checks separately."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Boundary",
+            "meaning": "A point where one component's contract meets another."
+          },
+          {
+            "term": "Snapshot",
+            "meaning": "A collection accepted together."
+          },
+          {
+            "term": "Provenance",
+            "meaning": "Where data or a claimed result came from."
+          }
+        ],
+        "remember": "Useful data survives an unrelated failure, and each claim needs its own evidence.",
+        "boundary": "Interception is local service testing, not a live feed; approximate drawing does not alter Decimal data or measure device performance."
+      }
+    }
+  ]
+}

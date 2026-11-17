@@ -1,0 +1,677 @@
+{
+  "unit": {
+    "id": "market-project",
+    "title": "Build a synthetic asset explorer",
+    "summary": "An original read-only project with checked HTTP/Codable services, explained Combine and async ownership, Decimal amounts, search, favorites, detail, charts and independent resource recovery.",
+    "order": 23
+  },
+  "lessons": [
+    {
+      "id": "125",
+      "title": "Decode a synthetic asset snapshot behind a service",
+      "summary": "Build an original read-only market explorer using made-up prices, checked HTTP responses, Codable input records and stable decimal-string amounts.",
+      "duration": 105,
+      "level": "Project sequence",
+      "prerequisites": [
+        "061",
+        "062",
+        "067",
+        "068",
+        "076"
+      ],
+      "objectives": [
+        "Separate transport, HTTP status, JSON decoding and domain validation failures.",
+        "Decode exact decimal-string prices and reject duplicate asset IDs.",
+        "Keep the offline fixture and real URLSession adapters separately identifiable."
+      ],
+      "sections": [
+        {
+          "id": "snapshot-before-screen",
+          "title": "Start with made-up assets and a clear contract",
+          "html": "<p>A snapshot is a collection of facts accepted together at one point in the feature's loading process. Our original snapshot contains Luma sample and Pebble sample. Their IDs are luma and pebble, symbols LUM and PEB, and prices are made up. This project is a read-only explorer: it searches, shows detail, draws a sample chart and stores favorite choices. It neither trades nor claims a live feed.</p><p>An Android implementation might separate an HTTP client, a Retrofit response DTO, a repository and a ViewModel. Swift has different tools, but the responsibility questions transfer. URLSession handles transport. A Codable input type handles decoding. A domain validator checks IDs, amounts and series. A view model owns visible loading state. SwiftUI reads that state.</p><p>Define the JSON contract before choosing a public endpoint. The root is an array. Each row contains id, symbol, name, priceUSD as a decimal string, and points with integer second and decimal-string amount. iconURL is optional. No secret, account or third-party SDK is needed for the fixture.</p><p>A displayed price of 12.30 means the fixture's declared US-dollar amount, not a current quotation. Synthetic point seconds zero, sixty and one hundred twenty form a teaching timeline rather than real exchange timestamps. Labelling that provenance consistently makes the implementation useful without disguising model data as service integration.</p>"
+        },
+        {
+          "id": "http-contract",
+          "title": "Check the response before decoding its body",
+          "html": "<p>Transport success means the request received a response without a transport error. It does not mean that response represents successful application data. HTTP status codes and content type must be checked before decoding. A 503 response with valid JSON is still a service failure, and a 200 HTML error page is not our array contract.</p><p>The HTTP adapter sends GET, advertises application/json through Accept, and uses a fifteen-second request timeout. It accepts the declared 200 through 299 status policy and requires application/json MIME type. A valid 204 response with no body still fails this particular array decoder: a status policy and a body-schema policy are separate decisions.</p><p>A successful JSON response then passes through a one-megabyte decoded-input cap and domain validation. The current dataTaskPublisher and data(for:) examples buffer the response before checking body size. That is a post-download cap, not a streaming memory bound or protection against unlimited transfer. Production size control may require a delegate/streaming implementation and earlier Content-Length checks, while retaining validation of actual bytes.</p><p>Keep network timeout, HTTP refusal, MIME mismatch, malformed JSON and invalid domain records distinct for diagnostics and testing. The UI can group them into a concise recovery message while the service still has typed failure information. Never interpret an HTML page as an empty successful catalog merely to make the loading indicator disappear.</p>"
+        },
+        {
+          "id": "codable-boundary",
+          "title": "Translate JSON input into checked values",
+          "html": "<p>Codable combines Encodable and Decodable, protocols for translating values to and from supported external representations. This service only needs Decodable DTOs. A data transfer object mirrors input fields; a domain Asset describes accepted feature data. Keeping them separate allows parsing to succeed while validation still rejects inappropriate values.</p><pre><code class=\"language-swift\">private struct PointDTO: Decodable {\n    let second: Int64\n    let amount: String\n}\n\nprivate struct AssetDTO: Decodable {\n    let id: String\n    let symbol: String\n    let name: String\n    let priceUSD: String\n    let points: [PointDTO]\n    let iconURL: URL?\n}</code></pre><p>The colon declares each field type. An array of PointDTO values uses square brackets; URL? permits a missing or null icon. Int64 defines the integer timeline range rather than guessing that every JSON number is a price. JSONDecoder throws for missing required keys or wrong types. Unknown extra fields can remain compatible because this decoder ignores fields it does not request.</p><p>After decoding the array, collect IDs in a Set and reject repeated insertion. The lab accepts bounded lowercase IDs, nonempty names/symbols, bounded sample counts and strictly increasing point seconds. An invalid whole snapshot preserves the previous accepted catalog in the view model. Partial import could be another product policy, but it would need explicit rejected-row reporting.</p><p>An optional URL parsing successfully does not make it an approved resource. The lab requires HTTPS with a host. A production feed may need an allowlist and redirect policy. The default fixture has no icon URLs, so opening its rows never silently downloads images.</p>"
+        },
+        {
+          "id": "decimal-input",
+          "title": "Keep exact amounts separate from drawing numbers",
+          "html": "<p>Decimal represents base-ten arithmetic within a finite precision range. Binary Double is useful for geometry but can represent familiar decimal fractions only approximately. Keep accepted prices as Decimal constructed from a restricted decimal string. Converting through Double first would already lose the input's exact base-ten meaning.</p><p>The companion accepts unsigned digits, an optional decimal point, and one through eight fractional digits. It limits total text length to thirty-seven characters and uses the en_US_POSIX parsing locale. Those bounds keep the supplied grammar within Decimal's representable precision for this exercise. Negative, exponential, comma-separated, malformed-prefix and overprecision inputs are rejected rather than guessed.</p><p>For example, string 0.10 becomes a Decimal amount and string 0.20 another. Adding them yields Decimal 0.30. Trailing zero scale is not a separate identity property of Decimal; formatting later selects two displayed currency digits. If a business rule needs original entered scale or a rounding mode, store and apply that policy explicitly.</p><p>Kotlin BigDecimal is a useful analogy for decimal arithmetic but has different precision, scale and API behavior. Swift Decimal is not arbitrary precision. This explorer performs no portfolio quantity multiplication, fee accounting or settlement rounding. Later learner extensions must define overflow and rounding behavior before using it as a financial ledger.</p>"
+        },
+        {
+          "id": "service-integration",
+          "title": "Separate the fixture from actual URLSession code",
+          "html": "<p>A service is a small interface supplying accepted data or an error. MarketService returns a publisher of Asset arrays. FixtureMarketService decodes the in-source synthetic JSON, or deliberately fails for offline recovery practice. HTTPMarketService uses a real URLSession dataTaskPublisher. AsyncHTTPMarketService is a separately identified one-shot alternative using data(for:).</p><p>The app chooses FixtureMarketService by default. The actual HTTP adapter source is supplied, but no real endpoint is constructed or fetched automatically. A learner can intentionally inject an approved HTTPS endpoint that implements this exact schema. Do not paste credentials or change an account's trading configuration to run a read-only teaching app.</p><p>The offline ServiceChecks executable injects an ephemeral session with a URLProtocol that intercepts fixture.invalid requests. It runs both real URLSession adapter implementations against local synthetic responses. This is stronger evidence than calling only the domain decoder, yet it still performs no DNS, socket, remote TLS, provider rate-limit or real feed check.</p><p>The client URLSession dispatcher explicitly throws notImplemented for its normal path and warns about missing OAuth2 and certificate pinning. That inspected source is a boundary example, not permission to route production calls through our small service. A scratch anonymous fixture client does not replace the company's network authentication and trust requirements.</p>"
+        },
+        {
+          "id": "availability-and-evidence",
+          "title": "Name compiler, API and service limits",
+          "html": "<p>The host decoder and file logic use Foundation. Combine began on iOS thirteen and is available on the macOS author host; the native screen chooses iOS seventeen. URLSession's Swift async data APIs require the modern concurrency/runtime availability, commonly iOS fifteen and later. This project's target satisfies that boundary without making the later concurrency course a prerequisite.</p><p>The next lesson explains publisher subscription and one-shot async ownership locally. Swift Charts, used in detail, begins on iOS sixteen; the screen's iOS seventeen baseline also supports its newer onChange forms. Do not infer all of these versions from a single import or the latest installed Xcode version.</p><p>Actual host results cover exact decimal behavior, repeated IDs, point ordering, synthetic status/MIME decisions, stale snapshots and store failures. The URLProtocol adapter checks cover URLSession integration with local responses. Native typechecking covers compiler declarations. No linked iOS app, live endpoint, TLS/certificate policy, remote images or device accessibility is established by those commands.</p><p>Record those evidence categories separately in the README and learner submission. A copied working decoder is not a completed exercise. The learner must change an independent fixture, predict its result and show whether it was accepted, rejected or left the prior snapshot visible.</p><p>Optional later course reading: lesson <code>018</code> expands HTTP, authentication and production service boundaries after this project. Its advanced material is not required to implement this snapshot contract.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "URLSession receives HTTP 503 with valid JSON. Is this an accepted catalog?",
+          "options": [
+            "Yes, transport completed.",
+            "No, the status fails before decoding.",
+            "Only if IDs are unique."
+          ],
+          "answer": 1,
+          "explanation": "Transport, status and schema success are distinct. The adapter rejects nonaccepted status even with parseable JSON."
+        },
+        {
+          "question": "Why is priceUSD a decimal string in the fixture?",
+          "options": [
+            "To preserve declared decimal input before Decimal parsing.",
+            "Because JSON cannot contain numbers.",
+            "To make the chart arbitrary precision."
+          ],
+          "answer": 0,
+          "explanation": "A decimal string preserves exact input under a bounded grammar. JSON has numbers, but converting through binary floating point would change precision semantics."
+        },
+        {
+          "question": "What does the URLProtocol adapter check establish?",
+          "options": [
+            "A live feed works.",
+            "Real URLSession adapters accept/reject intercepted local responses.",
+            "Remote TLS is verified."
+          ],
+          "answer": 1,
+          "explanation": "The offline injected protocol exercises service code without external networking. Remote service and TLS behavior remain untested."
+        }
+      ],
+      "exercise": {
+        "brief": "Create an independently modified snapshot and test domain versus HTTP failure without fetching a real feed.",
+        "steps": [
+          "Add a fictional ember asset priced by a decimal string.",
+          "Create separate repeated-ID, unordered-point and malformed-price fixtures.",
+          "Inject 503, HTML and malformed JSON through the local protocol.",
+          "Write evidence distinguishing decoder, adapter and provider behavior."
+        ],
+        "acceptance": [
+          "A valid new row retains exact declared decimal input and stable ID.",
+          "Bad status, bad MIME, bad JSON and bad domain input fail at named boundaries.",
+          "The previous accepted snapshot is not silently replaced by invalid input.",
+          "No remote feed, credentials or trades are used."
+        ],
+        "solution": "<p>Add ember with a unique bounded lowercase ID, symbol EMB, nonempty name and priceUSD 3.40. Supply point seconds zero and sixty in strictly increasing order. Decode the JSON into DTOs first, then map accepted decimal strings and IDs to Assets. A repeated ember ID fails catalog validation even though each DTO parses independently.</p><p>Change 3.40 to 3.40oops in another fixture. The numeric grammar rejects it before Decimal can accept an ambiguous prefix. A duplicated point second fails series ordering. Keep these failures separate from a 503 status, text/html MIME type or malformed root JSON, because they explain different broken contracts and recovery owners.</p><p>The service test session uses FixtureURLProtocol, so a URL with fixture.invalid is intercepted locally and never reaches a provider. Run both Combine and async adapters against success and each failure path. Report exactly that integration evidence, not a live-feed result. The fixture app continues using its default local service.</p><p>The learner's handoff names the new asset, original expected values and changed failure cases, then includes actual command results. It explains that Decimal has bounded precision, chart geometry will use a converted copy, and neither decoder success nor URLProtocol success proves production authentication, trust, rate limits or quote freshness. The provided worked answer leaves those independent modifications and real runtime checks for the learner.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: URLSession.DataTaskPublisher",
+          "url": "https://developer.apple.com/documentation/foundation/urlsession/datataskpublisher"
+        },
+        {
+          "label": "Apple: JSONDecoder",
+          "url": "https://developer.apple.com/documentation/foundation/jsondecoder"
+        },
+        {
+          "label": "Apple: Decimal",
+          "url": "https://developer.apple.com/documentation/foundation/decimal"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client dispatcher documents an unsupported normal path",
+          "path": "ios-client/Projects/Infra/ZDNetworking/Sources/ZDUrlSessionExtension/UrlSession+ApiOperationDispatcher.swift",
+          "line": 29,
+          "why": "Inspected notImplemented and OAuth2/pinning warning; anonymous scratch URLSession code is not this client's production dispatcher."
+        }
+      ],
+      "checklist": [
+        "I can check status, MIME, JSON and domain validation separately.",
+        "I can distinguish synthetic fixtures, real adapter source and remote provider evidence."
+      ],
+      "simple": {
+        "story": "Rae receives a sealed envelope marked Asset snapshot. First she checks whether the delivery succeeded, then whether the envelope says it contains the expected list. Opening it reveals two cards, but she still checks that the names are unique and the printed prices follow the agreed decimal format. A successfully delivered envelope can contain an error notice or damaged cards. Rae keeps her previous accepted cards until the new set passes every check.",
+        "meaning": "Transport, response and decoded domain validation are separate acceptance boundaries.",
+        "example": {
+          "before": "Luma and Pebble are accepted.",
+          "change": "Receive an intercepted 503 response containing valid JSON.",
+          "after": "The status is rejected and the previous snapshot remains."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Accept a snapshot only after every boundary succeeds.",
+          "items": [
+            {
+              "label": "Response",
+              "text": "Check accepted HTTP status and MIME."
+            },
+            {
+              "label": "Decode",
+              "text": "Read required JSON fields."
+            },
+            {
+              "label": "Validate",
+              "text": "Reject duplicate IDs and invalid decimal/series values."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Snapshot",
+            "meaning": "Facts accepted together as one collection."
+          },
+          {
+            "term": "DTO",
+            "meaning": "An input record matching an external data shape."
+          },
+          {
+            "term": "Decimal",
+            "meaning": "A bounded base-ten numeric representation."
+          }
+        ],
+        "remember": "A response arriving does not mean its data is acceptable.",
+        "boundary": "The envelope story does not simulate networking, TLS or provider behavior; fixture prices are entirely made up."
+      }
+    },
+    {
+      "id": "126",
+      "title": "Own a Combine subscription and an async refresh",
+      "summary": "Explain publisher delivery, cancellable ownership, main-actor commits and one-shot async alternatives without depending on the later concurrency course.",
+      "duration": 120,
+      "level": "Project sequence",
+      "prerequisites": [
+        "125",
+        "081"
+      ],
+      "objectives": [
+        "Read a one-output Combine service and retain its cancellable.",
+        "Explain receive(on:), actor isolation and generation checks as distinct mechanisms.",
+        "Compare a direct async Task owner with a Future bridge and identify cancellation gaps."
+      ],
+      "sections": [
+        {
+          "id": "publisher-basics",
+          "title": "Understand the producer and subscriber",
+          "html": "<p>A publisher describes how values and completion can be delivered to a subscriber. A subscriber asks to receive them. Combine is Apple's framework for these contracts. This project uses AnyPublisher&lt;[Asset], Error&gt;: the output is an Asset array and failure is an Error. The erased type hides the detailed operator chain while preserving the interface's output and failure types.</p><p>A publisher can send values, finish successfully, or fail. A failure terminates that subscription. Our market service contract intentionally sends at most one accepted snapshot and then finishes. This narrow contract is simpler than a continuous live-price stream, and the app does not claim that a stream of data is being supplied just because Combine is imported.</p><p>sink installs a subscriber with completion and value closures. AnyCancellable is the handle retained to keep the subscription alive and to request cancellation later. Discarding that handle can cancel the subscription immediately. Store one refresh handle when there is one refresh lane; use separate handles or named owners for independently running resources.</p><p>Kotlin Flow collecting a stream is a useful analogy for values and lifetime, but Combine publishers have different demand, scheduling and eagerness contracts. Do not assume every publisher is cold. Just emits its value when subscribed, Future starts its closure when created, and URLSession's task publisher begins network work through subscription. Learn the concrete producer rather than importing one general Flow assumption.</p>"
+        },
+        {
+          "id": "operators-and-errors",
+          "title": "Read the service pipeline in order",
+          "html": "<p>An operator transforms the publisher contract. tryMap runs a throwing transformation, so status or decoding validation can terminate the subscription with an error. eraseToAnyPublisher hides the concrete nested type. receive(on:) chooses the scheduler for downstream delivery; it does not retroactively move upstream JSON decoding to that scheduler.</p><p>In FixtureMarketService, Just supplies the in-source JSON synchronously on subscription, and tryMap performs its decoding there. In HTTPMarketService, dataTaskPublisher supplies a URLSession response before the same validation. The small fixture is bounded, but a production pipeline should measure parsing work and choose an explicit processing scheduler for larger bodies instead of claiming all async-looking code is automatically off the UI thread.</p><p>The view model maps a service failure into a visible refresh message while retaining accepted rows. It does not convert invalid data into a fake successful empty array. Successful empty output is an accepted snapshot and can legitimately remove all rows. Failure leaves old rows with a different message. Those outcomes deserve separate tests.</p><p>A request timeout is another input to the transport contract, not a retry policy. This app offers explicit retry. Automatic retry would need bounded attempts, relevant generation checks, provider rate-limit behavior, and a stop condition. It must not create a new hidden sequence of work after the person's screen owner disappears.</p>"
+        },
+        {
+          "id": "state-and-main-actor",
+          "title": "Cross into UI state deliberately",
+          "html": "<p>MainActor is an isolation rule for mutable UI-facing state. @Published announces changes to an ObservableObject; it does not itself select a queue or make cross-thread writes safe. MarketModel owns the snapshot and is @MainActor. A downstream main-queue scheduler is useful for delivery, but scheduler configuration alone is not a Swift type-level actor annotation.</p><p>The sample therefore performs an explicit actor hop in each sink closure. Task { @MainActor in ... } schedules the commit in the model's isolation context. That hop can be queued when a newer action occurs, so the captured generation remains essential. The Task is brief commit work rather than the long-lived producer resource.</p><pre><code class=\"language-swift\">let token = snapshot.begin()\nsubscription = service.assets()\n    .receive(on: DispatchQueue.main)\n    .sink(receiveCompletion: { [weak self] completion in\n        guard case .failure(let error) = completion else { return }\n        Task { @MainActor [weak self] in\n            self?.snapshot.complete(.failure(error), token: token)\n        }\n    }, receiveValue: { [weak self] assets in\n        Task { @MainActor [weak self] in\n            self?.snapshot.complete(.success(assets), token: token)\n        }\n    })</code></pre><p>weak self avoids making the subscription closures the permanent owner of the model. Optional chaining skips mutation if it no longer exists. snapshot.complete rejects an obsolete token in either branch. Successful completion carries no additional value here; the value closure already accepted the one snapshot. A production implementation can assert the one-output service contract rather than assuming an arbitrary publisher emits only once.</p>"
+        },
+        {
+          "id": "cancel-and-generation",
+          "title": "Stop resources and protect state",
+          "html": "<p>Cancellation asks a subscription or task to stop its work. Relevance decides whether a completion can still change state. Replacing a refresh first cancels its AnyCancellable and starts a new snapshot generation. A previously queued value can still reach the main-actor commit, but it no longer matches. Cancelling the current refresh invalidates its generation before releasing the handle.</p><p>Walk through a specific schedule. Generation one loads Luma and Pebble. Refresh A gets two, then refresh B gets three. A delivers an empty array late; two is rejected. B fails; three is current, so visible rows remain Luma and Pebble with a failure message. A's later failure is also rejected and cannot overwrite B's status.</p><p>This check belongs at the commit boundary, after any suspension or queued scheduler hop. Checking only when the request starts proves nothing about later intent. @MainActor still permits other work while a task waits; it prevents unsafe access rather than freezing logical ownership.</p><p>Each resource should have an appropriate lane. Snapshot refresh owns one cancellable, row images own others, and persistence is a separate operation. A missing image must not cancel the asset snapshot. A favorites write failure must not clear loaded assets. A large feature might name these owners explicitly, but this project can teach the same rule with three small, independently handled operations.</p>"
+        },
+        {
+          "id": "async-boundary",
+          "title": "Compare a direct async call with a bridge",
+          "html": "<p>async marks a function that can suspend and await marks a suspension point. try handles a throwing result. A direct one-shot refresh can own a Task handle, await AsyncHTTPMarketService.assets, call Task.checkCancellation and compare its generation before updating state. URLSession's async API cooperates with task cancellation, while the generation still guards a late or obsolete commit.</p><p>Do not wrap an arbitrary Task in Future and assume cancelling AnyCancellable cancels that Task. Future has its own delivery lifetime, and the Task handle must be retained and cancellation wired deliberately. Deferred can postpone creating the Future until subscription, but it does not by itself solve task cancellation. A checked continuation adapts callbacks, but likewise does not automatically invent resource cleanup.</p><p>The inspected NearbyProvidersCarouselViewModel uses Future to wrap a Task and flatMap(maxPublishers: .max(1)). That is real client evidence of a bridge, not evidence that inner Task cancellation is forwarded. A maximum of one is an inner-subscription concurrency policy, not automatically a latest-request-wins rule. switchToLatest has different replacement behavior and still cannot cancel an unowned Task hidden inside a publisher.</p><p>For a single snapshot, choose direct async ownership or the documented publisher contract rather than accumulating both mechanisms without purpose. Continuous streams can justify Combine composition. Later concurrency lessons deepen isolation and transfer; this project already teaches the minimum await, Task, cancellation and post-wait relevance rules needed to read its code.</p>"
+        },
+        {
+          "id": "availability-and-evidence",
+          "title": "State what each check proves",
+          "html": "<p>Combine's base API is available from iOS thirteen. URLSession async data APIs and Combine's AsyncPublisher values bridge used by the host service checks require the newer async-support availability; this project chooses iOS seventeen for its native screen and the available modern macOS host for testing. A Swift language version and an OS deployment version remain different choices.</p><p>Offline domain checks prove generation schedules with exact injected events. ServiceChecks runs the real Combine and async URLSession adapters through intercepted local responses. It does not prove native screen lifecycle or every cancellation edge of a remote provider. Native typechecking confirms this source's Swift six isolation and SDK compatibility, not interaction.</p><p>The current view model's default synthetic publisher can complete immediately. That makes it suitable for predictable first use, while adversarial host schedules are needed to expose late-event bugs. A quick visible success on one simulator would not prove latest-only behavior. Record the controlled schedule and the relevant state after each step.</p><p>For independent practice, change one schedule and compare both success and failure. Keep cancellation requests, accepted state, and resource completion as separate observations. Do not mark the learner complete from a supplied passing test. The worked answer establishes a contract and a review standard, not a certificate of native correctness.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Does receive(on: DispatchQueue.main) move an earlier tryMap decoder to the main queue?",
+          "options": [
+            "Yes, it moves the whole chain.",
+            "No, it schedules downstream delivery.",
+            "Only for Just."
+          ],
+          "answer": 1,
+          "explanation": "Operator order matters. receive(on:) changes downstream scheduling; upstream work retains its own execution context."
+        },
+        {
+          "question": "Cancelling a Future subscription that created a Task always does what?",
+          "options": [
+            "Automatically cancels the Task.",
+            "Only ends the subscription unless Task cancellation is explicitly wired.",
+            "Deletes cached assets."
+          ],
+          "answer": 1,
+          "explanation": "Publisher and Task lifetimes are separate. Retain and cancel the task deliberately, or use a directly owned one-shot async boundary."
+        },
+        {
+          "question": "Why check the generation inside the main-actor commit?",
+          "options": [
+            "@Published cannot publish arrays.",
+            "A scheduler or actor hop can be queued after intent changed.",
+            "HTTP IDs contain actor numbers."
+          ],
+          "answer": 1,
+          "explanation": "Isolation and scheduling do not establish logical relevance. The captured token must still match at mutation time."
+        }
+      ],
+      "exercise": {
+        "brief": "Add two refresh schedules and explain how an alternative async owner would stop its work.",
+        "steps": [
+          "Predict an old empty success after a new failure with previously accepted rows.",
+          "Predict an old error after a new success.",
+          "Write the direct Task handle, cancel and post-await guard sequence.",
+          "Contrast it with an unowned Task inside Future and identify the missing cancellation bridge."
+        ],
+        "acceptance": [
+          "Both success and error use the same relevance rule.",
+          "Accepted rows survive current failure or cancellation.",
+          "The answer distinguishes scheduler, actor isolation and cancellation ownership.",
+          "No later concurrency lesson is assumed to supply unexplained steps."
+        ],
+        "solution": "<p>Load the original rows at generation one. A begins at two and B at three. Deliver B's failure: the catalog remains and status becomes Refresh failed. Deliver A's empty success and error: both are rejected because two is obsolete. In the second schedule, B succeeds with the learner's Ember fixture, then A fails; Ember remains current and its status is not overwritten.</p><p>For an async alternative, store Task&lt;Void, Never&gt; in the model. Invalidate the previous generation and call task.cancel when replacing it. Await the service in do/catch, check cancellation, then compare the captured generation before either success or error changes state. Use weak ownership appropriately; cancellation still needs a retained handle even if the model may be released.</p><p>A Future wrapping Task without retaining that handle has a gap: ending the subscriber does not necessarily stop the async producer. Deferred changes when it starts, and switchToLatest changes inner subscription replacement, but neither supplies a lost Task handle. Choose a direct one-shot path or implement a small bridge with deliberate cancellation instead of assuming framework names imply it.</p><p>Record actual host/adapter commands and the new predicted schedules separately from native lifecycle interaction. A learner should explain why a queued main-actor commit remains harmless after cancellation, and why preserving rows is consistent with a clearly labelled failed refresh. The model can be correct without claiming that all underlying provider work stopped instantly.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Publisher.receive(on:options:)",
+          "url": "https://developer.apple.com/documentation/combine/publisher/receive(on:options:)"
+        },
+        {
+          "label": "Apple: Future",
+          "url": "https://developer.apple.com/documentation/combine/future"
+        },
+        {
+          "label": "Swift: Concurrency",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client Future wraps an async Task",
+          "path": "ios-client/Projects/Features/ZDHome/Sources/ZDHome/NearbyProvidersCarouselViewModel.swift",
+          "line": 54,
+          "why": "Inspected Future/Task bridge and flatMap max-one pipeline; source does not show retained Task cancellation and is not automatically latest-only."
+        }
+      ],
+      "checklist": [
+        "I can retain and cancel a refresh subscription.",
+        "I can explain why isolation, scheduling and relevance are separate.",
+        "I can identify a Task cancellation gap inside a Future bridge."
+      ],
+      "simple": {
+        "story": "Sam subscribes to a bulletin clerk's updates and keeps the subscription ticket. The clerk can send a sheet or a final failure notice. Sam cancels an old ticket when asking for a replacement, but a sheet may already be waiting in his inbox. Before posting it on the wall, he checks whether its request number still matches. Choosing which inbox receives sheets does not make every sheet current, and cancelling a ticket does not necessarily stop a separate helper the clerk hired.",
+        "meaning": "Subscription ownership, delivery scheduling and result relevance solve different problems.",
+        "example": {
+          "before": "Refresh A owns generation 2 and B owns 3.",
+          "change": "B succeeds, then an already queued A error reaches the actor.",
+          "after": "B's rows and message remain because A is obsolete."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "A value must still be current when it reaches UI state.",
+          "items": [
+            {
+              "label": "Subscribe",
+              "text": "Retain the producer's cancellable handle."
+            },
+            {
+              "label": "Deliver",
+              "text": "Hop into main-actor state deliberately."
+            },
+            {
+              "label": "Commit",
+              "text": "Compare the captured generation before publishing."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Publisher",
+            "meaning": "A producer contract for values and completion."
+          },
+          {
+            "term": "Cancellable",
+            "meaning": "A handle used to request that subscription work stops."
+          },
+          {
+            "term": "Actor isolation",
+            "meaning": "A rule controlling safe access to mutable state."
+          }
+        ],
+        "remember": "Delivering on the right scheduler does not make an old answer current.",
+        "boundary": "The story does not define Combine demand or guarantee instant producer cancellation; actors are isolation rather than dedicated threads."
+      }
+    },
+    {
+      "id": "127",
+      "title": "Keep search, favorites, detail and charts consistent",
+      "summary": "Derive rows from accepted IDs, save favorites without hiding failures, and draw made-up histories while retaining Decimal amounts.",
+      "duration": 120,
+      "level": "Project sequence",
+      "prerequisites": [
+        "126",
+        "079",
+        "083"
+      ],
+      "objectives": [
+        "Derive search and favorites filters from one catalog.",
+        "Resolve detail by stable ID and handle an absent asset.",
+        "Persist preferences after successful writes and distinguish chart geometry from Decimal data."
+      ],
+      "sections": [
+        {
+          "id": "one-catalog",
+          "title": "Use one accepted catalog",
+          "html": "<p>A source of truth is owned state from which other displays are derived. Here it is MarketSnapshot's last accepted Asset array. Search results, favorite-only rows and detail do not maintain independently editable copies. They derive from the same catalog and stable IDs, so an accepted replacement updates them consistently.</p><p>The query is local input. A trimmed empty query returns every asset. Otherwise the screen matches name or symbol with localized case-insensitive comparison. This creates no HTTP request. An empty accepted catalog differs from a nonempty catalog filtered to zero matches; one may need refresh, while the other needs a changed query.</p><p>Favorite IDs form another owned value. With Favorites only off, all query matches appear. With it on, only matches whose IDs belong to the set appear. The toggle does not delete assets or saved preferences. A filter is a derived view, not a destructive storage operation.</p><p>Kotlin StateFlow projections and Compose derivedStateOf are useful analogies, but SwiftUI computed properties and invalidation follow their own contracts. The sample filters a small bounded array rather than introducing an indexing cache prematurely. Measure representative input before selecting a more complex algorithm or claiming the projection is a performance problem.</p>"
+        },
+        {
+          "id": "detail-identity",
+          "title": "Navigate with an ID",
+          "html": "<p>Navigation identity describes which destination to show. NavigationLink supplies asset.id as its value. navigationDestination for String resolves that ID in the current accepted catalog. A refreshed price then appears in detail without a permanently copied old Asset. Identity remains stable while the representation changes.</p><p>If an accepted replacement removes the ID, detail shows an absent-asset message and a normal return path. It never chooses the next row implicitly. A favorite ID may remain saved, so it can match again if the asset returns later. That is this project's declared local preference policy, not proof that a provider still supports the asset.</p><p>Use a typed route enum when a larger feature has several kinds of String identifiers. This isolated target has one String destination type, so it can teach lookup without requiring an advanced coordinator or reducer. Android navigation arguments provide a familiar identity question, but NavigationStack destination lookup is SwiftUI behavior.</p><p>Detail offers a visible Save favorite or Remove favorite button as well as list swipe actions. Essential tasks should not require discovering a hidden gesture. The button's accessibility value identifies current favorite state. Focus order, changed text and gesture discoverability still need runtime assistive-technology checks rather than a source-only claim.</p>"
+        },
+        {
+          "id": "decimal-display",
+          "title": "Format amounts without reparsing display text",
+          "html": "<p>Formatting turns an accepted amount into readable text and is separate from arithmetic. priceText uses a currency format style with code USD and two fractional digits. The fixture's Decimal 12.30 displays as a two-digit US-dollar amount under the active locale. Decimal itself does not preserve entered trailing-zero scale as an independent domain identity.</p><p>The currency code belongs to the data contract. A multicurrency service must carry it rather than format every number as USD. Locale controls punctuation, grouping and symbol placement; it does not change exchange units. List and detail should consistently present the same declared amount and currency.</p><p>Avoid feeding a displayed currency string back into the service decoder. It may contain symbols or grouping characters outside the restricted input grammar. The decoder reads bounded decimal strings with a POSIX locale; the UI formats accepted values for people. Those boundaries deliberately serve different purposes.</p><p>A later quantity or balance exercise must define rounding before calculating totals. Swift Decimal has bounded base-ten precision, unlike arbitrary-precision Kotlin BigDecimal. Overflow and rounding modes need explicit operation policy. This read-only explorer correctly presents sample prices without pretending to be a settlement ledger, portfolio calculator or financial recommendation.</p><p>An exact sample formatter must preserve the accepted numeric value rather than reuse the two-digit currency summary. The shared Core helper canonicalDecimalText calls Foundation's NSDecimalString with the POSIX locale and never converts through Double. exactSampleText adds an explicit USD label. Detail shows an exact current price as well as its rounded currency summary; the sample list uses this same exact helper.</p><pre><code class=\"language-swift\">func canonicalDecimalText(_ amount: Decimal) -&gt; String {\n    var value = amount\n    return NSDecimalString(&amp;value, Locale(identifier: \"en_US_POSIX\"))\n}\n\nfunc exactSampleText(_ amount: Decimal) -&gt; String {\n    \"USD \\(canonicalDecimalText(amount))\"\n}</code></pre><p>The local var supplies addressable Decimal storage; the ampersand borrows it for the Foundation call. Canonical means a standard numeric spelling, not preservation of the original string's redundant zeroes. Input 00012.34000000 becomes 12.34 without changing its value. The helper does not round to cents, choose a user's currency symbol, or become an arithmetic input.</p><p>For accepted 0.00000001, exact sample text is USD 0.00000001; accepted 12.345678 produces USD 12.345678. A two-digit US-dollar overview can instead display $0.00 or $12.35. That intentional overview rounding is why it cannot substantiate an exact-value claim. Offline checks assert canonical strings, USD labels and decode-format-decode Decimal equality for these cases.</p>"
+        },
+        {
+          "id": "chart-boundary",
+          "title": "Draw a copy and retain exact text",
+          "html": "<p>A chart summarizes series visually. Swift Charts LineMark receives x and y values. Here x is synthetic integer second and y is a Double converted from a Decimal copy through NSDecimalNumber. Approximate floating-point geometry is acceptable for this teaching display; it never becomes the authoritative price.</p><p>Chart identifies each PricePoint by its second field. The decoder already requires strictly increasing seconds, so no two points claim the same identity. The key path spelled backslash-dot-second selects that field. Each .value call names the axis data, and frame height two hundred twenty gives the line a bounded area inside a scrolling detail layout.</p><p>An empty series shows No synthetic history available. Below a nonempty chart, text lists every sample's synthetic second and exact base-ten Decimal value with an explicit USD label. Unlike the two-digit summary price, it does not round a sample with extra fractional digits. The basic information remains available without seeing the line's colour or exact position. This also makes amount comparisons checkable when two geometric points are visually close.</p><p>Unordered samples should not be connected simply because the chart accepts an array. Repeated or descending seconds fail before presentation. A real provider requires an explicit timestamp, missing-sample and time-zone policy. Our zero, sixty and one hundred twenty are made-up teaching seconds, not exchange timestamps or readings of the device clock.</p><pre><code class=\"language-swift\">Chart(asset.points, id: \\.second) { point in\n    LineMark(x: .value(\"Synthetic second\", point.second),\n             y: .value(\"USD display value\",\n                 NSDecimalNumber(decimal: point.amount).doubleValue))\n}</code></pre><p>Both the exact current-price text and every sample row call exactSampleText from Core, while only the overview calls priceText. The tiny and six-fractional-digit checks run that same shared helper outside SwiftUI. They establish formatter precision without claiming that a chart or native screen was launched. Chart's Double conversion remains solely a drawing boundary.</p>"
+        },
+        {
+          "id": "favorites-store",
+          "title": "Publish preferences after the save succeeds",
+          "html": "<p>Persistence stores preferences for an ordinary reopen. FavoritesStore encodes a versioned document of sorted unique IDs. A missing file starts empty. Corrupt data, repeated IDs or an unsupported version throws while preserving the bytes. The view model keeps its store unavailable instead of overwriting failed input with a convenient empty list.</p><p>A mutation first builds a separate next Set. It inserts or removes the selected ID, encodes the proposed document and calls the injected writer. Only after writing succeeds does it assign ids to next. MarketModel then publishes favorites. If writing throws, the old visible selection remains and a failure message explains the unsuccessful attempt.</p><p>Set insertion is idempotent: repeated Favorite requests retain one copy of the same ID. Sorting makes document ordering predictable without redefining identity. A test writer can throw before touching disk, proving memory rollback for that boundary. It does not prove crash consistency or coordination among multiple simultaneous writers.</p><p>The native folder is under Application Support. Host tests use a unique temporary directory and remove it afterward. The small synchronous file operation is an explicit teaching tradeoff; a surrounding async service does not automatically move file IO off the UI owner. Larger stores need an IO owner, sequencing, migration and recovery policy.</p>"
+        },
+        {
+          "id": "availability-and-evidence",
+          "title": "Check presentation and storage separately",
+          "html": "<p>NavigationStack and Swift Charts began on iOS sixteen. This scratch screen targets iOS seventeen, matching its onChange overload and the course project baseline. ObservableObject and StateObject avoid requiring the Observation macro. A local LabState alias selects SwiftUI's State property-wrapper type under the current SDK's same-name macro overload.</p><p>Host checks establish decimal addition, sample order, favorite idempotence, ordinary reopen, failed-write rollback, corrupt-byte preservation and future-version refusal. The temporary directory is independent of learner progress. A reopened file does not prove power-loss durability, multi-scene consistency, file coordination or disk failure recovery.</p><p>Native typechecking confirms the Chart, navigation and formatting declarations match the SDK and target. It does not verify currency appearance under every locale, large-text wrapping, VoiceOver, swipe discovery or navigation restoration after process death. Runtime evidence must name the actual simulator/device and settings used.</p><p>The inspected client carousel owns Published state separately from its async search closure. That supports service/state ownership discussion without establishing our market, charts or favorites there. Later architecture and persistence deep dives are optional extensions. The learner's independent capstone must change a fixture and report predicted search, detail and preference outcomes rather than copy the answer.</p><p>The final host suite adds canonical rendering and value-round-trip checks for 0.00000001, 12.345678, redundant zeroes and zero. These are formatter assertions with accepted Decimal inputs, separate from the locale-dependent rounded overview and from unperformed native presentation checks.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What happens to an absent asset's favorite ID under this policy?",
+          "options": [
+            "It selects the next row.",
+            "It remains a preference and may match if the ID returns.",
+            "It changes an Apple account."
+          ],
+          "answer": 1,
+          "explanation": "Favorite identity is independent of the current catalog, and detail handles absence explicitly."
+        },
+        {
+          "question": "Does Double chart geometry replace authoritative Decimal amounts?",
+          "options": [
+            "Yes.",
+            "No, it converts only a display copy.",
+            "Only with duplicate times."
+          ],
+          "answer": 1,
+          "explanation": "Stored amounts and exact sample text remain Decimal; drawing uses approximate geometry."
+        },
+        {
+          "question": "A favorite write fails. What is published?",
+          "options": [
+            "The attempted set.",
+            "The previous saved set plus a failure message.",
+            "An empty asset catalog."
+          ],
+          "answer": 1,
+          "explanation": "The model publishes next IDs only after a successful save. Catalog and preference failures are independent."
+        }
+      ],
+      "exercise": {
+        "brief": "Add an Ember detail flow and an injected favorite-save failure.",
+        "steps": [
+          "Predict local EMB search with Favorites only on/off.",
+          "Open Ember by ID, then accept a snapshot where it is absent.",
+          "Inject a failing writer and compare old selection and accepted assets.",
+          "Add repeated sample time and reject it before Chart."
+        ],
+        "acceptance": [
+          "Local search generates no HTTP.",
+          "Detail resolves current identity or explains absence.",
+          "Failed persistence keeps old favorites and assets.",
+          "Chart conversions do not replace Decimal domain values."
+        ],
+        "solution": "<p>Give Ember ID ember and symbol EMB. Searching EMB matches the symbol. With Favorites only enabled, it appears only if ember is in the set. Clearing query or disabling the filter changes derived rows without deleting the accepted Asset or preference.</p><p>Navigate by ember. When a valid replacement excludes that ID, the existing detail reports absence instead of substituting the next index. Retain the preference under this declared policy, so later reappearance makes it useful. No copied Asset remains silently stale while the catalog advances.</p><p>Build next before saving. Inject a writer that throws and verify previous favorites remain visible while catalog rows stay accepted. Corrupt-store initialization refuses writes rather than resetting bytes. Ordinary reopen establishes basic persistence, leaving crash and multiwriter behavior pending.</p><p>Repeated Ember seconds fail series validation before Chart. Valid samples keep Decimal amounts, converting only display copies. Record the changed fixture, expected filter/detail states, actual commands and any native interaction. Locale formatting and accessibility need observed settings and outcomes, not inference from compilation. This answer leaves independent implementation and evidence to the learner.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: NavigationStack",
+          "url": "https://developer.apple.com/documentation/swiftui/navigationstack"
+        },
+        {
+          "label": "Apple: Chart",
+          "url": "https://developer.apple.com/documentation/charts/chart"
+        },
+        {
+          "label": "Apple: Data atomic writing",
+          "url": "https://developer.apple.com/documentation/foundation/data/writingoptions/atomic"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client owns published state behind a service closure",
+          "path": "ios-client/Projects/Features/ZDHome/Sources/ZDHome/NearbyProvidersCarouselViewModel.swift",
+          "line": 23,
+          "why": "Inspected Published state and separately injected async search closure; no market, Charts or favorites integration is implied."
+        }
+      ],
+      "checklist": [
+        "I can derive filtered rows and resolve current detail by ID.",
+        "I can preserve saved state on write failure.",
+        "I can separate Decimal amounts from chart geometry."
+      ],
+      "simple": {
+        "story": "Tess keeps a catalog of cards and a separate set of favorite labels. Looking through a search window hides cards that do not match; it does not shred them. Opening a label reads its current card. If that card is absent, Tess says so instead of substituting the next one. For a graph she uses approximate positions on paper and keeps original printed amounts beside it. A failed notebook save leaves her previously recorded favorite choice visible.",
+        "meaning": "Search and detail derive from stable IDs, while storage and chart drawing have separate contracts.",
+        "example": {
+          "before": "Ember exists and favorite IDs contain ember.",
+          "change": "Accept a catalog without Ember.",
+          "after": "Detail reports absence; ember remains a saved preference."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Derive rows and detail from one accepted catalog.",
+          "items": [
+            {
+              "label": "Catalog",
+              "text": "Accepted IDs and Decimal amounts remain authoritative."
+            },
+            {
+              "label": "Projection",
+              "text": "Query and favorite filters derive visible rows."
+            },
+            {
+              "label": "Detail",
+              "text": "Resolve its route ID against current data."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Projection",
+            "meaning": "A display derived from owned data."
+          },
+          {
+            "term": "Idempotent",
+            "meaning": "Repeating a requested effect does not duplicate it."
+          },
+          {
+            "term": "Persistence",
+            "meaning": "Saving data for a later reopen."
+          }
+        ],
+        "remember": "Filtering hides rows; identity chooses records; formatting presents amounts.",
+        "boundary": "File reopen does not prove crash durability, and chart geometry does not provide arbitrary-precision arithmetic."
+      }
+    },
+    {
+      "id": "128",
+      "title": "Recover offline failures and cancel resource work",
+      "summary": "Keep asset, favorite and image failures independent; stop obsolete resource loads; and finish the synthetic explorer with a precise evidence handoff.",
+      "duration": 135,
+      "level": "Project sequence",
+      "prerequisites": [
+        "127",
+        "082"
+      ],
+      "objectives": [
+        "Own and cancel remote-image subscriptions without disturbing asset data.",
+        "Describe post-buffer byte caps, decoded-image cost and cache boundaries precisely.",
+        "Deliver an independent offline capstone with honest native/provider verification limits."
+      ],
+      "sections": [
+        {
+          "id": "independent-dependencies",
+          "title": "Keep a useful screen when one dependency fails",
+          "html": "<p>A dependency is another component the feature needs for one part of its job. The asset snapshot, local favorite file, optional remote icon and native chart are different dependencies. Treating them as one all-or-nothing operation makes a small failure unnecessarily destroy useful data.</p><p>In this lab, snapshot failure retains accepted rows with a failed-refresh message. Favorite-save failure retains prior saved selection. Icon failure shows a placeholder while asset identity and price remain visible. No synthetic row has an icon URL, so opening the default app loads no external image. The app can remain useful with all external networking unavailable.</p><p>An accepted empty snapshot differs from failure. Empty success intentionally replaces rows; current error preserves them. Cancelling a refresh preserves them with a cancellation message. Local search and Favorites only still derive from those accepted rows. Text should explain why displayed data may be old instead of presenting it as freshly loaded.</p><p>Before implementation, make a failure table with dependency, retained state, visible message, retry action and owner. A failed icon owns only its image state. A corrupt preferences store owns its disabled preference writes. The person should not lose a readable catalog because an unrelated image server or disk write failed.</p>"
+        },
+        {
+          "id": "resource-owner",
+          "title": "Give each image request a small owner",
+          "html": "<p>A resource owner controls the work that obtains and retains a resource. Each RemoteIcon uses its own StateObject IconLoader. On appearance it loads the current optional URL; on URL change it replaces the load; on disappearance it cancels. A generation protects commits that were already queued before cancellation.</p><p>load first calls stop, clears image/failure state and returns immediately for nil URL. HTTPS is required for a supplied remote URL. The loader retains AnyCancellable from URLSession.dataTaskPublisher. It checks accepted status, image MIME type and a byte cap before a main-actor hop creates UIImage. The generation check applies to image success and failure.</p><p>Consider a cell showing asset A's icon and then being asked for asset B's URL. stop invalidates A's token and requests subscription cancellation. A's later data cannot become B's visible icon. Identity alone is insufficient when the same row ID receives a corrected URL, so URL change also restarts the owned resource.</p><p>Do not create network work inside body. SwiftUI can evaluate a view description repeatedly, and doing so would generate duplicate unowned requests. Lifecycle actions and a retained owner make start/replace/stop visible. Actual view disappearance and native cancellation still need runtime evidence; the host gate proves the relevance mechanism only.</p>"
+        },
+        {
+          "id": "image-boundaries",
+          "title": "Bound data carefully and explain what remains unbounded",
+          "html": "<p>A byte cap limits the accepted encoded image data to two hundred sixty-two thousand one hundred forty-four bytes. This teaching URLSession publisher buffers before checking that cap. It does not bound the transfer or peak response memory while receiving. A production delegate/streaming adapter needs earlier rejection and an actual received-byte policy.</p><p>Encoded size also does not bound decoded pixel memory. A small compressed file can describe a very large bitmap. UIImage construction and display can trigger work beyond this simple byte check. Production image loading should inspect dimensions, downsample to the intended display size, process on an appropriate owner, and measure representative images. This companion supplies real integration but deliberately does not claim that full image pipeline.</p><p>A frame of thirty-two by thirty-two points sets the rendered icon area; it does not force the source image to decode at that size. A missing or bad image gets a decorative placeholder hidden from accessibility because text already carries asset identity. Price and favorite controls remain usable during failure.</p><p>The loader has no app-owned decoded-image cache. URLSession.shared may use its configured system URL caching behavior, which differs from a bounded bitmap cache keyed by URL, revision and target size. Do not claim memory reuse or request coalescing merely because the icon view looks small. Adding those policies is an independent exercise with ownership, memory and invalidation evidence.</p>"
+        },
+        {
+          "id": "cancellation-contract",
+          "title": "Reject obsolete resource successes and errors",
+          "html": "<p>Cancellation is a request to stop work, not an instant stop guarantee. The generation invalidation is the state-safety rule. stop must change the generation before releasing the handle so an already delivered callback or enqueued actor hop cannot publish under an old token.</p><pre><code class=\"language-swift\">func stop() {\n    gate.invalidate()\n    request?.cancel()\n    request = nil\n}</code></pre><p>The optional chaining on request calls cancel only when a handle exists. Assigning nil releases the owned subscription. The helper does not remove accepted catalog rows or change favorite IDs because it owns only image work. Its gate is separate from MarketSnapshot's refresh gate.</p><p>A result guarded before a scheduler hop can still become obsolete during the hop. Check inside the final main-actor closure immediately before assigning image or failed. For the same reason, a stale failure cannot replace a newer loaded icon with an error placeholder. The asset owner and image owner use the same principle in separate lanes.</p><p>For an async loader alternative, retain its Task, ask for cancellation on replacement, recheck Task cancellation and generation after await, and handle error relevance identically. Avoid hiding an unretained Task in Future. Lesson one hundred twenty-six already taught that boundary, so no advanced concurrency course is silently required to complete the image exercise.</p>"
+        },
+        {
+          "id": "capstone-and-comparison",
+          "title": "Change the fixture and compare real outcomes",
+          "html": "<p>An independent capstone requires work that differs from the supplied answer. Add fictional Ember with a unique ID, valid Decimal-string amount and ordered sample series. Choose new query/favorite/detail cases, inject failures, and predict exact retained state before running. Merely opening the default Luma/Pebble screen is reference use, not completion.</p><p>The host checks already exercise malformed amounts, duplicate IDs/times, current and obsolete success/error, cancelled refresh, ordinary reopen and corrupt/future store refusal. Extend a case where a resource gate is cancelled while the snapshot gate remains current. Explain why an image error does not affect those rows. This tests a boundary rather than reproducing the decoder implementation.</p><p>ServiceChecks compares the Combine and async adapters against the same local intercepted success, 503, HTML and malformed-JSON responses. The values must agree and failures must reject. That provides concrete integration comparison evidence without installing a server or contacting a provider. It does not compare performance, native frame time or remote cancellation efficiency.</p><p>For native practice, use the isolated Xcode target and include only its own Core and App files. Verify search, Favorites only, detail absence, sample text, failed save and large text. Optional icon requests require a deliberately approved endpoint and separate evidence. Do not add real feeds, secrets or trading actions to make the exercise appear realistic.</p>"
+        },
+        {
+          "id": "availability-and-evidence",
+          "title": "Deliver a precise handoff",
+          "html": "<p>The native screen targets iOS seventeen, using SwiftUI, Combine, Foundation, UIKit image decoding and Swift Charts. These frameworks do not all share the same introduction version: Combine's base is iOS thirteen, Charts iOS sixteen, and newer SwiftUI overloads used here fit the chosen seventeen baseline. The README records the actual compiler/SDK rather than guessing versions from syntax.</p><p>Successful Swift six native typechecking covers every supplied App and Core source file. Host execution covers local domain and preference behaviors. Offline URLProtocol execution covers actual service adapters against intercepted responses. The author did not link or launch an app, exercise VoiceOver, download icons, fetch a real provider or test remote TLS, latency and rate limits.</p><p>The current code uses bounded small synchronous preference operations and a basic image decoder. Its byte caps are checked after buffering. There is no downsampling, bitmap cache, persistent quote cache, background navigation or continuous live-price subscription. These are explicit implementation limits that guide future work rather than hidden production claims.</p><p>The client's Future/Task bridge is an inspected example of an ownership question, not a claim that its producer cancellation is wired like this lab. Hand off paths, changed learner cases, commands/results, retained-state predictions and pending platform checks. Later performance and concurrency deep dives are optional reading for extending those boundaries, with separate evidence when the learner reaches them.</p><p>Optional later course reading: lesson <code>024</code> deepens reliability and observability after this project's locally taught recovery rules. No prerequisite knowledge from that lesson is assumed here.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "An icon request fails. Which state should it own?",
+          "options": [
+            "The whole catalog must disappear.",
+            "Only image state, with a placeholder and retained asset text.",
+            "Favorite IDs must reset."
+          ],
+          "answer": 1,
+          "explanation": "Independent dependencies have independent recovery. An icon cannot erase accepted prices or preferences."
+        },
+        {
+          "question": "Does a post-download 256 KiB cap bound decoded image memory?",
+          "options": [
+            "Yes.",
+            "No, encoded bytes, transfer buffering and decoded dimensions differ.",
+            "Only at 32-point view size."
+          ],
+          "answer": 1,
+          "explanation": "Small compressed input may decode to a large bitmap. A frame is presentation geometry, not a downsampling operation."
+        },
+        {
+          "question": "Why invalidate the image gate before cancel and release?",
+          "options": [
+            "It grants more network access.",
+            "It prevents queued old success or error from committing.",
+            "It erases system URL caches."
+          ],
+          "answer": 1,
+          "explanation": "Cancellation may arrive after delivery. Invalidating logical authority protects the eventual mutation boundary."
+        }
+      ],
+      "exercise": {
+        "brief": "Complete the Ember explorer and add an independent image/resource cancellation case with an evidence handoff.",
+        "steps": [
+          "Create a changed fictional asset, series and exact filter/detail predictions.",
+          "Use separate gates to cancel a resource while retaining the snapshot.",
+          "Run domain and offline adapter checks with new failure input.",
+          "Typecheck the native files and record runtime/accessibility/provider rows individually."
+        ],
+        "acceptance": [
+          "New valid synthetic data is independently authored.",
+          "Resource failures and cancellation cannot erase accepted rows or favorites.",
+          "Decimal input remains exact and chart conversion remains presentational.",
+          "The report states buffering, decoding, cache and native-runtime limits honestly."
+        ],
+        "solution": "<p>Add Ember using the documented array schema, with no icon URL by default. Predict a matching symbol query, a Favorites only exclusion before saving and inclusion after success, then detail absence after an accepted replacement removes ember. A failed favorite writer retains the saved selection rather than changing it optimistically.</p><p>Create separate snapshot and resource gates. Capture their tokens, invalidate only the resource lane, and deliver its obsolete success and error. Both are rejected. The snapshot token remains current and its accepted rows stay available. Explain that this proves local authority separation, not that a remote server stopped sending bytes instantly.</p><p>Run the real service adapters through the offline protocol and compare accepted arrays. Inject an additional MIME or malformed-input case and record which boundary fails. Typecheck every native source against the selected simulator target. Optional app interaction must name an actual built/installed target and observed controls, not infer usability from compile success.</p><p>The handoff states that the image adapter buffers before its cap, does not inspect dimensions or downsample, and has no app-owned bitmap cache. Synthetic quotes are made up. Host and intercepted-service checks establish no live-feed, TLS, resource-download or device-performance behavior. The learner's modified fixture, independent schedule and recorded observations remain necessary; this answer does not complete them automatically.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: URLSessionDataTask",
+          "url": "https://developer.apple.com/documentation/foundation/urlsessiondatatask"
+        },
+        {
+          "label": "Apple: AnyCancellable",
+          "url": "https://developer.apple.com/documentation/combine/anycancellable"
+        },
+        {
+          "label": "Apple: Reducing image memory use",
+          "url": "https://developer.apple.com/documentation/imageio/cgimagesourcecreatethumbnailatindex(_:_:_:)"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client bridge exposes producer ownership",
+          "path": "ios-client/Projects/Features/ZDHome/Sources/ZDHome/NearbyProvidersCarouselViewModel.swift",
+          "line": 55,
+          "why": "Inspected Task creation inside Future with no retained Task handle in this method; cancellation must be analyzed separately from subscription scheduling."
+        }
+      ],
+      "checklist": [
+        "I can cancel each resource through its own owner and gate.",
+        "I can preserve useful data across independent failures.",
+        "I can report exact host, adapter and native evidence limits."
+      ],
+      "simple": {
+        "story": "Ari reads a catalog page while a helper fetches a small decorative picture. The picture fails to arrive, but the printed name and price are still readable. Ari changes the requested picture and marks the old request obsolete. If the old picture later arrives, it cannot be placed beside the new item. The picture's envelope may be small while the unfolded poster is huge, so Ari checks more than envelope size before planning wall space.",
+        "meaning": "Resource ownership preserves independent data and distinguishes encoded bytes from decoded memory.",
+        "example": {
+          "before": "The catalog is accepted and icon A owns token 1.",
+          "change": "Replace A with icon B, token 2; A fails late.",
+          "after": "A's error is ignored and the catalog remains accepted."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Stop obsolete resource work without invalidating accepted assets.",
+          "items": [
+            {
+              "label": "Replace",
+              "text": "Invalidate the icon's old token."
+            },
+            {
+              "label": "Cancel",
+              "text": "Request subscription cleanup."
+            },
+            {
+              "label": "Keep useful data",
+              "text": "Catalog and favorite owners retain their state."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Resource owner",
+            "meaning": "The component responsible for obtaining and releasing a resource."
+          },
+          {
+            "term": "Downsampling",
+            "meaning": "Decoding an image at a smaller useful resolution."
+          },
+          {
+            "term": "Evidence",
+            "meaning": "An actual command or observation supporting a specific claim."
+          }
+        ],
+        "remember": "A failed picture should not erase a readable catalog.",
+        "boundary": "Cancellation is not instant; encoded-byte checks do not bound decoded pixels or prove device memory behavior."
+      }
+    }
+  ]
+}

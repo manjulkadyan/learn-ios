@@ -1,0 +1,204 @@
+{
+  "questions": [
+    {
+      "id": "iq-125-a",
+      "lesson": "125",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "What must pass before a received asset array becomes an accepted snapshot?",
+      "scenario": "A fixture returns 503 JSON, then 200 HTML, then 200 JSON with repeated asset IDs.",
+      "minutes": 7,
+      "androidBridge": "Compare Retrofit/OkHttp response, DTO and domain boundaries; HTTP completion and domain success are different on either platform.",
+      "rubric": [
+        "Distinguishes transport, status, MIME, JSON and domain validation.",
+        "Rejects repeated IDs before publishing.",
+        "Parses bounded decimal strings directly into Decimal.",
+        "Preserves prior accepted rows on current failure and labels synthetic data."
+      ],
+      "answerHTML": "<p>Treat each boundary separately. Receiving bytes proves transport delivery, not acceptance. A 503 fails the status policy before decoding. A 200 text/html response fails the MIME policy. Valid application/json can decode successfully yet fail domain validation because repeated IDs would make multiple rows claim one identity.  The DTO holds input strings and integer sample seconds. The domain adapter accepts bounded IDs, exact decimal-string grammar and strictly increasing samples, then creates Assets. Parse prices directly into Decimal with the fixed input locale rather than converting through Double. A successful empty array is a different outcome from a rejected response.  Preserve the prior accepted snapshot on current failure and explain its freshness. Fixture data remains made up. URLProtocol checks exercise actual URLSession adapter code with local intercepted responses but establish no remote TLS, feed accuracy or rate-limit behavior. Kotlin response and DTO separation is useful context, not proof that every Retrofit configuration matches this service.</p>",
+      "followUps": [
+        "Why can HTTP 204 still fail the declared body contract?",
+        "What would a partial-import policy need to report?"
+      ],
+      "pitfalls": [
+        "Treating successful transport as accepted application data.",
+        "Turning every invalid input into a successful empty array."
+      ]
+    },
+    {
+      "id": "iq-125-b",
+      "lesson": "125",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Both adapters decode a fixture, but production returns HTML and huge responses. Which claims and limits need correction?",
+      "scenario": "The service caps data after dataTaskPublisher or data(for:) has buffered the body; a price is 12.30oops.",
+      "minutes": 10,
+      "androidBridge": "Compare OkHttp body buffering and Kotlin BigDecimal parsing, while Swift Decimal has its own finite precision and parser behavior.",
+      "rubric": [
+        "Checks HTTP MIME and actual bytes before decoding domain data.",
+        "Calls the size cap post-buffer rather than streaming protection.",
+        "Rejects malformed decimal text with grammar and bounded length.",
+        "Separates intercepted adapter tests from remote networking and trust."
+      ],
+      "answerHTML": "<p>Reject the HTML response at the MIME boundary rather than attempting to decode it or presenting empty success. The one-megabyte cap checks buffered bytes, so it limits accepted input but does not prevent a larger response from consuming transfer time and memory first. A production bound needs delegate/streaming control, early metadata checks and an actual received-byte policy.  Reject 12.30oops with the explicit grammar before Decimal parsing. Decimal may accept a numeric prefix under some parsing behavior, and it is bounded precision rather than Kotlin BigDecimal's arbitrary precision. Keep the length and fractional-digit contract visible and never claim formatting repairs malformed input.  Run both real adapters through the injected local URLProtocol for status, MIME and decoding failures. Those checks validate code integration without DNS or remote requests. They do not establish live feed schema, redirect policy, TLS, authentication, quote freshness or resource usage on devices. Assign those integration checks independently and retain prior accepted catalog state during failure.</p>",
+      "followUps": [
+        "What new evidence would support a streaming memory bound?",
+        "How would redirect and icon-host approval become explicit?"
+      ],
+      "pitfalls": [
+        "Calling a buffered-body check a transfer or peak-memory guarantee.",
+        "Using parser success without a declared decimal grammar."
+      ]
+    },
+    {
+      "id": "iq-126-a",
+      "lesson": "126",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Explain AnyCancellable, receive(on:) and the final main-actor generation check.",
+      "scenario": "The old refresh value has already been queued when the person presses Cancel.",
+      "minutes": 7,
+      "androidBridge": "Use coroutine collection ownership as an analogy; Combine demand and producer eagerness are distinct contracts.",
+      "rubric": [
+        "Retains the subscription handle and cancels it explicitly.",
+        "Explains downstream scheduling versus upstream work.",
+        "Separates actor isolation from logical relevance.",
+        "Invalidates before release and guards both value and failure."
+      ],
+      "answerHTML": "<p>AnyCancellable keeps the refresh subscription owned and supplies a cancellation request. receive(on: DispatchQueue.main) schedules downstream delivery; it does not move an earlier decoder automatically or annotate every closure with Swift actor isolation. The model crosses deliberately into @MainActor for visible state mutation.  Cancelling first invalidates the generation, then asks the subscription to stop and releases its handle. An old value may already be queued, so the commit closure compares its captured token before updating rows. Apply exactly the same comparison to failure; an old error is also obsolete.  MainActor provides safe isolation, not a guarantee that nothing changes while async work waits or a scheduler hop is queued. A current failure retains accepted rows with a failure message, while a valid empty success can replace them. Host schedules prove this local rule; native lifecycle and remote producer cleanup require separate observations. Kotlin cancellation discipline helps frame the question but cannot supply Combine-specific semantics automatically.</p>",
+      "followUps": [
+        "Why does discarding the handle immediately often stop delivery?",
+        "Where should a heavy parsing scheduler be introduced?"
+      ],
+      "pitfalls": [
+        "Assuming receive(on:) changes upstream execution.",
+        "Checking relevance before rather than at the final mutation."
+      ]
+    },
+    {
+      "id": "iq-126-b",
+      "lesson": "126",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Why can a Task hidden inside Future outlive subscription cancellation? Choose a clearer one-shot boundary.",
+      "scenario": "A view disappears and cancels AnyCancellable, but its Future-created Task continues and later calls the promise.",
+      "minutes": 10,
+      "androidBridge": "Flow/coroutine bridges also need owned jobs; Future creation, Deferred and switchToLatest have different Apple contracts.",
+      "rubric": [
+        "Explains Future's eager creation and independent Task handle.",
+        "Identifies missing task cancellation wiring.",
+        "Distinguishes flatMap max-one from latest replacement.",
+        "Compares directly owned async Task with a deliberately cancellation-aware bridge."
+      ],
+      "answerHTML": "<p>Future starts its closure when created; the Task it creates has a separate lifetime. Cancelling the subscriber does not magically retrieve or cancel an unretained Task handle. Deferred can postpone Future construction until subscription, but it still does not forward cancellation to that task. switchToLatest replaces inner subscriptions, while an inner hidden Task can continue without a bridge.  For a single snapshot, retain a Task directly in the model, invalidate the old generation, cancel on replacement or exit, await the service and check cancellation plus relevance before success or failure commits. Alternatively implement a narrow publisher bridge that deliberately retains and cancels its Task.  The inspected client uses Future/Task and flatMap(maxPublishers: .max(1)); that source is evidence of a bridge and an inner-concurrency policy, not automatic latest-only behavior or wired cancellation. Compare lifecycle and returned arrays with controlled schedules rather than claiming a performance win. Keep the later concurrency deep dive optional because the required ownership steps are taught here.</p>",
+      "followUps": [
+        "What would you test in a cancellation-aware bridge?",
+        "When would a continuous publisher be better than a one-shot async function?"
+      ],
+      "pitfalls": [
+        "Treating Deferred or switchToLatest as a missing-task-handle replacement.",
+        "Assuming max-one means newest result wins."
+      ]
+    },
+    {
+      "id": "iq-127-a",
+      "lesson": "127",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "How do stable detail IDs, favorite filtering and Decimal chart copies remain consistent?",
+      "scenario": "Ember is favorite, then disappears from an accepted snapshot; the chart converts sample prices to Double.",
+      "minutes": 7,
+      "androidBridge": "Compare Android navigation IDs and derived lists; Swift Decimal is not identical to arbitrary-precision BigDecimal.",
+      "rubric": [
+        "Derives rows from one catalog and independent query/favorite state.",
+        "Resolves detail by ID and handles absence explicitly.",
+        "Retains absent favorites under the declared policy.",
+        "Keeps Decimal authoritative while converting display geometry."
+      ],
+      "answerHTML": "<p>The accepted catalog is the source of truth. Query matching and Favorites only derive visible rows without deleting records. Detail navigation carries ember and resolves it against current Assets, so a refreshed representation appears automatically. When Ember is absent, detail explains absence rather than substituting the next index.  The favorite set is a local preference independent of today's catalog. This policy retains ember so a later reappearance can match again. A different product may prune preferences, but it must make that explicit rather than accidentally coupling storage to a filter.  Prices and samples remain Decimal under the bounded service grammar. The Chart receives a Double copy for approximate geometry, and exact formatted sample text remains available beside it. Neither drawing nor currency formatting becomes an arithmetic input. Swift Decimal has finite precision, so quantity, rounding and overflow rules need additional design before extending this read-only explorer into calculations.</p><p>Keep overview currency rounding separate from canonical sample/detail text: 0.00000001 renders USD 0.00000001 and 12.345678 renders USD 12.345678 through POSIX NSDecimalString. Check those exact strings and Decimal round-trips offline; a rounded overview is not exact-value evidence.</p>",
+      "followUps": [
+        "Why should filtering not mutate persistent favorites?",
+        "What happens when only an asset's display name changes?"
+      ],
+      "pitfalls": [
+        "Navigating by row index or permanently copied values.",
+        "Replacing Decimal amounts with chart Doubles."
+      ]
+    },
+    {
+      "id": "iq-127-b",
+      "lesson": "127",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "A favorites save fails and a corrupt store is found on reopen. What should the user and bytes see?",
+      "scenario": "The model attempts to add pebble while only luma was saved; the writer throws. Another file contains broken JSON.",
+      "minutes": 10,
+      "androidBridge": "Compare DataStore/Room recovery decisions with Foundation files; atomic write options do not establish multiwriter or crash guarantees.",
+      "rubric": [
+        "Builds next IDs separately and publishes only after successful write.",
+        "Retains prior selection on write failure.",
+        "Preserves corrupt or future-version bytes and disables unsafe overwrite.",
+        "Separates ordinary reopen, injected failure and crash/multiwriter evidence."
+      ],
+      "answerHTML": "<p>Build a candidate Set from saved IDs, insert pebble, encode it and call the writer. Publish the new IDs only after success. A thrown writer leaves visible favorites as luma and reports that the attempted change failed. It must not clear accepted assets, because preference and catalog ownership are independent.  On malformed JSON or an unsupported version, keep the original file. The model should leave the store unavailable and expose repair guidance rather than silently creating empty preferences and overwriting evidence. The supplied host failure closure throws before mutation; it proves that publish-after-save boundary, not every disk failure mode.  Reopening a valid temporary file verifies ordinary persistence and idempotent ID insertion. Data's atomic option supports replacement semantics but is not a complete power-loss, multi-process or multi-scene coordination proof. Record those limits and choose a migration/repair owner before broadening the store. The learner should add an independent failure case instead of copying the reference test.</p>",
+      "followUps": [
+        "What should an explicit repair flow preserve or export first?",
+        "How does a future schema version differ from missing storage?"
+      ],
+      "pitfalls": [
+        "Publishing optimistically without a stated rollback policy.",
+        "Deleting corrupt input to make initialization appear successful."
+      ]
+    },
+    {
+      "id": "iq-128-a",
+      "lesson": "128",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "How do you prevent an old icon from appearing under a new URL without losing asset rows?",
+      "scenario": "Icon A returns after a row begins loading B; then A's error arrives on a queued actor hop.",
+      "minutes": 8,
+      "androidBridge": "Compare image-loader request keys and coroutine cancellation; native image decoding and lifecycle need their own evidence.",
+      "rubric": [
+        "Uses an independent image owner and generation.",
+        "Invalidates on URL change/disappear before cancel/release.",
+        "Guards image success and failure inside the final actor commit.",
+        "Retains catalog/favorites and provides a decorative placeholder."
+      ],
+      "answerHTML": "<p>Each RemoteIcon owns an IconLoader and its cancellable. Loading B calls stop first, invalidating A's generation and requesting cleanup before clearing and replacing image state. When A's data or failure reaches the main-actor closure, its captured token no longer matches, so it cannot replace B or display a stale error.  The image gate is independent of the snapshot refresh gate. An icon failure affects only its placeholder; accepted asset names, prices and saved favorite choices remain usable. nil URL returns immediately, which keeps default synthetic rows free of image networking.  Start work in explicit lifecycle actions rather than body evaluation, and also handle URL changes for a still-existing row. The post-buffer encoded cap and 32-point frame do not downsample or bound decoded memory. Host gate schedules prove local relevance, while native disappearance, resource cancellation, decoding and device memory require separate observations. A direct async variant would likewise need an owned Task and post-await guards.</p>",
+      "followUps": [
+        "Why does row ID alone not handle a corrected URL?",
+        "Which stage needs a decoded-dimension policy?"
+      ],
+      "pitfalls": [
+        "Putting network work in body.",
+        "Letting resource failure invalidate accepted catalog data."
+      ]
+    },
+    {
+      "id": "iq-128-b",
+      "lesson": "128",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Define an honest delivery gate for the original offline explorer and its real adapters.",
+      "scenario": "Host and intercepted-service checks pass; no app is launched, icon downloaded or remote feed contacted.",
+      "minutes": 15,
+      "androidBridge": "Android test-layer distinctions transfer as evidence categories; simulator, provider and device claims remain platform-specific.",
+      "rubric": [
+        "Names host/domain, URLProtocol adapter and native typecheck results separately.",
+        "Lists linked-app/runtime/accessibility/provider gaps without inventing measurements.",
+        "Assigns image memory, streaming caps and cache work concrete owners.",
+        "Requires changed synthetic data and independent learner evidence, with recovery and a simpler default."
+      ],
+      "answerHTML": "<p>Ship the authored companion as a bounded teaching artifact with separate evidence rows. Host checks cover validation, stale-state schedules, decimal arithmetic and preference recovery. URLProtocol executes actual Combine and async URLSession adapters against local intercepted responses. Native typechecking verifies supplied source declarations for the target. None establishes a linked or launched app.  Keep the default synthetic service, absent icon URLs and readable text controls. Require an independent Ember fixture, changed schedule and recorded acceptance output for learner completion. Runtime large text, VoiceOver, navigation behavior, optional image downloads, remote TLS/feed contracts and cancellation need actual isolated-target observations.  The image pipeline buffers before checking its encoded cap and lacks dimension inspection, downsampling and an app-owned bitmap cache. Assign those extensions an owner and representative device evidence rather than reporting a fictional performance improvement. Preserve accepted rows and saved preferences through independent failure. Later reliability and concurrency lessons are optional follow-up; the local project already explains its required HTTP and cancellation basics.</p>",
+      "followUps": [
+        "Which evidence would justify enabling an approved remote endpoint?",
+        "What simpler release still satisfies the main learning task?"
+      ],
+      "pitfalls": [
+        "Treating passing host tests as native/provider certification.",
+        "Calling supplied answers completed learner work."
+      ]
+    }
+  ]
+}

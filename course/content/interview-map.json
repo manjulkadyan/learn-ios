@@ -1,0 +1,204 @@
+{
+  "questions": [
+    {
+      "id": "iq-121-a",
+      "lesson": "121",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Why does Paper Garden remain selected after reordering, and which coordinate inputs must be rejected?",
+      "scenario": "The two fictional destinations reverse order. Paper's name also changes; a third record contains longitude 181.",
+      "minutes": 6,
+      "androidBridge": "Compare stable RecyclerView/Compose item keys with Kotlin data-class equality; ID and whole-value equality remain different concepts.",
+      "rubric": [
+        "Stores selection by stable domain ID rather than index or name.",
+        "Explains labelled finite latitude/longitude and inclusive ranges.",
+        "Rejects duplicate/empty catalog IDs.",
+        "Applies validation during decoding as well as direct construction."
+      ],
+      "answerHTML": "<p>Select demo:paper rather than index one. Reordering changes the display order but the lookup still identifies Paper Garden, and renaming changes its representation rather than its identity. Identifiable supplies an id property but does not prove that two accepted records have different IDs; checkedPlaces rejects duplicate and empty identifiers.  Latitude belongs within minus ninety through ninety and longitude within minus one hundred eighty through one hundred eighty, with finite numbers required first. Longitude 181 fails the input contract. Keep labels at call sites so latitude and longitude are not accidentally swapped. Coordinate decoding calls the same checked initializer instead of allowing synthesized decoding to bypass validation.  Constructing CLLocationCoordinate2D only translates numbers; it does not fetch GPS or map tiles. Kotlin data-class equality may change with a renamed field, while stable domain identity remains the same. Host checks establish these rules for synthetic inputs, leaving native map behavior to separate evidence.</p>",
+      "followUps": [
+        "What should happen if the selected ID is removed?",
+        "Why can two destinations legitimately share coordinates?"
+      ],
+      "pitfalls": [
+        "Using array index or display text as permanent identity.",
+        "Treating a coordinate value as a location permission request."
+      ]
+    },
+    {
+      "id": "iq-121-b",
+      "lesson": "121",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "A decoded catalog crashes ForEach and a valid marker is shown in the wrong country. How do you isolate the two faults?",
+      "scenario": "The API repeats one ID and swaps latitude/longitude in another record; both fields can remain numerically in range.",
+      "minutes": 10,
+      "androidBridge": "Android list keys and coordinate DTO validation pose similar questions; framework rendering cannot determine intended geography.",
+      "rubric": [
+        "Separates repeated identity from geographically wrong but valid data.",
+        "Rejects duplicates before publishing a candidate catalog.",
+        "Checks field order and source intent rather than silently clamping/swapping.",
+        "Preserves the last accepted catalog and records domain versus native evidence."
+      ],
+      "answerHTML": "<p>First inspect the accepted input contract. Repeated IDs make two rows claim the same identity, so validate a candidate catalog before assigning it to visible state. Preserve the previous catalog and report the invalid replacement. Next inspect labelled coordinate fields: range validation catches longitude 181 but cannot detect every swapped pair when both values happen to remain in range. Compare the source fixture and intended coordinate order instead of automatically swapping numbers until a marker looks plausible.  A valid coordinate establishes a representable position, not that it identifies the intended destination or a real fictional business. Add an independent failing import and a known labelled fixture expectation to the host checks. Keep those tests separate from opening MapKit to observe rendering. If geography remains uncertain, reject or request input correction rather than inventing a repaired place.  Stable selection follows domain identity across a valid reorder. A model fix does not prove tile availability, actual GPS, geocoding or roads; the handoff must name those separate pending observations.</p>",
+      "followUps": [
+        "What partial-import policy could preserve good records without hiding failures?",
+        "Which case would pass numeric ranges but still be wrong?"
+      ],
+      "pitfalls": [
+        "Assuming range checks establish semantic geographic correctness.",
+        "Publishing partially validated data or resetting all selection silently."
+      ]
+    },
+    {
+      "id": "iq-122-a",
+      "lesson": "122",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Explain the camera binding, String? selection and Marker tag in the iOS 17 screen.",
+      "scenario": "A text button chooses demo:paper, then the person pans away without selecting another destination.",
+      "minutes": 6,
+      "androidBridge": "Use Android camera/marker state as a responsibility analogy, not a one-to-one API translation.",
+      "rubric": [
+        "Distinguishes catalog, selected ID and camera framing.",
+        "Explains binding projection and matching tag type.",
+        "Keeps selection after a pan unless explicitly changed.",
+        "Names the iOS 17 modern Map/content availability boundary."
+      ],
+      "answerHTML": "<p>The catalog holds checked destinations. String? stores the selected destination's ID or nil. Marker.tag supplies a String matching that selection binding, allowing map content and ordinary buttons to address the same identity. The dollar-sign projection passes access to owned state rather than a copied value.  Camera position is a separate framing description. The Paper button deliberately changes both the selected ID and camera region. A later pan changes the viewpoint while Paper can remain selected. onMapCameraChange captures the region; the sample does not interpret every callback as a network-search command or fresh user intent.  This is the modern iOS 17 Map content/camera family. Older coordinateRegion examples use a different initializer family. A deployment annotation requires either a compatible target or a guarded fallback; it does not automatically make the feature available on older systems. The readable destination list remains useful when the Map branch is hidden, while native rendering and assistive-technology behavior need actual runtime evidence.</p>",
+      "followUps": [
+        "Why might automatic camera reframing on every refresh be frustrating?",
+        "How do you handle a response-scoped selected ID after replacement search?"
+      ],
+      "pitfalls": [
+        "Confusing selection with camera position.",
+        "Assuming every camera callback means the user requested network work."
+      ]
+    },
+    {
+      "id": "iq-122-b",
+      "lesson": "122",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "How would you deliver destination selection when tiles are unavailable and a person uses VoiceOver?",
+      "scenario": "The catalog works offline, but the Map surface fails to load and large text makes compact controls wrap.",
+      "minutes": 12,
+      "androidBridge": "Compare Android semantic controls and map accessibility; actual platform focus behavior needs separate evidence.",
+      "rubric": [
+        "Provides equivalent labelled text selection and visible selected state.",
+        "Preserves independent catalog state when map data fails.",
+        "Separates availability fallback from runtime failure recovery.",
+        "Names device/accessibility evidence, owner and a simpler list-only option."
+      ],
+      "answerHTML": "<p>Make destination choice a domain action with equivalent text buttons outside the Map branch. Share the stable selected ID with tagged markers, and expose Selected or Not selected through accessibility values and visible text/checkmarks. Keep origin and route messages readable without relying on a coloured path. A list-only first version may satisfy the primary task with lower interaction and data-dependency cost.  Preserve the accepted catalog during tile failure. A local array does not imply app-owned offline Apple tiles, and successful typechecking does not establish VoiceOver focus or large-text geometry. Keep the Show Apple map boundary explicit, then recover search and directions independently.  Assign screen composition and service recovery ownership separately. Verify selection from the text and map surfaces, long names, Dynamic Type, focus order, hidden-map state and provider failure in an actual isolated app. Record simulator/device and observed result. If that evidence is unavailable, retain the source and concrete pending checks rather than claiming accessibility compliance from model tests.</p>",
+      "followUps": [
+        "Which controls must remain usable if the map is removed entirely?",
+        "How should a refreshed estimate affect focus?"
+      ],
+      "pitfalls": [
+        "Treating pin colour or a gesture as the only task affordance.",
+        "Claiming native accessibility from a host identity test."
+      ]
+    },
+    {
+      "id": "iq-123-a",
+      "lesson": "123",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "When may this lab request a location fix, and how do permission and accuracy differ?",
+      "scenario": "The initial delegate callback says authorizedWhenInUse before anyone presses the location button; a later explicit request returns reduced accuracy.",
+      "minutes": 7,
+      "androidBridge": "Android runtime permission offers a sequence analogy; iOS usage keys, status and accuracy authorization are separate contracts.",
+      "rubric": [
+        "Does not request from initialization or unsolicited authorization callback.",
+        "Gates the fix on explicit wantsFix intent.",
+        "Handles denied/restricted and retains simulation.",
+        "Checks timestamp/actual horizontalAccuracy and labels approximate input."
+      ],
+      "answerHTML": "<p>Constructing the service configures its manager but does not request authorization or a fix. An initial authorization callback is not new intent. wantsFix stays false until the person presses Request my location once. For notDetermined, request When In Use authorization with the configured usage description; after grant, request one fix. Already granted access permits the button's one-fix request directly.  denied and restricted provide different explanations while preserving the simulation origin. Permission does not promise accuracy: reducedAccuracy is a separate platform axis, and desiredAccuracy is merely a preference. Inspect the delivered timestamp and nonnegative horizontalAccuracy rather than claiming the requested precision was achieved.  The accepted fix remains separate from route origin until the person chooses the toggle. Clearing intent ignores callbacks while stopped, but delegates lack the search lane's exact generation correlation. Host synthetic checks establish no prompt or physical-location behavior. Those require separately recorded scratch-target runtime interactions.</p>",
+      "followUps": [
+        "Why is requesting Always access unnecessary here?",
+        "What happens to a stale but otherwise valid fix?"
+      ],
+      "pitfalls": [
+        "Requesting in init or whenever an authorization callback fires.",
+        "Treating desiredAccuracy as a guarantee."
+      ]
+    },
+    {
+      "id": "iq-123-b",
+      "lesson": "123",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "A cancelled search's error overwrites newer results. Explain a correct owner and commit rule.",
+      "scenario": "A starts at generation 1, B at 2. B succeeds, then A fails on a queued callback.",
+      "minutes": 9,
+      "androidBridge": "Compare Kotlin coroutine Job cancellation plus stale-result guards; cancellation does not replace logical relevance checks.",
+      "rubric": [
+        "Retains both Task and MKLocalSearch resource handles.",
+        "Invalidates generation on replace, blank input and exit.",
+        "Guards success and error after await/actor hop.",
+        "Distinguishes main-actor safety, cancellation request and relevance."
+      ],
+      "answerHTML": "<p>MapModel owns one search lane and retains the Task and MKLocalSearch operation. Starting B invalidates A's generation and requests cancellation through both handles. B may commit at token two. A's later catch handler must compare its captured token one before changing any visible message, just as its success handler does.  MainActor prevents unsynchronized UI-state access, but a method can suspend at await while another action starts B. Isolation therefore cannot establish that A is current. Task.checkCancellation helps reject cancelled work, and generation comparison protects the final commit even if provider cancellation arrived too late or a value was queued already.  Empty query and screen exit invalidate the current token too; accepted prior places remain available with recovery text. Route and search gates stay separate, with replacement catalog acceptance explicitly invalidating route selection. Deterministic host schedules prove the policy, while Apple cancellation, network behavior and a launched screen remain separate evidence.</p>",
+      "followUps": [
+        "Why must the guard also cover empty responses?",
+        "Which operation changes route ownership after accepted search replacement?"
+      ],
+      "pitfalls": [
+        "Checking only success or checking the token only before suspension.",
+        "Assuming @MainActor freezes the screen during await."
+      ]
+    },
+    {
+      "id": "iq-124-a",
+      "lesson": "124",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Describe a route cache key and exact lifetime boundary for the supported directions options.",
+      "scenario": "A Lantern-to-Paper walking route is inserted at uptime 100 with lifetime 60; the person then chooses Driving.",
+      "minutes": 7,
+      "androidBridge": "Compare Android routing cache intent; the complete request key and monotonic lifetime policy are domain choices.",
+      "rubric": [
+        "Keys origin, destination and supported mode.",
+        "Distinguishes reverse direction and changed origin.",
+        "Accepts 159 and rejects 160 or negative age.",
+        "Does not claim a route cache is an offline tile store."
+      ],
+      "answerHTML": "<p>The key contains the checked origin coordinate, destination coordinate and walking/automobile mode. A reversed journey, changed origin or Driving mode misses the walking entry. If future requests add departure time, transit or other options, the varying parameters must join the key rather than sharing an incomplete cache identity.  An entry at injected 100 remains valid at 159 because its age is below 60; at 160 it is expired. Negative age is rejected. The native memory cache uses systemUptime for process-local age, which cannot be persisted as a meaningful across-relaunch timestamp.  Switching to Driving invalidates the current route lane and clears an old walking presentation before another explicit request. Resource cancellation saves work; generation guards late success, error or no-route outcomes. A cached MKRoute is still an estimate and does not provide app-owned Apple tiles. The host's synthetic summary tests key and expiration behavior without proving roads, actual estimates or provider cancellation.</p>",
+      "followUps": [
+        "What does coordinate quantization change about correctness?",
+        "How would departure-time support change the cache contract?"
+      ],
+      "pitfalls": [
+        "Keying only by destination or display name.",
+        "Claiming cached route data provides offline navigation."
+      ]
+    },
+    {
+      "id": "iq-124-b",
+      "lesson": "124",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "How would you hand off route recovery without overstating host or native evidence?",
+      "scenario": "Location is denied, tiles are intermittent, search fails, and directions returns no route for one mode.",
+      "minutes": 13,
+      "androidBridge": "Android dependency/fallback planning transfers as questions; Apple service and OS behavior need their own observations.",
+      "rubric": [
+        "Retains catalog and simulation origin independently.",
+        "Distinguishes current failure, no-route and stale completion.",
+        "Provides readable summary/retry and intentional mode/origin changes.",
+        "States native/typecheck/provider/accessibility evidence and recovery owners."
+      ],
+      "answerHTML": "<p>Keep the fictional destination list and simulation origin available when location is denied. Tile loading, search and directions are independent dependencies: a tile failure does not invalidate checked records, and a search failure retains accepted destinations. A valid empty directions response gets a no-route explanation and preserves the selected destination, allowing explicit retry or another mode.  Invalidate route ownership when origin, destination or mode changes. Guard success and failure after the await boundary so obsolete outcomes cannot erase a current route. Present approximate distance/duration, provenance and cache freshness in text outside the map; this project does not supply turn-by-turn guidance.  The handoff assigns screen recovery, request lifecycle and optional location verification separately. List actual host cache/generation commands, native typecheck and independently pending app interaction, VoiceOver and provider requests. Synthetic metres and seconds are not measurements. A list-only alternative may satisfy first delivery, with the native map added after concrete rendering and recovery evidence.</p>",
+      "followUps": [
+        "When could a clearly labelled stale route be preferable to clearing it?",
+        "Which observation proves no-route rather than request failure?"
+      ],
+      "pitfalls": [
+        "Collapsing every dependency into an empty screen.",
+        "Claiming device or service behavior from model-only checks."
+      ]
+    }
+  ]
+}

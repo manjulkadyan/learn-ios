@@ -1,0 +1,670 @@
+{
+  "unit": {
+    "id": "map-project",
+    "title": "Build a place explorer with MapKit",
+    "summary": "Original fictional destinations, modern iOS 17 map content, optional location, owned search and directions, bounded caching and accessible recovery.",
+    "order": 22
+  },
+  "lessons": [
+    {
+      "id": "121",
+      "title": "Give places stable names and valid coordinates",
+      "summary": "Build a small fictional place catalog, validate latitude and longitude, and keep selection attached to identity when rows move.",
+      "duration": 90,
+      "level": "Project sequence",
+      "prerequisites": [
+        "064",
+        "075",
+        "076"
+      ],
+      "objectives": [
+        "Validate a coordinate before adapting it to MapKit.",
+        "Distinguish a stable place ID from a row index or display name.",
+        "Explain which parts of the companion work offline and which require Apple map data."
+      ],
+      "sections": [
+        {
+          "id": "places-before-map",
+          "title": "Start with two places on a paper list",
+          "html": "<p>A place model is a small record describing something a person can choose. Imagine a notebook with Lantern Library and Paper Garden. The notebook works before anyone unfolds a street map. Our app should do the same: keep a readable destination list even if the map cannot load. Both names are fictional, and the numerical coordinates are examples rather than claims about actual businesses.</p><p>An Android engineer might start with a Room entity or a Kotlin data class and then add Google Maps markers. Start here with a Swift struct. The struct describes the destination; MapKit later translates its coordinate into map content. The model does not import a mapping framework or request permission. This separation makes identity and input validation checkable in a host executable with no simulator.</p><p>Give each place an ID that survives editing and sorting. Use demo:lantern for the library and demo:paper for the garden. Changing the library's label to Lantern Reading Room must not turn it into a different place. A coordinate is also not a universally safe ID: multiple destinations can share a building, and a corrected coordinate can still describe the same destination.</p><p>Write the first acceptance prediction before drawing anything. With IDs [demo:lantern, demo:paper], selecting demo:paper and reversing the array should leave the garden selected. Selecting index one instead would point to the library after reversal. That small before-and-after check explains why a functioning map begins with a functioning data contract.</p>"
+        },
+        {
+          "id": "valid-coordinates",
+          "title": "Check the two coordinate numbers",
+          "html": "<p>A coordinate names a position using latitude and longitude in degrees. Latitude measures north or south of the equator and belongs between minus ninety and ninety. Longitude measures east or west and belongs between minus one hundred eighty and one hundred eighty. The labels matter: swapping the two numbers can produce an invalid latitude or, more dangerously, a valid but wrong location.</p><p>A floating-point number can represent special non-finite values such as NaN and infinity. A range check alone should not be the whole explanation. First require finite input, then require both ranges. A throwing initializer stops invalid state from becoming an apparently usable place. The caller chooses whether to show an input message, reject a server record, or repair a fixture. It does not silently clamp a longitude to a convenient limit.</p><pre><code class=\"language-swift\">struct Coordinate: Hashable, Sendable {\n    let latitude: Double\n    let longitude: Double\n\n    init(latitude: Double, longitude: Double) throws {\n        guard latitude.isFinite, longitude.isFinite,\n              (-90...90).contains(latitude),\n              (-180...180).contains(longitude) else {\n            throw MapInputError.coordinate\n        }\n        self.latitude = latitude\n        self.longitude = longitude\n    }\n}</code></pre><p>The colon introduces a type. The argument labels make the two inputs readable at the call site. The three dots form inclusive closed ranges, so minus ninety and one hundred eighty are accepted boundaries. guard exits by throwing when a condition fails. self.latitude assigns the validated input to the instance. Hashable supports dictionary keys, while Sendable declares that this immutable value can cross a concurrency boundary safely; it does not start any concurrent work.</p>"
+        },
+        {
+          "id": "identity-and-selection",
+          "title": "Keep an ID while the list changes",
+          "html": "<p>Identity is the answer to which item this is across updates. Identifiable requires an id property; it does not itself guarantee unique or permanent IDs. The companion's checkedPlaces function rejects an empty ID and a repeated ID before the list is accepted. That protects SwiftUI's ForEach from having two rows that claim the same identity.</p><p>Selection stores an optional String. An optional can contain a selected ID or nil, meaning no selection. To display details, look up the ID in the current catalog rather than copying a whole selected object forever. A renamed place then supplies its current name. If a refresh removes that ID, clear selection or explain that the destination is unavailable. Do not fall back silently to the first row.</p><p>Kotlin data classes compare their stored properties, but value equality is not the same concept as stable application identity. Two Swift Place values can share an ID while having different names because one is a newer representation. A Set of full Place objects would not solve this domain choice. A dictionary indexed by ID and a separate ordering array are useful when independent updates grow more complex.</p><p>Search results deserve a different rule. In this lab, each Apple search response receives IDs based on the request generation and result position. They are stable within that response only. We do not pretend that matching a name and coordinate across searches proves the same permanent business. Saved domain places require a deliberate identifier strategy rather than an accidental result-array index.</p>"
+        },
+        {
+          "id": "framework-boundary",
+          "title": "Translate a checked value into MapKit",
+          "html": "<p>An adapter is code that translates one contract into another. Coordinate is our checked contract; CLLocationCoordinate2D is Core Location's coordinate structure accepted by MapKit. Constructing it from the two numbers performs no location lookup, GPS access, geocoding, or network search. The adapter preserves latitude and longitude order.</p><pre><code class=\"language-swift\">import MapKit\n\nextension Coordinate {\n    var clCoordinate: CLLocationCoordinate2D {\n        CLLocationCoordinate2D(\n            latitude: latitude,\n            longitude: longitude\n        )\n    }\n}</code></pre><p>An extension adds behavior without changing the stored data. This computed property returns a new framework value each time it is read. The host model remains independently testable because this extension lives in App/MapServices.swift, while Core/MapDomain.swift imports only Foundation. Include both in an iOS target; include only Core and Host in the offline checks.</p><p>A map view may load Apple's basemap and other map data from the network even when every destination marker came from a local array. Offline model success therefore proves neither offline map rendering nor searchable local map tiles. The app initially shows the text list and offers an explicit Show Apple map button. Turning the map off preserves the model; it does not turn previously fetched tiles into an app-owned offline map package.</p><p>The inspected client wrapper holds a map controller behind a SwiftUI view. Its updateMap method accepts professional locations and a separate repositionMap flag. That separation is useful evidence: changing model data and moving the visible camera are distinct decisions. It establishes an existing UIKit/SwiftUI integration, not that the client uses our Coordinate type or the new Map content builder.</p>"
+        },
+        {
+          "id": "decoding-and-failures",
+          "title": "Validate records coming from elsewhere",
+          "html": "<p>Decoding turns encoded data into values. A synthesized Decodable initializer can fill stored properties without going through an unrelated validating initializer. The companion explicitly implements init(from:) and calls the checked coordinate initializer. An encoded longitude of one hundred eighty-one therefore fails rather than entering the model through a back door.</p><p>Distinguish failure at each boundary. Missing keys and wrong JSON types are decoding errors. Out-of-range coordinates are domain input errors. Duplicate destination IDs fail catalog validation. A map-data outage is a platform or network error after the catalog already exists. Showing one generic empty screen for all four would hide recoverable information and make debugging needlessly difficult.</p><p>Our host checks accept an inclusive boundary, reject NaN and latitude ninety-one, reject decoded longitude one hundred eighty-one, and reject repeated places. They also reverse the array and inspect the retained ID. These are behavior checks with different inputs, rather than a test that merely copies the initializer's conditions into another function.</p><p>For learner practice, add an invalid record and predict its failure before running. Preserve an already accepted catalog when a replacement fails validation. For a larger import, choose whether one bad record rejects the whole catalog or produces an explicit partial result. The lesson uses whole-catalog rejection so the app never quietly hides a destination without explaining why.</p>"
+        },
+        {
+          "id": "availability-and-evidence",
+          "title": "Name the platform and the evidence",
+          "html": "<p>Availability tells you which operating-system version provides an API, while the installed SDK tells the compiler which declarations it can see. These are different facts. This lesson's Foundation model is a macOS host executable. CLLocationCoordinate2D is a longstanding Core Location value. The modern SwiftUI map screen introduced in the next lesson deliberately targets iOS seventeen and later.</p><p>The companion README records the actual Swift compiler, SDK, command, and result. A host run verifies our validation and identity rules. A simulator-target typecheck verifies that the separately supplied native source fits the SDK declarations and selected language mode. Neither proves that an app was linked, installed, granted permission, or visibly rendered a map.</p><p>Read the Apple coordinate and Swift protocol references for the precise contracts. The available SDK headers and Apple's MapCameraPosition documentation support the later version boundary. Keep device and network experiments as learner-owned rows in the evidence ledger. Do not infer current-location accuracy or a road connection from two valid numbers; those require different data and observations.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "The selected ID is demo:paper. The catalog reverses its order. What should happen?",
+          "options": [
+            "Selection follows the current index one.",
+            "Paper Garden remains selected by its ID.",
+            "Selection always becomes nil."
+          ],
+          "answer": 1,
+          "explanation": "A stable ID identifies the destination independently of row order. Clear selection only when that ID is removed or the person clears it."
+        },
+        {
+          "question": "Does constructing CLLocationCoordinate2D request the person's location?",
+          "options": [
+            "Yes, it starts GPS.",
+            "No, it constructs a value from supplied numbers.",
+            "Only when longitude is negative."
+          ],
+          "answer": 1,
+          "explanation": "The coordinate is a value. CLLocationManager owns permission and location requests; map views and search have separate data behavior."
+        },
+        {
+          "question": "Why does the companion implement init(from:) for Coordinate?",
+          "options": [
+            "To make JSON parsing use the same coordinate validation.",
+            "To cache Apple's map tiles.",
+            "To assign new IDs during sorting."
+          ],
+          "answer": 0,
+          "explanation": "Custom decoding calls the checked initializer so invalid encoded coordinates cannot bypass validation."
+        }
+      ],
+      "exercise": {
+        "brief": "Create a third fictional destination and a failing import. Predict identity and validation behavior without opening a map.",
+        "steps": [
+          "Add a place with ID demo:ink and valid, separately labelled latitude/longitude.",
+          "Rename and reorder the catalog while keeping the selected ID demo:ink.",
+          "Attempt a duplicate ID and encoded longitude 181; preserve the previous accepted catalog.",
+          "Run the host checks and write separate pending rows for native rendering and real location."
+        ],
+        "acceptance": [
+          "The selected ID resolves to the renamed destination after reorder.",
+          "Invalid coordinates and duplicate IDs are rejected; no failed import replaces accepted places.",
+          "The evidence states that local values do not provide offline Apple tiles or actual location."
+        ],
+        "solution": "<p>Assign demo:ink once when the fictional destination is created. Give it a display label such as Ink Courtyard and valid coordinates, then select that ID. Rename the label to Ink Reading Yard and reverse the array. Resolve details with first(where:) on id; the new label appears while the selected identity remains demo:ink. A row-index selection would fail this prediction.</p><p>Build the candidate array separately and pass it through checkedPlaces before assigning it to visible state. If demo:ink appears twice, catch duplicateID and retain the previous array. Decode the encoded longitude one hundred eighty-one through Coordinate's init(from:); it throws the same coordinate input error as direct construction. Do not repair the value by swapping fields or clamping it without a declared policy, because those operations can point somewhere the author did not intend.</p><p>The independent acceptance evidence includes the learner's new case, expected values, command output, and explanation. The supplied checks are a starting reference rather than proof that the learner completed those modifications. In the host executable, values do not load tiles or observe GPS. In a scratch iOS target, the adapter constructs framework values but permission and actual map rendering remain separate experiments.</p><p>A useful handoff identifies Core/MapDomain.swift as the portable input contract and App/MapServices.swift as the framework boundary. It records where synthetic names came from and marks device, location, tile-loading, and search behavior pending until exercised. Preserve the client checkout; the inspected wrapper is a comparison anchor, not a file to migrate during this lesson.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: CLLocationCoordinate2D",
+          "url": "https://developer.apple.com/documentation/corelocation/cllocationcoordinate2d"
+        },
+        {
+          "label": "Swift: Protocols",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/protocols/"
+        },
+        {
+          "label": "Apple: Identifiable",
+          "url": "https://developer.apple.com/documentation/swift/identifiable"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client separates map data and camera policy",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Map/Views/MapViewControllerRepresentable.swift",
+          "line": 47,
+          "why": "Inspected updateMap arguments include destination collections and repositionMap; this is a UIKit-backed SwiftUI wrapper, not modern Map content."
+        }
+      ],
+      "checklist": [
+        "I can reject invalid coordinates and duplicate destination IDs.",
+        "I can explain why selection survives sorting and why tiles differ from local records."
+      ],
+      "simple": {
+        "story": "Mira writes two destinations on cards and gives each card a small permanent label: lantern and paper. She puts the paper card second, then sorts the cards alphabetically. Her chosen card still says paper even if it moves. She also checks that each card contains two sensible coordinate numbers before copying it onto a map. A beautiful map would not fix a card with the wrong numbers or two cards using the same permanent label.",
+        "meaning": "A place ID stays attached to a destination; validated coordinates describe its position.",
+        "example": {
+          "before": "Paper Garden has ID demo:paper at index 1.",
+          "change": "Reverse the two-place array.",
+          "after": "Paper Garden moves to index 0 and remains selected by demo:paper."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "A place ID stays attached to a destination; validated coordinates describe its position.",
+          "items": [
+            {
+              "label": "Record",
+              "text": "A fictional place supplies a stable ID."
+            },
+            {
+              "label": "Validation",
+              "text": "Its two coordinate numbers pass the input contract."
+            },
+            {
+              "label": "Selection",
+              "text": "The ID still resolves after the rows move."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Coordinate",
+            "meaning": "Two labelled numbers describing a position."
+          },
+          {
+            "term": "Identity",
+            "meaning": "The value that says which destination this is."
+          },
+          {
+            "term": "Validation",
+            "meaning": "Checking input before accepting it."
+          }
+        ],
+        "remember": "Choose by identity, and validate position before drawing.",
+        "boundary": "Valid example coordinates do not prove that a fictional place exists, that roads connect it, or that Apple map data is available."
+      }
+    },
+    {
+      "id": "122",
+      "title": "Draw an iOS 17 map without losing camera or selection",
+      "summary": "Use modern Map content, a bound camera position, and tagged destination IDs while keeping a readable list and an explicit map-data boundary.",
+      "duration": 105,
+      "level": "Project sequence",
+      "prerequisites": [
+        "121"
+      ],
+      "objectives": [
+        "Build iOS 17 Map content with Marker tags and optional selection.",
+        "Keep camera movement separate from catalog updates and user-driven panning.",
+        "Retain equivalent text controls when map data or visual interaction is unavailable."
+      ],
+      "sections": [
+        {
+          "id": "camera-and-content",
+          "title": "Separate the window from the places",
+          "html": "<p>A camera is the map's visible viewpoint, including which area it frames. A destination is a model record. Think of a paper map under a movable magnifying glass: moving the glass does not rename a destination. SwiftUI's Map content describes the markers and overlays, while MapCameraPosition describes the desired framing. Keeping those values separate prevents a refresh from dragging the person away from the area they chose to inspect.</p><p>On Android, GoogleMap camera state and marker models can also have different owners. That is a useful design analogy, but MapKit's SwiftUI content builder and selection binding are Apple contracts. The code here is not a translation of every Google Maps callback. We target the modern Map APIs added in iOS seventeen and preserve the existing client's UIKit wrapper as a comparison rather than attempting a migration.</p><p>Begin with the fictional catalog and a region centred on Lantern's coordinate. The region spans 0.03 degrees in both directions. A degree span is angular extent, not a fixed width in metres everywhere on Earth. The companion does not claim that this region encloses a walking radius or creates a route.</p><p>Before interaction, camera framing and selection are independent: the initial region can include both destinations while selectedID is nil. Selecting Paper Garden changes the selected ID and deliberately requests a tighter region around its coordinate. Panning afterward changes the viewpoint without necessarily choosing a different destination. Explain those three states before adding animations.</p>"
+        },
+        {
+          "id": "map-builder",
+          "title": "Read the content builder one step at a time",
+          "html": "<p>A result builder lets Swift assemble a sequence of declarations into a larger value. Inside this Map initializer, the content is MapContent rather than arbitrary screen views. Marker is MapKit's built-in destination representation. ForEach supplies one marker for every checked Place. The tag connects marker selection to a domain ID.</p><pre><code class=\"language-swift\">import SwiftUI\nimport MapKit\n\n@available(iOS 17.0, *)\nstruct PlaceMap: View {\n    let places: [Place]\n    @Binding var selectedID: String?\n    @Binding var camera: MapCameraPosition\n\n    var body: some View {\n        Map(position: $camera, selection: $selectedID) {\n            ForEach(places) { place in\n                Marker(place.name, coordinate: place.coordinate.clCoordinate)\n                    .tag(place.id)\n            }\n        }\n    }\n}</code></pre><p>The dollar sign accesses a binding's projected value so Map can read and update the same storage. A Binding points to state owned elsewhere; it is not an independent copy. String? permits nil, meaning no selected destination. place.id is a String tag matching the selected ID's wrapped type. A missing or mismatched tag prevents the intended model selection contract even if the marker remains visible.</p><p>The availability annotation identifies the operating-system boundary. It does not lower the required version by itself. Either set the isolated app target to iOS seventeen or guard use with if #available and provide an earlier fallback. Marker and MapPolyline belong to this modern content family. An old Map(coordinateRegion:annotationItems:) tutorial uses another API family and cannot be mixed line for line with this initializer.</p>"
+        },
+        {
+          "id": "camera-updates",
+          "title": "Give the person control of the visible area",
+          "html": "<p>A bound MapCameraPosition can contain .region, .camera, .rect, .automatic, or other supported framing choices. Choose one intentionally. .automatic lets MapKit frame its content; it is useful for a small initial catalog, but it is not a guarantee that every later refresh preserves the person's viewpoint. The lab begins with an explicit .region so the first visible area is predictable.</p><p>The screen stores camera state across body evaluations. body is a description recalculated from state, not a durable controller whose local variables retain every prior interaction. Creating a fresh camera value inside body for every update can repeatedly impose a default. The companion uses state owned by the screen and changes it in a destination button action, where the intention to recenter is explicit.</p><p>onMapCameraChange receives a camera update context. At frequency .onEnd, the lab copies context.region after an interaction finishes. That region becomes a hint for a later explicit Apple search. It does not make dragging automatically issue a network search. A separate Search this area control is often easier to explain and avoids generating requests for every tiny camera movement.</p><p>If a programmatic camera change also produces a callback, do not interpret every callback as fresh user intent. The sample only captures the latest region and leaves the network action to a button, so it does not need to guess the cause. For more advanced camera ownership, distinguish user panning, selected-destination framing, route framing, and restoration. Add animation only after those transitions produce the intended final region.</p>"
+        },
+        {
+          "id": "selection-and-list",
+          "title": "Make the same choice available outside the map",
+          "html": "<p>Selection is an optional domain ID that the map and destination list share. A text button sets model.selection to place.id. The matching marker is tagged with that ID. The list also displays a checkmark and an accessibility value of Selected or Not selected. A person using VoiceOver can therefore perform the main task through ordinary controls even if manipulating map content is difficult.</p><p>Do not rely only on colour, a tiny pin, or a gesture. A selected destination's name, origin choice, route estimate, and errors should remain readable text. Let labels wrap for larger Dynamic Type sizes. The sample places controls in a scrolling vertical layout and keeps the map at a bounded teaching height. That is a starting composition, not proof that every device size or assistive technology has been tested.</p><p>When an Apple search replaces the entire response-scoped catalog, the sample clears the previous selection and route. A tag from the old response must not silently refer to another new result. For a stable saved catalog refresh, lookup the existing selected ID and retain it when still present. Those are different policies because the data identities have different lifetimes.</p><p>An empty result is also distinct from an error. A successful search with zero items says no destinations matched that request. A failed search preserves the prior accepted destinations and supplies retry or fixture restoration. Map selection should not decide whether those service states existed; the service owner exposes them as separate text.</p>"
+        },
+        {
+          "id": "maps-and-offline",
+          "title": "Keep local content and Apple data distinct",
+          "html": "<p>A synthetic model is data we made up for practice. demoPlaces contains fictional names and supplied coordinate values. A native Map renders Apple's map surface around those values. Its basemap may need network data and system-managed caches. Our host test does not fetch or store those tiles, and the memory route cache introduced later does not change that fact.</p><p>The screen initially offers the destination list without constructing the Map branch. The Show Apple map button makes that boundary visible before the native surface may fetch data. Hiding the map removes that branch while the catalog remains owned by MapModel. Even if tiles happen to remain cached on a device, that observed behavior is not a contractual offline-map feature supplied by this lab.</p><p>MapKit search and directions are separate requests that can fail while the visible map still shows previously available tiles. Conversely, a marker list can be healthy while tile rendering fails. A useful error model keeps these dependencies independent rather than assuming that one rendered marker means every network service succeeded.</p><p>The client MKMapView delegate dequeues annotation views with identifiers such as zdPin and configures model-specific annotations. That proves a UIKit annotation-reuse implementation. SwiftUI's modern Marker content avoids authoring that same dequeue method, but it does not remove data identity, accessibility, lifetime, or request-ownership decisions. The comparison helps explain integration choices without claiming that the client's controller has been replaced.</p>"
+        },
+        {
+          "id": "availability-and-evidence",
+          "title": "Check API availability and visible behavior separately",
+          "html": "<p>The teaching native target has a minimum deployment version of iOS seventeen. MapCameraPosition, the MapContent builder family used here, selection-capable modern Map content, and MapPolyline require that modern API boundary. SwiftUI itself began earlier, while older Map forms were available from iOS fourteen. An import MapKit line cannot prove that every symbol belongs to the same OS release.</p><p>Apple's MapCameraPosition documentation identifies iOS seventeen availability. SDK declarations provide a second concrete check for the compiler-facing API family. The README records native typechecking with an arm64 iOS simulator target at version seventeen. That checks source and SDK compatibility, not visual pin selection or a linked Xcode application.</p><p>The current toolchain exposes both a State macro and the older generic property wrapper. The companion uses LabState as a local type alias for SwiftUI.State to select the property wrapper without requiring the newer same-name macro in the authoring sandbox. That spelling does not turn state into a reference model or change the lesson's ownership rules.</p><p>Learner runtime evidence should name an actual simulator or device and cover pan, selection from both surfaces, replacement catalog, large text, and offline recovery. Rendering quality, network availability, VoiceOver focus order, and interaction at different sizes remain pending until exercised. A compiler result cannot establish those observations.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does .tag(place.id) do in this selection-capable Map?",
+          "options": [
+            "It connects selectable content to the matching selection value.",
+            "It fetches a place from Apple's servers.",
+            "It makes the coordinate globally unique."
+          ],
+          "answer": 0,
+          "explanation": "The tag binds the map item to a selection identity. It does not create a network lookup or establish domain uniqueness."
+        },
+        {
+          "question": "Why does the lab capture camera changes without immediately searching?",
+          "options": [
+            "Camera callbacks prove the user wants a new request.",
+            "An explicit button separates visible framing from network intent.",
+            "MapKit never sends callbacks for programmatic movement."
+          ],
+          "answer": 1,
+          "explanation": "Camera updates can have several causes. Capturing a region and searching on a button makes request intent explicit."
+        },
+        {
+          "question": "The host catalog checks pass with no network. What is established?",
+          "options": [
+            "Apple tiles are guaranteed offline.",
+            "The synthetic model works; native map rendering still needs separate evidence.",
+            "Actual GPS accuracy is within one metre."
+          ],
+          "answer": 1,
+          "explanation": "The host checks validate values and identities. Tile rendering, location and search are independent platform dependencies."
+        }
+      ],
+      "exercise": {
+        "brief": "Build the isolated iOS 17 screen and change its selection/camera policy for a third fictional destination. Keep runtime evidence separate from compilation.",
+        "steps": [
+          "Create the scratch target exactly as described in the companion README, including only Core and App source.",
+          "Add a text destination button and matching Marker tag for demo:ink.",
+          "Predict initial region, explicit recenter, user pan, and catalog replacement states before running.",
+          "Check large text and VoiceOver selection if a simulator/device is available; mark unperformed checks pending."
+        ],
+        "acceptance": [
+          "The text button and marker share the same String ID selection.",
+          "A camera callback records region without starting an Apple search.",
+          "The catalog remains usable while the Map branch is hidden.",
+          "Evidence separates typecheck from linked app, interactive rendering and accessibility."
+        ],
+        "solution": "<p>Keep selectedID in one owner and pass its binding to Map. Add demo:ink to the checked catalog, then create both surfaces from that catalog rather than maintaining separate marker and list arrays. Pressing the Ink button sets selectedID to demo:ink and assigns a region centred on its coordinate. The marker tag uses the identical ID. After panning, camera reflects a new viewpoint while selection still identifies Ink until explicitly changed.</p><p>Capture the final camera update's region at .onEnd. Leave the request-generation code untouched until the person presses Search Apple map data. That makes the testable prediction simple: ten camera updates produce zero search requests, and one search button press creates one request. The visible region is a search hint, not a hard filter of Apple's results.</p><p>For a saved-catalog rename, preserve selection when demo:ink still exists. For replacement Apple results with response-scoped IDs, clear selection before publishing the new list. Show a normal empty-result message when the new list has no rows. Hiding Map should leave the list and selected ID intact because the model owner sits outside that conditional branch.</p><p>Compile or typecheck the assigned native files against the recorded SDK, then perform interaction checks only if an app is actually built and launched. Record large-text wrapping, selected text value, focus sequence, and failure recovery as observations. The worked answer is a design reference; the learner still supplies the third destination, changed behavior, and evidence. Neither source reading nor a host executable proves that VoiceOver can select the marker on an actual device.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: MapCameraPosition",
+          "url": "https://developer.apple.com/documentation/mapkit/mapcameraposition"
+        },
+        {
+          "label": "Apple: MapContentBuilder",
+          "url": "https://developer.apple.com/documentation/mapkit/mapcontentbuilder"
+        },
+        {
+          "label": "Apple: MapPolyline",
+          "url": "https://developer.apple.com/documentation/mapkit/mappolyline"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client uses reusable UIKit annotations",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Map/MapViewController+MapKit.swift",
+          "line": 47,
+          "why": "Inspected annotation-view dequeue and model assignment; this is a precise contrast with modern SwiftUI Marker content."
+        }
+      ],
+      "checklist": [
+        "I can explain the iOS 17 Map content and camera boundary.",
+        "I can share selection between a map and readable destination controls."
+      ],
+      "simple": {
+        "story": "Dev keeps a magnifying glass over a paper map and a list of destinations beside it. Choosing Paper Garden puts a tick beside its name and moves the glass over that destination. Sliding the glass elsewhere does not erase the tick. Replacing the entire destination list requires checking whether the tick still refers to a valid card. The list also lets a friend choose a destination without seeing or moving the glass.",
+        "meaning": "Camera framing, destination identity, and the control used to select a place are separate state.",
+        "example": {
+          "before": "No destination is selected; the initial region frames both fictional coordinates.",
+          "change": "Select demo:paper using its text button.",
+          "after": "Paper Garden becomes selected and the camera receives its explicit region."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Camera framing, destination identity, and the control used to select a place are separate state.",
+          "items": [
+            {
+              "label": "Choose",
+              "text": "A text button supplies demo:paper."
+            },
+            {
+              "label": "Share",
+              "text": "The same ID is bound to Map selection."
+            },
+            {
+              "label": "Frame",
+              "text": "A deliberate camera change centres that destination."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Camera",
+            "meaning": "The map's current viewpoint."
+          },
+          {
+            "term": "Binding",
+            "meaning": "A connection to state another owner stores."
+          },
+          {
+            "term": "Tag",
+            "meaning": "The selection value attached to map content."
+          }
+        ],
+        "remember": "Move the viewpoint deliberately and keep selection attached to an ID.",
+        "boundary": "A map camera is a software framing description; visible tiles and assistive-technology behavior depend on MapKit and runtime evidence."
+      }
+    },
+    {
+      "id": "123",
+      "title": "Ask for location deliberately and own each search",
+      "summary": "Keep location permission optional, simulate an origin, and reject obsolete Apple search successes and errors with an explicit request owner.",
+      "duration": 120,
+      "level": "Project sequence",
+      "prerequisites": [
+        "122",
+        "067",
+        "068"
+      ],
+      "objectives": [
+        "Request When In Use location only from a clear user action.",
+        "Explain Task, await, main-actor and cancellation boundaries needed here.",
+        "Cancel replaced searches and reject late successes and errors."
+      ],
+      "sections": [
+        {
+          "id": "optional-location",
+          "title": "Let the task work without GPS",
+          "html": "<p>Location permission is the person's authorization for the app to access location through the platform. It is not permission to use every network API, and a map of supplied coordinates does not require GPS. Start with a simulation origin: the fictional Lantern coordinate. The person can inspect places and request a route from that origin without revealing where they are.</p><p>The app offers Request my location once as an explicit action. Creating LocationService sets the manager's delegate and desired accuracy but does not call requestWhenInUseAuthorization or requestLocation. An initial authorization delegate callback can happen without a button press. The wantsFix flag prevents that callback from being interpreted as a fresh request.</p><p>On Android, checking a runtime permission before obtaining a location is a familiar sequence. iOS adds its own usage-description keys, delegate behavior, accuracy authorization, and Settings policy. Configure NSLocationWhenInUseUsageDescription in the scratch target with truthful text explaining the one-fix origin feature. A missing usage description is configuration failure; denied access is the person's decision.</p><p>Receiving a location and using it are separate actions. The toggle stays disabled until a usable fix exists. With it off, a newly received real coordinate does not replace the simulation route origin. This keeps the before-and-after outcome understandable and avoids surprising movement or network requests.</p>"
+        },
+        {
+          "id": "permission-states",
+          "title": "Handle permission and accuracy separately",
+          "html": "<p>An authorization status is the platform's current answer about access. notDetermined means the person has not made the relevant choice. authorizedWhenInUse and authorizedAlways permit this foreground request, although our feature never asks for Always access. denied means refusal or disabled access; restricted means a policy prevents access. Unknown future states require a usable fallback.</p><p>Call requestWhenInUseAuthorization only after the feature button and only for notDetermined. A subsequent granted delegate callback can call requestLocation while wantsFix remains true. For an already granted state, the button requests the fix directly. After denial, explain Settings as a separate voluntary recovery route rather than repeatedly trying to prompt.</p><p>Accuracy authorization is a separate axis. On iOS fourteen and later, reducedAccuracy indicates approximate access. desiredAccuracy is a preference, not proof about the delivered horizontalAccuracy. The lab rejects negative accuracy and fixes more than sixty seconds away from current wall time. Accepted approximate fixes remain labelled with their actual accuracy.</p><p>stop clears wantsFix and asks the manager to stop updates, so callbacks while stopped are ignored. Core Location delegates do not supply our search-generation token. A later explicit request may receive a recent valid platform observation; this sample claims intent gating and freshness filtering, not exact per-fix request correlation. Navigation-grade tracking would require a different accuracy, lifecycle and recovery contract.</p>"
+        },
+        {
+          "id": "async-first-steps",
+          "title": "Learn the small async boundary now",
+          "html": "<p>An asynchronous operation may finish later without blocking its caller for the whole duration. async marks a function that can suspend; await marks a call where suspension may happen. Suspension lets other work proceed. It does not promise a new thread, immediate cancellation, or unchanged screen state when the answer returns.</p><p>Task creates an asynchronous-work handle. The owner retains it so replacement or screen exit can request cancellation. MainActor isolates UI-facing mutable state. It is not a task's permanently dedicated thread. MapModel is main-actor isolated, and its Task explicitly uses that UI mutation boundary.</p><p>Read search as six actions: construct a request, create the operation, keep both handles, await the result, check cancellation, and compare the captured token. Only then assign places and messages. try permits throwing; do/catch branches between success and error. Task.checkCancellation throws if the task was cancelled before the commit.</p><p>A main-actor method can be interrupted while awaiting. A suspends, B becomes current, then A returns. Isolation prevents unsynchronized access, but it does not make A's answer logically current. The token checks relevance. This lesson teaches the required vocabulary instead of making completion of the later concurrency course an unstated prerequisite.</p>"
+        },
+        {
+          "id": "search-owner",
+          "title": "Cancel resources and check relevance",
+          "html": "<p>A request generation is a local attempt number owned by one request lane. Starting a search increments it. Both success and error compare their captured token with the current number. Replacement and cancellation invalidate the token. This protects visible state even when resource cancellation arrives too late.</p><pre><code class=\"language-swift\">var gate = RequestGate()\nlet first = gate.begin()   // generation 1\nlet second = gate.begin()  // generation 2\nprint(gate.accepts(first)) // false\nprint(gate.accepts(second)) // true\ngate.invalidate()         // generation 3\nprint(gate.accepts(second)) // false</code></pre><p>The lab calls searchTask.cancel() and MKLocalSearch.cancel(). The task handle owns Swift async work; the operation owns the MapKit request. Cancellation asks resources to stop. The generation comparison decides whether any returned value or error still has authority to change state. They solve related but different problems.</p><p>Guard catch as well. A failure after B succeeds must not replace B's success message. Empty input cancels work and keeps previous places with an input message. Query editing invalidates an outstanding request, and the explicit Search button starts another one. Camera panning only updates the region hint.</p><p>Use separate search and route gates. Cancelling search should not reject an unrelated route solely because a shared counter moved. An accepted replacement catalog deliberately clears route selection because destination identities changed. The host checks verify these local policies, not cancellation of Apple's server work.</p><p>PlaceSearchSnapshot now owns accepted places, search status and the generation as one portable value. MapModel publishes that snapshot and derives places, isSearching and searchMessage from it. cancelSearch first calls snapshot.cancel, then asks the Task and MKLocalSearch to stop. The explicit Cancel action publishes Search cancelled; query editing supplies inputChanged and publishes Query changed; both retain accepted places. A blank search overrides that generic status with Enter a query. Host checks exercise the actual shared transitions, including late success/error rejection and invalid replacement recovery.</p>"
+        },
+        {
+          "id": "search-data-and-errors",
+          "title": "Treat search results as service data",
+          "html": "<p>MKLocalSearch searches Apple's map data using a natural-language query and an optional region hint. A hint is not a strict geographic exclusion rule. The supplied region and query allow search without a GPS fix. The operation may still need network access and provider availability.</p><p>The response contains MKMapItem values. The lab translates each name and coordinate into a checked Place, assigning search:generation:index IDs scoped to that response. Those are Apple results, distinct from fictional demoPlaces. Missing names get a readable fallback. Conversion failure leaves the previous accepted catalog intact instead of publishing a partially broken array.</p><p>Searching, zero results, and failure are separate states. While searching, retain old destinations. Successful zero results replaces them with an accepted empty answer and clears old selection. Failure keeps previous destinations, query text, retry, and fixture restoration. A blank screen would conceal those different recovery paths.</p><p>Search strings and precise coordinates can be sensitive. This scratch feature does not log them or add remote diagnostics. A production plan can count bounded failure categories without copying private inputs. The sample also avoids automatic searches for every keystroke, background location, real accounts, and a hidden transition from fixture data to provider data.</p>"
+        },
+        {
+          "id": "availability-and-evidence",
+          "title": "Keep platform checks in an evidence ledger",
+          "html": "<p>The native companion chooses iOS seventeen for modern map content. CLLocationManager and MKLocalSearch predate that UI family. Installed SDK headers identify MKLocalSearch on iOS 6.1 and MKDirections on iOS seven. That base availability does not make every later initializer or async spelling compatible with an arbitrary old compiler and deployment target.</p><p>The Swift async code needs a compatible compiler and runtime; this project intentionally uses iOS seventeen rather than teaching back-deployment plumbing. Accuracy authorization is an iOS fourteen feature. The delegate conformance uses preconcurrency to bridge an older imported callback contract while the manager is created and used on the main actor's run loop.</p><p>Host checks exercise synthetic coordinates and generation decisions without permission or Apple searches. Native typechecking verifies source declarations. Neither checks a prompt, reduced-accuracy fix, offline search response or actual cancellation delivery. Those require the isolated target, usage key, and recorded simulator/device interactions.</p><p>The inspected client's recenter action starts location from a button and distinguishes denial from another error. It supports that ownership discussion without proving our simulation or generation implementation exists there. Report denied, restricted, approximate, stale-fix, replacement-success, replacement-error, and screen-exit cases as independently performed or pending.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "An old cancelled search fails after a newer search succeeds. What should its catch handler do?",
+          "options": [
+            "Always display the old error.",
+            "Compare its token and ignore it when obsolete.",
+            "Delete all saved places."
+          ],
+          "answer": 1,
+          "explanation": "Errors can arrive late too. Every visible commit needs the relevance check."
+        },
+        {
+          "question": "Does @MainActor make a result current after await?",
+          "options": [
+            "Yes, nothing else runs while it waits.",
+            "No, recheck request relevance after suspension.",
+            "Only with a region hint."
+          ],
+          "answer": 1,
+          "explanation": "Isolation protects state access. Generation checks logical relevance when other actions ran during suspension."
+        },
+        {
+          "question": "When does the lab request initial location permission?",
+          "options": [
+            "Inside service initialization.",
+            "After the explicit one-location button.",
+            "When map tiles appear."
+          ],
+          "answer": 1,
+          "explanation": "The button expresses intent. Construction and initial delegate callbacks do not authorize a request."
+        }
+      ],
+      "exercise": {
+        "brief": "Add an adversarial offline request schedule and a permission prediction table.",
+        "steps": [
+          "Predict A-success after B-success, A-error after B-success, and cancelled B-error.",
+          "Add an empty-query invalidation case to host checks.",
+          "Predict notDetermined, denied, restricted, approximate and stale-fix behavior.",
+          "Use an isolated target for optional location simulation; record unperformed provider cases."
+        ],
+        "acceptance": [
+          "Old successes and errors cannot change current state.",
+          "Blank input invalidates work and preserves accepted destinations.",
+          "Construction and initial authorization callbacks request no fix.",
+          "Host, native and real permission/service evidence remain separate."
+        ],
+        "solution": "<p>Start A at generation one, then B at generation two. B may commit only while its token matches. A's later success and error fail that comparison. Cancel B by invalidating to three and asking both resource handles to stop. A queued B handler can still execute, but its token no longer grants authority. Apply the same reasoning to blank input.</p><p>The permission table starts with wantsFix false. Manager construction and its initial authorization callback do not change intent or origin. The explicit button sets wantsFix true. notDetermined requests When In Use authorization; granted access requests one fix; denied and restricted reset intent with a simulation message. Negative accuracy or a stale timestamp does not update the received coordinate.</p><p>Keep the simulation toggle off until the person changes it, even after receiving a fix. A chosen origin change invalidates the current route because a route from Lantern cannot remain labelled as a route from the person. The sample ignores callbacks while stopped but does not promise instant GPS shutdown or exact request-to-fix correlation.</p><p>Run host modifications without MapKit. Record native configuration separately from whether a simulator fix, permission prompt or physical location was observed. Do not automatically read the author's location. The learner still supplies the added schedule and evidence; this worked answer is the ownership policy rather than a completed exercise.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Requesting location authorization",
+          "url": "https://developer.apple.com/documentation/corelocation/requesting-authorization-to-use-location-services"
+        },
+        {
+          "label": "Apple: MKLocalSearch",
+          "url": "https://developer.apple.com/documentation/mapkit/mklocalsearch"
+        },
+        {
+          "label": "Swift: Concurrency",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client requests location from recenter",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Map/MapViewController.swift",
+          "line": 184,
+          "why": "Inspected button callback starts intrusiveLocation and handles denial separately; it does not establish our simulation or async request guard."
+        }
+      ],
+      "checklist": [
+        "I can explain permission versus accuracy and keep location optional.",
+        "I can request cancellation and reject stale success and error."
+      ],
+      "simple": {
+        "story": "Noor asks a librarian to find books about gardens, then changes her mind and asks about lamps. The garden reply arrives last. It may be correct, but it answers the old question. Noor keeps a numbered slip for each request and accepts only the current slip. If she withdraws the lamp request, she invalidates that slip too. Asking the librarian to stop saves effort; checking the slip keeps the displayed answer relevant.",
+        "meaning": "Cancellation requests less work; a generation token checks whether a result still belongs to current intent.",
+        "example": {
+          "before": "A owns token 1.",
+          "change": "Start B with token 2, then A fails.",
+          "after": "A's obsolete error cannot change B's state."
+        },
+        "picture": {
+          "kind": "timeline",
+          "caption": "An old completion loses authority after replacement.",
+          "items": [
+            {
+              "label": "A starts",
+              "text": "A captures token 1."
+            },
+            {
+              "label": "B replaces",
+              "text": "Current generation becomes 2."
+            },
+            {
+              "label": "A returns",
+              "text": "Its old success or error is ignored."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Authorization",
+            "meaning": "The person's permission for location access."
+          },
+          {
+            "term": "Suspension",
+            "meaning": "A point where async work waits while other work can proceed."
+          },
+          {
+            "term": "Generation",
+            "meaning": "A local number identifying the current attempt."
+          }
+        ],
+        "remember": "Check the current owner after every wait, including failure.",
+        "boundary": "MapKit may return work after cancellation; Core Location observations do not carry search-generation tokens."
+      }
+    },
+    {
+      "id": "124",
+      "title": "Present routes with honest freshness and recovery",
+      "summary": "Request directions from an explicit origin, cache by complete route intent, cancel obsolete routes, and present estimates without claiming offline navigation.",
+      "duration": 120,
+      "level": "Project sequence",
+      "prerequisites": [
+        "123",
+        "082"
+      ],
+      "objectives": [
+        "Create directions using explicit source, destination and travel mode.",
+        "Key and expire a bounded in-memory route cache.",
+        "Recover independent service failures and report exact verification limits."
+      ],
+      "sections": [
+        {
+          "id": "route-intent",
+          "title": "Say which journey the request describes",
+          "html": "<p>A route is a service-provided path between an origin and destination under a chosen travel mode. Two valid coordinates do not establish a usable road or walking connection. The fictional Lantern origin and Paper Garden destination are supplied inputs. Apple directions supplies a path, and the app labels any returned estimate as Apple's answer.</p><p>Write route intent as three fields: origin, destination and walking or automobile mode. Swapping endpoints creates a different intent. Switching mode creates another. If departure-time or traffic options are introduced, they must join the intent and cache key. This implementation intentionally supports only the two declared modes with default departure semantics.</p><p>The person selects a destination, then presses Request Apple directions. Selecting a marker does not send the request. Receiving real location does not change origin while the separate toggle remains off. Each action therefore has a predictable purpose and an identifiable request owner.</p><p>A route is an answer for a journey, not a permanent capability of a place. Keep the selected destination readable when directions fail. A place name can still be useful without a walking route. Android's location-record and routing-service distinction is a helpful analogy, while MKDirections and MKRoute keep their Apple-specific contracts.</p>"
+        },
+        {
+          "id": "directions-adapter",
+          "title": "Read the Apple request one field at a time",
+          "html": "<p>MKDirections.Request stores source, destination, transport type and an alternatives policy. MKMapItem wraps each supplied coordinate. Those constructors do not discover a person's location: origin already contains either the chosen simulation coordinate or the accepted fix.</p><pre><code class=\"language-swift\">let request = MKDirections.Request()\nrequest.source = MKMapItem(\n    placemark: MKPlacemark(coordinate: origin.clCoordinate)\n)\nrequest.destination = MKMapItem(\n    placemark: MKPlacemark(coordinate: destination.coordinate.clCoordinate)\n)\nrequest.transportType = mode == .walking ? .walking : .automobile\nrequest.requestsAlternateRoutes = false\nlet operation = MKDirections(request: request)\nlet response = try await operation.calculate()</code></pre><p>The conditional operator chooses walking when our domain value is walking, otherwise automobile. requestsAlternateRoutes false keeps this teaching operation bounded rather than implementing an alternative chooser. response.routes can be empty, so inspect first safely instead of indexing zero. No-route is a meaningful outcome rather than proof that input validation failed.</p><p>MKRoute includes distance, expectedTravelTime, steps and a polyline. Distance uses metres; expectedTravelTime uses seconds. The sample converts these to simple integer text, rounding down. A production interface should choose locale-aware units and clearly approximate durations, not promise an arrival from truncated numbers.</p><p>The owner retains the operation and Task handle. After calculate returns, cancellation and the route token are checked before committing. That is the locally taught await-and-recheck sequence, not a requirement to understand continuations, executor implementation or the later advanced concurrency lessons.</p>"
+        },
+        {
+          "id": "request-lifetime",
+          "title": "Invalidate the answer when inputs change",
+          "html": "<p>A request owner starts, retains, replaces and stops work. MapModel owns the route lane. Changing selection, mode, chosen origin source, or accepted origin coordinate invalidates route generation and clears the visible old route. The person then chooses whether to request another answer.</p><p>Suppose walking from Lantern to Paper owns token four. Choosing Driving invalidates to five and clears the polyline. The walking response may still arrive, but four is obsolete. Keeping it visible as a current Driving route would misrepresent the answer even if both paths happened to look similar.</p><p>Check errors and empty responses with the same token rule. A stale no-route answer must not erase a newer route, and an old failure must not overwrite current status. Separate route and search gates prevent accidental coupling. Accepting an entirely replacement search catalog deliberately clears selection and invalidates route because the destination identities changed.</p><p>Screen exit stops both request lanes. Task.cancel and MKDirections.cancel request cleanup; token invalidation denies delayed handlers authority. The scratch screen has no continuing background navigation. A production navigation feature needs a different owner, lifetime, permission and recovery policy rather than stretching a disappearing screen's service into an accidental background controller.</p>"
+        },
+        {
+          "id": "cache-contract",
+          "title": "Reuse only a matching recent answer",
+          "html": "<p>A cache stores data for possible reuse. A useful cache contract names the key, freshness rule and bound. The companion keys by exact checked origin, destination and mode, holds MKRoute only in memory, and accepts entries younger than sixty seconds. That lifetime is a teaching choice, not an Apple guarantee.</p><p>Native lookups use systemUptime for this process-local duration. The host cache instead accepts an injected time value so boundaries can be tested without sleeping. An entry inserted at one hundred is valid at one hundred fifty-nine and expired at one hundred sixty. Negative age is rejected. A process-relative clock is not a timestamp that can be persisted meaningfully across relaunch.</p><p>Exact coordinate keys favour correctness over hit rate. Nearby received fixes can miss because their numbers differ. Quantization could improve reuse, but it changes the represented origin and needs a declared tolerance. A route from a nearby point is not automatically an accurate route from the current point.</p><p>The sample bounds memory to eight entries and can discard prior entries on another insertion. It is not a production least-recently-used implementation, disk route archive, or offline map package. Cached MKRoute does not include an app-owned tile store. Provider terms and product requirements need their own review before storing or redistributing provider data persistently.</p><p>A cache hit also needs its insertion time. TimedCache.entry applies the same key and expiry checks as value, then returns the accepted value with insertedAt. MapModel reads uptime once, obtains that validated entry and passes now minus insertedAt to the shared routeEstimateText helper. This preserves both estimate units and cache freshness after invalidateRoute clears the previous presentation.</p>"
+        },
+        {
+          "id": "route-presentation",
+          "title": "Make the answer readable beyond its line",
+          "html": "<p>A polyline is an ordered sequence of connected path segments. MapPolyline(route.polyline) presents Apple's path inside modern Map content. Its stroke chooses colour and width. Text must also explain the destination, origin choice, mode, approximate distance/duration and whether a recently cached answer was reused.</p><p>A person who cannot see the blue line should still understand the basic result. The lab provides destination buttons and messages outside Map. It does not narrate every turn or implement accessible navigation. A future turn list should use returned step instructions, preserve focus during updates, and be checked with assistive technology.</p><p>Recover dependencies independently. Tile trouble should not erase local places. Search failure preserves prior destinations. Directions failure keeps selection and explicit retry. Permission denial keeps the simulation origin. Successful empty directions gets a no-route message rather than an array-index crash.</p><p>Predict transitions in order: a valid route is labelled with its intent; changing input clears it; a new explicit request shows loading; success supplies a route; failure preserves the new intent without claiming the old line represents it. This conservative clearing policy is easy to audit. A product may instead preserve a clearly stale estimate, but must make that status and old intent understandable.</p><p>Fresh and cached responses call the same Core formatter. With the synthetic test summary of 420 metres and 300 seconds, both begin Apple estimate: about 420 metres; 5 minutes. Fresh adds Fresh response; a valid cache hit at injected age 59 adds Cached response, 59 seconds old (expiry at 60 seconds). The Apple label is the native presentation template under test, not evidence that Apple supplied these host numbers. Expired or invalid inputs instead request recovery.</p><p>The route message is rendered outside the conditional Map branch, so hiding the map retains distance, duration and cache status. This source relationship and the shared formatter's host checks are verified; no actual hidden-map simulator interaction is claimed.</p>"
+        },
+        {
+          "id": "availability-and-evidence",
+          "title": "Close the project with precise evidence",
+          "html": "<p>Installed SDK headers place MKDirections itself on iOS seven. This modern SwiftUI surface still requires iOS seventeen because MapPolyline and the camera/content family do. MKPlacemark-based MKMapItem construction is usable at that target; newer SDKs may deprecate these constructors in favour of newer coordinate APIs. Deprecated and unavailable are different states.</p><p>The host checks use a synthetic RouteSummary of four hundred twenty metres and three hundred seconds. Those numbers test key separation and expiry only. They are not an Apple path, measured journey or offline navigation result. A native source typecheck establishes compiler-facing integration, not a launched route screen.</p><p>Runtime evidence should name the destination inputs, chosen mode, actual simulator/device, provider result, cancellation action and recovery. Network and real location access are separate observations. No author check automatically requests either. Injecting a stale host token proves local policy, while MapKit cancellation and provider availability need their own experiments.</p><p>The client's onSearchInRegion action demonstrates a map-to-feature operation boundary. It does not establish directions or this cache. Finish with fictional-data provenance, version boundary, owned resources, freshness policy, independent learner changes and pending runtime cases. The optional later concurrency and platform deep dives extend this project; they are not prerequisites in the current reading sequence.</p><p>The extended Map host suite has six behavior groups, including cancellation/edit/blank status with retained destinations and fresh/cache-hit distance, duration, age and expiry text. It tests the same Foundation presentation helpers used by the native adapter, without creating a MapKit operation or reading location.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What key is sufficient for the route options supported here?",
+          "options": [
+            "Only destination name.",
+            "Origin, destination and walking/automobile mode.",
+            "Selected row index."
+          ],
+          "answer": 1,
+          "explanation": "Every supported varying route input participates. Later time or transit options would also need to join the key."
+        },
+        {
+          "question": "Inserted at 100 with lifetime 60: is an entry usable at 160?",
+          "options": [
+            "Yes.",
+            "No, equal age is expired.",
+            "Only for the same display name."
+          ],
+          "answer": 1,
+          "explanation": "Accepted age is nonnegative and strictly below the lifetime."
+        },
+        {
+          "question": "Does an MKRoute memory cache provide offline Apple tiles?",
+          "options": [
+            "Yes.",
+            "No, route memory and basemap data are separate.",
+            "Only for walking."
+          ],
+          "answer": 1,
+          "explanation": "A route value is not an app-owned map tile store, and host checks establish neither provider data nor offline rendering."
+        }
+      ],
+      "exercise": {
+        "brief": "Extend the offline route schedule and write a recovery handoff before optional native interaction.",
+        "steps": [
+          "Add a third origin and prove a Lantern-keyed route misses.",
+          "Predict old walking success/error after switching to Driving.",
+          "Add exact cache lookups at injected 159 and 160.",
+          "Document text summaries and independent location/search/directions/tile recovery."
+        ],
+        "acceptance": [
+          "Input changes invalidate old route state and request tokens.",
+          "Old success and error cannot publish after intent changes.",
+          "The cache separates origin, destination, direction, mode and exact expiry.",
+          "Evidence separates synthetic numbers, typecheck and provider/runtime checks."
+        ],
+        "solution": "<p>Create the Lantern-to-Paper walking key and insert the synthetic summary at one hundred. A third-origin key misses even with the same destination. Reversed endpoints and automobile also miss. The original key returns at one hundred fifty-nine, then expires at one hundred sixty. These checks establish the declared local cache rule without contacting Apple or discovering roads.</p><p>Capture a walking token, invalidate it on mode change, then start a driving request only after the button. Feed the obsolete token both a success and failure in the learner's added schedule. Neither changes current route status. Driving remains the intent and no walking line appears current. New success can supply its matching path; new failure leaves destination selection available with retry.</p><p>Show provenance and freshness alongside approximate units. A cached provider answer younger than sixty seconds is still an estimate. Keep the text list and simulation-origin control outside the Map branch so permission and tiles do not block destination choice. The project is a place explorer, not turn-by-turn guidance.</p><p>The evidence ledger names the host command, independent added cases, SDK/typecheck and any actual runtime interaction. Label a response Apple only when a native request was actually observed. Synthetic summaries remain labelled synthetic. Pending runtime rows specify concrete isolated-target actions rather than invented success. The learner must still implement the third-origin case and supply their own observations.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: MKDirections",
+          "url": "https://developer.apple.com/documentation/mapkit/mkdirections"
+        },
+        {
+          "label": "Apple: MKRoute",
+          "url": "https://developer.apple.com/documentation/mapkit/mkroute"
+        },
+        {
+          "label": "Apple: MapPolyline",
+          "url": "https://developer.apple.com/documentation/mapkit/mappolyline"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Client exposes region search as an action",
+          "path": "ios-client/Projects/Apps/Zocdoc/Sources/Map/Views/MapViewControllerRepresentable.swift",
+          "line": 74,
+          "why": "Inspected onSearchInRegion callback demonstrates explicit feature operations, not route planning or cache implementation."
+        }
+      ],
+      "checklist": [
+        "I can explain route intent, cancellation and cache expiry.",
+        "I can separate host, native and provider evidence."
+      ],
+      "simple": {
+        "story": "Eli keeps a walking estimate from Lantern to Paper on a slip. Then he chooses to drive from a different starting point. The old slip still contains numbers, but it no longer answers his journey. He writes the complete journey on every slip and reuses it only for a short time. When an old replacement arrives late, he checks its journey and attempt before displaying it. A path printed on a slip also does not supply the whole street map.",
+        "meaning": "A route belongs to a complete journey, current request and freshness rule.",
+        "example": {
+          "before": "A walking answer is cached at time 100 for 60 seconds.",
+          "change": "Read at 159 and 160.",
+          "after": "159 returns it; 160 expires it."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Journey and freshness decide route reuse.",
+          "items": [
+            {
+              "label": "Intent",
+              "text": "Origin, destination and mode form the key."
+            },
+            {
+              "label": "Owner",
+              "text": "Only the current attempt may commit."
+            },
+            {
+              "label": "Reuse",
+              "text": "The matching cache entry must be younger than its lifetime."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Route",
+            "meaning": "A service-provided path for a journey."
+          },
+          {
+            "term": "Polyline",
+            "meaning": "Connected segments used to draw a path."
+          },
+          {
+            "term": "Freshness",
+            "meaning": "How recently an accepted answer was obtained."
+          }
+        ],
+        "remember": "Use a route only for its declared journey and freshness rule.",
+        "boundary": "Synthetic cache checks prove no roads, provider estimates, instant cancellation or offline tiles."
+      }
+    }
+  ]
+}
