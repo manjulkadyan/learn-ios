@@ -11,7 +11,7 @@ service firebase.storage {
         && request.resource.metadata.keys().hasAll(['ownerID'])
         && request.resource.metadata.keys().hasOnly(['ownerID'])
         && request.resource.metadata.ownerID == uid;
-      // Immutable objects: a changed image gets a new ID; metadata cannot transfer rights.
+      // Updates deny. Delete then create can reuse a path, so cleanup binds object generation.
       allow update: if false;
       allow delete: if owner(uid);
     }

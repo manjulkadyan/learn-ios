@@ -39,16 +39,28 @@ enum ProductionBootstrap {
         defer { trace?.stop() }
         return try await operation()
     }
-    static func pageSize() async throws -> Int {
+    static func pageSize() async throws -> ConfigSelection {
         let config = RemoteConfig.remoteConfig()
         config.setDefaults(["notes_page_size": 10 as NSNumber])
-        _ = try await config.fetchAndActivate()
-        return ConfigPolicy.pageSize(remote: config["notes_page_size"].numberValue.intValue)
+        try Task.checkCancellation()
+        let refreshed: Bool
+        do {
+            _ = try await config.fetchAndActivate()
+            refreshed = true
+        } catch {
+            // Cancellation ends this owner's work; ordinary fetch failure keeps usable config.
+            if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
+                throw CancellationError()
+            }
+            refreshed = false
+        }
+        try Task.checkCancellation()
+        return ConfigPolicy.selection(number: config["notes_page_size"].numberValue.doubleValue, refreshed: refreshed)
     }
-    static func requestCleanup(mediaID: String, commandID: String) async throws {
+    static func requestCleanup(mediaID: String, generation: String, commandID: String) async throws {
         // Server implementation is separate; it must validate auth, rights and idempotency.
         _ = try await Functions.functions(region: "us-central1").httpsCallable("abandonMedia")
-            .call(["mediaID": mediaID, "commandID": commandID])
+            .call(["mediaID": mediaID, "generation": generation, "commandID": commandID])
     }
 }
 

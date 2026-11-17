@@ -82,6 +82,14 @@ final class FirebaseNotesRepository: ObservableObject {
         return try Self.decode(try await collection(uid: uid).document(id).getDocument(), owner: uid)
     }
 
+    // A cache miss must not authorize retry after an ambiguous create acknowledgement.
+    func findOwnedOnServer(uid: String, id: String) async throws -> Note? {
+        guard NotePolicy.validID(id) else { throw PolicyFailure.invalidID }
+        let snapshot = try await collection(uid: uid).document(id).getDocument(source: .server)
+        guard !snapshot.metadata.isFromCache else { throw PolicyFailure.malformedSnapshot }
+        return snapshot.exists ? try Self.decode(snapshot, owner: uid) : nil
+    }
+
     func revise(uid: String, id: String, expected: Int, title raw: String) async throws {
         guard NotePolicy.validID(id) else { throw PolicyFailure.invalidID }
         let title = try NotePolicy.title(raw)

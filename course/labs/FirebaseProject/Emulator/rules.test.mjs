@@ -82,4 +82,6 @@ test('Storage ownership, immutable object, MIME, metadata and byte boundaries', 
   await assertSucceeds(uploadBytes(ref(aliceStorage(), 'users/alice/media/edge.jpg'), new Uint8Array(1_048_576), metadata));
   await assertFails(deleteObject(ref(env.authenticatedContext('bob').storage(), own.fullPath)));
   await assertSucceeds(deleteObject(own));
+  // Immutability of an existing object does not reserve its deleted path forever.
+  await assertSucceeds(uploadBytes(own, new Uint8Array([9]), metadata));
 });

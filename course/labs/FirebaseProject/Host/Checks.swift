@@ -66,6 +66,43 @@ enum Checks {
         check(ConfigPolicy.pageSize(remote: 300) == 10 && ConfigPolicy.pageSize(remote: nil) == 10, "bad and absent config use bounded default")
         check(ConfigPolicy.readEstimate(sessions: 100, pageSize: 10, pages: 3) == 3000, "synthetic read arithmetic")
         check(ConfigPolicy.readEstimate(sessions: Int.max, pageSize: 25, pages: 3) == nil, "estimate overflow rejected")
+        // Independent schedules exercise owner replacement, late errors and cleanup boundaries.
+        var publication = PublicationPolicy()
+        let oldWork = publication.begin()
+        publication.invalidate()
+        let bobWork = publication.begin()
+        var status = "Bob succeeded"
+        if publication.accepts(oldWork) { status = "Alice succeeded" }
+        check(status == "Bob succeeded", "old success cannot overwrite newer account status")
+        if publication.accepts(oldWork) { status = "Alice failed" }
+        check(status == "Bob succeeded", "old error cannot overwrite newer account status")
+        check(!publication.finish(oldWork) && publication.accepts(bobWork), "old task cleanup cannot release new request")
+        publication.invalidate()
+        let returnedAlice = publication.begin()
+        check(!publication.accepts(oldWork) && publication.accepts(returnedAlice), "new lifetime rejects old work even on return")
+        let superseding = publication.begin()
+        check(!publication.accepts(returnedAlice) && publication.accepts(superseding), "latest request rejects prior same-account result")
+        let draft = PendingCreate(owner: current, id: "draft_1", title: "Paper lantern")
+        check(CreatePolicy.reconcile(draft, serverNote: nil) == .create, "server-confirmed absence permits same-ID create")
+        let committed = Note(id: draft.id, ownerID: "alice", title: draft.title, revision: 0)
+        check(CreatePolicy.reconcile(draft, serverNote: committed) == .acknowledged, "lost acknowledgement reconciles original identity")
+        check(CreatePolicy.reconcile(draft, serverNote: Note(id: draft.id, ownerID: "bob", title: draft.title, revision: 0)) == .conflict, "reconciliation cannot accept another owner")
+        check(CreatePolicy.reconcile(draft, serverNote: Note(id: draft.id, ownerID: "alice", title: "Changed", revision: 1)) == .conflict, "changed server record requires review instead of duplicate create")
+        let recoveryCases: [(Bool, Bool, Bool, MediaRecovery)] = [
+            (false, false, false, .upload), (false, false, true, .discardLocalDraft),
+            (false, true, false, .removeDanglingManifest), (false, true, true, .removeDanglingManifest),
+            (true, false, false, .publishManifest), (true, false, true, .removeOrphan),
+            (true, true, false, .complete), (true, true, true, .complete)
+        ]
+        for (uploaded, published, abandoned, expected) in recoveryCases {
+            check(MediaPolicy.recovery(uploaded: uploaded, published: published, abandoned: abandoned) == expected,
+                  "recovery boundary uploaded=\(uploaded) published=\(published) abandoned=\(abandoned)")
+        }
+        check(ConfigPolicy.selection(number: 5, refreshed: false) == ConfigSelection(pageSize: 5, diagnostic: .retainedAfterFetchFailure), "fetch failure retains validated active value and diagnostic")
+        check(ConfigPolicy.selection(number: nil, refreshed: false).pageSize == 10, "fetch failure without active value uses default")
+        for invalid in [Double.nan, Double.infinity, -1, 0, 25.5, 300] {
+            check(ConfigPolicy.selection(number: invalid, refreshed: false).pageSize == 10, "invalid active number falls back safely: \(invalid)")
+        }
         print("\(passed) offline policy checks passed; Firebase rules and SDK were not executed.")
     }
 }

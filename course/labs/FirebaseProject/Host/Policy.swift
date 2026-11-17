@@ -59,6 +59,53 @@ struct SessionStamp: Equatable, Sendable {
     let generation: Int
 }
 
+struct WorkStamp: Equatable, Sendable {
+    let generation: Int
+    let request: Int
+}
+
+// One owner and its latest request; success and error use the same publication gate.
+struct PublicationPolicy {
+    private var generation = 0
+    private var sequence = 0
+    private(set) var current: WorkStamp?
+    mutating func begin() -> WorkStamp {
+        sequence += 1
+        let stamp = WorkStamp(generation: generation, request: sequence)
+        current = stamp
+        return stamp
+    }
+    mutating func invalidate() { generation += 1; current = nil }
+    func accepts(_ stamp: WorkStamp) -> Bool { current == stamp }
+    @discardableResult
+    mutating func finish(_ stamp: WorkStamp) -> Bool {
+        guard accepts(stamp) else { return false }
+        current = nil
+        return true
+    }
+}
+
+struct PendingCreate: Equatable, Sendable {
+    let owner: SessionStamp
+    let id: String
+    let title: String
+}
+enum CreateReconciliation: Equatable { case create, acknowledged, conflict }
+enum CreatePolicy {
+    // nil means an authoritative server lookup found no document, not a cache miss.
+    static func reconcile(_ draft: PendingCreate, serverNote: Note?) -> CreateReconciliation {
+        guard let note = serverNote else { return .create }
+        return note.id == draft.id && note.ownerID == draft.owner.uid
+            && note.title == draft.title && note.revision == 0 ? .acknowledged : .conflict
+    }
+}
+
+struct MediaUploadReceipt: Equatable, Sendable {
+    let path: String
+    // A decimal string is safe to carry to JavaScript without Number rounding.
+    let generation: String
+}
+
 struct SessionModel {
     private(set) var uid: String?
     private(set) var generation = 0
@@ -128,7 +175,10 @@ struct TokenOwnership {
     }
 }
 
-enum MediaRecovery: Equatable { case upload, publishManifest, complete, removeOrphan }
+enum MediaRecovery: Equatable {
+    case upload, publishManifest, complete, removeOrphan
+    case discardLocalDraft, removeDanglingManifest
+}
 struct MediaPolicy {
     static func path(owner: String, mediaID: String) throws -> String {
         guard NotePolicy.validID(owner), NotePolicy.validID(mediaID) else {
@@ -140,16 +190,29 @@ struct MediaPolicy {
         uid == owner && uid != nil && bytes > 0 && bytes <= 1_048_576 && contentType == "image/jpeg"
     }
     static func recovery(uploaded: Bool, published: Bool, abandoned: Bool) -> MediaRecovery {
-        if published { return .complete }
+        if published { return uploaded ? .complete : .removeDanglingManifest }
         if uploaded { return abandoned ? .removeOrphan : .publishManifest }
-        return .upload
+        return abandoned ? .discardLocalDraft : .upload
     }
+}
+
+enum ConfigDiagnostic: Equatable, Sendable { case refreshed, retainedAfterFetchFailure }
+struct ConfigSelection: Equatable, Sendable {
+    let pageSize: Int
+    let diagnostic: ConfigDiagnostic
 }
 
 struct ConfigPolicy {
     static func pageSize(remote: Int?) -> Int {
         guard let remote, (1...25).contains(remote) else { return 10 }
         return remote
+    }
+    static func selection(number: Double?, refreshed: Bool) -> ConfigSelection {
+        let size: Int
+        if let number, number.isFinite, (1...25).contains(number), number.rounded(.towardZero) == number {
+            size = pageSize(remote: Int(number))
+        } else { size = 10 }
+        return ConfigSelection(pageSize: size, diagnostic: refreshed ? .refreshed : .retainedAfterFetchFailure)
     }
     // Synthetic arithmetic only; no real Firebase price or quota is asserted.
     static func readEstimate(sessions: Int, pageSize: Int, pages: Int) -> Int? {

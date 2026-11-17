@@ -11,7 +11,7 @@ final class FirebaseMediaRepository {
     // This method accepts already prepared JPEG bytes, never raw picker assets.
     // Only one active transfer belongs to this owner; a replacement cancels it.
     func upload(uid: String, mediaID: String, jpeg: Data,
-                completion: @escaping (Result<String, Error>) -> Void) throws {
+                completion: @escaping (Result<MediaUploadReceipt, Error>) -> Void) throws {
         guard MediaPolicy.canUpload(uid: uid, owner: uid, bytes: jpeg.count, contentType: "image/jpeg") else {
             throw PolicyFailure.invalidTitle
         }
@@ -20,10 +20,12 @@ final class FirebaseMediaRepository {
         let metadata = StorageMetadata()
         metadata.contentType = "image/jpeg"
         metadata.customMetadata = ["ownerID": uid]
-        task = storage.reference(withPath: path).putData(jpeg, metadata: metadata) { _, error in
+        task = storage.reference(withPath: path).putData(jpeg, metadata: metadata) { uploaded, error in
             // Caller checks account generation before showing this completion.
             if let error { completion(.failure(error)) }
-            else { completion(.success(path)) }
+            else if let uploaded, uploaded.generation > 0 {
+                completion(.success(MediaUploadReceipt(path: path, generation: String(uploaded.generation))))
+            } else { completion(.failure(PolicyFailure.malformedSnapshot)) }
         }
     }
     func cancel() { task?.cancel(); task = nil }

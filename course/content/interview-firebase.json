@@ -65,7 +65,7 @@
         "Checks both success and failure stamps.",
         "Distinguishes listener removal from rejecting already queued work."
       ],
-      "answerHTML": "<p>A Firebase UID identifies an account, while the local generation identifies one app-owned session lifetime. Alice at generation 1 and Alice at generation 3 have the same UID but different ownership of in-flight work. A request captures both before it begins. After a callback hop or await, publication requires the captured stamp to match the current one.</p><p>switchAccount clears visible rows and advances the generation. Bob's generation 2 must not accept Alice's old success or failure. Alice's later login must not accept the generation-1 result either. Apply the comparison to errors as well as data so an old failure cannot overwrite a newer success.</p><p>Removing listeners and requesting task cancellation reduce work; they cannot guarantee that a callback already queued disappears. The comparison supplies the final publication gate. Kotlin Flow or coroutine lifecycle patterns can use the same policy, but cancellation alone is not that policy.</p>",
+      "answerHTML": "<p>A Firebase UID identifies an account, while the local generation identifies one app-owned session lifetime. Alice at generation 1 and Alice at generation 3 have the same UID but different ownership of in-flight work. A request captures both before it begins. After a callback hop or await, publication requires the captured stamp to match the current one.</p><p>switchAccount clears visible rows and advances the generation. Bob's generation 2 must not accept Alice's old success or failure. Alice's later login must not accept the generation-1 result either. Apply the comparison to errors as well as data so an old failure cannot overwrite a newer success.</p><p>Removing listeners and requesting task cancellation reduce work; they cannot guarantee that a callback already queued disappears. The comparison supplies the final publication gate. Kotlin Flow or coroutine lifecycle patterns can use the same policy, but cancellation alone is not that policy.</p><p>The screen's async success and error paths use the same final gate. Credential-changing submissions are serialized, and listener generations reject callbacks from a removed owner.</p>",
       "followUps": [
         "How should an old error be handled?",
         "When should account-owned upload tasks be cancelled?"
@@ -118,7 +118,8 @@
       "answerHTML": "<p>The editor retains the revision it loaded. Inside the transaction, read n1, decode current ownership and revision, and compare expected with stored revision. The first editor can move revision 0 to 1. The second editor still expects 0, so a transaction reading revision 1 reports a product conflict rather than overwriting the newer title.</p><p>Firestore can rerun the transaction body after a concurrent change. Keep it free of toasts, analytics events, notifications and view-model mutation. Schedule writes only after the reads and checks. Present completion only after the outer transaction returns successfully.</p><p>Preserve the second draft and show the newer record for review. Do not secretly change expected to 1 and resubmit, because that hides the user's stale basis. Ordinary database optimistic-locking experience helps, but the exact Firestore retry and offline failure contracts still matter. The host revision helper is a model, not proof of a service transaction.</p>",
       "followUps": [
         "How does a commutative counter change the retry policy?",
-        "What does an offline editor display?"
+        "What does an offline editor display?",
+        "How does a pending create retain its identity after a lost acknowledgement?"
       ],
       "pitfalls": [
         "Mutating UI inside a retried transaction body.",
@@ -240,9 +241,10 @@
         "Names uploadedUnpublished and cleanupPending states.",
         "Plans durable idempotent orphan cleanup.",
         "Rejects stale transfer completion after account changes.",
-        "States that current notebook rules do not grant manifest writes."
+        "States that current notebook rules do not grant manifest writes.",
+        "Handles abandonment before upload, dangling publication and generation-bound cleanup."
       ],
-      "answerHTML": "<p>Upload and manifest publication are separate effects. If p1 uploads but publication fails, retain uploadedUnpublished with the same media ID. A retry should retry the manifest rather than invent another object identity. If Alice abandons the draft, choose removeOrphan and assign a cleanup owner.</p><p>Persist the intended cleanup in a durable job before claiming recovery will survive restart. Deletion can succeed while job acknowledgement fails, so repeated deletion should tolerate an already absent object. Keep progress visible and avoid silently forgetting failed cleanup. The host recovery helper only selects a next step; it neither persists nor executes that job.</p><p>Cancel an account-owned transfer on departure and compare its captured account/request stamp before publishing progress or completion. Already queued callbacks can outlive cancellation. The current Firestore notebook rules deny manifest paths, so a manifest schema, rules fixtures and integration are additional work. Do not describe these sources as a completed photo application.</p>",
+      "answerHTML": "<p>Upload and manifest publication are separate effects. If p1 uploads but publication fails, retain uploadedUnpublished with the same media ID. A retry should retry the manifest rather than invent another object identity. If Alice abandons the draft, choose removeOrphan and assign a cleanup owner.</p><p>Persist the intended cleanup in a durable job before claiming recovery will survive restart. Deletion can succeed while job acknowledgement fails, so repeated deletion must retain the original object's generation precondition. It reconciles absence and preserves a replacement at the same path. Keep progress visible and avoid silently forgetting failed cleanup. The host recovery helper only selects a next step; it neither persists nor executes that job.</p><p>Cancel an account-owned transfer on departure and compare its captured account/request stamp before publishing progress or completion. Already queued callbacks can outlive cancellation. The current Firestore notebook rules deny manifest paths, so a manifest schema, rules fixtures and integration are additional work. Do not describe these sources as a completed photo application.</p><p>Abandonment before upload discards the local draft. A published reference without an upload needs manifest repair, not completion. Carry the upload generation as a decimal string.</p>",
       "followUps": [
         "What if the object is already missing during retry?",
         "How do published references change deletion policy?"
@@ -320,7 +322,7 @@
         "Installs provider factory before configure and stages enforcement.",
         "Keeps secrets and grants out of client flags."
       ],
-      "answerHTML": "<p>Remote Config proposes product values; the app validates them and chooses when to activate behavior. Page size 300 is outside the lab's 1–25 range, so the host chooses the local default 10. The list rule independently caps allowed queries. A remote flag cannot safely grant administrator rights or carry a secret.</p><p>App Check supplies evidence about the app environment under the configured provider's contract. Auth identifies the user. Rules authorize the resource operation. An attested Bob still has no right to edit Alice's private note, and an authenticated Alice does not automatically prove an unmodified client environment.</p><p>Install the App Check provider factory before Firebase initialization and use metrics, supported-device observations and controlled debug integration before enforcement. A simulator debug token is not physical-device App Attest evidence. The optional remote-services source is separately gated and unexecuted, while the host only proves default selection.</p>",
+      "answerHTML": "<p>Remote Config proposes product values; the app validates them and chooses when to activate behavior. Page size 300 is outside the lab's 1–25 range, so the host chooses the local default 10. The list rule independently caps allowed queries. A remote flag cannot safely grant administrator rights or carry a secret.</p><p>App Check supplies evidence about the app environment under the configured provider's contract. Auth identifies the user. Rules authorize the resource operation. An attested Bob still has no right to edit Alice's private note, and an authenticated Alice does not automatically prove an unmodified client environment.</p><p>Install the App Check provider factory before Firebase initialization and use metrics, supported-device observations and controlled debug integration before enforcement. A simulator debug token is not physical-device App Attest evidence. The optional remote-services source is separately gated and unexecuted, while the host only proves default selection.</p><p>Ordinary fetch failure returns validated active/default configuration with a separate diagnostic; explicit cancellation ends the operation. Firebase App Attest integration requires the signed production environment.</p>",
       "followUps": [
         "When should a disruptive fetched value become active?",
         "What happens during an attestation outage?"
@@ -337,23 +339,24 @@
       "kind": "Design",
       "minutes": 15,
       "prompt": "How would you review a callable cleanup command and connection-aware presence for retry safety?",
-      "scenario": "c1 cleans Alice's p1; its acknowledgement is lost while a presence registration completes after signout.",
+      "scenario": "c1 binds Alice's p1 and generation g1; progress acknowledgement is lost, p1 is recreated as g2, and presence registration completes after signout.",
       "androidBridge": "Compare durable commands and server disconnect hooks; a coroutine scope cannot guarantee server cleanup or immediate presence detection.",
       "rubric": [
         "Derives UID from authenticated request and validates IDs.",
         "Rejects command-ID reuse with a different payload.",
         "Separates accepted durable work from completed deletion.",
-        "Handles repeated worker deletion idempotently.",
+        "Binds original object generation and preserves a replacement on conditional-delete replay without unsafe Number conversion.",
         "Checks account/generation before advertising presence after registration."
       ],
-      "answerHTML": "<p>The callable derives UID from request.auth and accepts restricted media and command IDs. Store the command under that user's namespace with its payload. Repeating c1 for p1 reuses its state; c1 for p2 is a failed precondition. App Check enforcement complements these checks but cannot repair arbitrary-path administrative deletion.</p><p>Return accepted when durable intent exists, then let the worker delete the derived owned Storage path and mark completion. Deletion and progress recording are not one transaction. Repeated deletion tolerates an already absent object, allowing recovery after lost acknowledgement. Published media references would need an additional invalidation contract.</p><p>Presence registers server-side disconnect removal before advertising online. A completion after signout must compare account and connection generation and avoid an online write. Reconnect requires fresh registration. Presence describes a connection, not user attention, and server disconnect detection is not instantaneous. These operational sources were syntax checked, not invoked or deployed.</p>",
+      "answerHTML": "<p>The callable derives UID from request.auth and accepts restricted media and command IDs. Store media ID and original generation string under that user's command namespace. Retrying the same payload reuses intent; changing either value is a failed precondition. App Check enforcement complements these checks but cannot repair arbitrary-path administrative deletion.</p><p>Return accepted when durable intent exists, then let the worker delete the derived owned Storage path and mark completion. Deletion and progress recording are not one transaction. Delete with the original generation-match precondition. Replay reconciles absence or preserves a replacement generation, allowing recovery after lost acknowledgement. Keep exact decimal strings; never round them through Number. Published media references would need an additional invalidation contract.</p><p>Presence registers server-side disconnect removal before advertising online. A completion after signout must compare account and connection generation and avoid an online write. Reconnect requires fresh registration. Presence describes a connection, not user attention, and server disconnect detection is not instantaneous. These operational sources were syntax checked, not invoked or deployed.</p>",
       "followUps": [
         "How can two connections avoid overwriting each other's presence?",
         "Who investigates a cleanup job stuck pending?"
       ],
       "pitfalls": [
         "Returning accepted as completed deletion.",
-        "Advertising online from a stale registration completion."
+        "Advertising online from a stale registration completion.",
+        "Treating a path or rounded generation Number as a stable object version."
       ]
     },
     {
@@ -363,7 +366,7 @@
       "kind": "Explain",
       "minutes": 8,
       "prompt": "Which verification gate can establish a Firebase authorization result?",
-      "scenario": "The Swift policy passes 30 checks and the Node fixture parses, but no emulators were started.",
+      "scenario": "The Swift policy passes 55 checks and the Node fixture parses, but no emulators were started.",
       "androidBridge": "A Kotlin fake repository is also separate from a real emulator/interpreter test.",
       "rubric": [
         "Names what the host compile includes.",
@@ -371,7 +374,7 @@
         "Explains mocked identities with real rule interpreter execution.",
         "Requires provisioned dependency/runtime evidence and direct denied requests."
       ],
-      "answerHTML": "<p>The host compile includes only Policy.swift and Checks.swift. Its 30 passing checks establish our declared synthetic policy under the recorded compiler. It contains no Firebase module, authenticated service request or rules interpreter. A Node syntax pass verifies that the fixture can be parsed; it does not import dependencies or execute assertFails.</p><p>Actual rules evidence requires provisioned client/rules-testing modules and local Firestore/Storage emulator processes. initializeTestEnvironment loads rule text, and mocked authenticated or anonymous contexts issue requests. The identities are synthetic, but the interpreter evaluates the real expressions for those requests.</p><p>Record exact command, toolchain, endpoints, project ID and observed outcomes. Directly request Alice's document as Bob and expect denial; hiding a screen is insufficient. Startup can download missing emulator binaries, so a CLI executable alone does not establish readiness under a no-download constraint. Native SDK and provider evidence remain additional gates.</p>",
+      "answerHTML": "<p>The host compile includes only Policy.swift and Checks.swift. Its 55 passing checks establish our declared synthetic policy under the recorded compiler. It contains no Firebase module, authenticated service request or rules interpreter. A Node syntax pass verifies that the fixture can be parsed; it does not import dependencies or execute assertFails.</p><p>Actual rules evidence requires provisioned client/rules-testing modules and local Firestore/Storage emulator processes. initializeTestEnvironment loads rule text, and mocked authenticated or anonymous contexts issue requests. The identities are synthetic, but the interpreter evaluates the real expressions for those requests.</p><p>Record exact command, toolchain, endpoints, project ID and observed outcomes. Directly request Alice's document as Bob and expect denial; hiding a screen is insufficient. Startup can download missing emulator binaries, so a CLI executable alone does not establish readiness under a no-download constraint. Native SDK and provider evidence remain additional gates.</p><p>The eight pure cleanup replay tests exercise a synthetic store and orchestration helper. They establish neither GCS preconditions nor Firebase provider execution.</p>",
       "followUps": [
         "What does a cleared UI fail to prove?",
         "Why clear service state between fixtures?"
