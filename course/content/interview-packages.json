@@ -1,0 +1,204 @@
+{
+  "questions": [
+    {
+      "id": "iq-137-a",
+      "lesson": "137",
+      "level": "Foundation",
+      "kind": "Explain",
+      "prompt": "Map a local resource-backed package to its product, targets, module, and bundle.",
+      "scenario": "PackageProject exports WorkshopKit, has WorkshopKitTests, and declares cards.json as a processed resource.",
+      "minutes": 6,
+      "androidBridge": "A Gradle artifact/module analogy helps identify a build boundary; SwiftPM products can compose targets and Bundle.module follows SwiftPM's resource generation.",
+      "rubric": [
+        "Names package, product, library target/module, and test target separately.",
+        "Explains resources belong to WorkshopKit.",
+        "Uses Bundle.module internally and semantic loading externally.",
+        "Separates tools version from deployment version."
+      ],
+      "answerHTML": "<p>PackageProject is the package description and directory. WorkshopKit is its library product and target module; WorkshopKitTests is a separate test target depending on it. The consumer selects the product and imports the module. The resource rule causes SwiftPM to generate a resource bundle accessor for WorkshopKit. Catalog.bundled uses Bundle.module inside that target, so callers need not know cards.json's location. Bundle.main would describe the consuming app or executable rather than necessarily this resource bundle. The tools-version comment concerns manifest/toolchain support, while platforms declares deployment minima. A host resource-loading test checks this arrangement under the recorded SwiftPM build. It does not establish iOS app packaging, signing, or runtime display.</p>",
+      "followUps": [
+        "What changes when the resource filename changes internally?",
+        "Why can a test pass while an app bundle still misses resources?"
+      ],
+      "pitfalls": [
+        "Treating a product name as always identical to an import.",
+        "Claiming the host resource test proves an iOS app."
+      ]
+    },
+    {
+      "id": "iq-137-b",
+      "lesson": "137",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Explain why successful Codable decoding can still produce an unusable catalog.",
+      "scenario": "JSON has two blue IDs and a positive duration of 241; a developer returns every valid prefix before the bad record.",
+      "minutes": 8,
+      "androidBridge": "Kotlin serialization also separates shape from domain validation; neither serializer automatically enforces this notebook identity and range policy.",
+      "rubric": [
+        "Distinguishes decoding from validation.",
+        "Requires unique IDs and inclusive 1...240 minutes.",
+        "Publishes only a complete candidate.",
+        "Keeps corrupt input, domain errors, and IO errors separate."
+      ],
+      "answerHTML": "<p>Codable establishes that fields can be decoded into the declared types, not that the product's rules hold. An integer 241 can decode successfully while violating the allowed duration range. Two blue IDs violate stable identity even if their titles differ. Build a local candidate and validate every record before assigning the public cards array. A set insertion detects duplicates; title trimming catches blank text. Throw a domain error rather than returning a valid prefix, because a caller would otherwise receive an incomplete catalog that appears successful. Keep invalidJSON distinct from invalidCard and duplicateID, and leave resource-read failures as IO errors. Tests should challenge duplicates, malformed bytes, the accepted equality boundary, and an out-of-range value through normal public imports.</p>",
+      "followUps": [
+        "How would zero cards differ from a failed resource read?",
+        "What test demonstrates publication is all-or-error?"
+      ],
+      "pitfalls": [
+        "Using try? followed by an empty-array fallback for every error.",
+        "Testing only the happy-path total."
+      ]
+    },
+    {
+      "id": "iq-138-a",
+      "lesson": "138",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Explain why a separate consumer can fail while a library's own source compiles.",
+      "scenario": "WorkshopCard is public but its synthesized initializer is not exposed; the consumer also omits its product dependency.",
+      "minutes": 7,
+      "androidBridge": "An external Gradle consumer tests ordinary visibility too, but Swift's memberwise initializer access and product/module declarations differ.",
+      "rubric": [
+        "Adds an explicit public initializer when intended.",
+        "Declares a product edge before importing the module.",
+        "Avoids @testable for external consumer proof.",
+        "Explains package access does not reach a separate package."
+      ],
+      "answerHTML": "<p>The library's own code can call internal declarations, so internal examples do not prove its public API is usable. A public struct does not automatically export its synthesized memberwise initializer; define an explicit public initializer when callers must construct the value. The consumer manifest must select the WorkshopKit product for its target, after declaring the local package relationship. An import statement alone does not establish that build dependency. Package access can support modules within one package but does not expose a declaration to this separate consumer package. Compile the consumer using a normal import and run it to check resources and behavior. That evidence supports the intended host boundary without claiming remote resolution or native application interaction.</p>",
+      "followUps": [
+        "Which declarations should remain internal after repairing compilation?",
+        "How would a public vendor type affect a future replacement?"
+      ],
+      "pitfalls": [
+        "Exporting every helper to silence compiler errors.",
+        "Using @testable to claim ordinary consumer compatibility."
+      ]
+    },
+    {
+      "id": "iq-138-b",
+      "lesson": "138",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Plan an API addition without leaking resource or vendor details.",
+      "scenario": "A consumer requests cards up to a duration bound while existing callers rely on totalMinutes and absent lookup returning nil.",
+      "minutes": 10,
+      "androidBridge": "A Kotlin facade can similarly hide implementation types; Swift public signatures and package product relationships still need their own consuming builds.",
+      "rubric": [
+        "Defines an inclusive filter and negative-bound behavior.",
+        "Preserves documented ordering and existing API semantics.",
+        "Returns feature-owned values rather than vendor types.",
+        "Runs public tests and a separate consumer with recovery ownership."
+      ],
+      "answerHTML": "<p>Add a public query returning [WorkshopCard] with an explicitly inclusive maximum. With the fixture, twenty returns blue and twenty-five returns blue then green. Define negative bounds as empty or choose a documented throwing alternative before implementation. Preserve input order and keep totalMinutes and optional card lookup unchanged. The query should not expose the JSON path, decoder configuration, or a third-party collection type. Test boundary values and a reversed custom catalog through normal imports, then build and run the separate consumer. An additive method can preserve source compatibility while a changed ordering rule could still break behavior. Retain the baseline, document migration if behavior changes, and keep presentation/retry policy with the consuming program.</p>",
+      "followUps": [
+        "What would make this source compatible but behaviorally breaking?",
+        "Where should a UI decide how to present a load failure?"
+      ],
+      "pitfalls": [
+        "Equating successful compilation with unchanged behavior.",
+        "Forcing callers to import a future vendor collection."
+      ]
+    },
+    {
+      "id": "iq-139-a",
+      "lesson": "139",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "State exactly what the pinned Collections evidence supports.",
+      "scenario": "The review reads the 1.1.4 manifest, README, license, and complete file tree but neither builds nor audits every implementation.",
+      "minutes": 7,
+      "androidBridge": "Gradle dependency review also needs versioned primary evidence; package formats and Apple privacy-manifest obligations are different.",
+      "rubric": [
+        "Cites exact version/revision rather than latest claims.",
+        "Names the README compiler floor separately from tools version.",
+        "Names Apache 2.0 with Runtime Library Exception.",
+        "Limits no-.xcprivacy observation to the complete tree."
+      ],
+      "answerHTML": "<p>The checkout requests Collections exactly at 1.1.4 and records revision 671108c96644956dddcd89dd59c203dcdb36cec7. The pinned manifest has tools version 5.7 and no remote package dependency declarations. The pinned README states the 1.1.x compiler floor as Swift 5.7.2 and Xcode 14.2, with no minimum deployment target. The license is Apache 2.0 with Runtime Library Exception. A complete, untruncated tree with no .xcprivacy path establishes file absence at that revision only. It does not audit required-reason API calls, prove app privacy practices, or grant organizational legal approval. No vendor build or benchmark ran, so product/API execution and performance claims remain pending. These limits belong in the decision alongside the inspected source URLs.</p>",
+      "followUps": [
+        "Why is tools version 5.7 not the entire compiler requirement?",
+        "Which app-level review remains even with no privacy-manifest path?"
+      ],
+      "pitfalls": [
+        "Calling the pin the latest version.",
+        "Turning file absence into a privacy certification."
+      ]
+    },
+    {
+      "id": "iq-139-b",
+      "lesson": "139",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Make an adopt-or-retain decision with an exit condition.",
+      "scenario": "A two-card catalog already validates order and uniqueness using Array and Set; a later feature may need heavy ordered selection.",
+      "minutes": 12,
+      "androidBridge": "Dependency cost assessment applies on Android too, but Swift product imports, toolchain floors, and distribution rules require platform-specific evidence.",
+      "rubric": [
+        "Retains the offline implementation for the current bounded need.",
+        "Defines a larger concrete need before adoption.",
+        "Hides the vendor behind feature-owned values.",
+        "Names correctness gates, pending measurements, owner, and rollback."
+      ],
+      "answerHTML": "<p>Retain Array plus Set for the two-card offline catalog: it already satisfies the observed order and uniqueness rule without adding remote setup. For a larger ordered-unique selection, specify duplicate and removal/reselection behavior, then assess OrderedCollections behind a feature-owned adapter returning arrays. Compile that adapter at the recorded pin and test repeated selection, unknown IDs, removal, and replay before accepting integration. If speed matters, define representative sizes, operation mix, optimized configuration, destination, repeated raw samples, and a correctness oracle. No benchmark result should appear until collected. Name the adopting feature maintainer and a rollback to the local implementation if behavior or supported builds fail. Inspect proposed release requirements and preserve license/privacy review boundaries before an upgrade.</p>",
+      "followUps": [
+        "Which requirement would justify a deque instead?",
+        "What must be retained to reverse the adoption?"
+      ],
+      "pitfalls": [
+        "Adopting solely because the dependency is already somewhere in the workspace.",
+        "Inventing a speedup from an algorithm description."
+      ]
+    },
+    {
+      "id": "iq-140-a",
+      "lesson": "140",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Distinguish source, ABI, and module stability in a library decision.",
+      "scenario": "A team assumes that distributing an XCFramework means every caller can keep using every old binary and source forever.",
+      "minutes": 8,
+      "androidBridge": "JVM source/binary compatibility offers a broad analogy; Swift's ABI, textual module interfaces, destination slices, and evolution rules are distinct.",
+      "rubric": [
+        "Defines all three compatibility concepts separately.",
+        "Explains XCFramework is a variant container.",
+        "Distinguishes platform stable ABI from a vendor promise.",
+        "Requires supported compiler/destination and consumer evidence."
+      ],
+      "answerHTML": "<p>Source compatibility asks whether a caller's source still compiles. ABI compatibility concerns cooperation between already compiled binaries under their calling and layout contracts. Module stability concerns a compiler's ability to read a distributed stable interface across supported compiler setups. These do not promise identical behavior. An XCFramework packages platform/architecture variants; simulator arm64 and device arm64 are distinct destinations. Swift's platform ABI stability is not a blanket third-party library compatibility guarantee. A binary publisher needs a deliberate library-evolution and module-interface plan, symbols, resources, supported matrices, and release ownership. The source-only companion's immediate gate is rebuilding a normal public consumer and checking behavior. It does not establish binary distribution or compatibility across arbitrary compilers.</p>",
+      "followUps": [
+        "Why can a source-compatible release still change behavior?",
+        "What responsibilities does binary distribution transfer to the publisher?"
+      ],
+      "pitfalls": [
+        "Treating ABI stability as universal vendor API stability.",
+        "Selecting a device slice because its CPU name matches the simulator."
+      ]
+    },
+    {
+      "id": "iq-140-b",
+      "lesson": "140",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Repair a proposed module split and define its recovery gate.",
+      "scenario": "WorkshopKit depends on CatalogRules, which imports WorkshopKit for WorkshopCard and user-facing error text.",
+      "minutes": 12,
+      "androidBridge": "Gradle cycles also expose responsibility mistakes; Swift target/product and access boundaries make the exact repair platform-specific.",
+      "rubric": [
+        "Detects the directed cycle.",
+        "Assigns shared value and error ownership explicitly.",
+        "Considers a private helper as a simpler alternative.",
+        "Checks consumer resources/behavior and defines rollback without measured build claims."
+      ],
+      "answerHTML": "<p>The proposed arrows form a cycle, so moving files alone is insufficient. Keep presentation wording in the consumer and return domain errors from the core. Decide whether WorkshopCard belongs in a lower value/rules module or whether a private helper inside WorkshopKit is enough. For this small library, the helper may avoid unnecessary target and API overhead. If splitting, require consumer to WorkshopKit to CatalogRules with no reverse import, and explain any public model migration. Preserve resource ownership in WorkshopKit, test the public errors/order, and run the separate consumer's resource load. Retain the previous graph and declarations for rollback. A build-speed claim remains pending until repeated clean/incremental experiments with fixed edits and cache policy support it.</p>",
+      "followUps": [
+        "Which resource input is easy to lose during a graph migration?",
+        "How would an adapter reduce consumer migration cost?"
+      ],
+      "pitfalls": [
+        "Adding a shared global module merely to hide the cycle.",
+        "Claiming fewer source files proves faster builds."
+      ]
+    }
+  ]
+}

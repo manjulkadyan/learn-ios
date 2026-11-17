@@ -1,0 +1,204 @@
+{
+  "questions": [
+    {
+      "id": "iq-141-a",
+      "lesson": "141",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Explain ownership across the notebook dashboard, tile, detail, and editor.",
+      "scenario": "Blue is edited from 15 to 20 minutes, while the summary and detail must show current values.",
+      "minutes": 7,
+      "androidBridge": "Compose state hoisting helps explain value/action flow; SwiftUI view structs are descriptions and @State lifetime follows view identity.",
+      "rubric": [
+        "Names DashboardView's single Board owner.",
+        "Passes values and action closures to tiles.",
+        "Uses Binding for the editor's shared publication boundary.",
+        "Routes by stable ID and resolves current data."
+      ],
+      "answerHTML": "<p>DashboardView owns one Board in State. Tiles receive current card values and a named pin callback rather than owning another sample Board. Detail receives a binding plus an ID and resolves the current card each time the description is evaluated. The editor owns a separate CardDraft until Save validates and publishes through that binding. Blue's stable ID remains blue when its duration becomes twenty. The total then derives from the same Board and becomes forty-five, while detail resolves twenty. A SwiftUI view value is a description rather than an Activity-like screen object. Copying a card into a destination snapshot could preserve stale values. The fixture feed is current cards reversed, not persistent event history.</p>",
+      "followUps": [
+        "What happens to an open route after deletion?",
+        "Why should the summary avoid its own total State?"
+      ],
+      "pitfalls": [
+        "Giving every component a new Board.sample.",
+        "Confusing a view initializer with a durable screen lifecycle."
+      ]
+    },
+    {
+      "id": "iq-141-b",
+      "lesson": "141",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Diagnose a detail screen that shows the wrong notebook after deletion.",
+      "scenario": "Navigation stores an array index; deleting the first card makes the destination show another card under the old route.",
+      "minutes": 8,
+      "androidBridge": "Android routes often use item IDs too; SwiftUI NavigationStack value destinations and view identity still need their own semantics.",
+      "rubric": [
+        "Replaces index/title routing with a stable unique ID.",
+        "Looks up current values rather than caching the original card.",
+        "Shows a missing state when no ID resolves.",
+        "Tests identity independently from displayed labels and order."
+      ],
+      "answerHTML": "<p>An array index names a position, not the logical notebook. After deleting Blue, index zero may refer to Green, so the old route silently changes meaning. Pass blue as a stable ID instead and resolve it against the current Board at the destination. After deletion, lookup returns nil and the UI shows Notebook removed with a usable return path. A rename preserves the ID, so it changes text without changing the route. Enforce duplicate-ID rejection at construction. Test host lookup after removal and test the native destination separately, because absence in a model does not prove the missing message is visible or accessible. Keep accessibility identifiers distinct from localized labels so automation can follow the logical control.</p>",
+      "followUps": [
+        "When would a typed route enum improve this bounded String route?",
+        "How would account switching affect route ownership?"
+      ],
+      "pitfalls": [
+        "Using the title as a supposedly stable unique key.",
+        "Replacing a missing item with a blank card."
+      ]
+    },
+    {
+      "id": "iq-142-a",
+      "lesson": "142",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Predict the board's adaptive columns and the limits of that prediction.",
+      "scenario": "Region widths are 631 and 632 points with ordinary text; a third case has 832 points and accessibility text.",
+      "minutes": 7,
+      "androidBridge": "Android region-driven adaptation is analogous; SwiftUI points, proposals, and Dynamic Type categories are different mechanisms.",
+      "rubric": [
+        "Subtracts 32 points for padding.",
+        "Predicts one at 599 and two at 600 usable width.",
+        "Overrides to one for accessibility text at 800.",
+        "Separates policy tests from rendered text and accessibility."
+      ],
+      "answerHTML": "<p>The dashboard reserves sixteen points on each horizontal side, so region 631 yields usable 599 and one column. Region 632 yields usable 600 and two columns for ordinary text. Region 832 yields usable 800, but accessibility text forces one column. These are the companion's declared product thresholds, not universal Apple breakpoints. The host test can prove the policy branch at each boundary. It cannot establish text wrapping, font metrics, VoiceOver controls, safe-area placement, or right-to-left behavior. Those need a native target with recorded environment and input method. A layout proposal is offered space; measurement answers size and placement positions children. Nil proposal dimensions mean unspecified rather than zero.</p>",
+      "followUps": [
+        "Why use the region instead of physical display width?",
+        "What would change if a long title made the control unreadable?"
+      ],
+      "pitfalls": [
+        "Assuming tablet always means wide two-column layout.",
+        "Claiming a width predicate test proves readable pixels."
+      ]
+    },
+    {
+      "id": "iq-142-b",
+      "lesson": "142",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Repair a tile whose merged accessibility element hides one of its actions.",
+      "scenario": "The entire tile combines a navigation link and pin button into one element; text looks readable but assistive users cannot independently choose both.",
+      "minutes": 9,
+      "androidBridge": "Compose semantics grouping presents a similar intent question; Apple accessibility elements/actions and focus behavior need native observation.",
+      "rubric": [
+        "Preserves separate semantic open and pin controls.",
+        "Groups static text only where appropriate.",
+        "Names state and equivalent pin action explicitly.",
+        "Defines native large-text and assistive checks without treating host tests as proof."
+      ],
+      "answerHTML": "<p>The tile contains two user intentions: open the notebook and toggle its pin. Combining the whole tile can conceal one of those controls behind a single element. Preserve independent NavigationLink and Button semantics, combine only static title/time where useful, and give Pin/Unpin an explicit current value. The gesture must remain optional; a button or named accessibility action offers the same state change. Use scalable text and a minimum rather than fixed control height, then inspect long labels and accessibility text. Native VoiceOver interaction should discover and activate both controls in a sensible order. A host uniqueness or width test has no accessibility runtime, so it cannot certify the repair. Record destination, text size, appearance, and observed actions.</p>",
+      "followUps": [
+        "How is keyboard input focus different from VoiceOver focus?",
+        "Which modifier order changes the tile's background area?"
+      ],
+      "pitfalls": [
+        "Adding a label while continuing to hide an action.",
+        "Treating a fixed height as proof of accessibility."
+      ]
+    },
+    {
+      "id": "iq-143-a",
+      "lesson": "143",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Predict draft, published, validation, and focus outcomes.",
+      "scenario": "Blue starts at revision 0 with 15 minutes. The user types 20, then tries a blank title before correcting it.",
+      "minutes": 7,
+      "androidBridge": "Kotlin form state also separates unfinished strings from valid domain values; SwiftUI FocusState and Binding provide distinct native connections.",
+      "rubric": [
+        "Keeps unpublished String input separate from valid Int state.",
+        "Rejects invalid input before changing any fields.",
+        "Publishes 20 and total 45 only after a valid current Save.",
+        "Maps invalid field to input focus without claiming assistive focus or durable recovery."
+      ],
+      "answerHTML": "<p>Typing twenty changes minutesText in CardDraft but leaves Board's Blue at fifteen and the total at forty. Saving with a blank trimmed title returns invalid title before publication. The native adapter retains the draft, shows Enter a title, and requests title input focus. After restoring a nonblank title, valid whole minutes within one through two hundred forty can save if the base revision still matches. Blue becomes twenty, total forty-five, and revision increments. Cancel never calls publication. Keyboard type is only a convenience and cannot validate pasted or hardware input. FocusState requests the matching field; it does not automatically move VoiceOver focus. The draft is in memory while presented, so durable autosave and process restoration remain separate work.</p>",
+      "followUps": [
+        "What happens after a pin mutation changes the revision?",
+        "Why is minutesText a String rather than an Int binding?"
+      ],
+      "pitfalls": [
+        "Updating published fields on each keystroke.",
+        "Calling keyboardType a validation rule."
+      ]
+    },
+    {
+      "id": "iq-143-b",
+      "lesson": "143",
+      "level": "Senior",
+      "kind": "Debug",
+      "prompt": "Explain a gesture that pins during scrolling and a stale form that overwrites a later change.",
+      "scenario": "A drag callback toggles on every update; an editor created at revision 0 saves after pinning moved the card to revision 1.",
+      "minutes": 10,
+      "androidBridge": "Android nested scrolling and optimistic versions offer analogies; SwiftUI gesture arbitration and this local revision policy require specific checks.",
+      "rubric": [
+        "Commits the gesture only once on an accepted end.",
+        "Applies >=80 horizontal and >2*vertical gate.",
+        "Keeps an accessible button and verifies native arbitration.",
+        "Rejects stale revision before publication and retains the draft."
+      ],
+      "answerHTML": "<p>Toggling on every drag update can repeat the action and can react to mostly vertical scrolling. Run the owner action only at an accepted onEnded completion. The pure gate requires absolute horizontal distance at least eighty and strictly greater than twice vertical distance; eighty by forty fails while minus eighty by zero passes. Check the gate on the host and actual scroll arbitration natively. Keep Pin/Unpin as a semantic button so the gesture can be removed if it conflicts. Separately, save must compare the draft's base revision zero with current revision one before publishing. Return conflict and retain the draft rather than undoing the new state. Under Reduce Motion the same actions remain valid while visual movement changes.</p>",
+      "followUps": [
+        "Why does a predicate pass not prove gesture delivery?",
+        "When could a field-aware merge replace the conservative card revision rule?"
+      ],
+      "pitfalls": [
+        "Committing every pointer update.",
+        "Silently disabling the version check to let stale forms save."
+      ]
+    },
+    {
+      "id": "iq-144-a",
+      "lesson": "144",
+      "level": "Senior",
+      "kind": "Explain",
+      "prompt": "Map four claims to four different evidence boundaries.",
+      "scenario": "The team has passing core tests and an iOS simulator source typecheck, but no app launch or trace.",
+      "minutes": 7,
+      "androidBridge": "Unit tests, Android instrumentation, and profiling are broadly comparable boundaries; Apple SDK/destination and simulator services still differ.",
+      "rubric": [
+        "Assigns deterministic value rules to host tests.",
+        "Assigns source/API availability to native typecheck.",
+        "Requires native interaction for focus/accessibility.",
+        "Requires recorded representative traces for performance and marks absent evidence pending."
+      ],
+      "answerHTML": "<p>Host tests establish the declared Board and Catalog rules for their inputs: duplicate rejection, totals, invalid publication, and stale revisions. The native source check establishes accepted SwiftUI symbols, module visibility, and availability for arm64 iOS 17 simulator against the recorded SDK. It does not assemble an app bundle, launch a sheet, focus a field, or expose a VoiceOver action. Those require native interaction with a recorded destination and settings. Performance needs a representative optimized workload, defined interval, raw repeated observations, and correctness gate. The package adapter's generated host resource accessor also leaves iOS resource packaging unverified. Report these as distinct evidence rows, with absent interaction/device measurements pending rather than borrowing confidence from compilation.</p>",
+      "followUps": [
+        "Which check proves Bundle.module loads in the host consumer?",
+        "What extra evidence is needed for physical-device responsiveness?"
+      ],
+      "pitfalls": [
+        "Treating typechecking as a UI test.",
+        "Inventing a performance result to fill an evidence table."
+      ]
+    },
+    {
+      "id": "iq-144-b",
+      "lesson": "144",
+      "level": "Staff",
+      "kind": "Design",
+      "prompt": "Decide whether to cache the board total after a reported scrolling issue.",
+      "scenario": "No trace exists yet. A candidate cache is fast in a demonstration but becomes wrong after deleting Blue.",
+      "minutes": 12,
+      "androidBridge": "Android performance work also needs correctness and representative traces; SwiftUI invalidation and Instruments stacks are platform-specific.",
+      "rubric": [
+        "Defines workload/interval/destination before measuring.",
+        "Rejects a broken cached total despite possible speed.",
+        "Tests mutation and failure invariants against recomputation.",
+        "Names a baseline, owner, reversal condition, and pending measurements."
+      ],
+      "answerHTML": "<p>Keep the baseline reduction until evidence identifies a material cost. Define a deterministic larger fixture, optimized build, named destination, fixed scroll interval, warmup, repeated raw samples, and correct navigation/pin behavior. Use actual traces to locate the expensive stack or updates. A demonstration is not a device performance result. If a cache is tested, compare it against recomputation after initialization, valid edit, invalid edit, deletion, and pinning. A wrong total after deletion fails correctness and must be rejected even if a timing sample improves. Consider reducing broad observation instead of duplicating state. Retain the working baseline, name the regression owner, and reverse if correctness or declared resource budgets fail. Leave unrecorded performance claims pending.</p>",
+      "followUps": [
+        "How would broad view invalidation change the experiment?",
+        "What would justify a no-change recommendation?"
+      ],
+      "pitfalls": [
+        "Optimizing an unmeasured hypothesis as if it were established.",
+        "Accepting a faster run with different fixture or incorrect state."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,699 @@
+{
+  "unit": {
+    "id": "interface-project",
+    "title": "Compose and verify an original interface",
+    "summary": "Build an isolated notebook dashboard, detail, fixture feed, and editor with adaptive layout, semantic controls, motion, focus, and bounded verification.",
+    "order": 26
+  },
+  "lessons": [
+    {
+      "id": "141",
+      "title": "Compose a dashboard, detail, and readable feed",
+      "summary": "Build an original notebook board from stable values, semantic components, shared design choices, and destination IDs that resolve current data.",
+      "duration": 90,
+      "level": "Senior",
+      "prerequisites": [
+        "073",
+        "075",
+        "079",
+        "082",
+        "140"
+      ],
+      "objectives": [
+        "Compose dashboard, detail, and fixture feed without duplicating state.",
+        "Define semantic design tokens and controls with clear responsibilities.",
+        "Resolve navigation IDs against current values instead of stale snapshots."
+      ],
+      "sections": [
+        {
+          "id": "one-board",
+          "title": "Start with one board and exact values",
+          "html": "<p>Composition means building a larger interface from smaller views. Imagine an Android screen showing two notebooks, a total planned time, and a detail destination. Our original Notebook board starts with blue at fifteen minutes and green at twenty-five. The dashboard total is forty. Every view reads the same Board value, so editing blue changes the total without a second independent counter.</p><p>The host package owns BoardCard, CardDraft, validation, revisions, and small interaction policies. The Native source owns SwiftUI composition, navigation, controls, focus, and presentation. This is a boundary for testing and ownership, not a claim that the host program is a native app. A local package can supply domain values without importing SwiftUI or knowing view lifetime.</p><p>A view is a description SwiftUI evaluates, not a durable screen object comparable to an Android Activity instance. <code>@State</code> at DashboardView owns the current Board for that view identity. Creating a child view value during evaluation does not create a second Board. A child that needs to edit the board receives a binding to the same owned state.</p><p>The sample fixture is in memory. Relaunching the scratch app recreates two notebooks and forty minutes. No persistence, account synchronization, backend feed, or restored navigation is implied. Tell the learner this before discussing polish. A useful interface contract can be precise even when storage and remote integration remain a separate project.</p>"
+        },
+        {
+          "id": "semantic-pieces",
+          "title": "Give each component one visible job",
+          "html": "<p>A component is a reusable view with a coherent user-facing job. NotebookTile presents a notebook, an open destination, and a pin control. NotebookDetail resolves one ID to the current notebook. NotebookEditor holds a local draft until Save. DashboardView composes those pieces and owns the board. Splitting every modifier into a named type would not improve these responsibilities.</p><p>The tile gets a BoardCard value and a closure named togglePin. The closure is an action the owner performs. It does not grant arbitrary write access to the whole collection. Separate the navigation link from the pin button so one control does not sit inside another control's activation area. The expected tap result should be evident from the semantic control.</p><pre><code class=\"language-swift\">struct NotebookTile: View {\n    let card: BoardCard\n    let togglePin: () -&gt; Void\n    var body: some View {\n        VStack(alignment: .leading) {\n            NavigationLink(value: card.id) { Text(card.title) }\n            Button(card.pinned ? \"Unpin\" : \"Pin\", action: togglePin)\n        }\n    }\n}</code></pre><p><code>let</code> means the child inputs do not mutate inside this view. <code>() -&gt; Void</code> is a function taking no arguments and returning no useful value. The ternary expression chooses the current button label. The callback captures the stable card ID in the parent. A renamed title therefore leaves both the destination and action identity intact.</p><p>Compose's state hoisting is a useful analogy: values flow down and actions travel back to an owner. SwiftUI Binding supplies a distinct writable connection when required. Do not compare a Swift struct view to a mutable Android View object or assume its initializer is a lifecycle callback. Keep the state rule and the rendering description separate.</p>"
+        },
+        {
+          "id": "design-tokens",
+          "title": "Give spacing, controls, and text a shared meaning",
+          "html": "<p>A design token is a named design decision reused by components. The companion declares a sixteen-point gap, eighteen-point corner radius, a forty-four-point minimum control height, and an accent color. Names make intent reviewable. They are local product choices rather than evidence that all platform controls must look identical or that one size fits every language.</p><p>The minimumControl token is a minimum, not a fixed height. The custom button adds vertical and horizontal padding around a headline label, then uses frame(minHeight:). Large text can therefore increase content height. A fixed frame(height:) could clip a multiline label. Contrast and disabled-state legibility still require visual and accessibility inspection; choosing a token does not certify them.</p><p>Use system text styles and semantic colors where their meaning fits. The system can adapt text size and appearances. A named accent used as a faint background still needs contrast review for text and state. Do not signal pinned state only with a color change: the label and accessibility value say Pinned or Not pinned explicitly.</p><p>The active client contains MezzanineButtonStyle with environment-driven enabled behavior, labels, control-state styling, and press feedback. Read it as a real component boundary, not a template to copy branding or a claim that it passes this lab's large-text/reduced-motion checks. Our tokens and notebook content are original and isolated from company assets.</p>"
+        },
+        {
+          "id": "id-destinations",
+          "title": "Open current data using a stable identity",
+          "html": "<p>Identity tells the interface which logical item remains the same across updates. BoardCard.id is a nonempty stable string, and Board rejects duplicate IDs. ForEach uses Identifiable cards. NavigationLink passes the card's ID rather than an array index or full editable snapshot. The destination then asks Board for the current value with that ID.</p><p>Before editing, blue means Blue notebook, fifteen minutes, revision zero. After a successful twenty-minute edit, the ID remains blue, the title may change, and revision becomes one. The open detail resolves the new value. Passing a copied BoardCard into a long-lived destination could instead keep showing fifteen minutes even though the board total has changed.</p><p>If blue is removed while its destination exists, the lookup returns nil. The native detail shows Notebook removed and tells the user to return to the board. It does not manufacture an empty card or open a different notebook at the same array index. Missing-data recovery is part of navigation correctness, not an obscure optional-unwrapping detail.</p><p>Android navigation arguments often use stable IDs for the same reason, but SwiftUI destination construction follows the NavigationStack's value routing and view identity rules. A String route is sufficient for this bounded app. A larger product could use a typed route enum and account ownership. Do not claim this fixture implements deep links or multi-window restoration.</p>"
+        },
+        {
+          "id": "feed-and-previews",
+          "title": "Show a fixture feed and predict its limits",
+          "html": "<p>A feed presents a sequence that a reader can scan. Here the Notebook feed is the current card array reversed: green then blue at startup. It is explicitly a fixture feed of current cards, not an audit log or server history. Editing a title updates that row because it reads the same Board; pinning does not create a new chronological event.</p><p>Use a distinct event model if the product later needs real activity history. Give events stable IDs and timestamps with a defined source. Do not use a view's creation time to fabricate history. A preview can show a feed style with made-up data without pretending that pagination, networking, offline caching, or event ordering has been implemented.</p><p>A preview is a development rendering fixture. The supplied previews show default board, accessibility-sized text, and the system's current motion preference. In the inspected SDK, accessibilityReduceMotion is read-only, so enable Reduce Motion in the simulator's Accessibility settings rather than assigning that environment value. Preview declarations alone do not prove rendering or successful interaction.</p><p>Predict the visible board before opening Xcode: two tiles, forty total minutes, two feed links, and current-value detail destinations. Then compare with an actual isolated target. Add a long notebook title and check whether it wraps without hiding the pin action. Keep observations labeled by destination, content size, appearance, and input method so another engineer can reproduce them.</p>"
+        },
+        {
+          "id": "version-evidence",
+          "title": "Verify the composition at its real boundary",
+          "html": "<p>The companion's Swift package has tools version 6.0 and no remote dependencies. The native source requires an isolated iOS app target with iOS 17 deployment minimum, the InterfaceCore local product, and its own app entry. The README lists exact file membership and removal of Xcode's generated app entry so two @main declarations do not compete.</p><p>Host tests establish Board validation, revision checking, missing IDs, and policy thresholds. Native typechecking can establish the declared SwiftUI source is accepted by the recorded simulator SDK and compiler. Neither establishes sheet behavior, keyboard appearance, large-text readability, accessibility focus, gesture arbitration, signed packaging, or measured scrolling performance.</p><p>Use this source connection to study a real component's input/action/style boundaries, then make the notebook component independently. Keep the experiment isolated from the client and use original notebook fixtures rather than branded screens. A supplied worked example is reference material, so the learner must still make and verify the independent modification.</p><p>A complete handoff states what each owner promises: the core supplies valid current values; the dashboard owns shared state; the detail handles missing identities; the editor retains unpublished drafts; the component offers named actions. Those concrete contracts let future storage or feed work be added without treating every view as a global data service.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why route using blue rather than array index 0?",
+          "options": [
+            "It gives a stable identity after reorder or deletion",
+            "It makes every destination persistent",
+            "It prevents all optional values"
+          ],
+          "answer": 0,
+          "explanation": "Indices describe current positions. A stable ID lets the destination resolve the current item or show a missing state."
+        },
+        {
+          "question": "What does the supplied feed represent?",
+          "options": [
+            "A verified remote activity stream",
+            "The current fixture cards in reversed order",
+            "A durable audit history"
+          ],
+          "answer": 1,
+          "explanation": "It is explicitly an in-memory presentation of current cards. A real event feed needs its own identities, ordering, and storage/network contracts."
+        },
+        {
+          "question": "What should a pin control receive?",
+          "options": [
+            "Every app dependency and account service",
+            "A mutable global array",
+            "Current display values and an owner action"
+          ],
+          "answer": 2,
+          "explanation": "Small value inputs and a named action keep responsibility clear and make component behavior easier to verify."
+        }
+      ],
+      "exercise": {
+        "brief": "In a scratch target, add an original third notebook and a reusable summary component, then verify detail values follow an edit.",
+        "steps": [
+          "Add amber with ten minutes using a unique ID; predict total fifty and feed order.",
+          "Extract a summary view taking count and total values without storing a second Board.",
+          "Edit blue to twenty minutes and verify the summary total becomes fifty-five.",
+          "Delete the currently opened item and describe the missing route state."
+        ],
+        "acceptance": [
+          "There is one shared Board owner and no copied total state.",
+          "Changing a title does not change destination identity.",
+          "The opened detail resolves current data and handles deletion visibly.",
+          "The evidence labels host checks, native source checks, and actual interaction separately."
+        ],
+        "solution": "<p>Add amber with ten minutes to Board.sample in the scratch copy. Keep blue and green IDs unchanged. The total is now fifteen plus twenty-five plus ten, or fifty. Reversing current cards produces amber, green, blue. The summary component receives card count three and total fifty as inputs; it does not recompute a private source of truth or initialize a new sample Board.</p><p>Open blue through its ID and save twenty minutes. Board.save validates the draft and increments its revision. The shared total becomes fifty-five, and the detail reads twenty when it resolves blue again. A title rename changes only the title. If a test checks navigation by title rather than ID, improve that test so display text can evolve without corrupting identity.</p><p>Delete blue while its detail is open. The collection count becomes two, total becomes thirty-five, and lookup of blue returns nil. The detail shows the missing-state message. Returning to the dashboard exposes green and amber. No old index is reused to make the route display green under blue's destination.</p><p>Record these predicted values before interaction, then collect observed values in the isolated target. A host test can check totals and lookup absence. It cannot verify where the message appears or whether VoiceOver reads it. The preview and actual interaction rows remain separate. Finish with a small ownership note explaining the summary inputs, state owner, and recovery behavior.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: NavigationStack",
+          "url": "https://developer.apple.com/documentation/swiftui/navigationstack"
+        },
+        {
+          "label": "Apple: ButtonStyle",
+          "url": "https://developer.apple.com/documentation/swiftui/buttonstyle"
+        },
+        {
+          "label": "Apple: State",
+          "url": "https://developer.apple.com/documentation/swiftui/state"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Active Mezzanine button component",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDMezzanineLibrary/Library/Components/Buttons/SwiftUI+Button.swift",
+          "line": 32,
+          "why": "The active UI source declares a ButtonStyle with enabled environment and component inputs; compare its boundary with the isolated original notebook style."
+        }
+      ],
+      "checklist": [
+        "I can identify the single owner of dashboard values.",
+        "I can compose semantic components and actions.",
+        "I can resolve a detail ID after edit or deletion."
+      ],
+      "simple": {
+        "story": "A desk has two notebooks and a small sign showing the planned reading time. The sign reads the notebooks' current plans rather than keeping a second secret total. A bookmark names the Blue notebook, so it still finds Blue after the desk is rearranged. If Blue is removed, the bookmark cannot suddenly mean Green. The desk shows that Blue is gone and lets the reader choose another notebook. One shared set of values keeps the sign, list, and detail consistent.",
+        "meaning": "Compose views around one state owner and resolve a stable ID to the current value.",
+        "example": {
+          "before": "Blue has 15 minutes and Green has 25; the total is 40.",
+          "change": "Save Blue with 20 minutes using the same blue ID.",
+          "after": "The board total becomes 45 and Blue's detail resolves 20 minutes."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "One successful save changes shared values used by summary and detail.",
+          "items": [
+            {
+              "label": "Shared board",
+              "text": "Blue has 15 minutes and the total is 40."
+            },
+            {
+              "label": "Save",
+              "text": "The checked draft changes Blue to 20 minutes."
+            },
+            {
+              "label": "Current views",
+              "text": "The total becomes 45 and detail reads 20."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Composition",
+            "meaning": "Building an interface from smaller views with clear jobs."
+          },
+          {
+            "term": "Identity",
+            "meaning": "The stable name of one logical item."
+          },
+          {
+            "term": "Binding",
+            "meaning": "A writable connection to state owned elsewhere."
+          }
+        ],
+        "remember": "Share the values; keep each control's job clear.",
+        "boundary": "A bookmark explains item identity, not SwiftUI screen lifetime or persisted navigation."
+      }
+    },
+    {
+      "id": "142",
+      "title": "Make layout adapt to space and larger text",
+      "summary": "Explain proposals, modifier order, adaptive grids, and accessibility semantics with exact geometry and visible acceptance criteria.",
+      "duration": 90,
+      "level": "Senior",
+      "prerequisites": [
+        "141",
+        "073",
+        "082"
+      ],
+      "objectives": [
+        "Explain measurement versus placement and modifier-order effects.",
+        "Use available region width and text size to choose a readable layout.",
+        "Define accessibility labels, actions, and meaningful native checks."
+      ],
+      "sections": [
+        {
+          "id": "space-negotiation",
+          "title": "A parent offers space and a child answers",
+          "html": "<p>A layout proposal is the space a parent offers a child during measurement. The child reports the size it needs under that proposal. Placement then assigns positions inside actual bounds. Think of Android measure/layout as an analogy for the two questions, but SwiftUI's proposals and view modifiers have their own rules; offered size is not always a command.</p><p>A nil proposed dimension means unspecified, not zero. A custom Layout should define its response to unspecified, zero, finite, and potentially unbounded dimensions. Text can grow when width changes, so treating every intrinsic width as permanently fixed can produce clipping. State the content contract before choosing a custom algorithm or cache.</p><p>The inspected active FlowLayout measures subviews with unspecified proposals, arranges them against a width, and places them with origins offset by bounds.minX and bounds.minY. It recomputes for final bounds width. This reveals real measurement and placement responsibilities. It does not prove every oversized localized child will fit or that a custom cache is needed.</p><p>Start this project with system stacks, ScrollView, ViewThatFits, and LazyVGrid. They express the small board's needs without implementing a new Layout protocol. A custom layout is appropriate when those structures cannot represent the product's arrangement. The course teaches the protocol contract through inspected source, while the companion deliberately uses a simpler native adapter.</p>"
+        },
+        {
+          "id": "exact-grid",
+          "title": "Choose columns from the available region",
+          "html": "<p>The available region is the width assigned to this screen content, not the full physical display width. DashboardView reads GeometryReader's region and subtracts thirty-two points for sixteen-point padding on each side. The pure policy chooses two columns at a usable width of at least six hundred, unless the text size is an accessibility size.</p><p>At region width 631, usable width is 599, so the board uses one column. At 632, usable width is 600, so it uses two for ordinary text. At region width 832 and accessibility text, usable width is 800 but the board still uses one. These exact values make the contract testable without confusing device type with actual window space.</p><pre><code class=\"language-swift\">public static func columns(width: Double, accessibilityText: Bool) -&gt; Int {\n    width &gt;= 600 &amp;&amp; !accessibilityText ? 2 : 1\n}\n// Usable width 599, normal text -&gt; 1.\n// Usable width 600, normal text -&gt; 2.\n// Usable width 800, accessibility text -&gt; 1.</code></pre><p>The six-hundred threshold is an original product choice rather than an Apple universal breakpoint. Two flexible grid items share the usable area with sixteen-point spacing. At width six hundred, each column can receive approximately two hundred ninety-two points before a child's own padding. Actual text height still comes from measurement. Do not hard-code identical tile heights solely for visual symmetry.</p><p>Use split-view and resizable-window checks because an iPad can offer a narrow region. Compose adaptive layouts use similar region-driven decisions, but Android density units and SwiftUI points are different platform concepts. Describe the intended control/text result in each window rather than translating a phone/tablet label into a guaranteed width.</p>"
+        },
+        {
+          "id": "modifier-order",
+          "title": "Read wrappers from inside to outside",
+          "html": "<p>A modifier transforms a view description. Modifier order matters because later modifiers wrap the result of earlier ones. Padding adds space around content. A background draws behind the size of the view it receives. A frame can propose or constrain dimensions and align the child. The order therefore determines what area gets a background and what area participates in interaction.</p><p>Compare Text(\"Blue\").padding(16).background(...) with Text(\"Blue\").background(...).padding(16). In the first, the background covers text plus padding. In the second, the background covers the text's area while the added outer space remains outside that background. The text and exact measured size depend on font and environment; the wrapper relationship is the checkable rule.</p><p>The companion button applies label font, padding, minimum height, background, and clipping in that order. Its background follows the padded minimum-height control region. The minimum height lets taller labels grow. A scale effect changes rendering without redefining the earlier layout size as a new measurement rule; inspect overlap and hit geometry when adding visual transforms.</p><p>A content shape describes the region used by relevant interactions. It does not automatically supply semantic button behavior or adequate accessibility naming. A real Button remains the control; a decorative Text with onTapGesture is not an equivalent replacement. Test the activation area and control role in the native target, especially after adding overlays, transforms, or competing gestures.</p>"
+        },
+        {
+          "id": "text-and-layout",
+          "title": "Let readable text drive the arrangement",
+          "html": "<p>Dynamic Type is the system text-size setting used by scalable styles. The project reads dynamicTypeSize and chooses one column for accessibility categories. ViewThatFits tries a horizontal title/summary arrangement and falls back to a vertical one when the first does not fit the offered space. This improves a visible content requirement rather than detecting a device model.</p><p>Long text is a content case, not an exception to hide with a fixed truncation rule. Add a title such as Notes from the long mountain walk and inspect whether the navigation label and pin action remain readable. Permit wrapping and vertical growth unless the product explicitly needs a bounded title preview. Keep full content available in detail and accessibility.</p><p>Respect safe areas and keyboard layout through system containers. A form uses Form rather than manually subtracting a guessed keyboard height. A scroll container gives tall content somewhere to go. Do not disable safe-area handling globally to make a screenshot look full-screen; controls near home indicators or split-view chrome still need intentional reachable placement.</p><p>Right-to-left language and leading/trailing alignment require native checks. A width-policy test has no text shaping, direction, font fallback, or accessibility runtime. A custom layout that places left-to-right coordinates might need explicit direction handling. Read the active FlowLayout's stated ordering and compare it with the intended localization contract before claiming universal adaptation.</p>"
+        },
+        {
+          "id": "accessibility-contract",
+          "title": "Name controls and provide equivalent actions",
+          "html": "<p>Accessibility semantics describe what a control is, what it means, and what actions it supports. The tile has a navigation link for opening a notebook and a separate pin button with a label and current value. The parent also provides a named accessibility action for pinning. The gesture is a convenience, so the same state change remains available without swiping.</p><p>Do not combine an entire card into one accessibility element if that hides distinct open and pin operations. Combine static title/time text where it forms one label, but preserve separate actionable controls. A header trait marks Notebook feed as a heading. Stable test identifiers help automated lookup without requiring visible labels to remain frozen across localization.</p><p>The custom control's minimum height is forty-four points, with padding and expandable text. That is a chosen practical target size, not proof of reachable interaction on every input method. Check contrast, focus ordering, labels, state announcement, switch access, keyboard operation, and large text. Semantic defaults help but do not replace observations of the composed result.</p><p>Accessibility focus is different from text-entry focus. FocusState manages a field or other supported focus placement; VoiceOver's current spoken element has distinct mechanisms. The form lesson handles input focus explicitly. Here the acceptance contract is that both notebook opening and pinning remain discoverable, correctly named, and operable when a drag cannot be performed.</p>"
+        },
+        {
+          "id": "version-evidence",
+          "title": "Test pure decisions and actual geometry separately",
+          "html": "<p>The host policy tests cover usable-width equality at 600, below-threshold width 599, and accessibility text at 800. They establish branch decisions. They do not render LazyVGrid, prove exact glyph sizes, or establish that VoiceOver exposes every action. A native observation needs the real target, content size, region, language, appearance, and input method.</p><p>Apple's Layout documentation identifies iOS 16 introduction; FocusState begins at iOS 15. The companion's iOS 17 floor also supports its missing-state ContentUnavailableView and modern source choices. Keep minimum framework availability separate from Xcode's simulator SDK version. A newer SDK can typecheck source whose deployment floor is older, subject to availability.</p><p>The active FlowLayout anchor is included in the ZDMezzanine source glob in Project.swift. It is actual inspected client code, kept read-only. Its algorithm is a teaching connection for proposal, measurement, and offset placement. We neither run its snapshot suite nor claim this isolated notebook grid fixes any existing client layout behavior.</p><p>The bounded native checklist asks for narrow and wide windows, accessibility text, long labels, right-to-left direction, and separate open/pin actions. Record pending until performed. A complete outcome combines a predictable core policy with visible readable content and observed control access. Optional later lessons 031 and 095 deepen custom layout after this project; they are not prerequisites.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Region width is 632 with ordinary text. What column count does the companion choose?",
+          "options": [
+            "One because only phones use one",
+            "Two because usable width is 600 after padding",
+            "Three because screen width exceeds 600"
+          ],
+          "answer": 1,
+          "explanation": "The region loses 32 points to horizontal padding. The inclusive 600 threshold yields two columns."
+        },
+        {
+          "question": "What does nil in a proposed layout dimension mean?",
+          "options": [
+            "Unspecified, requiring the layout's stated sizing policy",
+            "Exactly zero points",
+            "The child is hidden"
+          ],
+          "answer": 0,
+          "explanation": "An unspecified proposal asks for a suitable size. It is not a zero-size command."
+        },
+        {
+          "question": "Which check establishes that the pin action is discoverable with VoiceOver?",
+          "options": [
+            "An array uniqueness test",
+            "A passing width policy test",
+            "A native accessibility interaction in the isolated target"
+          ],
+          "answer": 2,
+          "explanation": "Host tests have no accessibility runtime. Native interaction must inspect and activate the named control/action."
+        }
+      ],
+      "exercise": {
+        "brief": "Make a long-title, large-text fixture and preserve separate open/pin actions at narrow and wide widths.",
+        "steps": [
+          "Predict column counts for usable widths 599, 600, and 800 with accessibility text.",
+          "Add a long synthetic title and inspect system styles without fixed tile heights.",
+          "Compare padding/background order on a scratch button and explain its geometry.",
+          "Record native action names, text clipping, and focus ordering or mark them pending."
+        ],
+        "acceptance": [
+          "Policy tests preserve the documented width and text branches.",
+          "Large titles remain readable with pin and open independently reachable.",
+          "The explanation predicts background bounds from modifier order.",
+          "Evidence separates host branches from native layout/accessibility success."
+        ],
+        "solution": "<p>Use one column at 599. Use two at 600 with ordinary text. Use one at 800 with accessibility text. Add a long synthetic title without changing its ID, so the route still resolves the same notebook. Keep the tile's vertical size driven by content. The expanded label and independent pin button are a better correctness target than equal-height cards that clip text.</p><p>In the scratch button, apply padding before the background and observe that the filled region includes the padding. Reverse those modifiers and observe outer padding around the smaller background. Describe the wrapper relationship rather than reporting an invented exact text width. Include the font, text size, and device/window when recording actual bounds.</p><p>Inspect separate open and pin accessibility controls. Activate pin and verify its value becomes Pinned; activate open and verify the correct ID's detail appears. Check a named accessibility pin action if the card exposes it. Keep navigation distinct from changing state. If one merged element hides either action, revise the semantic grouping.</p><p>Host tests remain the oracle for pure column decisions. Native interaction is the oracle for rendered clipping, accessibility exposure, and input behavior. Record results or pending status for narrow/wide, large text, direction, and appearance. A complete learner submission contains the fixture change, predictions, observations, and one remaining limitation rather than a claim that all UI environments were tested.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Layout protocol",
+          "url": "https://developer.apple.com/documentation/swiftui/layout"
+        },
+        {
+          "label": "Apple: ViewThatFits",
+          "url": "https://developer.apple.com/documentation/swiftui/viewthatfits"
+        },
+        {
+          "label": "Apple: Accessibility actions",
+          "url": "https://developer.apple.com/documentation/swiftui/view/accessibilityaction(named:_:)"
+        },
+        {
+          "label": "Apple: DynamicTypeSize",
+          "url": "https://developer.apple.com/documentation/swiftui/dynamictypesize"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Active FlowLayout measurement",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDMezzanine/Views/SwiftUI/FlowLayout.swift",
+          "line": 75,
+          "why": "The Layout implementation measures children and later offsets placement into actual bounds; compare that protocol contract with the notebook's simpler system-container composition."
+        }
+      ],
+      "checklist": [
+        "I can distinguish offered size, reported size, and placement bounds.",
+        "I can predict padding/background order.",
+        "I can keep open and pin available through accessible controls."
+      ],
+      "simple": {
+        "story": "A teacher puts notebook cards on a desk. A wide desk can hold two cards side by side; a narrow desk gets one column. When a reader needs much larger writing, the teacher uses one column even on a wide desk so every label remains readable. The card still has two clearly marked actions: open it or pin it. A swipe is only an extra shortcut. Nobody has to make that movement to use the desk.",
+        "meaning": "Layout follows available space and readable content, while each action keeps a clear accessible alternative.",
+        "example": {
+          "before": "The usable region is 800 points wide and ordinary text allows two columns.",
+          "change": "Change the text category to an accessibility size.",
+          "after": "The policy returns one column while open and pin remain separate controls."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Larger text changes the layout policy at the same width.",
+          "items": [
+            {
+              "label": "Wide region",
+              "text": "800 usable points allow two ordinary-text columns."
+            },
+            {
+              "label": "Larger text",
+              "text": "Accessibility text overrides the two-column branch."
+            },
+            {
+              "label": "Readable arrangement",
+              "text": "One column preserves room for text and controls."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Proposal",
+            "meaning": "Space a parent offers during layout measurement."
+          },
+          {
+            "term": "Placement",
+            "meaning": "Where a measured child is put inside actual bounds."
+          },
+          {
+            "term": "Accessibility semantics",
+            "meaning": "The meaning and actions exposed to assistive interaction."
+          }
+        ],
+        "remember": "Fit the content to the space and keep every action reachable.",
+        "boundary": "A desk story does not measure fonts, layout proposals, or the accessibility runtime."
+      }
+    },
+    {
+      "id": "143",
+      "title": "Edit drafts with focus, gestures, and reduced motion",
+      "summary": "Keep unfinished input separate, validate before publishing, reject stale drafts, move input focus deliberately, and offer accessible actions beside gestures.",
+      "duration": 90,
+      "level": "Senior",
+      "prerequisites": [
+        "141",
+        "142",
+        "075",
+        "080"
+      ],
+      "objectives": [
+        "Predict saved versus draft state and stale-revision outcomes.",
+        "Move input focus to the first invalid field without conflating accessibility focus.",
+        "Apply one gesture action at an explicit threshold and respect system motion preference."
+      ],
+      "sections": [
+        {
+          "id": "draft-separation",
+          "title": "Let unfinished writing stay on a separate sheet",
+          "html": "<p>A draft is a temporary editable copy that has not been published. The notebook editor creates CardDraft from the current card when its sheet begins. Title and minutesText can then change independently from Board. Cancel dismisses the sheet without calling save. This matches a common Android form pattern, but SwiftUI's State and Binding lifetime must be stated separately.</p><p>The draft remembers id and baseRevision. The ID says which notebook it edits; the revision says which version it began from. minutesText is a String because a person may temporarily type nothing, a minus sign, or malformed input. BoardCard.minutes remains an Int with a valid domain range. Forcing every keystroke immediately into that valid integer would erase legitimate editing states.</p><p>Before editing, Blue has fifteen minutes and the board total is forty. Type twenty in the draft but do not save: published values stay fifteen and forty. Save a valid current draft: Blue becomes twenty, total becomes forty-five, and its revision increments. Cancel after typing twenty: published values remain fifteen and forty. Predict these separate outcomes before interaction.</p><p>The editor is an in-memory scratch form. Dismissing it discards its local draft; there is no durable draft store or process-restoration claim. For valuable long-form content, design autosave and recovery separately. The supplied missing/conflict message preserves text while the editor remains open, but cancellation or app termination is still a clear loss boundary.</p>"
+        },
+        {
+          "id": "validation-and-focus",
+          "title": "Check the whole draft before changing shared values",
+          "html": "<p>Validation applies the product's rules to the proposed edit. Board.save first resolves the card ID, then compares revisions, then trims the title, then parses whole minutes in the inclusive range one through two hundred forty. It changes no published field until these checks pass. SaveOutcome names saved, invalid field, missing item, or conflict.</p><p>The native switch translates those outcomes into presentation policy. A valid save clears input focus and dismisses. An invalid title or minutes field retains the draft, displays a specific message, and focuses that field. Conflict and missing retain the draft and show recovery wording. Domain validation remains independent from the SwiftUI focus mechanism.</p><pre><code class=\"language-swift\">@FocusState private var focused: Field?\n// Each TextField has .focused($focused, equals: itsField).\nswitch board.save(draft) {\ncase .saved:\n    focused = nil\n    dismiss()\ncase .invalid(let field):\n    focused = field\n    message = field == .title ? \"Enter a title.\" : \"Enter whole minutes from 1 through 240.\"\ncase .conflict:\n    message = \"This notebook changed. Your draft is retained.\"\ncase .missing:\n    message = \"This notebook was removed. Your draft is retained.\"\n}</code></pre><p>The question mark permits no focused field. Assigning title or minutes requests focus for the matching field; nil clears that request. Dollar-prefixed focused is the projected binding used by the field modifier. These statements belong inside the native view, where board, draft, message, and dismiss have defined owners. They are not a standalone host script.</p><p>A number-pad keyboard is a convenience, not validation. Pasted text, hardware keyboards, accessibility input, and future adapters can still provide malformed strings. The whole-number parser is intentionally locale-simple for this bounded fixture. A localized decimal-duration editor would need an explicit formatter, intermediate-input policy, and domain representation rather than merely changing keyboardType.</p>"
+        },
+        {
+          "id": "revision-conflict",
+          "title": "Do not overwrite a change made after editing began",
+          "html": "<p>A revision is a local version counter used for comparison. The editor records revision zero when it opens Blue. If another action pins Blue, Board increments its revision to one. Saving the old draft now returns conflict before changing title or minutes. That prevents the editor from treating an outdated snapshot as the latest state.</p><p>The chosen policy treats pin changes as a conflict even when the draft edits another field. This is conservative: it makes every card mutation invalidate the old draft. A more advanced field-aware merge could combine independent changes, but it would need a stated base/local/current comparison and tests. Do not silently weaken the revision check merely to make a stale save succeed.</p><p>If Blue is deleted while editing, save returns missing and no item is recreated. The editor's current fields remain visible for copying until dismissed. The detail destination separately shows Notebook removed when its lookup fails. These distinct outcomes avoid using a blank form or a substituted item at an old index as an accidental recovery policy.</p><p>Local revisions are not server transactions or globally unique versions. All operations here occur synchronously against one value owner. A real multi-device or account-aware store needs conditional persistence, owner generation, durable drafts, and conflict recovery. Android optimistic-locking ideas are a helpful analogy, but this host test does not establish remote or disk atomicity.</p>"
+        },
+        {
+          "id": "gesture-contract",
+          "title": "Trigger a shortcut only after a deliberate movement",
+          "html": "<p>A gesture recognizes a pattern of input movement. The notebook tile attaches a simultaneous drag so ordinary vertical scrolling can still coexist under SwiftUI's gesture arbitration. The product gate runs only onEnded: horizontal translation must have absolute magnitude at least eighty points and exceed twice the absolute vertical translation. One accepted completion requests one pin toggle.</p><p>For dx=79 and dy=0, the gate is false. For dx=80 and dy=0, it is true. For dx=80 and dy=40, it is false because eighty is not greater than eighty. For dx=100 and dy=70, it is false. A leftward dx=-80 with dy=0 is also true under this original symmetric shortcut. State the sign policy instead of assuming only rightward drags work.</p><p>A passing pure predicate test does not prove the drag receives input, cooperates with scrolling, or avoids activating a nearby NavigationLink on every platform. Test that actual arbitration in the scratch target. Gesture recognition can be cancelled by the system or another recognizer; cancellation is not a completed onEnded action that should commit a toggle.</p><p>The Pin/Unpin Button and named accessibility action invoke the same owner operation. A person can therefore change state without dragging. Keep the semantic action available even if the gesture is later removed because it interferes with scroll behavior. Compose pointer-input and nested-scrolling analogies help explain ownership, but platform gesture priorities require native evidence.</p>"
+        },
+        {
+          "id": "motion-state",
+          "title": "Change the state first and choose how it appears",
+          "html": "<p>An animation interpolates a visual change; it is not the domain state itself. A transition describes how a view enters or leaves when its presence changes. The detail's Show plan action toggles expanded. The text appears when expanded is true, using opacity for ordinary motion and an identity transition when the system requests reduced motion.</p><p>The button style reads accessibilityReduceMotion and avoids press scaling when it is true. It also disables its press interpolation. The detail and gesture paths pass nil animation for reduced motion. The pin state still changes, and the expanded plan still becomes available. Reduced Motion should preserve the useful outcome while changing the movement used to show it.</p><p>The inspected SDK exposes accessibilityReduceMotion as a read-only environment value. The native preview therefore follows the system setting. Enable Reduce Motion in the simulator's Accessibility settings and repeat the same actions. A test override of a feature-owned policy could be useful later, but assigning a nonwritable environment key is not a valid preview configuration here.</p><p>Keep animation scope bounded to the value/action that needs feedback. Avoid attaching a broad animation to every state update and accidentally animating error placement or keyboard-sensitive layout. Compare before and after with the same input sequence. A source typecheck can verify the API usage; only native observation shows whether the resulting motion is comfortable and readable.</p>"
+        },
+        {
+          "id": "version-evidence",
+          "title": "Separate core outcomes from keyboard and assistive behavior",
+          "html": "<p>The host test checks invalid blank title, out-of-range 241 minutes, a valid twenty-minute save, pin conflict, and deletion. It verifies published values and revisions. Those are meaningful domain outcomes. It does not focus a TextField, display a number pad, preserve selection during input-method composition, or verify a VoiceOver announcement of an error.</p><p>Apple's FocusState documentation identifies its supported scene-focus role and iOS 15 introduction. accessibilityReduceMotion has existed since earlier SwiftUI releases. The iOS 17 companion floor is a project choice supporting the complete source. On this recorded Xcode SDK, State uses compiler macro support, so native command-line checks also need functioning bundled compiler plugins.</p><p>The active client button style reads enabled state and applies press animation/haptic behavior. It is a useful real source connection for interaction styling, while the notebook's reduced-motion and draft rules are original. The lesson makes no claim that the company's existing button, gesture stack, or forms were tested or changed.</p><p>Native acceptance includes Cancel/Save behavior, invalid-field focus, keyboard Done, a hardware keyboard, drag-versus-scroll arbitration, accessible Pin/Unpin, and system Reduce Motion. Mark each unobserved case pending. Optional later lessons 032 and 033 deepen gestures and text editing after this project; all concepts needed for this bounded draft are introduced here.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "The draft contains 20 minutes but Save has not run. What is the board total?",
+          "options": [
+            "45 immediately",
+            "40 because draft input is unpublished",
+            "0 because the draft is invalid"
+          ],
+          "answer": 1,
+          "explanation": "The board retains Blue=15 and Green=25 until a valid current draft is saved."
+        },
+        {
+          "question": "A pin change increments Blue's revision after the editor opens. What does the old draft do?",
+          "options": [
+            "Returns conflict without changing published fields",
+            "Silently clears the pin",
+            "Recreates the card"
+          ],
+          "answer": 0,
+          "explanation": "The version comparison rejects the stale proposal before validation/publication."
+        },
+        {
+          "question": "Which movement passes the pin predicate?",
+          "options": [
+            "dx=80, dy=40",
+            "dx=79, dy=0",
+            "dx=-80, dy=0"
+          ],
+          "answer": 2,
+          "explanation": "Absolute horizontal movement must be at least 80 and strictly exceed twice vertical movement. The leftward horizontal case passes."
+        }
+      ],
+      "exercise": {
+        "brief": "Extend the scratch editor with a recoverable notes field while preserving valid publication, version checks, and equivalent pin actions.",
+        "steps": [
+          "Add a draft notes String and a published notes value under an explicit maximum length policy.",
+          "Predict Cancel, invalid Save, valid Save, and stale-revision results.",
+          "Focus an invalid notes field in the native adapter without claiming VoiceOver focus changes automatically.",
+          "Repeat pin via button and gesture under both system motion settings."
+        ],
+        "acceptance": [
+          "Invalid notes never partially update title or minutes.",
+          "Cancel leaves published values unchanged; stale drafts still conflict.",
+          "A named accessible pin control remains available without dragging.",
+          "Evidence distinguishes predicate tests from native focus, scrolling, and motion observations."
+        ],
+        "solution": "<p>Choose a clear notes policy, such as at most two hundred user-perceived Characters. Define whether whitespace counts and whether empty notes are valid. Add the published field to BoardCard and the editable field to CardDraft in a scratch copy, then add a Field.notes case. Validate all fields before assigning any published value. Swift String.count counts Characters, which differs from UTF-16 length used by some text APIs.</p><p>Open a draft at revision zero, type valid twenty-minute duration and oversized notes, and call save. Expect invalid notes while Blue remains fifteen and total forty. Correct notes and save against the same current revision: expect twenty and total forty-five. In a separate case, pin Blue after opening the draft and expect conflict regardless of the now-valid notes.</p><p>The native adapter maps invalid notes to its matching focused field and shows a concrete correction. Keyboard focus is a requested input placement; an accessibility announcement needs separate observation and possibly its own platform mechanism. Retain the draft after an error. Cancel still discards this in-memory draft without publishing it; durable recovery is separate work.</p><p>Use the Pin button and then an accepted horizontal drag to toggle the same notebook. Check vertical scrolling does not accidentally pin. Enable Reduce Motion and repeat; state results must remain correct while scaling/transitions follow the preference. Record the input method, system setting, and observed or pending outcomes. The worked answer does not pre-complete the independent notes implementation.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: FocusState",
+          "url": "https://developer.apple.com/documentation/swiftui/focusstate"
+        },
+        {
+          "label": "Apple: Reduce Motion environment value",
+          "url": "https://developer.apple.com/documentation/swiftui/environmentvalues/accessibilityreducemotion"
+        },
+        {
+          "label": "Apple: Simultaneous gestures",
+          "url": "https://developer.apple.com/documentation/swiftui/view/simultaneousgesture(_:including:)"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Active component press behavior",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDMezzanineLibrary/Library/Components/Buttons/SwiftUI+Button.swift",
+          "line": 96,
+          "why": "The active button applies press scaling and animation alongside enabled state; compare this real interaction boundary with the isolated motion-preference and action contract."
+        }
+      ],
+      "checklist": [
+        "I can predict draft and published values separately.",
+        "I can reject stale edits without discarding their text.",
+        "I can offer the same action with a button and a bounded gesture."
+      ],
+      "simple": {
+        "story": "A reader writes a new plan on a loose sheet beside the notebook. The notebook still shows fifteen minutes until the reader checks the sheet and saves it. A smudged number stays on the sheet so it can be corrected. If someone pins or removes the notebook while that sheet is being written, the reader must review the change instead of blindly replacing the notebook. A helpful sign points to the part that needs correction. A button offers the same pin action as a swipe.",
+        "meaning": "Draft input remains separate until a current valid proposal is saved; focus and gestures are presentation policies.",
+        "example": {
+          "before": "Blue is revision 0 at 15 minutes; a draft keeps baseRevision 0.",
+          "change": "Pin Blue, making its revision 1, then save the old draft.",
+          "after": "The save returns conflict and Blue's published values remain current."
+        },
+        "picture": {
+          "kind": "timeline",
+          "caption": "An intervening mutation makes the old draft stale.",
+          "items": [
+            {
+              "label": "Open draft",
+              "text": "The draft records revision 0."
+            },
+            {
+              "label": "Pin",
+              "text": "Blue changes to revision 1."
+            },
+            {
+              "label": "Old save",
+              "text": "Revision mismatch returns conflict without overwrite."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Draft",
+            "meaning": "Editable values not yet published to shared state."
+          },
+          {
+            "term": "Revision",
+            "meaning": "A local version value used to reject an outdated proposal."
+          },
+          {
+            "term": "Focus",
+            "meaning": "The input location requested for a supported field."
+          },
+          {
+            "term": "Transition",
+            "meaning": "The visual treatment of a view entering or leaving."
+          }
+        ],
+        "remember": "Keep the draft, check its version, then publish the whole valid change.",
+        "boundary": "The loose-sheet story does not provide disk recovery, server transactions, or accessibility focus guarantees."
+      }
+    },
+    {
+      "id": "144",
+      "title": "Verify the interface and investigate one performance cost",
+      "summary": "Combine deterministic core checks with an isolated native interaction plan, then record a bounded release-build profiling experiment without inventing measurements.",
+      "duration": 120,
+      "level": "Staff",
+      "prerequisites": [
+        "141",
+        "142",
+        "143",
+        "084",
+        "012"
+      ],
+      "objectives": [
+        "Choose host, native compilation, interaction, and profiling checks for different claims.",
+        "Build a deterministic interface regression flow with known before/after values.",
+        "Plan one correctness-preserving optimization with retained trace evidence and recovery."
+      ],
+      "sections": [
+        {
+          "id": "claim-and-oracle",
+          "title": "Choose the check that can answer the question",
+          "html": "<p>An oracle is the rule used to decide whether an outcome is correct. Our core oracle says Blue fifteen plus Green twenty-five equals forty; valid editing Blue to twenty produces forty-five; invalid input leaves forty; a stale draft cannot overwrite a newer revision. These rules can be checked without pixels, keyboard services, or a running app.</p><p>A native interaction check asks a different question: can a person reach Edit, correct the focused field, save, and read the resulting total? A source typecheck proves syntax, module visibility, and SDK availability for one destination. It does not tap a control. A performance recording measures timing/resource behavior in a defined workload; it does not replace correctness.</p><p>Write the claim before selecting the tool. Duplicate IDs require a domain test. Missing detail data requires core lookup and a native missing-state observation. VoiceOver action discovery requires an accessibility runtime. A compiler-cache failure is an environment/tooling failure rather than evidence that domain logic is wrong. Distinguishing those boundaries keeps diagnosis useful.</p><p>Android engineers can compare unit tests, instrumentation tests, and profilers at a high level. Apple destination selection, Swift compiler macros, simulator services, and Instruments traces have their own setup. The course supplies an isolated package and native source, not a completed company UI test run. Record each actual command and the evidence it can support.</p>"
+        },
+        {
+          "id": "repeatable-flow",
+          "title": "Use one known sequence with exact outcomes",
+          "html": "<p>A repeatable flow starts from a known fixture. Relaunch or reset the scratch in-memory app to Blue fifteen, Green twenty-five, total forty. Open Blue by stable identifier, choose Edit, clear title, and Save. The draft should remain visible with Enter a title and title input focus requested. The published board still contains the original valid card.</p><p>Restore a nonblank title and enter 241. Save should keep the sheet open and request minutes focus with a range message. Change it to twenty and save. The sheet should dismiss, detail show twenty, and dashboard show forty-five. Return to the board, pin Blue using the button, and verify the control value says Pinned.</p><p>Open Blue again and delete it from detail. The destination should show Notebook removed rather than a stale value or Green. Returning to the board leaves Green and total twenty-five. The host suite exercises the underlying save and missing-ID policies. Native observation establishes the controls, sheet, focus requests, and visible state compose correctly for the tested destination.</p><p>Stable accessibility identifiers such as draft-title, draft-minutes, save-draft, board-total, and open-blue support future UI automation. They do not automatically establish a passing test. Do not assert absolute screen coordinates or a fixed font pixel width when the contract is semantic state. A localized label can change while its stable test identifier and domain ID remain useful.</p>"
+        },
+        {
+          "id": "accessibility-and-adaptation",
+          "title": "Define a small but useful native matrix",
+          "html": "<p>A test matrix lists selected environments rather than claiming every possible device was tested. Use a narrow portrait region, a wider or split region, ordinary and accessibility text, light/dark appearance, system Reduce Motion, and a hardware keyboard where available. Add a right-to-left language fixture and VoiceOver for independent open/pin actions. Identify actual tested destinations.</p><p>Large-text acceptance asks whether complete labels remain readable or intentionally available in detail, errors are visible, and actions stay reachable. Motion acceptance asks whether pin and plan expansion still change state without press scaling or unwanted movement under Reduce Motion. Input acceptance asks whether Cancel preserves published values, Save selects the correction field, and Done can dismiss number-pad focus.</p><p>The symmetric drag shortcut needs a native scroll test. Move vertically through the board and require no pin toggle; make one deliberate horizontal movement and require one toggle. Also use the Pin button with assistive interaction. If the gesture conflicts with scrolling or a navigation link, remove or revise the shortcut while preserving its semantic alternative.</p><p>The form retains its draft only while presented. A conflict message allows copying and advises reopening to review current values. That is a bounded fallback, not ideal production conflict resolution or durable autosave. Include these limitations in the handoff so a future feature owner can choose merge, persistence, restoration, or account rules deliberately.</p>"
+        },
+        {
+          "id": "bounded-profile",
+          "title": "Measure one interval with one representative workload",
+          "html": "<p>Profiling is observing where execution spends time or resources during a defined activity. The two-card board is too small to justify claims about production scrolling scalability. For a later scratch experiment, create a deterministic one-thousand-card fixture, use stable IDs and short/long titles, then define the interval from beginning a fixed scroll sequence to completing it.</p><p>Use an optimized native build on a named representative destination and record toolchain, OS, thermal state, content size, appearance, and fixture size. A simulator trace may help diagnosis but cannot substitute for physical-device responsiveness or energy evidence. Begin with Time Profiler and relevant animation/hitch observations; retain the raw trace and identify the stack or update responsible for the cost.</p><p>Separate idle preparation from the measured interval. Warm and cold runs answer different questions, so report them separately. Repeat a fixed sequence and retain raw observations rather than selecting the fastest sample. Require correct totals, stable IDs, no accidental pinning, and readable controls in every candidate implementation. A faster broken screen is a failed experiment.</p><p>Possible hypotheses include repeated filtering/sorting in body, expensive formatting, broad state invalidation, or repeated total reduction. The supplied Board total is a linear reduction over cards. That is an algorithmic observation, not a measured bottleneck. Add caching or narrower state only after traces identify a material cost and after defining how the new cache remains correct on every mutation.</p>"
+        },
+        {
+          "id": "one-improvement",
+          "title": "Make one change and preserve its correctness contract",
+          "html": "<p>A performance contract includes the workload, interval, metric, acceptance threshold, correctness oracle, and recovery trigger. Suppose a real trace identifies repeated summary computation as material. One candidate is a separately maintained total. That changes the data contract: every save, delete, initialization, and future insert must update it consistently. Another candidate is changing observation boundaries before adding cached state.</p><p>The snippet below is an invariant to check in a scratch experiment, not a claim that caching is needed. It compares any cached total against recomputation. If the candidate passes timing but violates this equality after deletion or validation failure, it is rejected. The simplest baseline remains a valuable recovery implementation.</p><pre><code class=\"language-swift\">// Candidate cache oracle; add only in a scratch experiment.\nlet recomputed = board.cards.reduce(0) { $0 + $1.minutes }\n// If a candidate stores cachedTotal:\nprecondition(cachedTotal == recomputed)\n// Invalid saves must leave both values unchanged.\n// Valid Blue 15 -&gt; 20 changes total 40 -&gt; 45.\n// Removing Blue afterward changes total 45 -&gt; 25.</code></pre><p>Change one factor per experiment. Compare baseline and candidate with the same fixture, build settings, destination, warmup, and input sequence. Keep the previous implementation and a clear revert condition if the benefit is small, correctness weakens, or memory rises beyond the stated budget. Do not hide preparation or changed content inside the faster run.</p><p>Staff practice requires more than a quick local improvement. Name the owner of sustained regression checks, the environments that matter, and the release/reversal condition. For this course, those are proposed plans until native profiling exists. Optional later lessons 036–042 and 101–104 deepen Instruments and statistical profiling after this interface stage.</p>"
+        },
+        {
+          "id": "version-evidence",
+          "title": "Report source checks and open runtime work precisely",
+          "html": "<p>The recorded host suites exercise four package tests and four interface-core tests with zero failures on the stated Swift toolchain. The separate package consumer loads its own library resource and prints two cards, forty minutes, and Blue notebook. Those facts support offline host behavior and public boundaries; they do not establish a full application delivery.</p><p>Native checks use the iPhoneSimulator SDK with arm64-apple-ios17.0-simulator and Swift 6 language mode. The PackageCatalogView check uses the actual generated host resource accessor when emitting its module for typechecking; it therefore does not verify iOS resource bundle packaging. The InterfaceApp check compiles its declared SwiftUI use but does not assemble or launch an app bundle.</p><p>The initial native macro attempt encountered sandbox-exec denial; using the toolchain's subprocess sandbox flag allowed bundled compiler plugins to run in this environment. A read-only Reduce Motion environment assignment was then corrected to system-driven preview behavior. Retaining these failures and corrections makes the verification report reproducible and avoids claiming the first attempt passed.</p><p>No simulator interaction, VoiceOver session, keyboard experiment, physical-device trace, performance comparison, signing, remote dependency build, or client test suite was run for these sources. The checklist remains pending for those rows. The learner's independent extension, observations, and reviewed decision are still required; the reference implementation does not record completion.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What proves a field actually received focus after invalid Save?",
+          "options": [
+            "A host enum equality test",
+            "A native interaction observing the editor on a recorded destination",
+            "A source filename"
+          ],
+          "answer": 1,
+          "explanation": "Host tests prove invalid-field selection in the domain result; actual input focus requires a native runtime check."
+        },
+        {
+          "question": "A cached total is faster but wrong after deletion. What is the decision?",
+          "options": [
+            "Reject it because the correctness contract failed",
+            "Ship it because scrolling improved",
+            "Discard the failing sample"
+          ],
+          "answer": 0,
+          "explanation": "Correctness is an acceptance gate. Performance cannot justify a broken published total."
+        },
+        {
+          "question": "What does an unexecuted one-thousand-card profiling plan contain?",
+          "options": [
+            "A verified device speedup",
+            "A passed production regression gate",
+            "A specified fixture, interval, metrics, and pending observations"
+          ],
+          "answer": 2,
+          "explanation": "A concrete plan is useful, but measured claims must wait for retained actual recordings."
+        }
+      ],
+      "exercise": {
+        "brief": "Complete one scratch interface regression and propose or measure one bounded improvement, clearly separating performed and pending checks.",
+        "steps": [
+          "Run the public host suites and reproduce the native setup/typecheck steps.",
+          "Predict and then observe the invalid-title, invalid-minutes, valid-save, pin, and deletion flow.",
+          "Choose a deterministic larger fixture and specify profiling destination, interval, correctness oracle, and raw artifacts.",
+          "Change one factor only if actual evidence identifies a cost; retain the baseline and rollback condition."
+        ],
+        "acceptance": [
+          "Host results, source compilation, actual UI interaction, and profiling have separate evidence rows.",
+          "The known sequence preserves all documented before/after values and missing-state recovery.",
+          "Any measured claim names destination/configuration and retained raw evidence.",
+          "An unperformed native or device row is pending and learner work remains independent."
+        ],
+        "solution": "<p>Begin with the known flow at total forty. Invalid title and 241-minute saves leave forty. The valid twenty-minute save yields forty-five. Pinning changes state/revision but not total. Deleting Blue yields Green alone at twenty-five. Keep those values in the evidence plan before interacting. The host suite supports these rules; record separate observed focus, sheet, and missing-state behavior in the scratch native target.</p><p>Choose one thousand deterministic IDs only for the larger profiling fixture. Define a fixed scroll interval, optimized build, named device, content size, repeated runs, and retained trace. If no physical device is available, leave that row pending and state what a simulator trace can contribute. Do not invent a duration to make the submission look complete.</p><p>If traces identify total reduction as material, compare a candidate cache with the invariant against recomputation after initialization, valid edit, invalid edit, deletion, and pinning. Consider the simpler alternative of reducing broad view updates. Keep the unmodified baseline for comparison and rollback. A candidate must preserve navigation identity, accessibility controls, and published values.</p><p>Submit exact commands and actual outputs, the observed or pending interaction matrix, the trace location if collected, and a decision with owner and reversal trigger. A documented no-change decision is valid when evidence finds no material bottleneck. Optional later profiling lessons extend the investigation. This answer shows a method, not a completed learner experiment or a claim of production performance.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: Testing your apps in Xcode",
+          "url": "https://developer.apple.com/documentation/xcode/testing-your-apps-in-xcode"
+        },
+        {
+          "label": "Apple: Improving your app's performance",
+          "url": "https://developer.apple.com/documentation/xcode/improving-your-app-s-performance"
+        },
+        {
+          "label": "Apple: Understanding and improving SwiftUI performance",
+          "url": "https://developer.apple.com/documentation/xcode/understanding-and-improving-swiftui-performance"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Flow layout measurement and placement",
+          "path": "ios-client/Projects/Infra/ZDUI/Sources/ZDMezzanine/Views/SwiftUI/FlowLayout.swift",
+          "line": 107,
+          "why": "Placement recomputes the arrangement and offsets origins to actual bounds. This is a concrete inspection target for a future bounded trace, not evidence that profiling or client optimization occurred."
+        }
+      ],
+      "checklist": [
+        "I can match a correctness claim to an appropriate test boundary.",
+        "I can record a deterministic UI flow and pending native checks.",
+        "I can require correctness and retained measurements before accepting an optimization."
+      ],
+      "simple": {
+        "story": "A mechanic checks a bicycle in several ways. A ruler confirms that a part has the right length. A short ride confirms the brakes can be reached and used. A timed ride on a known route answers a speed question. The ruler cannot replace the ride, and a faster bicycle with broken brakes fails the job. The mechanic keeps the original part and the recorded route conditions so another person can repeat the comparison or restore the working bicycle.",
+        "meaning": "Use different evidence for core rules, source compilation, actual interaction, and performance.",
+        "example": {
+          "before": "The host core predicts total 40 and a valid Blue edit to 20 predicts total 45.",
+          "change": "Run host checks, then typecheck native source for one simulator destination.",
+          "after": "Core and source checks can pass while focus, accessibility, and device timing still remain pending."
+        },
+        "picture": {
+          "kind": "comparison",
+          "caption": "Each verification boundary supports a different claim.",
+          "items": [
+            {
+              "label": "Host test",
+              "text": "Checks deterministic values and failures."
+            },
+            {
+              "label": "Native typecheck",
+              "text": "Checks SwiftUI symbols and destination availability."
+            },
+            {
+              "label": "Interaction",
+              "text": "Observes controls, focus, and accessibility."
+            },
+            {
+              "label": "Trace",
+              "text": "Measures a stated native workload and interval."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Oracle",
+            "meaning": "The rule deciding whether an observed outcome is correct."
+          },
+          {
+            "term": "Profiling",
+            "meaning": "Recording where execution spends time or resources."
+          },
+          {
+            "term": "Regression",
+            "meaning": "A previously accepted behavior or cost becomes worse."
+          },
+          {
+            "term": "Raw evidence",
+            "meaning": "The original outputs or recordings behind a claim."
+          }
+        ],
+        "remember": "Match the claim to the check, and keep correctness as a gate.",
+        "boundary": "The bicycle story does not model simulator services, statistical uncertainty, or compiler macro execution."
+      }
+    }
+  ]
+}

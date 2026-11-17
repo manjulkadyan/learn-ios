@@ -1,0 +1,180 @@
+{
+  "workshops": [
+    {
+      "id": "interface-project",
+      "title": "Compose and check an original notebook interface",
+      "summary": "Run offline core checks, create a scratch native target from the supplied SwiftUI source, extend the form independently, and retain honest interaction/performance evidence.",
+      "kind": "Native implementation",
+      "sessions": [
+        "141",
+        "142",
+        "143",
+        "144"
+      ],
+      "sections": [
+        {
+          "id": "setup-and-ownership",
+          "title": "Prepare the core and a separate native target",
+          "html": "<p>A native implementation uses actual platform controls and frameworks. This companion provides an offline InterfaceCore package and real SwiftUI app source, with native interaction still pending. Use a scratch copy of labs/InterfaceProject. Swift tools 6.0 or later are required; package minima are macOS 13 and iOS 17. No remote package, company SDK, account, credential, or network operation is involved.</p><p>Run bash course/labs/InterfaceProject/verify-host.sh from ios-learning. Read the script's explicit module/scratch/cache paths and README.md's recorded commands/results. Then run python3 course/labs/InterfaceProject/check-native.py. That emits the core for an iOS simulator destination and typechecks the native source. The observed compiler is Swift 6.4.2 with Xcode 27.2, not proof every permitted older compiler was tested.</p><p>To build an actual app, create a scratch Xcode iOS SwiftUI App, minimum iOS 17, no storage template, and an unrelated bundle identifier. Add this local package and select InterfaceCore. Remove the template app entry and ContentView from target membership. Add a copy of Native/InterfaceApp.swift as the sole app entry. Do not add package Sources or Tests as app files.</p><p>Build and launch a selected simulator only when collecting native evidence. A command-line typecheck does not assemble an app bundle or run a sheet. The README's interaction matrix remains pending. Reading the source or copying the answer does not complete practice; the learner must make the independent change and provide their own observed results.</p>"
+        },
+        {
+          "id": "components-and-design",
+          "title": "Trace one board through dashboard, feed, and detail",
+          "html": "<p>DashboardView owns one Board value. It composes tiles, a summary, and a fixture feed of current cards in reversed order. This feed is not a server event history or durable audit log. Each tile receives current values and a named pin callback. Detail receives a stable ID and resolves current values, so a rename or duration edit does not create a different destination.</p><p>The starting values are Blue fifteen, Green twenty-five, total forty. The tokens name sixteen-point spacing, eighteen-point corners, accent appearance, and forty-four-point minimum controls. The button uses scalable text and expandable height. Open and Pin are separate semantic controls; a drag shortcut and named accessibility action invoke the same owner pin operation.</p><p>Layout uses the available region rather than device category. Subtract thirty-two horizontal padding points before the column policy. Usable width 599 gives one column; 600 gives two for ordinary text; accessibility-sized text gives one even at 800. ViewThatFits can choose a vertical header when horizontal text does not fit. Host policy checks are not font/layout observations.</p><p>Delete an item while detail exists and resolve the same ID again. Missing lookup shows Notebook removed, not another item at an old index. System navigation and controls retain semantic behavior. A broader application may need typed routes, restoration, storage, and account ownership; the bounded fixture implements none of those silently.</p>"
+        },
+        {
+          "id": "draft-and-motion",
+          "title": "Publish only a current valid draft",
+          "html": "<p>The editor owns a local CardDraft with String input and the card's starting revision. Typing twenty leaves published Blue at fifteen and total forty. Cancel dismisses without publication. Blank title or 241 minutes returns an invalid field. Valid twenty minutes changes total to forty-five. A pin change after the draft opened increments revision, so the old draft returns conflict.</p><p>The native adapter maps invalid field to FocusState, keeps the draft, and displays a correction. The number pad is only a keyboard preference; pasted text still needs validation. Done clears input focus. Text-entry focus is distinct from VoiceOver focus and does not automatically announce the error. In-memory retention ends when the sheet is dismissed or the app exits.</p><pre><code class=\"language-swift\">var board = Board.sample\nvar draft = CardDraft(card: board.cards[0])\ndraft.minutesText = \"20\"\n// board.totalMinutes is still 40.\ndraft.title = \" \"\nlet invalid = board.save(draft) // invalid(.title); total remains 40.\ndraft.title = \"Blue notes\"\nlet saved = board.save(draft) // saved; total is now 45.\n// Native focus and sheet behavior require a separate runtime check.</code></pre><p>The drag predicate accepts absolute horizontal movement at least eighty and strictly greater than twice vertical movement, committing only onEnded. Minus eighty by zero passes; eighty by forty fails. Keep the Pin button and accessible action even if native scroll arbitration makes the shortcut unsuitable. A predicate test cannot prove recognizer delivery or cancellation behavior.</p><p>The button and plan transition read system Reduce Motion. State still changes while scaling/interpolation is suppressed. In the inspected SDK, accessibilityReduceMotion is read-only, so use simulator Accessibility settings rather than trying to assign that environment key in a preview. The provided default/large-text/system-preference previews are source fixtures, not recorded rendered results.</p>"
+        },
+        {
+          "id": "independent-extension",
+          "title": "Add notes and challenge failure behavior",
+          "html": "<p>Add a notes field in the scratch model and draft with an explicit maximum length. Define whether empty input is valid and whether the limit counts Swift Characters, UTF-16 units, or another chosen measure. For this exercise choose at most two hundred Characters, allow empty notes, and preserve the text the person typed until a valid save or deliberate cancellation.</p><p>Validate notes before mutating any published field. If a draft has twenty valid minutes and too-long notes, the board must remain fifteen and forty, with all existing values unchanged. Add a Field.notes result and map it to the native notes control. The error should tell the person how to correct it rather than removing their text.</p><p>Keep the starting revision comparison before publication. Open a draft, pin Blue, then try to save notes; it must conflict rather than overwrite current state. Delete Blue and require missing without recreating a card. Test duplicate IDs separately. These adversarial cases exercise ownership and recovery assumptions; checks that merely repeat the validation implementation would add little confidence.</p><p>After correcting notes against a current revision, save twenty minutes and require forty-five. Cancel from a different draft leaves values unchanged. A production form might retain durable drafts or offer a field-aware merge, but those are separate extensions with their own storage and conflict contracts. Do not claim this small notes change implements a complete autosave system.</p>"
+        },
+        {
+          "id": "interaction-and-profile",
+          "title": "Record what the native target actually does",
+          "html": "<p>Use the known regression sequence: start forty, invalid title stays forty, 241 stays forty, valid twenty yields forty-five, pin leaves forty-five, and deleting Blue leaves twenty-five plus a missing detail. Observe sheet dismissal, invalid-field focus, keyboard Done, and separately accessible Open/Pin controls. Record destination, window/text/appearance settings, input method, and actual or pending outcome.</p><p>Test long titles, accessibility text, narrow/wide or split region, right-to-left direction, system Reduce Motion, and vertical scrolling versus a deliberate horizontal pin. Preserve an accessible button alternative. A successful typecheck cannot establish contrast, touch size reachability, error announcements, focus ordering, or the gesture's relationship with native scrolling. Those need runtime observations.</p><p>Only profile after defining a representative deterministic workload. A later scratch one-thousand-card fixture can support a fixed optimized scroll experiment on a named device. Define warm/cold handling, interval, repetitions, correctness oracle, and retained raw trace before collecting Time Profiler or animation evidence. No timing, memory, energy, or device performance measurement was collected for this companion.</p><p>If a trace identifies a material cost, change one factor and compare with the same conditions. A cached total must equal recomputation after valid/invalid saves, pin, deletion, and initialization. Reject a faster wrong candidate. Keep the baseline, an accountable maintainer, and a reversal condition. Optional later profiling lessons extend this investigation; an explicit no-change decision is valid without a demonstrated bottleneck.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Add notes under a clear input policy, verify atomic publication and stale-draft rejection, then complete or mark pending a bounded native interaction/profile ledger.",
+        "steps": [
+          "Predict the fixture, width, and gesture outcomes, then run the offline checks.",
+          "Create the isolated target with InterfaceCore and only InterfaceApp.swift as app source.",
+          "Add notes to published/draft values and validate its declared length before publication.",
+          "Add adversarial invalid/current/stale/missing cases and map notes focus natively.",
+          "Run the known native flow and record individual observed or pending environment rows.",
+          "Specify one profiling workload and keep measurements pending unless actually recorded."
+        ],
+        "acceptance": [
+          "Invalid notes never partially publish other fields; a valid current edit makes total forty-five.",
+          "Stale/missing edits preserve the current board and do not recreate removed identities.",
+          "Keyboard focus, assistive interaction, gesture arbitration, and motion have separate runtime evidence.",
+          "Any performance claim retains destination/configuration/raw recording and passes the correctness oracle."
+        ],
+        "solution": "<p>Use a two-hundred-Character notes limit, with empty notes valid. Add notes to BoardCard and copy it into CardDraft at editor creation. Validate every proposed field before assigning title, duration, or notes. Test a valid duration twenty combined with oversized notes: invalid notes must leave Blue at fifteen and the total forty. Then correct notes and save a current draft to get forty-five.</p><p>Test stale and missing cases independently. Pin after draft creation and expect conflict. Delete the target card and expect missing. Neither should erase draft text in the presented editor or recreate a published card. Add a notes TextField or TextEditor with a clear field-focus connection, then verify actual keyboard behavior in the target. String.count measures Characters here; do not silently compare a UIKit UTF-16 selection length to that policy.</p><p>The interaction ledger follows exact predicted values and records large text, direction, input, motion, and semantic actions. The source check is a separate pass row. If app build/launch or VoiceOver cannot be performed, mark them pending with a concrete next observation. Host tests still prove the proposed core rules, not rendered usability.</p><p>Choose a larger deterministic fixture only when profiling is useful. Retain raw trace conditions and compare one candidate with the baseline. Reject a cache that fails recomputation equality. If no trace exists or no material cost is found, retain the simpler implementation and state a no-change decision. Submit the scratch diff, commands, observations, pending limits, owner, and reversal condition rather than calling the reference source a completed native product.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: FocusState",
+          "url": "https://developer.apple.com/documentation/swiftui/focusstate"
+        },
+        {
+          "label": "Apple: Layout",
+          "url": "https://developer.apple.com/documentation/swiftui/layout"
+        },
+        {
+          "label": "Apple: Understanding and improving SwiftUI performance",
+          "url": "https://developer.apple.com/documentation/xcode/understanding-and-improving-swiftui-performance"
+        }
+      ],
+      "files": [
+        {
+          "label": "Readme, setup, and evidence",
+          "path": "labs/InterfaceProject/README.md"
+        },
+        {
+          "label": "Offline core manifest",
+          "path": "labs/InterfaceProject/Package.swift"
+        },
+        {
+          "label": "Values, validation, and policies",
+          "path": "labs/InterfaceProject/Sources/InterfaceCore/Board.swift"
+        },
+        {
+          "label": "Adversarial host tests",
+          "path": "labs/InterfaceProject/Tests/InterfaceCoreTests/BoardTests.swift"
+        },
+        {
+          "label": "Native dashboard, detail, feed, form, and entry",
+          "path": "labs/InterfaceProject/Native/InterfaceApp.swift"
+        },
+        {
+          "label": "Host check commands",
+          "path": "labs/InterfaceProject/verify-host.sh"
+        },
+        {
+          "label": "Native source check",
+          "path": "labs/InterfaceProject/check-native.py"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What should a too-long notes draft with valid twenty minutes do?",
+          "options": [
+            "Publish twenty first, then show notes error",
+            "Reject the whole proposal and keep published total forty",
+            "Discard all input immediately"
+          ],
+          "answer": 1,
+          "explanation": "Validation precedes all assignments. The editor retains draft text while the shared Board remains unchanged."
+        },
+        {
+          "question": "What proves vertical scrolling does not trigger pin in the app?",
+          "options": [
+            "Only testing dx/dy arithmetic",
+            "Changing the product to a dynamic library",
+            "Native scroll interaction on a recorded target"
+          ],
+          "answer": 2,
+          "explanation": "The pure predicate and native recognizer arbitration are separate evidence boundaries."
+        },
+        {
+          "question": "No trace identifies a material cost. What is a valid performance decision?",
+          "options": [
+            "Retain the simple baseline and define a future experiment if needed",
+            "Invent a speedup estimate",
+            "Cache every value immediately"
+          ],
+          "answer": 0,
+          "explanation": "A no-change decision is useful when evidence does not justify complexity. Actual measurements must precede measured claims."
+        }
+      ],
+      "simple": {
+        "story": "A reader tries a notebook desk before opening it to visitors. The small rules can be checked on paper: invalid plans keep the old total, and an old edit cannot overwrite a newer pin. The reader then needs to use the actual desk to see whether labels fit and buttons can be reached. A large-print card and a calm movement setting may change the arrangement. Timing a busy session is another experiment. Passing the paper checks does not mean those desk trials happened.",
+        "meaning": "Combine deterministic core checks with actual native source and separately observed interaction/performance evidence.",
+        "example": {
+          "before": "Blue is 15 minutes and total is 40; a new notes draft also proposes 20 minutes.",
+          "change": "Save notes beyond the chosen 200-Character limit.",
+          "after": "The proposed edit fails and the published total stays 40; correcting a current draft can later produce 45."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "The independent notes extension preserves all-or-error publication.",
+          "items": [
+            {
+              "label": "Draft",
+              "text": "The draft holds twenty minutes and oversized notes."
+            },
+            {
+              "label": "Validation",
+              "text": "The notes limit rejects the entire proposal."
+            },
+            {
+              "label": "Published board",
+              "text": "Blue remains fifteen and total remains forty."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Native source",
+            "meaning": "Real platform code that still needs target/runtime evidence."
+          },
+          {
+            "term": "Atomic publication",
+            "meaning": "The complete checked change is published, or none of it is."
+          },
+          {
+            "term": "Evidence ledger",
+            "meaning": "Separate recorded outcomes and pending checks for each claim."
+          }
+        ],
+        "remember": "Run the rules, inspect the real controls, and record each boundary separately.",
+        "boundary": "The desk story explains verification boundaries, not device timing, accessibility services, or durable transactions."
+      }
+    }
+  ]
+}

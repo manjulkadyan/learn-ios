@@ -1,0 +1,199 @@
+{
+  "workshops": [
+    {
+      "id": "package-course",
+      "title": "Build and review an offline package with a real consumer",
+      "summary": "Run a resource-backed library and separate executable, add an independent API, and write a pinned dependency decision with exact evidence limits.",
+      "kind": "Host implementation",
+      "sessions": [
+        "137",
+        "138",
+        "139",
+        "140"
+      ],
+      "sections": [
+        {
+          "id": "setup-and-graph",
+          "title": "Start with a library, a resource, and another package",
+          "html": "<p>A package is a directory with Package.swift describing its products and targets. Work from a scratch copy of labs/PackageProject rather than the company client. Swift tools 6.0 or later are required; the package declares macOS 13 and iOS 17. The library product, target, and import name are WorkshopKit. WorkshopKitTests is a separate target, and Consumer is a separately described package.</p><p>Read both manifests before running commands. Consumer depends on the parent path, then selects the WorkshopKit product for CatalogConsumer. The matching explicit platform floor prevents an implicit older consumer from requesting a newer-minimum library. The resource belongs under Sources/WorkshopKit/Resources, declared with .process. Native files are outside the package target source graph and do not become host UI tests.</p><p>From ios-learning run bash course/labs/PackageProject/verify-host.sh. It redirects Clang and SwiftPM module caches into /private/tmp, uses scratch build/cache paths, runs the public tests, then builds and runs the separate executable. Read README.md for exact expanded commands, recorded Swift/Xcode versions, initial failures, and actual results. No remote package download, account, or service is required.</p><p>Predict the starting output before execution: blue and green are unique IDs, durations are fifteen and twenty-five, total is forty. The consumer prints two cards and forty minutes, then Blue notebook. A changing resource must change its intentional consumer expectation; a precondition failure is not permission to remove the check without explaining the new contract.</p>"
+        },
+        {
+          "id": "decode-and-publication",
+          "title": "Trace input bytes into a complete valid value",
+          "html": "<p>Decoding turns bytes into a typed candidate. Validation then enforces product rules: nonblank ID/title, duration one through two hundred forty, and unique IDs. Catalog assigns its cards array only after checking the entire candidate. This is an all-or-error publication boundary, so a duplicate near the end cannot silently produce a successful partial catalog.</p><p>Catalog.bundled first asks Bundle.module for the declared JSON, reads Data, decodes it, and validates the result. Resource absence, IO failure, malformed shape, and invalid domain values are different mechanisms. An empty successful catalog is not a suitable fallback for all failures. A consuming UI can present an error/retry policy while the library stays independent from navigation.</p><pre><code class=\"language-swift\">let catalog = try Catalog.bundled()\nlet total = catalog.totalMinutes() // Fixture: 0 + 15 + 25 = 40.\nlet missing = catalog.card(id: \"absent\") // nil, after valid construction.\nlet duplicate = [\n    WorkshopCard(id: \"blue\", title: \"One\", minutes: 10),\n    WorkshopCard(id: \"blue\", title: \"Two\", minutes: 20)\n]\n// try Catalog(cards: duplicate) throws duplicateID(\"blue\").</code></pre><p>The explicit public WorkshopCard initializer matters to the external consumer because public structs do not automatically expose synthesized memberwise initializers. Tests import normally, without @testable, so they exercise caller-visible declarations. Copying the cards array and appending does not mutate the original Catalog value. That proves value behavior, not eager physical storage copying.</p><p>The packaged file contains only made-up notebooks. A processed resource is distributed application content, not secret storage. Loading this tiny fixture synchronously is intentional; a large catalog needs scheduling, cancellation, and performance decisions separately. Keep those later responsibilities out of a misleading claim that Bundle.module automatically supplies asynchronous IO.</p>"
+        },
+        {
+          "id": "adversarial-checks",
+          "title": "Challenge independent failure assumptions",
+          "html": "<p>The bundled test validates the actual declared host resource, IDs, total, and absent lookup. The duplicate test supplies conflicting blue values and requires the correct domain error. The corrupt-input test distinguishes broken JSON from shaped input with 241 minutes. The boundary/value-copy test accepts 240 and checks that independent mutation leaves the first catalog unchanged.</p><p>These are observable-contract checks rather than assertions that private branches executed. If a resource was not registered, the bundled check can fail while constructed-candidate tests still diagnose the core rule. If validation was weakened, duplicate and range cases fail without requiring a UI. Keeping those boundaries separate lets one independent failure remain understandable.</p><p>Now add your own input case in the scratch copy. Zero minutes must fail; a blank title must fail; one minute must pass. Predict exact error categories. Add amber with ten minutes to the resource and update the bundled/consumer expectations to three cards and fifty. Explain why changing data is intentional and why existing IDs stay stable.</p><p>Retain exact command outputs. The recorded reference suite ran four XCTest tests with zero failures and the consumer output above; your modified copy needs its own evidence. The supplied green result does not complete your exercise. Neither result verifies an iOS resource bundle, display, signing, every supported compiler, or a third-party resolver.</p>"
+        },
+        {
+          "id": "api-and-dependency",
+          "title": "Add an API, then assess a vendor without installing it",
+          "html": "<p>A consumer boundary lets internal implementation change while preserving observable promises. Add an inclusive maximum-duration query that returns [WorkshopCard] in input order. With the original fixture, twenty returns blue and twenty-five returns blue then green. Specify negative bounds as empty or select a documented throwing alternative. Keep optional absent lookup and total behavior unchanged.</p><p>Use that new method from CatalogConsumer rather than exposing JSON paths, decoder internals, or a future vendor collection. Build and run the separate package normally. An internal test can accidentally rely on broader access, so the consumer is important evidence. A source-compatible addition still needs ordering and error contracts to preserve behavior.</p><p>Read DEPENDENCY_ASSESSMENT.md. Its actual inspection covers Collections 1.1.4 manifest, README, license, and complete tree at the resolved checkout revision. It recommends retaining this tiny offline Array/Set implementation. For a future ordered-unique selection, define duplicate/removal rules and assess a private adapter returning ordinary values before adding a dependency.</p><p>The license observation is Apache 2.0 with Runtime Library Exception; organizational distribution review remains open. The complete tree has no .xcprivacy file, which is only file absence at that pin. No implementation audit, app privacy certification, vendor build, or benchmark occurred. Keep proposed adoption measurements and upgrade results pending until collected.</p>"
+        },
+        {
+          "id": "native-and-recovery",
+          "title": "Keep native resource evidence and rollback separate",
+          "html": "<p>The Native directory contains a real PackageDemoApp entry and PackageCatalogView adapter. README.md explains creating an isolated iOS 17 Xcode target, adding the local WorkshopKit product, removing template app membership, and including both native files. The app source owns visible load/error/retry state; the package continues to own the bundle and validated catalog.</p><p>python3 course/labs/PackageProject/check-native.py emits the library module for the simulator destination and typechecks both native files. It uses SwiftPM's actual generated host bundle accessor, so it verifies source compatibility but not construction of an iOS resource bundle. The actual scratch app build and runtime resource load remain required independent evidence.</p><p>A safe API migration retains the old behavior until the new consumer is working. Draw Consumer to WorkshopKit and keep resources with the library. If introducing a rules target, prevent a reverse import cycle and assign value/error ownership deliberately. A private helper may be the simpler choice when no independent module benefit is established.</p><p>Submit the scratch diff, public test output, separate consumer output, dependency decision, and exact pending native rows. Roll back the API/graph and resource declarations together if the consumer fails. Do not claim build-speed gains without repeated recorded experiments. Optional later lessons 041, 044, and 049 expand build/distribution/upgrade decisions after this project sequence.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Add amber and a filtered public query in a scratch copy, then defend a retain/adopt decision without installing vendor code.",
+        "steps": [
+          "Predict the baseline and run the recorded host commands.",
+          "Add amber=10 with a new ID, then update total/count consumer expectations deliberately.",
+          "Implement an inclusive filtered query and challenge zero, blank, boundary, and order cases through normal imports.",
+          "Use the query from the separate executable and retain its output.",
+          "Write a dependency/graph decision with primary pin evidence, owner, rollback, and pending native/vendor measurements."
+        ],
+        "acceptance": [
+          "The new fixture is three cards totaling fifty; twenty selects blue and amber in source order.",
+          "Invalid candidates never publish a partial catalog.",
+          "The separate consumer uses semantic public APIs without resource filenames or vendor types.",
+          "No native packaging, legal/privacy approval, vendor API execution, or measured speed is claimed without evidence."
+        ],
+        "solution": "<p>Append amber with ten minutes after green, preserving existing IDs. The new total is fifty. The twenty-minute query includes blue and amber in source order, and twenty-five includes all three. Negative and zero bounds return empty under the selected nonthrowing policy. Add a reversed candidate case to demonstrate that order follows input rather than a hidden alphabetical sort.</p><p>Use normal public imports for both tests and consumer. Challenge zero minutes and whitespace-only title independently from the shipped valid JSON. Preserve invalidJSON, invalidCard, and duplicateID distinctions. Update the intentional resource expectations and executable preconditions, then run both boundaries. A private helper call rejected by a normal consumer is a useful access lesson in a temporary scratch change, not a reason to expose every helper.</p><p>The decision keeps Array/Set for this small offline fixture while naming ordered uniqueness as a possible future requirement. It cites the exact Collections pin and inspected primary sources, identifies license/privacy review limits, and leaves vendor integration and measurements pending. A larger justified need would use an adapter with duplicate/removal invariants and an accountable feature owner.</p><p>Native source checks remain separate from actual iOS bundle loading. If you create the scratch app, include both entry and view files and select the package product, then record visible success or error/retry behavior. Retain the baseline and restore graph/resources together on failure. Your actual modification and evidence complete the workshop; the supplied answer only demonstrates the method.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: PackageDescription API",
+          "url": "https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html"
+        },
+        {
+          "label": "Apple: Bundling resources with a Swift package",
+          "url": "https://developer.apple.com/documentation/xcode/bundling-resources-with-a-swift-package"
+        },
+        {
+          "label": "Swift project: Pinned Collections README",
+          "url": "https://github.com/apple/swift-collections/blob/671108c96644956dddcd89dd59c203dcdb36cec7/README.md"
+        }
+      ],
+      "files": [
+        {
+          "label": "Readme and exact evidence",
+          "path": "labs/PackageProject/README.md"
+        },
+        {
+          "label": "Local library manifest",
+          "path": "labs/PackageProject/Package.swift"
+        },
+        {
+          "label": "Public catalog",
+          "path": "labs/PackageProject/Sources/WorkshopKit/Catalog.swift"
+        },
+        {
+          "label": "Bundled notebook fixture",
+          "path": "labs/PackageProject/Sources/WorkshopKit/Resources/cards.json"
+        },
+        {
+          "label": "Public behavioral tests",
+          "path": "labs/PackageProject/Tests/WorkshopKitTests/CatalogTests.swift"
+        },
+        {
+          "label": "Separate consumer manifest",
+          "path": "labs/PackageProject/Consumer/Package.swift"
+        },
+        {
+          "label": "Separate consumer source",
+          "path": "labs/PackageProject/Consumer/Sources/CatalogConsumer/main.swift"
+        },
+        {
+          "label": "Native catalog view",
+          "path": "labs/PackageProject/Native/PackageCard.swift"
+        },
+        {
+          "label": "Isolated native app entry",
+          "path": "labs/PackageProject/Native/PackageDemoApp.swift"
+        },
+        {
+          "label": "Host check commands",
+          "path": "labs/PackageProject/verify-host.sh"
+        },
+        {
+          "label": "Native source check",
+          "path": "labs/PackageProject/check-native.py"
+        },
+        {
+          "label": "Pinned dependency assessment",
+          "path": "labs/PackageProject/DEPENDENCY_ASSESSMENT.md"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Why is CatalogConsumer a separate package?",
+          "options": [
+            "To bypass access control",
+            "To verify normal product/module use and resource behavior",
+            "To prove all iPhone screens"
+          ],
+          "answer": 1,
+          "explanation": "The consumer exercises an ordinary external boundary. It neither grants test-only access nor observes native interaction."
+        },
+        {
+          "question": "After appending amber=10, what does the inclusive twenty-minute query return?",
+          "options": [
+            "Blue then amber",
+            "Green only",
+            "Every card sorted by title"
+          ],
+          "answer": 0,
+          "explanation": "Blue=15 and amber=10 meet the bound; filtering preserves source order. Green=25 is excluded."
+        },
+        {
+          "question": "What did the pinned no-.xcprivacy tree result establish?",
+          "options": [
+            "Every app has no privacy obligations",
+            "The vendor is already benchmarked",
+            "No file with that extension occurs in the inspected complete tree"
+          ],
+          "answer": 2,
+          "explanation": "The tree observation is precise but does not audit implementation calls or the consuming app's privacy practices."
+        }
+      ],
+      "simple": {
+        "story": "A workshop keeps a checked inventory in its own cupboard. A neighboring room asks for the total and for short jobs without copying the cupboard's paper list. The workshop tests bad labels and impossible work times before handing out any inventory. Later, someone suggests buying a special sorting tray. The room first checks whether its small list already works, reads the tray's instructions and conditions, and records the missing trial rather than pretending it has used the tray.",
+        "meaning": "Practice resource ownership and a public consumer before making a bounded dependency decision.",
+        "example": {
+          "before": "The resource has blue=15 and green=25, total 40.",
+          "change": "In a scratch copy append amber=10 and add an inclusive twenty-minute query.",
+          "after": "The total is 50 and the query returns blue then amber."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "One valid resource change reaches the separate consumer through the public API.",
+          "items": [
+            {
+              "label": "Resource",
+              "text": "Add amber with a unique ID and ten minutes."
+            },
+            {
+              "label": "Validation",
+              "text": "All records satisfy identity/title/range rules."
+            },
+            {
+              "label": "Consumer",
+              "text": "The total is fifty and the filtered order is blue, amber."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Public API",
+            "meaning": "The declarations and behaviors another module can rely on."
+          },
+          {
+            "term": "Resource ownership",
+            "meaning": "The target responsible for packaging and locating a file."
+          },
+          {
+            "term": "Rollback",
+            "meaning": "Restoring the previously working boundary and inputs."
+          }
+        ],
+        "remember": "Test the public borrower and keep every claim within its evidence.",
+        "boundary": "The cupboard story does not supply native bundle packaging, vendor benchmarks, or app privacy review."
+      }
+    }
+  ]
+}

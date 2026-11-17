@@ -1,0 +1,670 @@
+{
+  "unit": {
+    "id": "package-course",
+    "title": "Local packages and dependency decisions",
+    "summary": "Build a resource-backed library and public consumer, assess one pinned third-party dependency, and plan a reversible graph change.",
+    "order": 25
+  },
+  "lessons": [
+    {
+      "id": "137",
+      "title": "Build a local library with resources and tests",
+      "summary": "Make an offline Swift package, expose a small catalog API, load its own resource bundle, and check failures before another program uses it.",
+      "duration": 90,
+      "level": "Foundation",
+      "prerequisites": [
+        "057",
+        "064",
+        "070"
+      ],
+      "objectives": [
+        "Distinguish a package, product, target, and imported module.",
+        "Validate resource input before publishing a catalog.",
+        "Run public API tests without remote dependencies."
+      ],
+      "sections": [
+        {
+          "id": "first-library",
+          "title": "A small library is a reusable tool",
+          "html": "<p>A library is code another program can call. Imagine two Android screens both need the same notebook catalog. Copying the parser creates two repair sites when the JSON changes. Our Swift package holds the catalog rule once. It does not own navigation, keyboard focus, app accounts, or screen lifetime. Keeping those responsibilities outside makes the first program small enough to understand.</p><p>A package is a directory with a manifest named <code>Package.swift</code>. The manifest describes build inputs. A target groups source files into a compiled module or test module. A product is the thing a consumer selects, such as a library. A module supplies the name used by <code>import</code>. The four terms can share names, but they describe different boundaries.</p><p>In this lab, the package is <code>PackageProject</code>, the product is <code>WorkshopKit</code>, and the library target and imported module are also <code>WorkshopKit</code>. <code>WorkshopKitTests</code> is a separate test target. Start with this map before reading build diagnostics. A missing product dependency and a missing Swift symbol require different repairs.</p><p>An Android Gradle module is a useful analogy for a Swift target, and a published artifact resembles a product consumed by another build. The analogy has limits: SwiftPM source layout, access control, platform declarations, and resource bundle generation follow Swift rules. A Swift product may contain multiple targets. Do not assume every directory is independently publishable or that every target becomes an app.</p>"
+        },
+        {
+          "id": "manifest",
+          "title": "Read the build recipe one line at a time",
+          "html": "<p>The tools-version comment declares the minimum manifest/tooling version. It is not the app's minimum iOS version. <code>import PackageDescription</code> imports the API used by the manifest itself, not a runtime dependency of the catalog. <code>platforms</code> declares supported minimum deployment versions. The companion declares macOS 13 and iOS 17 while using tools version 6.0.</p><p>The library product exports <code>WorkshopKit</code>. The target uses conventional source placement under <code>Sources/WorkshopKit</code>. Its resource rule processes the <code>Resources</code> directory. The test target depends on the library target. The manifest has no remote dependency list, so the companion needs a local Swift toolchain and SDK but no account, server, or package download.</p><pre><code class=\"language-swift\">// swift-tools-version: 6.0\nimport PackageDescription\nlet package = Package(\n    name: \"PackageProject\",\n    platforms: [.macOS(.v13), .iOS(.v17)],\n    products: [.library(name: \"WorkshopKit\", targets: [\"WorkshopKit\"])],\n    targets: [\n        .target(name: \"WorkshopKit\", resources: [.process(\"Resources\")]),\n        .testTarget(name: \"WorkshopKitTests\", dependencies: [\"WorkshopKit\"])\n    ]\n)</code></pre><p>Read the parentheses as arguments to constructors. The leading dots shorten cases whose type is already known. Brackets create arrays: one product and two targets. The string names are build identities, so a typo does not refer to a different variable you declared elsewhere. The manifest's output is a package description, not a running catalog.</p><p>Run commands from the course directory or pass a clear package path. Put build and cache paths in a scratch directory so generated files do not appear among offline teaching artifacts. SwiftPM compiles the manifest before compiling source. An unsupported manifest API can fail before any catalog function is considered. Read the first meaningful error and identify that phase.</p><p>Open the manifest and predict which files are code, which are resources, and which are tests. Then compare the prediction with the package description. A resource named <code>cards.json</code> is input data rather than Swift source. A test file is compiled for the test target rather than included in the public library product.</p>"
+        },
+        {
+          "id": "resource-boundary",
+          "title": "Load data from the library's bundle",
+          "html": "<p>A bundle is a container for executable metadata or resources. SwiftPM creates a resource bundle for a target that declares resources. Inside that target, <code>Bundle.module</code> locates those declared resources. The consumer's <code>Bundle.main</code> describes a different ownership boundary. Code that works when a file happens to be in the app bundle can fail when the library is reused.</p><p><code>Catalog.bundled()</code> asks the module bundle for cards.json. A missing URL throws <code>missingResource</code>. Reading bytes can throw an IO error. Decoding those bytes can throw <code>invalidJSON</code>. Validation can throw <code>invalidCard</code> or <code>duplicateID</code>. Keeping these outcomes distinct helps a consumer show a useful diagnostic rather than pretending failure means an empty catalog.</p><p><code>.process</code> allows platform processing of supported resource types. <code>.copy</code> retains a resource directory or file as copied input when that structure matters. Do not treat either rule as an instruction to keep secrets safely. Packaged JSON is part of distributed application content. Anyone who obtains the artifact may inspect it, so the fixture contains only made-up notebooks.</p><p>Android engineers may compare resource ownership to using a library's packaged assets through its public API. SwiftPM does not provide Android's generated R identifiers for this JSON file. The generated module bundle accessor is a Swift build detail. Keep the accessor internal and expose a semantic method so callers do not need to know filenames or bundle layout.</p>"
+        },
+        {
+          "id": "validated-values",
+          "title": "Publish a complete catalog or an error",
+          "html": "<p>Validation checks whether decoded values satisfy the domain rule. Codable checks the shape of the input, but a decoded duration of 241 minutes can still violate this product's allowed range of 1 through 240. A nonempty identifier and a nonblank title are also required. State the rule explicitly rather than assuming successful decoding implies useful content.</p><p>The initializer builds a local set named <code>seen</code>. Each identifier is inserted once. <code>inserted</code> tells whether that identifier was new. Two blue identifiers therefore throw <code>duplicateID(\"blue\")</code>. The assignment to <code>self.cards</code> occurs after the complete loop. There is no published catalog containing a valid prefix followed by silently discarded invalid records.</p><p>The resource contains blue with 15 minutes and green with 25 minutes. Reduction starts with 0, adds 15, then adds 25, yielding 40. Looking up blue returns Blue notebook. Looking up absent returns nil. An optional lookup result describes absence; it does not conceal a parse failure, because construction already established a valid catalog or threw.</p><p>These models are structs and conform to <code>Sendable</code> using transferable value fields. That permits appropriate concurrency boundaries but does not make disk IO asynchronous or place work on a dedicated thread. Our tiny bundled load is synchronous. For large files, choose an execution and cancellation policy explicitly, then keep resource ownership and atomic validation unchanged.</p>"
+        },
+        {
+          "id": "test-observable-contracts",
+          "title": "Check public behavior and bad inputs",
+          "html": "<p>A contract is a promise a caller can observe. The tests import <code>WorkshopKit</code> normally, without <code>@testable</code>. They check the catalog product through its public surface. The bundled test catches resource registration mistakes as well as decode failures. Tests with constructed cards isolate domain behavior from resource packaging, so a broken fixture does not obscure every failure.</p><p>Use an adversarial candidate with two blue IDs and different titles. Construction must reject the whole candidate. Feed broken bytes and require invalidJSON. Feed shaped JSON with 241 minutes and require invalidCard. Test exactly 240 to show the accepted boundary. These cases challenge separate assumptions; simply asserting that a loop ran would not prove the public rule.</p><p>The value-copy test appends a new card to a local array copy and verifies the original catalog still contains one card. It also constructs a second catalog and checks the new total. This establishes value behavior visible to a consumer. It does not inspect storage addresses or claim every copy eagerly allocates new memory; Swift collections may use copy-on-write storage.</p><p>A test runner's green line proves the behaviors exercised under its recorded host toolchain. It does not prove VoiceOver, an iOS resource bundle inside a signed app, or every future compiler. Keep exact commands and limitations in the companion README. Learner completion additionally requires the independent modification and its own evidence, rather than reading the supplied worked answer.</p>"
+        },
+        {
+          "id": "version-evidence",
+          "title": "Connect the example to the checkout and its limits",
+          "html": "<p>The active ZDUI package manifest declares several library products and explicit resource processing for font resources in ZDMezzanineBase. Its sibling Project.swift also declares those font resource globs for the Tuist path. This is evidence of two build descriptions during coexistence, not proof that one generated workspace can be changed safely by editing only the other manifest.</p><p>Our lab intentionally owns one small library and one resource rule. It teaches the same ownership question without importing company dependencies, copying fonts, or changing the client. The source anchor explains which target owns resources. When studying the larger graph, inspect the consuming workspace and its active build description before applying any resource or deployment change.</p><p>Swift 6.0 is the minimum manifest requirement for the companion; the observed toolchain is documented separately. Package resource support began earlier than this requirement. The iOS 17 floor belongs to this course's companion choices, not to an assertion that JSON decoding or resources first appeared in iOS 17. Version numbers describe different layers and must stay separate.</p><p>The standalone consumer in the next lesson adds another build boundary. Native adapter source displays the same public catalog in SwiftUI, but host tests do not build an app. Its README gives isolated Xcode setup and recorded typecheck limits. If packaging or runtime interaction was not performed, state pending and name the specific missing observation rather than widening the claim.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which name does the consumer import?",
+          "options": [
+            "PackageProject because it is the directory",
+            "WorkshopKit because it is the library target's module",
+            "WorkshopKitTests because tests expose symbols"
+          ],
+          "answer": 1,
+          "explanation": "A product selects build output, while import names a module. WorkshopKit is both the selected product and its target module here."
+        },
+        {
+          "question": "Why use Bundle.module inside Catalog.bundled()?",
+          "options": [
+            "It finds resources declared by this target",
+            "It downloads missing resources",
+            "It exposes all app secrets"
+          ],
+          "answer": 0,
+          "explanation": "The generated accessor points to this target's resource bundle. It does not download anything and provides no secret storage."
+        },
+        {
+          "question": "A shaped JSON card has minutes = 241. What happens?",
+          "options": [
+            "It is accepted because Codable succeeded",
+            "The catalog publishes every valid earlier card",
+            "The domain validator rejects the candidate"
+          ],
+          "answer": 2,
+          "explanation": "Decoding checks shape; validation enforces 1...240. Publication occurs only after all cards pass."
+        }
+      ],
+      "exercise": {
+        "brief": "In a scratch copy, add a third resource card and an independent boundary case, while preserving the public resource-loading contract.",
+        "steps": [
+          "Predict the supplied catalog's IDs and total before running tests.",
+          "Add amber with 10 minutes to cards.json; update the consumer expectation deliberately.",
+          "Add a test for 0 minutes and one for a blank title using the public API.",
+          "Explain a missing-resource failure versus corrupt JSON and record your actual commands."
+        ],
+        "acceptance": [
+          "The new valid fixture publishes three cards totaling 50 minutes.",
+          "0 minutes and blank titles fail without a partial catalog.",
+          "The consumer imports only WorkshopKit and accesses no bundle filename.",
+          "Evidence separates host tests from iOS packaging and runtime checks."
+        ],
+        "solution": "<p>Add amber as a new ID rather than renaming blue. With 15, 25, and 10 minutes, the total is 50. The existing bundled assertion and consumer precondition should now fail until their intentional contract is updated. That failure is useful: it shows the fixture changed and prevents an old consumer expectation from silently remaining green. Preserve original identities when no migration requirement exists.</p><p>Construct the zero-minute card in a test without changing the shipped JSON. Expect invalidCard for that ID. Construct a title containing only spaces and a newline and expect the same failure category. Then construct 1 and 240 minute cards to demonstrate the inclusive valid range. A test for zero by itself would not prove where the accepted boundary starts.</p><p>The consumer should call Catalog.bundled() and totalMinutes(), not locate cards.json in its own main bundle. A missing resource means the declared file could not be located; malformed bytes mean it was located and decoded unsuccessfully. IO errors remain IO errors. Returning an empty array for all three cases would erase the information a caller needs to recover.</p><p>Run tests and the separate consumer from a scratch build directory. Retain the exact Swift version and observed output. A host pass supports resource access through SwiftPM on that host and the public catalog behavior. An iOS app bundle still requires a native build and runtime resource load. The supplied source and answer are reference material; submit your own change, predictions, and output to complete the exercise.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift Package Manager: PackageDescription manifest API",
+          "url": "https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html"
+        },
+        {
+          "label": "Apple: Bundling resources with a Swift package",
+          "url": "https://developer.apple.com/documentation/xcode/bundling-resources-with-a-swift-package"
+        }
+      ],
+      "repo": [
+        {
+          "label": "ZDUI resource target",
+          "path": "ios-client/Projects/Infra/ZDUI/Package.swift",
+          "line": 156,
+          "why": "ZDMezzanineBase processes its own font resources; compare that ownership with the local JSON target and the sibling Tuist resource declaration."
+        }
+      ],
+      "checklist": [
+        "I can map package, product, target, and module names.",
+        "I can distinguish bundle lookup, IO, decoding, and validation failures.",
+        "I can report exactly what my host test established."
+      ],
+      "simple": {
+        "story": "A craft room stores two notebook kits in its own cupboard. Another room borrows the craft room's catalog service, not the cupboard key or a copied inventory. The service first checks that each kit has a different name and a sensible work time. If two labels say Blue, it returns a problem instead of handing out a half-checked list. The borrowing room can ask for the total work time without knowing which shelf holds the paper list.",
+        "meaning": "The library owns resource lookup and catalog validation; callers receive valid values or an explicit error.",
+        "example": {
+          "before": "Blue is 15 minutes and Green is 25 minutes.",
+          "change": "Load the declared resource through Catalog.bundled().",
+          "after": "The catalog contains two cards and totalMinutes() returns 40."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "The library owns resource lookup and catalog validation; callers receive valid values or an explicit error.",
+          "items": [
+            {
+              "label": "Starting point",
+              "text": "Blue is 15 minutes and Green is 25 minutes."
+            },
+            {
+              "label": "Action",
+              "text": "Load the declared resource through Catalog.bundled()."
+            },
+            {
+              "label": "Result",
+              "text": "The catalog contains two cards and totalMinutes() returns 40."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Target",
+            "meaning": "Source and resources compiled as one build module."
+          },
+          {
+            "term": "Product",
+            "meaning": "A library or executable a consumer can select."
+          },
+          {
+            "term": "Resource bundle",
+            "meaning": "The container for this target's declared files."
+          }
+        ],
+        "remember": "Let the library own its files and publish only a checked result.",
+        "boundary": "A cupboard explains ownership, not SwiftPM's generated bundle accessor or OS file errors."
+      }
+    },
+    {
+      "id": "138",
+      "title": "Use a package through a deliberate consumer API",
+      "summary": "Connect a separate executable to a local product, choose access boundaries, and understand requirements, selected revisions, and consumer compatibility.",
+      "duration": 90,
+      "level": "Senior",
+      "prerequisites": [
+        "137",
+        "069"
+      ],
+      "objectives": [
+        "Build a separate consumer using only the library's public module.",
+        "Distinguish a dependency requirement from a resolved revision.",
+        "Plan API evolution without exposing resource paths or vendor types."
+      ],
+      "sections": [
+        {
+          "id": "caller-boundary",
+          "title": "Let another program borrow the tool",
+          "html": "<p>A consumer is the program that uses a library's output. Unit tests share a development workflow with the library, so a second package provides a stronger boundary check. Our CatalogConsumer lives in its own directory with its own manifest. It declares a local path dependency on the parent package and selects the WorkshopKit product for its executable target.</p><p>The consumer knows blue is a stable card ID and that totalMinutes returns a total. It does not know the resource filename, generated bundle class, decoder configuration, or validation loop. This reduces the changes that leak through the boundary. Renaming the internal file need not force every caller to change, provided the public method preserves its documented behavior.</p><p>Android engineers can compare a second Gradle project that consumes a module's public artifact. SwiftPM path dependencies point to a package directory, not to an individual source file. An import alone does not establish a build dependency. The target's dependencies must make the module available to the compiler and linker before the import can be resolved.</p><p>The companion uses the public import in both tests and the executable. That catches accidental reliance on internal helpers. A consumer should compile with normal access rules, because a release caller cannot assume the test target's extra privileges. Compile failures at this boundary can reveal a missing public initializer even when the library's own internal examples look correct.</p>"
+        },
+        {
+          "id": "consumer-recipe",
+          "title": "Read the local consumer recipe",
+          "html": "<p><code>.package(path: \"..\")</code> refers to the parent package relative to the consumer manifest. The product dependency selects WorkshopKit from PackageProject. The executable target is CatalogConsumer. SwiftPM uses the package relationship to build the required library and resource bundle; the source file then imports the target module and calls its methods.</p><p>The printed output is a contract demonstration, not an application screen. The two preconditions require two cards and forty minutes before printing. Blue's lookup then prints Blue notebook. A failed precondition indicates the shipped fixture and this consumer's expectation diverged. For learner experiments, update a changed expectation deliberately and explain whether it reflects a compatible data change.</p><pre><code class=\"language-swift\">// Consumer/Package.swift\ndependencies: [.package(path: \"..\")]\n// Within the executable target:\ndependencies: [.product(name: \"WorkshopKit\", package: \"PackageProject\")]\n// Consumer/Sources/CatalogConsumer/main.swift\nimport WorkshopKit\nlet catalog = try Catalog.bundled()\nprint(\"consumer: \\(catalog.cards.count) cards, \\(catalog.totalMinutes()) minutes\")\n// Expected fixture line: consumer: 2 cards, 40 minutes</code></pre><p>The manifest fragments belong inside the corresponding Package initializer and target initializer; they are not one standalone Swift script. The executable lines do belong in main.swift. Top-level try can terminate with an uncaught error, which is acceptable for this bounded command-line probe. A real UI should catch the error and choose visible recovery rather than crashing.</p><p>Run <code>swift run --package-path course/labs/PackageProject/Consumer</code> from the course's parent project directory, supplying the scratch/cache flags from the README. Do not move the consumer independently without updating its path relationship. A relative local dependency is intentionally convenient for a workspace exercise but is not a remote package release or evidence of published distribution.</p>"
+        },
+        {
+          "id": "access-surface",
+          "title": "Make public promises small enough to keep",
+          "html": "<p>Access control determines which declarations another module can use. Swift declarations are internal by default. A public struct does not automatically export its synthesized memberwise initializer; WorkshopCard therefore defines an explicit public initializer. Its public fields let callers read values. Catalog exposes an immutable array and semantic queries, preserving validation at construction.</p><p><code>package</code> access allows cooperation between modules within the same package in supported toolchains. It does not export a declaration to this separate consumer package. <code>private</code> hides an implementation detail more narrowly. <code>@testable</code> can grant test access to internal declarations when the module is built appropriately, but it is not a substitute for designing an external API.</p><p>Expose the domain's own value model rather than leaking a future third-party collection type. If a caller receives a vendor-specific ordered dictionary today, switching libraries later can become a source migration for every feature. An array of WorkshopCard and a stable lookup method let the implementation change independently, subject to order, error, and complexity promises you actually document.</p><p>A small surface still needs precise behavior. Does catalog order preserve resource order? Here it does. Are identifiers case-normalized? Here they are not: blue and Blue are distinct nonblank strings. Does lookup fail by throwing or return nil? It returns nil after valid catalog creation. A Kotlin data class analogy helps with values but does not determine Swift initializer visibility.</p>"
+        },
+        {
+          "id": "resolve-before-build",
+          "title": "Separate allowed versions from selected code",
+          "html": "<p>A requirement states which dependency versions a manifest permits. An exact version permits one version. A range beginning at a version generally allows compatible later releases within its chosen upper bound. A branch or revision has different update semantics. A resolved file records what a particular dependency resolution selected; it does not rewrite every manifest's original intent.</p><p>The inspected Tuist manifest requests Swift Collections exactly at 1.1.4. Its resolved file records revision 671108c96644956dddcd89dd59c203dcdb36cec7 for that version. Those two observations identify the checkout's selected dependency. They do not establish that 1.1.4 is latest, that another workspace uses the same pin, or that every target imports Collections.</p><p>All requirements in a resolved graph must coexist. If one parent requires a version excluded by another parent's range, selecting a convenient leaf version manually may not satisfy the graph. Diagnose the parent requirements and active resolver. Keeping a resolved file is useful for reproducibility, but review both manifests and lock changes when explaining why code changed.</p><p>The offline companion has only a local path relationship. It does not download Collections, generate a third-party pin, or test the organization's resolver. Gradle lockfiles offer an analogy for recording selections, with different formats and task behavior. Test your local graph independently, and keep remote resolution and SDK upgrade evidence separate from a working local consumer.</p>"
+        },
+        {
+          "id": "api-change",
+          "title": "Choose a compatible change and an honest migration",
+          "html": "<p>Source compatibility means callers' source still compiles with the changed API. Behavioral compatibility means their assumptions still hold. Adding a new query can be source compatible while changing resource order can alter visible behavior. Removing a public initializer is a source break. Turning absent lookup from nil into a thrown error changes the caller's control-flow contract.</p><p>Start a migration with a concrete consumer. Suppose the resource file changes internally but Catalog.bundled preserves IDs, order, values, and errors. The executable output remains two cards and forty minutes, so its observed contract is retained. Suppose minutes become a Decimal duration; the existing Int field changes, requiring a deliberate new API, compatibility adapter, or major-version migration.</p><p>Deprecation marks an API as discouraged while leaving a path for existing callers. Explain the replacement and the time window, then compile representative consumers with warnings visible. A deprecated symbol still needs working behavior during that window. A release note without an adapter or consuming test cannot tell you whether callers can actually adopt the replacement.</p><p>For a bounded exercise, add <code>card(id:)</code> behavior for an absent ID in the separate consumer and keep the returned optional. Then attempt a deliberate private helper call and observe the compiler reject it in a scratch copy. Remove that deliberate error before submitting. The purpose is to understand an access boundary, not to weaken access until arbitrary internals become callable.</p>"
+        },
+        {
+          "id": "version-evidence",
+          "title": "Keep build, runtime, and repository evidence distinct",
+          "html": "<p>A build checks source, dependencies, and linking for the selected target configuration. Running the executable additionally checks the resource load and computed output on the host. Typechecking the native adapter checks framework symbols and destination availability, but does not package the resource into an iOS app. Each row supports a narrower conclusion than a claim that the whole product works everywhere.</p><p>The active ZDUI manifest contains products comprising several targets and references local package products. Its sibling Tuist description selects static framework products for the generated path. This demonstrates why product shape and module imports must be read from actual configuration. The lesson does not infer a migration is finished merely because two build descriptions exist.</p><p>Consumer boundaries also define recovery ownership. Catalog throws a load failure; the command-line probe exits, while a UI can offer a visible message and retry. The package must not select an app navigation destination or silently log a user's account. Returning a documented error allows each caller to choose policy appropriate to its lifetime and context.</p><p>Use the recorded host compiler and minimum tools declaration in a change report. Keep third-party installation, deployment signing, organization-wide build matrices, and device resource interaction marked unperformed unless independently observed. Our public docs and checkout pins support specific dependency facts; they do not establish measured speed, security certification, or universal version compatibility.</p><p>Optional later reading: lesson 044 expands package distribution details after this project sequence.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What does package access allow?",
+          "options": [
+            "Every importing app can call the declaration",
+            "Modules in the same package can cooperate within that access boundary",
+            "Only the same source file can call it"
+          ],
+          "answer": 1,
+          "explanation": "Package access is broader than private and narrower than public across separate packages."
+        },
+        {
+          "question": "What does Package.resolved show?",
+          "options": [
+            "The versions and revisions selected by that resolution",
+            "That all future versions are compatible",
+            "Every module is dynamically linked"
+          ],
+          "answer": 0,
+          "explanation": "The resolved graph records selected dependencies. Compatibility and linkage still depend on requirements and build configuration."
+        },
+        {
+          "question": "Why compile a separate consumer?",
+          "options": [
+            "It grants access to all internals",
+            "It proves every iPhone interaction",
+            "It checks normal public-module use across another package boundary"
+          ],
+          "answer": 2,
+          "explanation": "A separate consumer detects missing public API and dependency declarations. It cannot establish native interaction or all configurations."
+        }
+      ],
+      "exercise": {
+        "brief": "Add a public filtered query in a scratch library and use it from the separate consumer without leaking files or internal types.",
+        "steps": [
+          "Define cards(maxMinutes:) with an inclusive bound and preserved source order.",
+          "Specify negative-bound behavior and write a public contract test.",
+          "Call the query from CatalogConsumer and print selected IDs.",
+          "Document whether any existing consumer output or API changed."
+        ],
+        "acceptance": [
+          "A bound of 20 returns blue; 25 returns blue then green.",
+          "A negative bound returns no cards under the chosen documented contract.",
+          "The consumer needs only import WorkshopKit.",
+          "The report distinguishes normal compilation from runtime and remote-resolution evidence."
+        ],
+        "solution": "<p>A simple compatible addition is public func cards(maxMinutes: Int) returning an array of WorkshopCard filtered by minutes less than or equal to the supplied bound. This query does not mutate the catalog and preserves the order produced by Array.filter. Define negative bounds as an empty result because all valid cards have positive minutes. Another policy could reject the bound, but it would require a throwing signature and an explicit error contract.</p><p>At 20 minutes, blue with 15 is included and green with 25 is excluded. At 25 both are included in resource order. At zero and at negative one the result is empty. Test these behavior boundaries through the normal import. Include a custom catalog with reversed input order to show that ordering follows the candidate rather than alphabetic ID.</p><p>In the consumer, print selected.map(\\.id).joined(separator: \",\"). The twenty-minute result is blue. No JSON path or decoder object crosses the API. Keep totalMinutes() and card(id:) unchanged so existing source still compiles. Adding a public method extends the surface but does not require callers to change their existing statements.</p><p>Build and run the external consumer after the tests. Record the commands and the exact new line, with the original two-card total still forty. This demonstrates the modified public contract on the recorded host. It does not exercise a remote resolver or all platform destinations. A native UI remains responsible for presenting absence, adapting to text, and handling any load failure.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift Package Manager: PackageDescription manifest API",
+          "url": "https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html"
+        },
+        {
+          "label": "Apple: Bundling resources with a Swift package",
+          "url": "https://developer.apple.com/documentation/xcode/bundling-resources-with-a-swift-package"
+        }
+      ],
+      "repo": [
+        {
+          "label": "ZDUI products and local dependencies",
+          "path": "ios-client/Projects/Infra/ZDUI/Package.swift",
+          "line": 10,
+          "why": "Products compose several targets and local path dependencies select public products; compare the distinct consumer module and product boundary."
+        }
+      ],
+      "checklist": [
+        "I can consume a product from a separate local package.",
+        "I can name a requirement and its selected revision separately.",
+        "I can identify a source or behavioral API break."
+      ],
+      "simple": {
+        "story": "A neighbor borrows a measuring tool from a workshop. The workshop gives a handle and a marked scale, while keeping the screws behind a cover. The neighbor can measure ten centimeters without knowing how the tool was assembled. If the workshop improves an internal screw, the same handle and scale still work. If it changes the scale to inches without saying so, the neighbor's unchanged actions produce the wrong result. The visible promise includes meaning as well as shape.",
+        "meaning": "A separate consumer depends on a public API and its behavior, not the package's private implementation.",
+        "example": {
+          "before": "CatalogConsumer selects WorkshopKit and expects two cards totaling 40.",
+          "change": "Build and run the separate consumer through its local path dependency.",
+          "after": "It imports WorkshopKit and prints consumer: 2 cards, 40 minutes."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "A separate consumer depends on a public API and its behavior, not the package's private implementation.",
+          "items": [
+            {
+              "label": "Starting point",
+              "text": "CatalogConsumer selects WorkshopKit and expects two cards totaling 40."
+            },
+            {
+              "label": "Action",
+              "text": "Build and run the separate consumer through its local path dependency."
+            },
+            {
+              "label": "Result",
+              "text": "It imports WorkshopKit and prints consumer: 2 cards, 40 minutes."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Consumer",
+            "meaning": "The program using a library's public output."
+          },
+          {
+            "term": "Requirement",
+            "meaning": "The dependency versions a manifest permits."
+          },
+          {
+            "term": "Resolved revision",
+            "meaning": "The exact selected source recorded by a resolver."
+          }
+        ],
+        "remember": "A public API promises observable meaning as well as compilable names.",
+        "boundary": "The tool story does not describe Swift linkage, lockfile formats, or automatic compatibility guarantees."
+      }
+    },
+    {
+      "id": "139",
+      "title": "Assess one pinned dependency before adopting it",
+      "summary": "Review Swift Collections 1.1.4 against a real use case, its primary sources, license, privacy scope, toolchain needs, and a reversible upgrade plan.",
+      "duration": 90,
+      "level": "Staff",
+      "prerequisites": [
+        "138"
+      ],
+      "objectives": [
+        "Make a bounded dependency decision using pinned primary-source evidence.",
+        "Separate license and privacy observations from an app-level review.",
+        "Define correctness, upgrade, measurement, and removal criteria."
+      ],
+      "sections": [
+        {
+          "id": "use-case-first",
+          "title": "Choose a tool for a stated job",
+          "html": "<p>A dependency assessment asks whether another team's code is worth the costs for one concrete need. Begin with a requirement, not a popularity list. Our candidate is Swift Collections 1.1.4 because the inspected Tuist graph already requests it. Our hypothetical need is an ordered collection of unique selected notebook IDs, or a queue with efficient operations at both ends.</p><p>The current offline catalog has only two cards and linear lookup. It can meet its teaching contract using Array and Set from the standard library. Adding a remote library would make setup less independent without improving this tiny exercise's demonstrated behavior. The assessment therefore recommends retaining the offline implementation while identifying when an ordered set or deque could justify adoption.</p><p>Swift Collections is maintained as a Swift open-source project of collection implementations. At the pinned revision its README describes Deque, OrderedSet, OrderedDictionary, and other structures. The package provides separate thematic modules. These statements come from that revision's sources, not a claim that the current main branch or latest release has identical products.</p><p>Compare alternatives by the product rule. An array preserves order but requires a separate uniqueness policy. A set provides uniqueness without an insertion-order contract. An ordered set combines those needs. The choice is not decided by an assumed number of milliseconds. State workload size, operation mix, memory constraints, and ownership before proposing a benchmark.</p>"
+        },
+        {
+          "id": "pin-and-primary",
+          "title": "Tie every factual claim to inspected source",
+          "html": "<p>A pin is a recorded selection of dependency code. Tuist/Package.swift requests exact 1.1.4. Tuist/Package.resolved records revision 671108c96644956dddcd89dd59c203dcdb36cec7. We inspected upstream Package.swift, README.md, LICENSE.txt, and the complete recursive tree for that revision. This is stronger evidence than citing an unversioned homepage while discussing an older checkout pin.</p><p>The pinned manifest starts with tools version 5.7. The pinned README states Swift Collections 1.1.x requires Swift 5.7.2 and Xcode 14.2 or later, and says the package has no minimum deployment target. Distinguish the manifest syntax floor from the documented compiler floor. Our course's Swift 6.0 manifest requirement remains an independent local choice.</p><p>The manifest generates separate library products from exported targets in its default configuration. OrderedCollections and DequeModule are available module/product boundaries. Its alternate COLLECTIONS_SINGLE_MODULE configuration changes the API/module arrangement. Do not enable unfamiliar build defines during a compatibility check and then report a result as representative of the default package configuration.</p><p>The inspected package manifest declares targets and products but no remote package dependencies. Its test infrastructure is still substantial local source. No remote dependency list does not mean no compiler, framework, runtime, or build cost. Record the exact source set reviewed and the unperformed operations: we did not install, compile, benchmark, or run the third-party package.</p>"
+        },
+        {
+          "id": "license-and-privacy",
+          "title": "Review obligations at the right boundary",
+          "html": "<p>A license grants permissions with conditions. The pinned LICENSE.txt contains Apache License 2.0 and the Swift Runtime Library Exception. The README identifies the same licensing basis. An adoption record should name that exact license, preserve appropriate notices and attribution, and have the owning organization review distribution obligations for its intended artifact and any modifications.</p><p>The runtime exception affects how portions of the library incorporated into another work are treated under the stated conditions. It is not a blanket waiver of every obligation for redistributed source or modified library code. The primary text remains the source of those conditions. This lesson records a technical assessment rather than inventing a completed organizational legal approval.</p><p>A privacy manifest is packaged metadata about relevant privacy practices and required-reason API use. The fetched complete tree contains no .xcprivacy file at this revision. That is an exact file-tree observation. It is not evidence that every compiled code path lacks relevant APIs, that the app collects nothing, or that the app's submission report needs no review.</p><p>Collections is a data-structure library rather than a network analytics service according to its stated scope. The review covered manifest, README, license, and tree, not a line-by-line audit of all implementations. The consuming app still chooses which data to store, whether to transmit it, and how to describe its practices. Do not label this limited inspection a privacy or security certification.</p>"
+        },
+        {
+          "id": "adapter-and-proof",
+          "title": "Keep a vendor behind the feature's own contract",
+          "html": "<p>An adapter translates another library's API into your feature's language. If adoption is justified, a feature-owned SelectionOrder can return [String] rather than export OrderedSet in every view signature. That allows a fallback using an array and uniqueness checks. It also centralizes whether reselecting an existing item changes its position or remains a no-op.</p><p>The conceptual snippet below requires a separately configured OrderedCollections product. It is integration source for discussion and is not included in or executed by the offline companion. Brackets provide initial IDs; append of an existing value keeps uniqueness. The observable requirement is ordered blue then green, regardless of the vendor's internal hash table.</p><pre><code class=\"language-swift\">// Requires Swift Collections 1.1.4 / OrderedCollections.\nimport OrderedCollections\nvar selected: OrderedSet&lt;String&gt; = [\"blue\", \"green\"]\nselected.append(\"blue\")\nlet visibleIDs: [String] = Array(selected)\n// Contract to verify after authorized integration: [\"blue\", \"green\"]</code></pre><p>The pinned README describes OrderedSet's ordered uniqueness and modular imports. Verify the exact API and duplicate behavior by compiling the intended consumer before accepting integration. A documentation-backed expected result is not an executed result. The offline package's tests exercise our local catalog only, so their green output cannot stand in for this vendor snippet.</p><p>Design invariant tests around selection behavior: repeated selection, removal then reselection, unknown ID policy, and persistence replay. Test a vendor failure or removal independently from the feature's domain state. An internal adapter should preserve usable selected IDs when an optional module is unavailable during development or a migration, rather than tying recovery to view-specific type names.</p>"
+        },
+        {
+          "id": "upgrade-and-measure",
+          "title": "Require useful evidence for a change",
+          "html": "<p>An upgrade changes selected code and may also change toolchain requirements. The pinned README says patch releases do not raise its required toolchain, while minor releases may. Before upgrading, inspect the proposed release's primary notes and manifest. Do not infer today's 1.1.x requirements apply to a future minor or assume semantic-version labels alone prove every behavior you rely on.</p><p>Create a scratch assessment branch or copy rather than changing the shared client. Retain the current requirement and resolved revision for rollback. Compare public API compilation, correctness invariants, release behavior, binary/resource changes, and build configurations used by the consuming target. A source-only library can still change performance or concurrency diagnostics even when source compiles.</p><p>Measure a representative operation mix when performance is part of the need. Define enqueue/dequeue sizes, mutation-to-read ratio, duplicate rate, optimization mode, destination, warmup, repetitions, and correctness oracle before collecting samples. Keep raw samples and uncertainty. The README's data-structure explanation supports an algorithmic rationale, not a fabricated speedup on an iPhone.</p><p>An adoption decision needs an owner and an exit condition. Adopt only when the domain behavior or measured cost improves enough to justify maintenance. Retain a fallback if removal is practical. Roll back if correctness changes, supported toolchains break, or validated costs exceed the declared threshold. An unexplained package bump is not a reviewable change plan.</p>"
+        },
+        {
+          "id": "version-evidence",
+          "title": "State the bounded recommendation and missing checks",
+          "html": "<p>The recommendation for PackageProject is to keep its remote-dependency-free Array/Set implementation. The two-card resource needs uniqueness validation and order preservation, which are already explicit. For a feature needing sustained ordered uniqueness or end-queue operations, assess the smallest matching product at the existing pin through a private adapter and real consuming build.</p><p>The inspected primary sources were fetched on 17 November 2026 at the checkout's revision, and the complete tree reported 692 entries with truncated=false. No .xcprivacy path was present. These are reproducible file observations, not runtime findings. The source URLs in this lesson and the companion assessment let another reviewer repeat the exact limited inspection.</p><p>The active Tuist manifest is the repository anchor for the assessment; the resolved file supplies the selected source. Other workspaces or packages may have different requirements, so a graph-wide conclusion needs their own inspection. This lesson does not update any manifest, install remote code, or claim a dependency migration was completed in the production application.</p><p>Pending evidence includes compiling the real vendor adapter, exercising the selected product, measuring representative runtime/build costs, inspecting relevant implementation/API use for the consuming app's privacy review, and organizational license approval. The decision stays useful because its assumptions, alternatives, owner, and reversal conditions are clear even before those expensive steps are authorized.</p><p>Optional later reading: lessons 044 and 049 deepen supply-chain and bounded upgrade practice after this project sequence.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "What did the privacy tree check establish?",
+          "options": [
+            "No app needs a privacy review",
+            "There was no .xcprivacy file in that pinned complete tree",
+            "No implementation calls any required-reason API"
+          ],
+          "answer": 1,
+          "explanation": "File absence is a bounded observation. It neither audits all implementation code nor determines app-level disclosure requirements."
+        },
+        {
+          "question": "Why keep the offline catalog on Array and Set?",
+          "options": [
+            "Third-party packages are always unsafe",
+            "OrderedSet cannot preserve order",
+            "The current small contract is already met without a remote setup cost"
+          ],
+          "answer": 2,
+          "explanation": "The recommendation follows the stated need and evidence. A larger ordered-uniqueness requirement could justify a different decision."
+        },
+        {
+          "question": "What supports a claim of faster app behavior?",
+          "options": [
+            "A representative recorded experiment with correctness checks",
+            "A package's popularity",
+            "A major version number"
+          ],
+          "answer": 0,
+          "explanation": "Algorithm descriptions inform hypotheses. Measured runtime claims require actual workloads, destinations, raw samples, and verified results."
+        }
+      ],
+      "exercise": {
+        "brief": "Write a one-page decision for ordered notebook selection using the pinned evidence and a measurable adoption gate, without installing the dependency.",
+        "steps": [
+          "State insert, duplicate, removal, and display-order behavior.",
+          "Compare Array plus Set with OrderedCollections 1.1.4 behind an adapter.",
+          "Cite the exact requirement, revision, license, and inspected privacy scope.",
+          "Define the next consuming build and a representative benchmark plan with pending results."
+        ],
+        "acceptance": [
+          "The decision ties its recommendation to a concrete requirement.",
+          "No unperformed vendor build, legal/privacy review, or benchmark is reported as passed.",
+          "The adapter returns feature-owned values and has rollback ownership.",
+          "All upstream facts are revision-specific and linked to primary sources."
+        ],
+        "solution": "<p>For two or ten selected notebook IDs, choose the local array plus a set-based uniqueness check if its simplicity meets the product rule. Require selecting blue twice to leave one blue at its original position. Removing blue and selecting it again should append it at the end under the declared contract. Unknown IDs should be rejected against the catalog rather than silently persisted as valid cards.</p><p>If the workload grows and ordered mutations become a material cost, propose OrderedCollections at the checkout's exact 1.1.4 pin behind SelectionOrder. The public feature method returns [String]. Its tests compare the same invariants across implementations. That makes rollback a change inside the adapter rather than a mass rewrite of SwiftUI view signatures.</p><p>The evidence table cites Tuist's exact requirement and resolved revision, the pinned README/compiler floor, and Apache 2.0 with Runtime Library Exception. It records no remote package dependencies in the inspected manifest and no privacy manifest in the complete tree. It explicitly leaves implementation audit and consuming app obligations open.</p><p>The next experiment compiles the adapter in an isolated authorized target, then runs duplicate/removal/replay invariants and a release-mode operation benchmark with stated sizes and repeated samples. Keep all results pending until executed. Name an owner and a fallback to the local implementation if compiler compatibility or correctness fails. A recommendation with such limits is stronger than unsupported certainty.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift project: Collections 1.1.4 README at selected revision",
+          "url": "https://github.com/apple/swift-collections/blob/671108c96644956dddcd89dd59c203dcdb36cec7/README.md"
+        },
+        {
+          "label": "Swift project: Collections manifest at selected revision",
+          "url": "https://github.com/apple/swift-collections/blob/671108c96644956dddcd89dd59c203dcdb36cec7/Package.swift"
+        },
+        {
+          "label": "Swift project: License with Runtime Library Exception",
+          "url": "https://github.com/apple/swift-collections/blob/671108c96644956dddcd89dd59c203dcdb36cec7/LICENSE.txt"
+        },
+        {
+          "label": "Apple: Describing data use in privacy manifests",
+          "url": "https://developer.apple.com/documentation/bundleresources/privacy_manifest_files/describing_data_use_in_privacy_manifests"
+        }
+      ],
+      "repo": [
+        {
+          "label": "Tuist's exact Collections requirement",
+          "path": "ios-client/Tuist/Package.swift",
+          "line": 77,
+          "why": "The active dependency graph requests swift-collections exactly at 1.1.4; the matching resolved entry supplies the revision assessed here."
+        }
+      ],
+      "checklist": [
+        "I can cite the selected dependency's primary sources.",
+        "I can separate a file-tree observation from an app privacy review.",
+        "I can specify an adoption and rollback gate without inventing measurements."
+      ],
+      "simple": {
+        "story": "A librarian wants a tray that keeps cards in arrival order without duplicates. A shop offers a special tray, but the librarian first tries a short list and a duplicate checklist. With only two cards, that simple method works. The librarian reads the special tray's instructions and license before deciding whether a busier desk would benefit. A catalog photo shows no warning label, but that alone does not prove every use is harmless. The decision records what was checked and what still needs a trial.",
+        "meaning": "Assess a pinned dependency against a real need and preserve the limits of the evidence.",
+        "example": {
+          "before": "The offline catalog contains two unique cards and already preserves order.",
+          "change": "Review Collections 1.1.4 primary sources without installing it.",
+          "after": "Retain the offline implementation; define a bounded adapter experiment for a larger need."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Assess a pinned dependency against a real need and preserve the limits of the evidence.",
+          "items": [
+            {
+              "label": "Starting point",
+              "text": "The offline catalog contains two unique cards and already preserves order."
+            },
+            {
+              "label": "Action",
+              "text": "Review Collections 1.1.4 primary sources without installing it."
+            },
+            {
+              "label": "Result",
+              "text": "Retain the offline implementation; define a bounded adapter experiment for a larger need."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Pin",
+            "meaning": "A recorded selection of exact dependency source."
+          },
+          {
+            "term": "License",
+            "meaning": "Permission to use code under stated conditions."
+          },
+          {
+            "term": "Assessment",
+            "meaning": "A decision supported by bounded evidence and open questions."
+          }
+        ],
+        "remember": "Choose the dependency for a need, then prove the claims you depend on.",
+        "boundary": "A tray story does not determine legal obligations, privacy disclosures, or measured algorithm costs."
+      }
+    },
+    {
+      "id": "140",
+      "title": "Plan package graphs, builds, and compatibility changes",
+      "summary": "Draw an acyclic feature graph, separate static and dynamic choices from ABI promises, and practice a small reversible package migration.",
+      "duration": 90,
+      "level": "Staff",
+      "prerequisites": [
+        "138",
+        "139"
+      ],
+      "objectives": [
+        "Draw target edges and prevent circular ownership.",
+        "Explain source compatibility, ABI stability, and module stability separately.",
+        "Design a bounded migration with a real consumer and recovery plan."
+      ],
+      "sections": [
+        {
+          "id": "graph-before-folders",
+          "title": "Draw who needs whom",
+          "html": "<p>A dependency graph is a set of build nodes and directed edges. An arrow from Consumer to WorkshopKit means Consumer needs that library to compile or link. The package manifest is not merely a folder map: it defines which modules can see which products. Draw the arrows before adding a new module to see where ownership and rebuild costs can spread.</p><p>Our companion graph has WorkshopKit as a library node, WorkshopKitTests as a testing node that depends on it, and CatalogConsumer as a separate package target that selects its product. The resource belongs to WorkshopKit. Neither the library nor its test target depends on the consumer. That direction lets the library remain useful when the original program is replaced.</p><p>An acyclic graph has no directed path back to the starting node. If a UI module depends on CatalogCore and CatalogCore imports that UI module for an error message, the graph contains a cycle. Fix the responsibility: return a domain error from the core and let the UI choose the visible wording. Moving files between folders does not remove an import cycle.</p><p>Android multi-module architecture offers the same question of dependency direction. SwiftPM adds product and target distinctions and its own compiler/linker behavior. A module split is justified by a coherent API and ownership boundary, not by a target count. Too many tiny modules can increase graph and integration overhead even when each file is easy to read.</p>"
+        },
+        {
+          "id": "local-versus-remote",
+          "title": "Know which build description owns the edge",
+          "html": "<p>A local package dependency uses source at a path in the workspace. A remote package dependency resolves versioned source from a repository. A product dependency selects the build output exposed by the dependency. When diagnosing a missing module, inspect the target's product edge and the active build description before editing import statements randomly.</p><p>The inspected ZDUI directory has both Package.swift and Project.swift during a stated coexistence migration. The latter declares static framework products and source globs, while the package manifest declares SwiftPM libraries and resources. Those descriptions can serve different workspaces. A correct edit to an inactive description may have no effect on the build the developer actually runs.</p><p>Resources, tests, generated code, and Objective-C targets complicate migration. A source-only target edge can compile while a missing resource glob produces a runtime failure. A macro also has a host-toolchain/plugin boundary. A test helper accidentally exported to production can enlarge the graph and expose unwanted API. List these inputs for each moved target rather than checking only Swift file counts.</p><p>Choose one consuming program to verify the initial change. Our separate executable is that program. Keep its product dependency and normal import working, then load the resource at runtime. A future iOS consumer adds a distinct packaging and SDK boundary. Do not use the host executable's success as proof of UIKit linkage, signed artifact resources, or an App Clip size limit.</p>"
+        },
+        {
+          "id": "linkage-choice",
+          "title": "Separate code reuse from static or dynamic linkage",
+          "html": "<p>Static linkage incorporates object code into a resulting binary at link time; dynamic linkage loads a separately linked library at runtime. SwiftPM library products can omit an explicit type and let the build choose an appropriate arrangement, or request static/dynamic where supported. A product declaration alone does not describe the complete final application artifact.</p><p>Our WorkshopKit library leaves the type unspecified because the exercise needs a simple reusable source contract. Selecting dynamic does not automatically improve startup, memory, or rebuild performance. Multiple consumers can create duplication or loading tradeoffs. Judge the final destination and graph, and measure the costs that motivated the choice instead of treating either linkage type as universally superior.</p><p>An XCFramework is a distribution container holding compatible library/framework variants for destinations and architectures. It is not a new Swift language module kind and does not erase deployment requirements. A simulator arm64 variant and a device arm64 variant target different platform environments even though their CPU architecture names match. Preserve the correct destination slice.</p><p>Binary distribution adds provenance, signing/artifact integrity, debug symbols, supported architectures, resource delivery, and upgrade questions. Our lab does not produce an XCFramework or a signed app. A staff decision should explain whether source distribution already meets the need before accepting binary maintenance. Changing distribution can transfer responsibility from each consumer's compiler to the library release owner.</p>"
+        },
+        {
+          "id": "compatibility-promises",
+          "title": "Keep three compatibility ideas separate",
+          "html": "<p>Source compatibility asks whether the consumer's source still compiles. ABI compatibility asks whether already compiled binaries can cooperate under the required calling and layout conventions. Module stability allows a compiler to understand a stable textual module interface produced by a different compatible compiler setup. None of these automatically promises unchanged user-visible behavior.</p><p>Swift's stable ABI on supported Apple platforms is a language/runtime platform fact, not a claim that arbitrary third-party libraries preserve every binary interface. Distributing a reusable Swift binary across compiler versions generally requires a deliberate library-evolution and module-interface plan. Enabling a flag in an ordinary source package does not create an unlimited compatibility promise.</p><p>Library evolution makes some implementation changes possible without requiring binary clients to be rebuilt, under the supported contract. Public frozen layout commitments restrict that flexibility. Publishing a vendor type inside your public model also broadens compatibility responsibility. Prefer feature-owned values and explicit errors while the API is small enough to evolve intentionally.</p><p>For this source package, ordinary consumers rebuild from source. The immediate gate is normal public compilation plus behavior tests and resource loading. If an organization later needs independent binary updates, make a separate distribution decision with test consumers, supported compiler/OS matrices, symbols, rollout, and rollback. The Kotlin/JVM analogy helps distinguish source from binary compatibility, but Swift's ABI rules are different.</p>"
+        },
+        {
+          "id": "bounded-migration",
+          "title": "Move a responsibility without breaking the consumer",
+          "html": "<p>A migration is a controlled change from one working boundary to another. Suppose catalog validation grows and deserves a dedicated CatalogRules target. First draw WorkshopKit to CatalogRules, with CatalogConsumer still to WorkshopKit. Tests for public behavior can remain against WorkshopKit. The core rule target must not depend back on WorkshopKit merely to obtain a presentation string.</p><p>The manifest shape below is a design sketch, not a completed split of the supplied lab. Decide where WorkshopCard belongs before coding. If CatalogRules needs the value model, place that model in the core target and expose a stable wrapper or rework the public ownership deliberately. Avoid a cycle caused by leaving the model in the facade while its rule target imports the facade.</p><pre><code class=\"language-swift\">// A proposed target graph, not the shipped companion:\n.target(name: \"CatalogRules\"),\n.target(name: \"WorkshopKit\", dependencies: [\"CatalogRules\"],\n        resources: [.process(\"Resources\")]),\n.testTarget(name: \"WorkshopKitTests\", dependencies: [\"WorkshopKit\"])\n// Arrows: consumer -&gt; WorkshopKit -&gt; CatalogRules.\n// Resource lookup stays in WorkshopKit.</code></pre><p>Do not rely on underscored re-export tricks as a beginner API repair. Keep consumer-facing models and initializer behavior explicit. One alternative is no module split: retain a private validation helper in WorkshopKit until independent ownership or build evidence justifies the target. Another is a shared value-core product used by both facade and consumer, which changes the public dependency contract.</p><p>Commit only after the consuming build and tests work in the user's authorized workflow. Keep the experiment in an isolated scratch copy, retain its diff, and review the consuming build and rollback plan before applying it to a shared project. A migration plan states who reviews the API, which consumer first adopts it, when deprecation ends, and how to restore the previous graph without losing resources or pending user work.</p>"
+        },
+        {
+          "id": "version-evidence",
+          "title": "Record build cost and recovery without guessing",
+          "html": "<p>A build-performance claim needs a workload and interval. Counted targets or a faster-looking graph are hypotheses. To measure a package split, define clean versus incremental builds, cache policy, machine/toolchain, affected edit, configuration, repeated raw durations, and a correctness gate. Exclude unrelated resolver/network variation or record it separately. Never label a synthetic number as an observed build improvement.</p><p>The actual host checks verify this companion's resource-backed public catalog and standalone consumer. The iOS adapter's typecheck, if recorded, checks its source for a simulator SDK destination. No XCFramework distribution, signing, binary compatibility matrix, production graph migration, or device performance recording is supplied. Those are distinct further experiments with their own acceptance evidence.</p><p>The existing client anchor illustrates resource and linkage inputs during a coexistence migration, not a prescription to migrate the client from this lesson. Preserve the client's source and requirements. Analyze one target using its active manifest and globs, then write an isolated proposal. A source connection is useful evidence when it explains a real boundary, not when it becomes an unauthorized production edit.</p><p>The recovery plan retains the previous product/API, records the selected graph, and restores a failed change together with resources and test relationships. A reversible first step can add an API adapter before moving a module. Set failure thresholds around missing resources, consumer compilation, or changed results. This gives reviewers a concrete reason to adopt, pause, or reverse the migration.</p><p>Optional later reading: lesson 041 expands compiler and build-cost investigation, and lessons 044/049 extend distribution and migration decisions. They are not prerequisites for this lesson.</p>"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "CatalogRules imports WorkshopKit while WorkshopKit depends on CatalogRules. What is wrong?",
+          "options": [
+            "A directed dependency cycle",
+            "A missing dynamic library preference",
+            "An invalid JSON resource"
+          ],
+          "answer": 0,
+          "explanation": "The responsibility graph points back to its starting node. Move shared values or error presentation ownership to remove the cycle."
+        },
+        {
+          "question": "What does module stability primarily address?",
+          "options": [
+            "Preserving all runtime behavior",
+            "Reading a distributed module interface across compatible compiler setups",
+            "Making every API source compatible"
+          ],
+          "answer": 1,
+          "explanation": "Module stability concerns the interface format/compiler boundary. ABI and behavior promises remain separate."
+        },
+        {
+          "question": "Why leave WorkshopKit's library type unspecified?",
+          "options": [
+            "It proves dynamic loading is faster",
+            "It disables linking",
+            "The local source exercise needs no explicit linkage commitment"
+          ],
+          "answer": 2,
+          "explanation": "The build can choose suitable linkage. A static/dynamic performance recommendation requires destination and graph evidence."
+        }
+      ],
+      "exercise": {
+        "brief": "Write and implement a scratch responsibility change with a working public consumer, then explain why a module split is or is not justified.",
+        "steps": [
+          "Draw the current graph and a proposed graph with no cycles.",
+          "Add a private validation helper first; preserve public errors, order, and resources.",
+          "Compare that change with a separate CatalogRules target and explain model ownership.",
+          "Run public tests and the separate consumer, then supply a rollback and build-measurement plan."
+        ],
+        "acceptance": [
+          "The graph has clear one-way ownership and no import cycle.",
+          "Normal consumer source and its two-card/40-minute result remain valid.",
+          "Resource lookup remains with its declaring target.",
+          "No unperformed ABI, binary-distribution, or performance claim appears."
+        ],
+        "solution": "<p>For this small catalog, the worked decision keeps one library target and extracts a private helper that validates a candidate. The public initializer still calls that helper before assigning cards. It throws duplicateID and invalidCard exactly as before. This improves reading without creating an extra public module or relocating WorkshopCard's ownership prematurely.</p><p>Draw the alternative as CatalogConsumer to WorkshopKit to CatalogRules, with WorkshopKitTests to WorkshopKit. If CatalogRules must accept WorkshopCard, the type ownership must change or the helper should accept its own primitive/value representation. Do not let the rules target import the facade. That would create the reverse edge and defeat the purpose of the split.</p><p>Public tests include duplicate IDs, corrupt JSON, accepted boundaries, value copies, and the bundled total. Run the separate consumer to check ordinary access and resources. If any expected result changes, stop and identify whether the proposed refactor accidentally changed a contract. A passing internal helper test alone would not demonstrate consumer compatibility.</p><p>Rollback restores the previous helper/target graph and resource declaration together. Record the exact toolchain and commands. If the split was proposed for build speed, leave that claim pending until a repeated clean/incremental experiment exists with defined edits and cache policy. Retain an API adapter during later consumer migration. The plan is successful when its boundaries and evidence are reviewable, even when the simpler design remains preferable.</p>"
+      },
+      "references": [
+        {
+          "label": "Swift: Library evolution and binary distribution",
+          "url": "https://www.swift.org/blog/library-evolution/"
+        },
+        {
+          "label": "Swift Package Manager: Library products and targets",
+          "url": "https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html"
+        },
+        {
+          "label": "Apple: Creating a multiplatform binary framework bundle",
+          "url": "https://developer.apple.com/documentation/xcode/creating-a-multi-platform-binary-framework-bundle"
+        }
+      ],
+      "repo": [
+        {
+          "label": "ZDUI Tuist graph and resource ownership",
+          "path": "ios-client/Projects/Infra/ZDUI/Project.swift",
+          "line": 35,
+          "why": "The coexisting Tuist description declares static frameworks, resource globs, and directed target dependencies; it shows why a migration must account for more than Swift source files."
+        }
+      ],
+      "checklist": [
+        "I can draw target dependencies and resolve a responsibility cycle.",
+        "I can distinguish source, ABI, and module compatibility.",
+        "I can propose a consumer gate and a complete rollback."
+      ],
+      "simple": {
+        "story": "A school has a kitchen, a lunch counter, and classrooms. The lunch counter asks the kitchen for meals; classrooms ask the counter for trays. The kitchen does not ask a classroom how to cook lunch. If it did, while the classroom still needed the counter, everyone could end up waiting in a circle. A new room is useful only when it takes clear responsibility. Moving a sign to another door does not remove a circular dependency or make lunch arrive faster.",
+        "meaning": "Package graphs need one-way responsibility; extra modules and linkage choices require specific benefits and evidence.",
+        "example": {
+          "before": "CatalogConsumer depends on WorkshopKit; resources belong to WorkshopKit.",
+          "change": "Consider extracting catalog rules into a new target.",
+          "after": "Keep a one-way graph or retain a private helper when another target has no justified benefit."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "Package graphs need one-way responsibility; extra modules and linkage choices require specific benefits and evidence.",
+          "items": [
+            {
+              "label": "Starting point",
+              "text": "CatalogConsumer depends on WorkshopKit; resources belong to WorkshopKit."
+            },
+            {
+              "label": "Action",
+              "text": "Consider extracting catalog rules into a new target."
+            },
+            {
+              "label": "Result",
+              "text": "Keep a one-way graph or retain a private helper when another target has no justified benefit."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Dependency graph",
+            "meaning": "Nodes and arrows showing what each build target needs."
+          },
+          {
+            "term": "ABI",
+            "meaning": "Compiled-code calling and layout agreement."
+          },
+          {
+            "term": "Module stability",
+            "meaning": "A compiler interface format usable across supported compiler versions."
+          }
+        ],
+        "remember": "Draw the arrows before moving the files.",
+        "boundary": "A school story explains dependency direction, not linker behavior, binary interfaces, or measured build cost."
+      }
+    }
+  ]
+}
