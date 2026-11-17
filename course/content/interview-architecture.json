@@ -1,0 +1,214 @@
+{
+  "questions": [
+    {
+      "id": "iq-145-a",
+      "lesson": "145",
+      "level": "Senior",
+      "kind": "Explain",
+      "minutes": 6,
+      "prompt": "Explain the smallest MVVM design for Field Notes and what Observation does within it.",
+      "scenario": "Browse loads two synthetic notes and has idle, loading, ready, and failed states. A teammate wants a repository, coordinator, and reducer library before the first screen works.",
+      "androidBridge": "An Android ViewModel can hold UI state, but SwiftUI Observation does not provide ViewModelStore retention or viewModelScope. Name Swift owners explicitly.",
+      "rubric": [
+        "Defines model, view, and view model using the actual list.",
+        "Distinguishes loaded empty from never loaded.",
+        "Separates Observation from MainActor isolation and cancellation.",
+        "Names a stable model owner and the caller's task owner.",
+        "Adds a repository only when shared data policy needs an owner."
+      ],
+      "answerHTML": "<p>Start with a Note value, a Browse view that renders state, and a view model that translates Reload and reader results into visible state. Idle means no load yet; ready with an empty array means a successful empty result. That distinction gives the screen an honest message without a collection of unrelated Boolean flags.</p><p>Observation tracks properties the view reads and changes to those properties. It does not fetch, retain the model for the desired screen lifetime, supply task scope, or reject stale responses. MainActor isolates UI-facing access, while the screen or Shell retains the model and owns the refresh task.</p><p>Keep one injected reader for the first feature. Introduce an account-scoped repository when Browse, Saved, and Detail must agree on records and membership. A reducer adds action/effect wiring; a coordinator adds journey lifetime. Both need a concrete requirement that earns those costs.</p>",
+      "followUps": [
+        "How would showing stale rows during refresh change the state type?",
+        "What changed requirement would justify an independently testable use-case object?"
+      ],
+      "pitfalls": [
+        "Assuming the Model suffix supplies Android lifecycle semantics.",
+        "Equating Observable with concurrency safety."
+      ]
+    },
+    {
+      "id": "iq-145-b",
+      "lesson": "145",
+      "level": "Senior",
+      "kind": "Debug",
+      "minutes": 8,
+      "prompt": "A newer refresh succeeds, then an older refresh fails. Explain why the failure can still corrupt the screen and fix the contract.",
+      "scenario": "Request A is held. B returns Garden plan and makes Browse ready. A throws offline afterward. The model checks revision only on success and assigns failed in every catch.",
+      "androidBridge": "Coroutine cancellation can also be cooperative. Kotlin exception handling and scopes differ, but both systems need an authority rule for results arriving after replacement.",
+      "rubric": [
+        "Walks through tickets one and two and the exact visible state.",
+        "Explains why MainActor does not freeze state across await.",
+        "Applies the revision comparison in success and failure paths.",
+        "Distinguishes cooperative cancellation from stale-result rejection.",
+        "Uses a registered gate rather than elapsed sleeps to verify the schedule."
+      ],
+      "answerHTML": "<p>A owns ticket one. B starts during A's suspension, increments revision to two, and accepts Garden plan. A's catch executes later on the correct isolation domain, but that alone does not grant authority. Assigning failed without checking its saved ticket overwrites B's useful ready state.</p><p>Compare ticket with current revision before any success or failure assignment. Reset must also increment revision so a task retained after screen replacement cannot publish into the reset model. Request cancellation to conserve work, then retain the comparison because an adapter may ignore cancellation or finish with an ordinary error.</p><p>Test by waiting until A and B have registered at a gate. Release B with Garden plan and join it; release A with offline and join it. Browse must remain ready with Garden plan. Repeat with old success to cover both result paths; do not infer native rendering from the host assertion.</p>",
+      "followUps": [
+        "What should a current canceled refresh show under this lesson's policy?",
+        "Why can a retained obsolete model still need a reset guard?"
+      ],
+      "pitfalls": [
+        "Treating MainActor as an indivisible async transaction.",
+        "Testing only old success or assuming cancel kills the reader."
+      ]
+    },
+    {
+      "id": "iq-146-a",
+      "lesson": "146",
+      "level": "Senior",
+      "kind": "Explain",
+      "minutes": 7,
+      "prompt": "Explain the five-target graph and where concrete dependencies are selected.",
+      "scenario": "BrowseFeature and SavedFeature share NoteAccess. A developer proposes importing NoteData directly into both features and placing all types in a folder called Domain.",
+      "androidBridge": "Gradle modules and Swift targets both constrain imports, but Swift products, public access, and package target rules have distinct meanings.",
+      "rubric": [
+        "Distinguishes folder, target module, package, and library product.",
+        "Names the actual dependency arrows.",
+        "Explains why NoteDomain avoids feature implementations.",
+        "Identifies AppShell as concrete composition owner.",
+        "States public initializer and API costs rather than claiming automatic build speed."
+      ],
+      "answerHTML": "<p>NoteDomain defines values and promises. NoteData implements the repository and clock. BrowseFeature and SavedFeature each import NoteDomain. AppShell imports all four so it can choose implementations and share one account-scoped repository between feature models. The graph is acyclic and deliberately keeps feature state away from storage implementation details.</p><p>A folder organizes files but does not enforce internal visibility. A target is a module; a package declares targets and products; ArchitectureKit is the library product consumed by the app. Cross-module types and initializers must be public when consumers need them. The explicit public Note initializer prevents reliance on an internal synthesized memberwise initializer.</p><p>Importing NoteData into each feature would broaden what those features know and make replacement more expensive. Keeping one target may still be sensible for a smaller app. Five targets buy compiler enforcement at the cost of configuration and API review; no build-time improvement has been measured.</p>",
+      "followUps": [
+        "Where would an ExportFeature consume snapshots without importing BrowseFeature?",
+        "How could the same responsibilities remain in one target initially?"
+      ],
+      "pitfalls": [
+        "Using a directory name as proof of an import boundary.",
+        "Confusing a selected product with one compiled module."
+      ]
+    },
+    {
+      "id": "iq-146-b",
+      "lesson": "146",
+      "level": "Staff",
+      "kind": "Design",
+      "minutes": 10,
+      "prompt": "Design route and mutation gates for A→B→A when note identifiers repeat across accounts.",
+      "scenario": "An old detail view carries demo-a/n1. After returning to demo-a, a delayed Toggle saved task runs. Account text matches, but it belongs to the first session.",
+      "androidBridge": "Android navigation arguments also require access and lifetime checks. A typed Swift enum and Hashable conformance do not authenticate input or supply lifecycle cancellation.",
+      "rubric": [
+        "Adds session identity distinct from account identity.",
+        "Gates both detail lookup and saved mutation.",
+        "Rechecks active session after suspended lookup.",
+        "Captures the correct old model instead of resolving a new global service later.",
+        "Prices route restoration and scene ownership as separate integration work."
+      ],
+      "answerHTML": "<p>Use Route.detail with local session UUID, account, and record identifier. A1, B1, and A2 have different UUIDs even when A's account text repeats. Shell rejects the A1 route in A2 before lookup or mutation. Hashable supports navigation values; it does not authorize them.</p><p>Resolve captures current session, validates route ownership, awaits the repository, and checks session again before returning. Mutation validates the same gate and captures the current SavedModel before awaiting. Account switching resets that model and revokes its repository before publishing replacements, so old work cannot target the new repository by looking it up after suspension.</p><p>Clear paths on switching and test old reads and old mutations with repeating n1 identifiers. Durable restoration must validate current data and construct a fresh session route; raw UUID persistence is not authorization. The fixture gives each scene its own Shell. App-wide accounts and independent per-tab stacks would add ownership and recovery work.</p>",
+      "followUps": [
+        "How should an untrusted external link become a current-session route?",
+        "What changes if several windows share one real account?"
+      ],
+      "pitfalls": [
+        "Checking account String equality without lifetime identity.",
+        "Letting an old task use shell.saved after a switch."
+      ]
+    },
+    {
+      "id": "iq-147-a",
+      "lesson": "147",
+      "level": "Senior",
+      "kind": "Code",
+      "minutes": 9,
+      "prompt": "Describe the checks and suspension points required before a repository commits a snapshot.",
+      "scenario": "An actor loads a complete snapshot, awaits an injected clock, then replaces its cache. Logout or a newer fetch may enter during either await.",
+      "androidBridge": "An isolated Swift actor does not behave like holding a Java monitor across a blocking operation. Kotlin Mutex and coroutine cancellation semantics must be chosen explicitly rather than assumed equivalent.",
+      "rubric": [
+        "Explains actor reentrancy in familiar terms.",
+        "Saves an admitted-fetch ticket before reader suspension.",
+        "Checks cancellation, account activity, and current generation after all awaits.",
+        "Validates duplicate/invalid values before replacement.",
+        "Commits and reconciles complete-snapshot membership without another suspension."
+      ],
+      "answerHTML": "<p>First check cancellation and active account. Read monotonic time, then recheck active authority because clock access can suspend. If an allowed cache is fresh, return it. Otherwise increment generation and save the ticket before awaiting the reader.</p><p>After the reader returns, obtain its acceptance time, then check cancellation and active state again. Compare the saved ticket with current generation. Validate all identifiers and titles, rejecting duplicate identifiers before replacing the last good snapshot. Assign cache and intersect saved membership with the complete snapshot without another await between final checks and commit.</p><p>The actor prevents arbitrary concurrent field access but permits other actor work while this method is suspended. A newer admitted fetch or invalidate can therefore change authority. A failed refresh preserves the last good cache, and a revoked account rejects commits even when the reader ignores cancellation. Disk atomicity and provider authorization are separate promises not established by this in-memory transition.</p>",
+      "followUps": [
+        "Why is absence from a paginated page insufficient to remove a saved identifier?",
+        "If B fails, should A's older successful response be accepted under this policy?"
+      ],
+      "pitfalls": [
+        "Treating the whole async actor method as atomic.",
+        "Validating after overwriting the accepted cache."
+      ]
+    },
+    {
+      "id": "iq-147-b",
+      "lesson": "147",
+      "level": "Senior",
+      "kind": "Debug",
+      "minutes": 10,
+      "prompt": "Replace flaky elapsed-time tests with deterministic cache and sleeper schedules.",
+      "scenario": "A test sleeps for 2.1 seconds and expects a delayed refresh to have begun. Another assumes a five-second cache is still valid at age five. CI failures are dismissed as slow hardware.",
+      "androidBridge": "A coroutine test scheduler is a useful analogy, but advancing the project's narrow ProjectClock does not automatically schedule every Swift task or release a GateReader.",
+      "rubric": [
+        "Defines strict TTL endpoint and accepted-load timestamp.",
+        "Waits for sleep registration before advancing time.",
+        "Separates clock control from reader start/completion gates.",
+        "Cancels and joins a sleeper and checks waiter cleanup.",
+        "Distinguishes narrow ProjectClock protocol from Swift Clock conformance and device measurement."
+      ],
+      "answerHTML": "<p>For TTL five seconds, accept a load at virtual time zero. Advance to four and expect CacheAllowed to return without another reader call. Advance to five, start a call, and wait for a second reader registration. The policy uses age less than TTL, so age five is expired.</p><p>For the delay, start refresh with two seconds, observe its registered sleeper, then advance one second. Reader count must remain zero. Advance one more second, observe reader registration, release a fixture, and join the task. Cancel another registered sleeper and join it; pending sleepers must be zero with no extra reader call.</p><p>ProjectClock controls local time and suspension through a narrow injected protocol. GateReader controls request ordering separately. Neither advancing time nor host execution speed proves a task reached a particular boundary. These assertions establish deterministic logic, while native lifecycle and device responsiveness remain separate evidence.</p>",
+      "followUps": [
+        "What happens if time advances before the sleeper registers?",
+        "How can cancellation and deadline completion settle one continuation safely?"
+      ],
+      "pitfalls": [
+        "Treating clock advancement as a universal executor drain.",
+        "Calling synthetic test durations measured device performance."
+      ]
+    },
+    {
+      "id": "iq-148-a",
+      "lesson": "148",
+      "level": "Staff",
+      "kind": "Design",
+      "minutes": 12,
+      "prompt": "Defend a choice among MVVM, reducer flow, and a coordinator for the Field Notes slice using explicit costs.",
+      "scenario": "The team needs Browse→Detail→Saved plus account switching. One proposal mandates a third-party reducer framework; another adds a coordinator for every screen.",
+      "androidBridge": "Android MVI, ViewModels, and navigation graphs provide useful responsibility comparisons, but they do not imply identical Swift task, module, or retention behavior.",
+      "rubric": [
+        "Traces the same vertical slice before comparing labels.",
+        "Names MVVM revision and shared policy obligations.",
+        "Names reducer actions/effects, runner, cancellation keys, and result tagging.",
+        "Names coordinator parent-child retention and terminal-result obligations.",
+        "Selects the smallest design for current needs and states a reevaluation trigger.",
+        "Avoids unmeasured performance or automatic correctness claims."
+      ],
+      "answerHTML": "<p>Compare all options against one journey: load n1, open it, save it, switch account, and reject the old route. Keep MVVM for the baseline because a small state enum and direct async methods are easy to inspect. Its ongoing cost is consistent revision checks in every result path and explicit task ownership.</p><p>A reducer centralizes visible transitions and makes event replay easier, but adds action cases, effect descriptions, a runner, cancellation identifiers, and result tagging. A library adds upgrade, license, training, and compatibility obligations. A coordinator centralizes journey lifetime and parent completion, but adds child retention, start/finish rules, and presentation adapters.</p><p>The repository's account and cache policies remain necessary in all three designs. Reconsider reducers when combinations dominate diagnosis, or coordinators when journeys cross UIKit/SwiftUI and return parent results. This is a costed architectural judgment, not a claim that one label automatically improves performance or prevents stale data.</p>",
+      "followUps": [
+        "Which changed requirement would trigger a reducer experiment?",
+        "How would you compare alternatives without duplicating side-effecting requests?"
+      ],
+      "pitfalls": [
+        "Treating MVVM and unidirectional flow as mutually exclusive.",
+        "Ignoring effect ownership because the transition function is pure."
+      ]
+    },
+    {
+      "id": "iq-148-b",
+      "lesson": "148",
+      "level": "Staff",
+      "kind": "Debug",
+      "minutes": 12,
+      "prompt": "Review a durable-bookmark change and explain recovery when new code has written a new format.",
+      "scenario": "The proposed account-scoped store must survive restart. A flag can select the old memory adapter, but a reviewer finds that old code cannot read the new stored envelope.",
+      "androidBridge": "Room migration and feature flags pose similar code/data compatibility questions. A Swift adapter switch also cannot restore overwritten bytes or prove native storage guarantees.",
+      "rubric": [
+        "Separates proposed durability checks from current host evidence.",
+        "Names account scope, atomic replacement, corruption, and failed-write acceptance.",
+        "Explains why code rollback is not data rollback.",
+        "Preserves a prior readable representation or tests compatibility.",
+        "Names stop conditions, implementation owner, and independent reviewer status.",
+        "Separates author review from peer approval and native/provider evidence."
+      ],
+      "answerHTML": "<p>The memory suite proves the current slice's authority and state contracts; it does not prove restart retention. Require a versioned account envelope, distinct missing/read-failed outcomes, failed-save preservation, corruption recovery, and rejection of obsolete writes. Assign an implementation owner and leave independent approval open until an actual reviewer supplies it.</p><p>Selecting the memory adapter changes future composition. It does not restore old data or make old code understand a new envelope. Before adoption, preserve a readable prior representation or test an explicit compatibility strategy. Stop new writes on account leakage or loss of the prior store. Preserve recoverable data and bounded diagnostic metadata instead of deleting the store to hide launch failure.</p><p>Rehearse recovery with invented fixtures and document what ran. Author review can close concrete source findings, but independent review, Xcode target integration, simulator interaction, and durable-store verification remain distinct gates. No real account, deployment, or production rollback is executed by this course plan.</p>",
+      "followUps": [
+        "What message should accompany a temporary return to in-memory saved choices?",
+        "How would account revocation interact with an atomic file replacement?"
+      ],
+      "pitfalls": [
+        "Saying a feature flag rolls back stored data.",
+        "Presenting a proposed corruption test as an executed disk test."
+      ]
+    }
+  ]
+}

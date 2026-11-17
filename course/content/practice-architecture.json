@@ -1,0 +1,223 @@
+{
+  "workshops": [
+    {
+      "id": "architecture-course",
+      "title": "Field Notes: a multi-feature architecture workshop",
+      "summary": "Run an original offline Browse/Saved/Detail slice, change a timing requirement, and review a recoverable storage proposal with a separate native adapter.",
+      "kind": "Host implementation",
+      "sessions": [
+        "145",
+        "146",
+        "147",
+        "148"
+      ],
+      "sections": [
+        {
+          "id": "setup",
+          "title": "Set up the isolated companion and record evidence",
+          "html": "<p>A companion is code you can inspect and run beside the course. Field Notes is a local Swift package with no remote dependencies and a separate SwiftUI app source. All records and accounts are invented. The workshop uses the public Advanced Architecture stage only as topic context; it does not claim to recreate a paid project or to certify completion.</p><p>Open labs/ArchitectureProject/README.md first. The package requires Swift tools 6.0 or newer and Swift 6 language mode. Its Observation host code needs macOS 14 or newer. The native adapter targets iOS 17 or newer. The author checked Apple Swift 6.4.2 and Xcode 27.2 with iPhoneSimulator27.2.sdk; those observed versions do not imply every older toolchain has been tested.</p><p>From course/labs/ArchitectureProject, run sh verify-host.sh. It prints the compiler version and runs Swift Testing with build and cache output under /private/tmp. Then run python3 verify-content.py and python3 verify-examples.py. The first audits only this author's schema, teaching depth, anchors, artifacts, and prerequisite sequence; the second typechecks the four complete Swift teaching snippets.</p><p>The first author host attempt failed because the default compiler cache was protected. The script explicitly sets CLANG_MODULE_CACHE_PATH and SWIFTPM_MODULECACHE_OVERRIDE. SwiftPM may still warn that user configuration/security directories are inaccessible; these optional user caches are disabled. Record your real result and any failure. Do not edit shared course builders, learner state, or client projects to make this lab pass.</p>"
+        },
+        {
+          "id": "trace",
+          "title": "Trace Browse, Detail, and Saved through the graph",
+          "html": "<p>A target is one compiled module. Package.swift declares NoteDomain, NoteData, BrowseFeature, SavedFeature, and AppShell, plus ArchitectureTests. Browse and Saved import only NoteDomain. NoteData implements its access contract. AppShell chooses concrete dependencies. Native/ArchitectureApp.swift is deliberately outside package Sources and is not represented as a host app.</p><p>Start with Sources/NoteDomain/Contracts.swift. Note is an immutable value with id and title. Validated rejects empty identifiers, blank titles, and duplicate identifiers but permits an empty complete snapshot. NoteAccess supplies notes, saved membership, detail, and invalidation in product terms. ProjectClock is a narrow injected time protocol, not a general Swift Clock implementation.</p><p>Read Repository.swift next. One actor owns cache, accepted completion time, saved identifiers, generation, and active account status. CacheAllowed reuses a snapshot only while age is less than five seconds; Reload starts a fetch. Duplicate or offline refresh failure does not overwrite the last accepted cache. Saved identifiers are reconciled against a complete snapshot, never an arbitrary page.</p><p>Follow Shell.refresh into BrowseModel.refresh, then repository notes and SyntheticReader. Ready contains demo-a n1 and n2. Open n1 to create a session-scoped Route; resolve checks current ownership and data. Toggle saved changes repository membership and reloads SavedModel. The vertical slice test asserts this whole logic path. Rendering those values through SwiftUI is a separate native evidence step.</p>"
+        },
+        {
+          "id": "failure-tests",
+          "title": "Control failures, cancellation, and time",
+          "html": "<p>A gate records when an operation starts and lets the test choose its completion. GateReader deliberately ignores cancellation. The stale schedule starts A, observes registration, starts B, observes registration, accepts B, then releases A. An old success cannot replace B's cache, and an old ordinary failure cannot replace B's ready presentation. Both paths matter.</p><p>Account invalidation removes commit authority independently of resource cancellation. Shell cancels its Browse task, resets feature state and routes, invalidates the old repository, and only then publishes a new session. The test repeats A-to-B-to-A with n1 in all accounts. The original route cannot read or toggle the replacement session even when the account text matches again.</p><p>TestClock moves only when advance is called. A cache accepted at zero is reusable at four and expired at exactly five. A delayed refresh must register its sleeper before time advances. Advance one second of a two-second delay and reader count remains zero; advance another and the reader starts. Cancel a separate registered sleeper, join its task, and verify zero pending sleepers.</p><p>The final author run passed twelve Swift Testing tests. The XCTest compatibility harness prints zero tests first; the subsequent twelve-test Swift Testing summary is the relevant result. Additional schedules check malformed refresh preserving good cache, canceled read unable to commit, removed saved records, late Saved errors after reset, and independent Saved failure leaving Browse unchanged. No real elapsed sleep or device timing claim is used.</p>"
+        },
+        {
+          "id": "native-target",
+          "title": "Add the real SwiftUI source to a scratch app",
+          "html": "<p>Run python3 verify-native.py to compile and link the actual adapter separately. The script selects the simulator SDK, compiles five module objects in Swift 6 mode, then links Native/ArchitectureApp.swift for deployment iOS 17. Vtool inspects the resulting binary's platform and minimum OS. This produces a simulator executable, not a packaged, installed, or interactively verified app.</p><p>For a runnable UI, create a new isolated Xcode iOS App in a scratch directory with SwiftUI and Swift, no storage template or remote service. Set deployment to iOS 17, language mode to Swift 6, and default actor isolation to nonisolated. Add the local ArchitectureProject package and its ArchitectureKit product. Do not copy the package's Sources into the app target.</p><p>Remove the generated App and ContentView declarations from target membership, then add Native/ArchitectureApp.swift to that app target. Keep one main entry. Choose an installed simulator; no distribution team or provider setup is required for this fixture. Build and run, recording scheme, destination, effective settings, warnings, and actual interaction results. The README provides the exact target steps.</p><p>Reload, open n1, toggle it saved, return to root, choose Saved, and update the list. Switch demo account and inspect empty membership and new titles. Check Back and large text, then VoiceOver and narrow/wide windows when available. The author did not perform these interactions. The adapter has one shared stack, scene-local Shell, no durable restore, no provider, and no live Saved subscription; compiler success cannot erase those boundaries.</p>"
+        },
+        {
+          "id": "decision",
+          "title": "Review one change and its recovery obligations",
+          "html": "<p>A costed decision compares obligations under the same requirement. Keep simple MVVM for the current small states. A reducer centralizes transition cases but needs actions, effect descriptions, result tags, cancellation keys, and an effect runner. A coordinator centralizes journeys but needs parent retention, child release, start-once and finish-once handling, and presentation adapters. Neither replaces account-scoped repository policy.</p><p>Read ChangePlan.md. The proposed requirement is durable saved choices per synthetic account across restarts. Its alternatives are memory only, account-scoped versioned snapshot files, and a database. The proposed storage seam remains in NoteData with a domain contract; features should not gain storage imports. Durability is proposed work, not something the memory tests established.</p><p>The author review closed session-route reuse and late Saved error findings with concrete guard changes and tests. It also documented the full-snapshot limitation. Independent review remains pending. A future disk adapter must prove that a held write cannot recreate a revoked account's store; checking a Boolean before an arbitrary suspending write is insufficient.</p><p>Recovery distinguishes changing code from restoring data. A flag can select a memory adapter for future scratch sessions but cannot restore overwritten bytes or make old code read a new format. Preserve a compatible prior representation, stop new writes on leakage/corruption, and explain temporary persistence limits. Failed-save, corrupted-envelope, interrupted-replacement, and revocation tests need an actual scratch file adapter before they can be reported as passed.</p>"
+        },
+        {
+          "id": "independent-work",
+          "title": "Make an independent change and keep a clear ledger",
+          "html": "<p>The exercise is an independent modification, not rerunning the reference answer and calling it finished. In a scratch copy change cache TTL from five to three seconds. Predict before running: accepted at zero, hit at two, miss at three. Use TestClock and GateReader to make each boundary observable. Do not replace the exact checks with wall-clock sleeping.</p><p>Then revise the proposed durable-store plan with an explicit account envelope, bounded input, missing-versus-failed read distinction, atomic replacement policy, obsolete-write authority, and previous-format recovery. Name the implementation owner and the independent reviewer when one actually participates. If only you review it, label author review and keep independent review open.</p><p>Keep an evidence ledger with separate entries for source inspection, host test execution, snippet typechecking, simulator SDK compilation/linking, isolated Xcode build, simulator interaction, physical device, and provider integration. Enter not performed where appropriate. The workshop has no provider, real account, or deployment requirement. No shared file, generated course data, client source, or learner completion record is modified.</p><p>Prerequisites follow the complete curriculum: the architecture stage builds on earlier UI, package, concurrency, and original architecture lessons. Later staff, runtime, durable recovery, and profiling sessions are optional deeper references, not workshop entry requirements. The terms needed for this slice and its recovery review are defined in lessons 145–148 and these artifacts.</p>"
+        }
+      ],
+      "exercise": {
+        "brief": "Change the exact TTL contract in a scratch copy and submit a reviewed durable-bookmark proposal with an honest evidence ledger.",
+        "steps": [
+          "Run the four scoped verification commands that your environment supports and record toolchain and outcomes.",
+          "Change repository TTL to three seconds and adapt the cache boundary test using time two and time three.",
+          "Reproduce old ordinary failure after new success and reset during a Saved toggle.",
+          "Trace n1 across Browse, Detail, Saved, B, and A again; explain each route/session check.",
+          "Revise ChangePlan.md in the scratch copy with storage ownership, corrupt input, failed write, obsolete-write, and compatibility cases.",
+          "Build/run the isolated native target if available; keep compiler, interaction, and provider entries distinct."
+        ],
+        "acceptance": [
+          "Twelve baseline behavior tests pass before modifications; the changed exact TTL schedule passes afterward.",
+          "Old failure and reset-late Saved error cannot change current presentation.",
+          "The n1 route from the first A session stays invalid after returning to A.",
+          "The storage proposal names precise acceptance, stop conditions, and code/data recovery.",
+          "Every registered companion file is explicit and readable offline.",
+          "Independent review and native/device/provider steps are marked pending until actually performed."
+        ],
+        "solution": "<p>First record the baseline compiler and the twelve-test result. In your scratch change, pass TTL .seconds(3) when constructing the tested repository or change its default deliberately. Accept Bridge sketch at virtual zero, advance two seconds, and check no second reader call. Advance one more second and wait for the new reader registration before supplying Garden plan. This establishes the exact three-second endpoint.</p><p>For the stale failure, register both requests, return Garden plan to B, join B, then fail A with offline and join A. Browse stays ready. For Saved, hold toggle, reset the model, fail the held call, and verify failed remains false with empty notes. These schedules test current authority, rather than relying on a cancellation-friendly fake.</p><p>The proposed envelope contains version, synthetic account identity, and bounded saved identifiers. A failed read stays a failure; a failed replacement preserves the prior committed file. Require serialized write ownership or a revocable commit lease so invalidation acknowledgment prevents future account writes. These obligations remain unexecuted until a real scratch store exists.</p><p>Conclude the ledger precisely: host logic and snippets checked; simulator source compiled/linked where supported; Xcode build and UI interactions only if you did them; independent review only if an actual person reviewed it. Record remaining gaps explicitly. The supplied reference plan and fixtures do not write course progress or pre-complete the learner's work.</p>"
+      },
+      "references": [
+        {
+          "label": "Apple: defining Swift Testing tests",
+          "url": "https://developer.apple.com/documentation/testing/definingtests"
+        },
+        {
+          "label": "Apple: NavigationStack data-driven presentation",
+          "url": "https://developer.apple.com/documentation/swiftui/navigationstack"
+        },
+        {
+          "label": "Swift: actor suspension and cancellation",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/"
+        }
+      ],
+      "files": [
+        {
+          "label": "Setup, commands, observed evidence, and integration limits",
+          "path": "labs/ArchitectureProject/README.md"
+        },
+        {
+          "label": "Target graph and Swift language mode",
+          "path": "labs/ArchitectureProject/Package.swift"
+        },
+        {
+          "label": "Domain values and access/time contracts",
+          "path": "labs/ArchitectureProject/Sources/NoteDomain/Contracts.swift"
+        },
+        {
+          "label": "Repository, synthetic reader, and live clock",
+          "path": "labs/ArchitectureProject/Sources/NoteData/Repository.swift"
+        },
+        {
+          "label": "Browse observable state and stale-result checks",
+          "path": "labs/ArchitectureProject/Sources/BrowseFeature/BrowseModel.swift"
+        },
+        {
+          "label": "Saved state and reset-safe operations",
+          "path": "labs/ArchitectureProject/Sources/SavedFeature/SavedModel.swift"
+        },
+        {
+          "label": "Session composition and typed navigation",
+          "path": "labs/ArchitectureProject/Sources/AppShell/Shell.swift"
+        },
+        {
+          "label": "Deterministic gates, test clock, and behavior checks",
+          "path": "labs/ArchitectureProject/Tests/ArchitectureTests/ArchitectureTests.swift"
+        },
+        {
+          "label": "Separately bounded SwiftUI app adapter",
+          "path": "labs/ArchitectureProject/Native/ArchitectureApp.swift"
+        },
+        {
+          "label": "Costed change plan, author review, and recovery",
+          "path": "labs/ArchitectureProject/ChangePlan.md"
+        },
+        {
+          "label": "Host verifier with temporary compiler caches",
+          "path": "labs/ArchitectureProject/verify-host.sh"
+        },
+        {
+          "label": "Simulator SDK compilation and linking",
+          "path": "labs/ArchitectureProject/verify-native.py"
+        },
+        {
+          "label": "Scoped content and prerequisite audit",
+          "path": "labs/ArchitectureProject/verify-content.py"
+        },
+        {
+          "label": "Complete Swift lesson snippet typechecking",
+          "path": "labs/ArchitectureProject/verify-examples.py"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "The host suite passes. Which additional claim is supported?",
+          "options": [
+            "The logic contracts passed under synthetic controlled schedules.",
+            "VoiceOver and Back gestures passed on a device.",
+            "A durable bookmark store recovered after corruption."
+          ],
+          "answer": 0,
+          "explanation": "Host fixtures test logic. Native interaction and durable-store behavior require their own executed evidence."
+        },
+        {
+          "question": "Why does the workshop use a reader gate as well as virtual time?",
+          "options": [
+            "Advancing time starts every Swift task automatically.",
+            "A gate observes request registration and controls completion; the clock controls freshness and sleepers.",
+            "The gate authenticates demo accounts."
+          ],
+          "answer": 1,
+          "explanation": "Ordering and time are distinct inputs. Observed registration avoids guessing whether a task reached the intended suspension point."
+        },
+        {
+          "question": "What is the honest review status of the durable-store proposal?",
+          "options": [
+            "Independent approval is automatic when twelve memory tests pass.",
+            "Author review is recorded; independent review and actual disk acceptance remain pending.",
+            "It has been deployed to real accounts."
+          ],
+          "answer": 1,
+          "explanation": "The plan has concrete author review and recovery obligations, but no independent reviewer or durable adapter execution is fabricated."
+        }
+      ],
+      "simple": {
+        "story": "Three desks help one library visitor. Browse offers cards, Detail shows one card, and Saved remembers a mark during that visit. The desks agree because one drawer owns the cards and marks. A test visitor can pause a courier, move a pretend timer, and change visitors in a chosen order. Those controlled events reveal whether old deliveries can affect a new visit. Opening the real library room and checking that people can use every sign is another check that still needs to be done.",
+        "meaning": "The host package verifies connected state and ownership. The separate SwiftUI adapter supplies real UI source with its own compile, target setup, and interaction evidence.",
+        "example": {
+          "before": "Demo-a session S1 has ready n1/n2 and saved n1.",
+          "change": "Switch to demo-b/S2, then return to demo-a/S3 and try the old S1 route.",
+          "after": "Saved is empty and the S1 route is rejected. This establishes local lifetime behavior, not durable storage or server authorization."
+        },
+        "picture": {
+          "kind": "flow",
+          "caption": "The workshop connects one behavior and separates its evidence levels.",
+          "items": [
+            {
+              "label": "Run host slice",
+              "text": "Browse, Detail, and Saved share account-scoped logic."
+            },
+            {
+              "label": "Inject adversity",
+              "text": "Gates and clocks expose stale work and exact expiry."
+            },
+            {
+              "label": "Compile native adapter",
+              "text": "The simulator SDK checks actual SwiftUI source."
+            },
+            {
+              "label": "Review and integrate",
+              "text": "Target interaction and durable-store acceptance remain separate tasks."
+            }
+          ]
+        },
+        "words": [
+          {
+            "term": "Fixture",
+            "meaning": "Invented input with independently predicted results."
+          },
+          {
+            "term": "Vertical slice",
+            "meaning": "One user goal connected through all required parts."
+          },
+          {
+            "term": "Adapter",
+            "meaning": "Code connecting a platform mechanism to a domain promise."
+          },
+          {
+            "term": "Evidence ledger",
+            "meaning": "A record separating what each executed check established."
+          }
+        ],
+        "remember": "Run a specific check and claim only what it established.",
+        "boundary": "Controlled host events do not execute SwiftUI interaction, filesystem durability, real authentication, or provider cancellation. The timer is virtual, not a device measurement."
+      }
+    }
+  ]
+}
