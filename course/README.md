@@ -28,10 +28,11 @@ open -a "Google Chrome" "/Users/manjul.kadyan/StudioProjects/zocdoc/mobile/ios-l
 
 This is the working access path in this workspace. All course data is embedded in the bundled `data.js`; no fetch, CDN, fonts, account, server, or connection is required for reading. Source files open through local file links in this mode, and line jumping depends on the browser. Official documentation links require an internet connection. If clicking the HTML inside Codex opens an editor, the command above opens the browser instead.
 
-Optional: on a machine that allows local listening, run this from `/Users/manjul.kadyan/StudioProjects/zocdoc/mobile`:
+Optional: on a machine that allows local listening, run this from the `ios-learning` repository:
 
 ```sh
-node ios-learning/course/serve.mjs
+cd /Users/manjul.kadyan/StudioProjects/zocdoc/mobile/ios-learning
+node course/serve.mjs
 ```
 
 Then open `http://127.0.0.1:4173` while that process is running. The dependency-free, read-only server binds only to loopback and renders source with line anchors. Stop it with Ctrl+C; set `IOS_COURSE_PORT` for a different port. A refused localhost connection means the server is not listening; it does not prevent offline reading.
@@ -106,22 +107,23 @@ Imports retain partial quiz/checklist work. When answers conflict, existing loca
 
 Source content is in `content/unit-01.json` through `unit-27.json`, with stable ranges/tracks and explicit interview/practice bank registration in `content/manifest.json`. The complete course and its source attribution are in `content/curriculum.json`; `curriculum.mjs` checks its connections and full lesson coverage. `content/paths.json` mirrors the complete sequence and retains the eight earlier paths. Workshop teaching and explicitly exposed artifact paths are in the registered `content/practice-*.json` files. The reference comparisons and syntax table are in `content/reference.json`; the audit is in `content/coverage.json`; supplementary Swift guides are in `content/essentials.json`. Interview prompts are in the registered `content/interview-*.json` banks; agendas are in `content/interview-rounds.json`. `inventory.mjs` reads the two checked-in remote pin graphs and Tuist declarations without changing the client. The authoring format is documented in `CONTENT_SPEC.md` and `PROGRESSIVE_SPEC.md`.
 
-After a content change:
+After a content change, run these commands from the `ios-learning` repository. If your terminal is already in `ios-learning`, use `course/build.mjs`; adding another `ios-learning/` would repeat the directory in the path.
 
 ```sh
-node ios-learning/course/build.mjs
-node ios-learning/course/build.mjs --check
-node ios-learning/course/check-teaching.mjs
-node --check ios-learning/course/app.js
-node --check ios-learning/course/state.js
-node --check ios-learning/course/serve.mjs
-node ios-learning/course/test.mjs
-node ios-learning/course/test-reader.mjs
-node ios-learning/course/test-interview.mjs
-node ios-learning/course/labs/MeasurementLab/test-evaluate.mjs
+cd /Users/manjul.kadyan/StudioProjects/zocdoc/mobile/ios-learning
+node course/build.mjs
+node course/build.mjs --check
+node course/check-teaching.mjs
+node --check course/app.js
+node --check course/state.js
+node --check course/serve.mjs
+node course/test.mjs
+node course/test-reader.mjs
+node course/test-interview.mjs
+node course/labs/MeasurementLab/test-evaluate.mjs
 ```
 
-The builder validates ranges, lesson order, both the original 56-session and pre-expansion 84-session quiz/checklist hashes, essential fields, references, teaching depth, safe HTML, prerequisites, coverage/path/guide/workbench links, complete-course connections, mock-round timing and repository path/line existence. It also requires the story/example/picture/vocabulary structure for all 177 teaching pages. `content/progress-plain-contract.json` remains the frozen baseline for the earlier 112 lessons, 18 workbenches and three guides, plus 224 interview identities/timing/code. New content extends the course without replacing that baseline. `check-teaching.mjs` can check one author's registered files, for example `node ios-learning/course/check-teaching.mjs unit-09.json unit-10.json`, while other authors are still working. Artifact paths must resolve to bounded text files inside `labs/`; only declared sources enter the bundle/server allowlist. SHA-256 digests identify bundled source snapshots. Generated `data.js` may be refreshed by the builder; edit source files rather than the bundle.
+The builder validates ranges, lesson order, both the original 56-session and pre-expansion 84-session quiz/checklist hashes, essential fields, references, teaching depth, safe HTML, prerequisites, coverage/path/guide/workbench links, complete-course connections, mock-round timing and repository path/line existence. It also requires the story/example/picture/vocabulary structure for all 177 teaching pages. `content/progress-plain-contract.json` remains the frozen baseline for the earlier 112 lessons, 18 workbenches and three guides, plus 224 interview identities/timing/code. New content extends the course without replacing that baseline. `check-teaching.mjs` can check one author's registered files, for example `node course/check-teaching.mjs unit-09.json unit-10.json`, while other authors are still working. Artifact paths must resolve to bounded text files inside `labs/`; only declared sources enter the bundle/server allowlist. SHA-256 digests identify bundled source snapshots. Generated `data.js` may be refreshed by the builder; edit source files rather than the bundle.
 
 The complete-order validator also rejects a prerequisite that appears later than its lesson. Older lessons keep their original prerequisite lists; integration moves them to suitable stages instead of weakening their requirements. Workshop/guide links may recur in several stages because a later task can reuse an earlier companion. Reading a repeated link does not infer implementation or completion.
 
@@ -205,10 +207,10 @@ Teaching-example evidence from the authors: all 55 runnable Swift bootcamp examp
 
 The current validation uses the offline reader and read-only handler, not a listening localhost server. The earlier sandbox blocked local listening/browser launch, and an installed Playwright package was not available to this integration. Real-browser layout, mobile/print and screenshot checks remain unexecuted. The native companion builds for the simulator SDK, but simulator services are unavailable: app launch, preview rendering, CRUD/relaunch, permissions, hardware, accessibility and widget interaction remain pending. No production-client build, provider authentication, Instruments/device measurement, signing or distribution was performed.
 
-For optional browser checks, supply an already installed Playwright package. The verifier defaults to the same offline HTML file:
+For optional browser checks, supply an already installed Playwright package and run from the `ios-learning` repository. The verifier defaults to the same offline HTML file:
 
 ```sh
-IOS_COURSE_PLAYWRIGHT=/absolute/path/to/node_modules/playwright/index.mjs node ios-learning/course/verify.mjs
+IOS_COURSE_PLAYWRIGHT=/absolute/path/to/node_modules/playwright/index.mjs node course/verify.mjs
 ```
 
 If that package has no bundled browser, also set `IOS_COURSE_BROWSER_PATH` to your installed Chrome executable. To include HTTP source-viewer checks, start the optional server and set `IOS_COURSE_URL=http://127.0.0.1:4173/`. The verifier uses a separate temporary profile, checks all numbered sessions plus paths/workbenches/artifacts and ledger behavior, and writes screenshots under `/private/tmp/ios-course-preview`. It does not download packages or touch your normal browser progress.

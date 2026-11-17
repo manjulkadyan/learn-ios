@@ -2,7 +2,7 @@
 window.IOS_COURSE = {
   "version": 1,
   "title": "Across the Stack",
-  "generatedAt": "2026-11-17T08:43:51.329Z",
+  "generatedAt": "2026-11-17T09:31:02.209Z",
   "units": [
     {
       "id": "foundations",
