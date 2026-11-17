@@ -7,7 +7,7 @@ import { buildCatalogue } from './inventory.mjs';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const workspace = path.resolve(root, '../..');
 const port = Number(process.env.IOS_COURSE_PORT || 4173);
-const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.swift': 'text/plain; charset=utf-8', '.mjs': 'text/plain; charset=utf-8', '.py': 'text/plain; charset=utf-8', '.sh': 'text/plain; charset=utf-8', '.pbxproj': 'text/plain; charset=utf-8', '.xcscheme': 'text/plain; charset=utf-8', '.plist': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.yml': 'text/plain; charset=utf-8', '.xcprivacy': 'text/plain; charset=utf-8' };
+const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.rules': 'text/plain; charset=utf-8', '.swift': 'text/plain; charset=utf-8', '.mjs': 'text/plain; charset=utf-8', '.py': 'text/plain; charset=utf-8', '.sh': 'text/plain; charset=utf-8', '.pbxproj': 'text/plain; charset=utf-8', '.xcscheme': 'text/plain; charset=utf-8', '.plist': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.yml': 'text/plain; charset=utf-8', '.xcprivacy': 'text/plain; charset=utf-8' };
 const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 // Expose only repository files deliberately linked by the course, not the entire checkout.
 const sourcePaths = new Set();
@@ -37,7 +37,7 @@ export async function handleRequest(req, res) {
     const url = new URL(req.url, 'http://127.0.0.1');
     if (url.pathname === '/source') {
       const relative = url.searchParams.get('path') || '';
-      if (!sourcePaths.has(relative) || !/^(ios-client|android-client)\//.test(relative) || relative.split('/').some(part => part.startsWith('.') && part !== '.github')) throw new Error('Invalid source path');
+      if (!sourcePaths.has(relative) || !/^(ios-client|android-client)\//.test(relative) || relative.split('/').some(part => part.startsWith('.') && !['.github', '.gitignore'].includes(part))) throw new Error('Invalid source path');
       const requested = path.resolve(workspace, relative);
       const real = await fs.realpath(requested);
       if (!real.startsWith(path.join(workspace, 'ios-client') + path.sep) && !real.startsWith(path.join(workspace, 'android-client') + path.sep)) throw new Error('Path outside clients');

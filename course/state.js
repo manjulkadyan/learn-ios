@@ -1,7 +1,7 @@
 /* Pure progress rules, shared by the browser and dependency-free tests. */
 (() => {
   'use strict';
-  const emptyState = () => ({ version: 1, theme: 'light', lastLesson: '004', lessons: {} });
+  const emptyState = () => ({ version: 1, theme: 'light', lastLesson: '057', lessons: {} });
   const blankEntry = () => ({ notes: '', bookmark: false, reviewed: false, checks: [], quizzes: {}, exerciseDone: false });
   // JSON can encode one note character as six bytes. Allow a backup of every bounded note.
   const backupLimit = lessons => Math.max(16000000, lessons.length * 600000 + 1000000);

@@ -1,6 +1,6 @@
 {
-  "auditedAt": "2026-11-02",
-  "scope": "A beginner-to-staff/principal depth audit for this UIKit/SwiftUI client: 14 Swift beginner sessions, 14 SwiftUI beginner sessions, 28 original core sessions and 28 deep dives. Runnable companions connect teaching to inspectable code. Topic labels describe available material, not completed learner work or coverage of every Apple API.",
+  "auditedAt": "2026-11-17",
+  "scope": "A beginner-to-advanced course with36 additional project lessons, the preserved112-session language/UI/production library, and eight additional guided projects. The first thirteen course stages follow Swiftful Thinking's public topic order using our original teaching. Topic labels describe available instruction and practice, with actual SDK, device and provider evidence distinguished.",
   "limitations": [
     "Coverage describes explanations and available exercises, not completed learner work. Your previous notes, quiz answers, and pending exercises are preserved.",
     "Host-package tests, a native simulator build and synthetic regression fixtures establish different evidence. None establishes production-client correctness, on-device performance, accessibility acceptance, provider authentication, APNs delivery or a signed distribution.",
@@ -10,6 +10,145 @@
     "Staff and principal scenarios provide decisions and feedback rubrics. Competence requires independently reviewed implementations, affected-team feedback and sustained real outcomes, not a self-score or course completion."
   ],
   "groups": [
+    {
+      "id": "progressive-projects",
+      "title": "Complete progressive app projects",
+      "summary": "Eight original courses connect the public beginner-to-advanced topic order to detailed lessons, explained interviews and isolated practice.",
+      "topics": [
+        {
+          "id": "todo-course",
+          "title": "A complete local Todo feature",
+          "detail": "Stable task identity, validation, observable editing, reorder/delete, save/reopen failures and accessible completion.",
+          "level": "practice",
+          "sessions": [
+            "113",
+            "114",
+            "115",
+            "116"
+          ],
+          "workshops": [
+            "todo-project"
+          ],
+          "evidence": "Retain a changed-input edit and save/reopen result. Separate tested model rules from observed native interaction."
+        },
+        {
+          "id": "git-course-topic",
+          "title": "Git from local history to team review",
+          "detail": "Scratch repositories, staged diffs, commits, ignored build artifacts, branches, intentional conflicts, recovery and reviewed team changes.",
+          "level": "practice",
+          "sessions": [
+            "117",
+            "118",
+            "119",
+            "120"
+          ],
+          "workshops": [
+            "git-course"
+          ],
+          "evidence": "Resolve a scratch conflict and explain the resulting commit history. No actual remote change is implied."
+        },
+        {
+          "id": "map-course",
+          "title": "Modern MapKit feature delivery",
+          "detail": "Coordinates, camera/selection, search and directions ownership, denied permissions, caching, presentation and accessibility.",
+          "level": "practice",
+          "sessions": [
+            "121",
+            "122",
+            "123",
+            "124"
+          ],
+          "workshops": [
+            "map-project"
+          ],
+          "evidence": "Run coordinate/request fixtures and separately record actual map, permission and route interaction."
+        },
+        {
+          "id": "market-course",
+          "title": "A read-only market-data project",
+          "detail": "HTTP/status/decoding boundaries, observable models, Combine/async ownership, Decimal amounts, search/favorites/charts and offline failure.",
+          "level": "practice",
+          "sessions": [
+            "125",
+            "126",
+            "127",
+            "128"
+          ],
+          "workshops": [
+            "market-project"
+          ],
+          "evidence": "Demonstrate a stale response or invalid value without losing a valid view. Fixture prices do not establish live-feed behavior."
+        },
+        {
+          "id": "firebase-course-topic",
+          "title": "Firebase setup through operational review",
+          "detail": "Authentication, Firestore CRUD/rules/listeners/pagination/offline behavior, Storage, messaging, consent, diagnostics, server controls and emulator authorization.",
+          "level": "practice",
+          "sessions": [
+            "129",
+            "130",
+            "131",
+            "132",
+            "133",
+            "134",
+            "135",
+            "136"
+          ],
+          "workshops": [
+            "firebase-course"
+          ],
+          "evidence": "Distinguish host policy fixtures from actual SDK/emulator/rules runs; retain denied-user and account-change outcomes plus environment and quotas."
+        },
+        {
+          "id": "packages-course",
+          "title": "Local and third-party package delivery",
+          "detail": "Library/resource/test targets, consumer APIs, resolution, dependency/license/privacy assessment and upgrade/migration ownership.",
+          "level": "practice",
+          "sessions": [
+            "137",
+            "138",
+            "139",
+            "140"
+          ],
+          "workshops": [
+            "package-course"
+          ],
+          "evidence": "Run the isolated local package and change a consumer fixture; inspect actual dependency evidence before recommending an upgrade."
+        },
+        {
+          "id": "interface-course",
+          "title": "Original complete-interface practice",
+          "detail": "Feed/dashboard/detail/editor composition, reusable tokens/components/previews, gestures/motion, focus, adaptation, accessibility and bounded profiling.",
+          "level": "practice",
+          "sessions": [
+            "141",
+            "142",
+            "143",
+            "144"
+          ],
+          "workshops": [
+            "interface-project"
+          ],
+          "evidence": "Record changed fixtures, input behavior, large text/reduced motion and the actual performance evidence collected."
+        },
+        {
+          "id": "architecture-course-topic",
+          "title": "An architecture that evolves with requirements",
+          "detail": "MVVM, feature modules, typed routes/dependencies, reducer/coordinator alternatives, account/data ownership, test clocks and reversible adoption.",
+          "level": "practice",
+          "sessions": [
+            "145",
+            "146",
+            "147",
+            "148"
+          ],
+          "workshops": [
+            "architecture-course"
+          ],
+          "evidence": "Implement a vertical slice, compare a simpler alternative, revise after independent critique and retain a recovery plan."
+        }
+      ]
+    },
     {
       "id": "swift-language",
       "title": "Swift language and API design",

@@ -76,7 +76,7 @@ function start(protocol = 'http:', narrow = false, alterCourse) {
   return { env, get, document, route, click, html: () => get('main').innerHTML, state: () => JSON.parse(persistent.get('across-the-stack.v1') || '{}') };
 }
 const reader = start();
-check(reader.html().includes('YOUR NEXT SESSION · 004'), 'Mentor continue session rendered');
+check(reader.html().includes('YOUR NEXT SESSION · 057') && reader.html().includes('href="#curriculum"'), 'Fresh reader begins with Swift and exposes the complete course');
 check((reader.html().match(/class="unit-card"/g) || []).length === reader.env.IOS_COURSE.units.length, 'All manifest chapters rendered');
 check(!reader.html().includes('undefined'), 'Deep-dive chapter labels and symbols are defined');
 for (const lesson of reader.env.IOS_COURSE.lessons) {
@@ -154,6 +154,27 @@ for (const guide of reader.env.IOS_COURSE.essentials) {
   reader.route(`#essentials/${guide.id}/quiz`);
   check(reader.get(`g-${guide.id}-quiz`).scrolled && reader.html().includes(guide.quiz[0].explanation), `Supplement assessments and anchor ${guide.id}`);
 }
+reader.route('#paths');
+const beforeCurriculum = JSON.stringify(reader.state());
+reader.route('#curriculum');
+check(reader.env.document.title === `${reader.env.IOS_COURSE.curriculum.title} · Across the Stack`, 'Complete-course document title describes the page');
+const allStages = [...reader.env.IOS_COURSE.curriculum.stages, ...reader.env.IOS_COURSE.curriculum.extensions];
+check((reader.html().match(/class="lesson-section course-stage"/g) || []).length === allStages.length && reader.html().includes('Public course outline'), 'All13 public-order stages and further practice render with attribution');
+for (const stage of allStages) {
+  check(decode(reader.html()).includes(stage.goal) && stage.lessons.every(id => reader.html().includes(`href="#lesson/${id}"`)), `Complete stage outcomes and lesson links ${stage.id}`);
+  reader.route(`#curriculum/${stage.id}`);
+  check(reader.env.document.title === `${stage.title} · Across the Stack`, `Stage document title ${stage.id}`);
+  check(reader.get(`course-stage-${stage.id}`).scrolled && stage.workshops.every(id => reader.html().includes(`#workshops/${id}`)), `Project links and navigable stage ${stage.id}`);
+}
+check(JSON.stringify(reader.state()) === beforeCurriculum, 'Reading the course outline cannot complete lessons or reset progress');
+reader.route('#curriculum/missing-stage');
+check(reader.html().includes('Course stage not found.'), 'Invalid course stage has a fallback');
+reader.route('#lesson/116');
+check(reader.html().includes('<small>NEXT SESSION →</small>') && reader.html().includes('href="#lesson/117"'), 'Todo capstone leads to the Git course');
+reader.route('#lesson/128');
+check(reader.html().includes('href="#lesson/011"'), 'Market project leads to concurrency through the teaching order');
+reader.route('#plan');
+check(reader.html().includes('complete course order') && reader.html().includes('href="#lesson/015"'), 'Daily plan follows the saved position into the next course stage');
 reader.route('#paths');
 check(reader.html().includes('Paths with an evidence trail.') && reader.html().includes('#path/swift') && reader.html().includes('#path/principal'), 'Beginner and principal paths are discoverable');
 for (const learningPath of reader.env.IOS_COURSE.paths) {

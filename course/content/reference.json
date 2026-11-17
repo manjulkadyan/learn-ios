@@ -1,6 +1,69 @@
 {
   "reference": [
     {
+      "id": "project-todo-state",
+      "category": "UI",
+      "android": "Compose state holders and immutable item IDs",
+      "ios": "Observable Todo model and stable SwiftUI identity",
+      "explanation": "Keep one task ID through editing, completion and reordering. Let a state owner apply changes and show validation or store failures.",
+      "boundary": "View identity and Observation invalidation have SwiftUI rules; Android lifecycle owners do not automatically define the iOS model's lifetime.",
+      "lesson": "114"
+    },
+    {
+      "id": "project-map-state",
+      "category": "Platform",
+      "android": "Maps camera state and location permission",
+      "ios": "MapKit camera/selection and Core Location authorization",
+      "explanation": "Separate the selected place, visible camera and permission decision. A denied location request need not prevent browsing synthetic or searched places.",
+      "boundary": "Provider APIs, camera events, permission states and physical-device behavior need their own platform checks.",
+      "lesson": "122"
+    },
+    {
+      "id": "project-market-stream",
+      "category": "Concurrency",
+      "android": "Flow collection and latest-request state",
+      "ios": "Combine subscriptions and async result ownership",
+      "explanation": "Choose who retains a subscription or task, what happens when input changes, and which result can update the visible model.",
+      "boundary": "Combine demand, cancellation and failure contracts are not identical to Kotlin Flow; neither automatically prevents an old result from being accepted.",
+      "lesson": "126"
+    },
+    {
+      "id": "project-firebase-auth",
+      "category": "Security",
+      "android": "Firebase Android authentication state listener",
+      "ios": "Firebase Auth state listener and account-owned model",
+      "explanation": "The service reports sign-in state; the app still owns which account's listeners, files and screen values remain valid after a change.",
+      "boundary": "A client-side account check does not authorize a backend operation. Rules and server verification are separate controls.",
+      "lesson": "130"
+    },
+    {
+      "id": "project-firestore-listener",
+      "category": "Data",
+      "android": "Firestore snapshot listeners and listener registration",
+      "ios": "Firestore listeners and explicit registration removal",
+      "explanation": "Keep the registration with its feature/account owner. Remove it at the defined lifetime boundary and reject a callback that belongs to an older owner.",
+      "boundary": "Removing a listener and establishing a server-side access rule solve different problems. Local cache and pending-write behavior also need explicit policies.",
+      "lesson": "132"
+    },
+    {
+      "id": "project-package-consumer",
+      "category": "Tooling",
+      "android": "Gradle library modules, published artifacts and resource contracts",
+      "ios": "SwiftPM targets, products, resources and consuming modules",
+      "explanation": "Check what the consuming target can import and construct, and which resources are provided. Run the consumer rather than testing only an internal implementation.",
+      "boundary": "SwiftPM products/targets and Swift access control do not map one-to-one onto Gradle configurations, AAR packaging or JVM visibility.",
+      "lesson": "138"
+    },
+    {
+      "id": "project-architecture-choice",
+      "category": "Production",
+      "android": "MVVM, unidirectional state and feature modules",
+      "ios": "Observable models, reducers, coordinators and Swift feature modules",
+      "explanation": "Choose boundaries from feature ownership and change needs. Compare a simple design with a proposed abstraction, including tests, adoption and recovery.",
+      "boundary": "Matching architecture names do not establish equivalent lifecycle, navigation, cancellation or build behavior across platforms.",
+      "lesson": "147"
+    },
+    {
       "id": "advanced-runloop",
       "category": "Runtime",
       "android": "Looper, Handler and message delivery",

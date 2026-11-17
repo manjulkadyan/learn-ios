@@ -32,7 +32,24 @@ try {
   await page.locator('#course-heading').waitFor();
   const data = await page.evaluate(() => window.IOS_COURSE);
   if (await page.locator('.unit-card').count() !== data.units.length) throw new Error('Missing course units');
+  if (!(await page.locator('.continue-card').textContent()).includes('057')) throw new Error('Fresh reader does not start with Swift');
   await page.screenshot({ path: path.join(output, 'desktop.png'), fullPage: true });
+  const stages = [...data.curriculum.stages, ...data.curriculum.extensions];
+  await page.goto(`${base}#curriculum`);
+  if (await page.locator('.course-stage').count() !== stages.length) throw new Error('Missing complete-course stages');
+  for (const stage of stages) {
+    await page.goto(`${base}#curriculum/${stage.id}`);
+    const section = page.locator(`#course-stage-${stage.id}`);
+    await section.waitFor();
+    if (!(await section.locator('.course-outcome').textContent()).includes(stage.goal)) throw new Error(`Missing stage outcome ${stage.id}`);
+    for (const id of stage.lessons) if (!(await section.locator(`a[href="#lesson/${id}"]`).count())) throw new Error(`Missing complete-course lesson ${id}`);
+    for (const id of stage.workshops) if (!(await section.locator(`a[href="#workshops/${id}"]`).count())) throw new Error(`Missing project ${id}`);
+    if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2)) throw new Error(`Desktop overflow in stage ${stage.id}`);
+  }
+  await page.goto(`${base}#lesson/116`);
+  if (!(await page.locator('.lesson-pagination a[href="#lesson/117"]').count())) throw new Error('Project reading order does not continue from Todo to Git');
+  await page.goto(`${base}#lesson/128`);
+  if (!(await page.locator('.lesson-pagination a[href="#lesson/011"]').count())) throw new Error('Project reading order does not continue from market to concurrency');
   await page.goto(`${base}#lesson/001`);
   await page.locator('#lesson-notes').fill('Ownership comparison: Kotlin reference versus Swift value.');
   await page.locator('[data-bookmark]').click();
@@ -147,7 +164,7 @@ try {
     await checkSimple(`simple-${lesson.id}`, lesson.simple);
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2)) throw new Error(`Mobile overflow in ${lesson.id}`);
   }
-  for (const route of ['coverage', 'libraries', 'interviews', 'interviews/iq-001-a', 'interviews/quiz', 'interviews/round/staff-design', ...data.essentials.map(guide => `essentials/${guide.id}`), ...data.paths.map(item => `path/${item.id}`), ...data.workshops.map(item => `workshops/${item.id}`), ...data.artifacts.map(item => `artifact/${encodeURIComponent(item.path)}`)]) {
+  for (const route of ['curriculum', ...stages.map(stage => `curriculum/${stage.id}`), 'coverage', 'libraries', 'interviews', 'interviews/iq-001-a', 'interviews/quiz', 'interviews/round/staff-design', ...data.essentials.map(guide => `essentials/${guide.id}`), ...data.paths.map(item => `path/${item.id}`), ...data.workshops.map(item => `workshops/${item.id}`), ...data.artifacts.map(item => `artifact/${encodeURIComponent(item.path)}`)]) {
     await page.goto(`${base}#${route}`);
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2)) throw new Error(`Mobile overflow in ${route}`);
   }

@@ -1,0 +1,572 @@
+{
+  "version": 1,
+  "reviewedAt": "2026-11-17",
+  "title": "Beginner to advanced, with complete app projects",
+  "source": {
+    "title": "Swiftful Thinking public course order",
+    "url": "https://www.swiftful-thinking.com/store"
+  },
+  "sourceScope": "The first thirteen stages follow the published topic order. These are our original lessons, examples and projects. Video transcripts and paid lessons were not used. Later stages add client, performance and staff/principal practice.",
+  "stages": [
+    {
+      "id": "swift",
+      "level": "Beginner",
+      "title": "Learn Swift, one small rule at a time",
+      "sourceCourseTitle": "Swift Basics",
+      "summary": "Read and write values, decisions, functions, collections and types before creating a screen.",
+      "goal": "Run a small program, predict a changed input, and explain its output.",
+      "prerequisites": [],
+      "lessons": [
+        "057",
+        "058",
+        "059",
+        "060",
+        "061",
+        "062",
+        "063",
+        "064",
+        "065",
+        "066",
+        "067",
+        "068",
+        "069",
+        "070",
+        "001",
+        "002",
+        "003",
+        "004",
+        "005",
+        "006",
+        "007"
+      ],
+      "workshops": [
+        "swift-workbench"
+      ],
+      "guides": [
+        "initialization-access",
+        "generic-contracts"
+      ],
+      "checkpoint": [
+        "What is different about a missing value and an empty value?",
+        "Which edits affect a copied struct or a shared class?",
+        "Can you explain each symbol in your function call?"
+      ]
+    },
+    {
+      "id": "swiftui",
+      "level": "Beginner",
+      "title": "Build your first SwiftUI screens",
+      "sourceCourseTitle": "The SwiftUI Bootcamp",
+      "summary": "Make controls, compose layouts, own state, navigate and save a small feature.",
+      "goal": "Build a screen whose state changes predictably and whose controls work with large text.",
+      "prerequisites": [
+        "swift"
+      ],
+      "lessons": [
+        "071",
+        "072",
+        "073",
+        "074",
+        "075",
+        "076",
+        "077",
+        "078",
+        "079",
+        "080",
+        "081",
+        "082",
+        "083",
+        "084",
+        "008",
+        "009"
+      ],
+      "workshops": [
+        "swiftui-workbench",
+        "ui-accessibility",
+        "persistence-store"
+      ],
+      "guides": [],
+      "checkpoint": [
+        "Which view owns each state value?",
+        "What changes when you swap modifier order?",
+        "What stops a view-owned task?"
+      ]
+    },
+    {
+      "id": "todo",
+      "level": "Beginner",
+      "title": "Build an editable Todo app",
+      "sourceCourseTitle": "SwiftUI Todo List",
+      "summary": "Reuse the language and UI rules in one app with stable task identity and recoverable local storage.",
+      "goal": "Add, edit, complete, reorder, save and reopen tasks without losing their identity.",
+      "prerequisites": [
+        "swiftui"
+      ],
+      "lessons": [
+        "113",
+        "114",
+        "115",
+        "116"
+      ],
+      "workshops": [
+        "todo-project"
+      ],
+      "guides": [],
+      "checkpoint": [
+        "What happens when two tasks have the same title?",
+        "How will a failed save be shown without deleting old data?",
+        "How can a person using VoiceOver complete a task?"
+      ]
+    },
+    {
+      "id": "git",
+      "level": "Beginner",
+      "title": "Keep, compare and review your changes",
+      "sourceCourseTitle": "Git & Source Control",
+      "summary": "Practice Git on an isolated scratch project before changing a team branch.",
+      "goal": "Create small commits, resolve a deliberate conflict and recover a mistaken change.",
+      "prerequisites": [
+        "todo"
+      ],
+      "lessons": [
+        "117",
+        "118",
+        "119",
+        "120"
+      ],
+      "workshops": [
+        "git-course"
+      ],
+      "guides": [],
+      "checkpoint": [
+        "Which files belong in source control?",
+        "How does revert differ from resetting a branch?",
+        "Can another reviewer understand your diff without this conversation?"
+      ]
+    },
+    {
+      "id": "map",
+      "level": "Beginner",
+      "title": "Build a searchable places app",
+      "sourceCourseTitle": "SwiftUI Map App",
+      "summary": "Connect coordinates, map selection, camera state, permission choices and search ownership.",
+      "goal": "Select and search synthetic places; explain permission denial and old-result rejection.",
+      "prerequisites": [
+        "git"
+      ],
+      "lessons": [
+        "121",
+        "122",
+        "123",
+        "124"
+      ],
+      "workshops": [
+        "map-project"
+      ],
+      "guides": [],
+      "checkpoint": [
+        "Which value identifies a place when its caption changes?",
+        "What should the screen do when location access is denied?",
+        "Which request may still update the selected route?"
+      ]
+    },
+    {
+      "id": "continued",
+      "level": "Intermediate",
+      "title": "Connect screens and shared services",
+      "sourceCourseTitle": "Continued Learning",
+      "summary": "Bridge UIKit and SwiftUI navigation, review callback ownership, and try the supplied file and platform adapters with synthetic inputs.",
+      "goal": "Draw which screen owns navigation and shared services. Explain a callback lifetime and run an independent adapter fixture before connecting a real provider.",
+      "prerequisites": [
+        "map"
+      ],
+      "lessons": [
+        "010"
+      ],
+      "workshops": [
+        "foundation-files",
+        "persistence-store",
+        "platform-adapters"
+      ],
+      "guides": [
+        "callback-ownership"
+      ],
+      "checkpoint": [
+        "Who owns navigation and callback lifetimes when a screen changes?",
+        "Which object retains each callback, and who stops its work?",
+        "Which behavior needs a device or provider check rather than a fake?"
+      ]
+    },
+    {
+      "id": "market",
+      "level": "Intermediate",
+      "title": "Build a market-data explorer",
+      "sourceCourseTitle": "SwiftUI Crypto App",
+      "summary": "Use made-up asset prices to learn service/view-model boundaries, streams, lists, charts, amounts and saved favorites.",
+      "goal": "Deliver a read-only explorer that behaves sensibly when data is loading, old, absent or invalid.",
+      "prerequisites": [
+        "continued"
+      ],
+      "lessons": [
+        "125",
+        "126",
+        "127",
+        "128"
+      ],
+      "workshops": [
+        "market-project"
+      ],
+      "guides": [],
+      "checkpoint": [
+        "How will an old response be rejected?",
+        "How are amounts represented and rounded?",
+        "What works offline, and what evidence supports that claim?"
+      ]
+    },
+    {
+      "id": "concurrency",
+      "level": "Intermediate",
+      "title": "Own asynchronous work and deliver a tested feature",
+      "sourceCourseTitle": "Swift Concurrency",
+      "summary": "Learn suspension, test a complete feature, then follow tasks, actors, streams, network data and storage through one owned request.",
+      "goal": "Deliver a synthetic feature and predict old success, old failure and cancellation. Name task, account, cache and screen ownership, then demonstrate a deterministic failure schedule.",
+      "prerequisites": [
+        "market"
+      ],
+      "lessons": [
+        "011",
+        "012",
+        "013",
+        "014",
+        "015",
+        "016",
+        "017",
+        "018",
+        "019",
+        "020",
+        "021",
+        "022"
+      ],
+      "workshops": [
+        "concurrency-gates"
+      ],
+      "guides": [],
+      "checkpoint": [
+        "Does cancellation immediately kill work?",
+        "Which assumptions must be rechecked after await?",
+        "Who stops the producer when a stream consumer leaves?"
+      ]
+    },
+    {
+      "id": "firebase",
+      "level": "Intermediate",
+      "title": "Build and protect a Firebase-backed feature",
+      "sourceCourseTitle": "SwiftUI + Firebase",
+      "summary": "Learn configuration, authentication, Firestore, listeners, Storage, messaging, observability, server controls and emulator testing.",
+      "goal": "Implement bounded local contracts, then follow the documented SDK/emulator integration with separate evidence.",
+      "prerequisites": [
+        "concurrency"
+      ],
+      "lessons": [
+        "129",
+        "130",
+        "131",
+        "132",
+        "133",
+        "134",
+        "135",
+        "136"
+      ],
+      "workshops": [
+        "firebase-course"
+      ],
+      "guides": [],
+      "checkpoint": [
+        "Which rule authorizes this user to read or change a document?",
+        "Which listener, upload and token belong to the current account?",
+        "Which tests actually execute Firebase rules, and which only test a model?"
+      ]
+    },
+    {
+      "id": "packages",
+      "level": "Intermediate",
+      "title": "Build and evaluate Swift packages",
+      "sourceCourseTitle": "Swift Packages",
+      "summary": "Use local libraries, resources and tests; inspect third-party dependencies and upgrade decisions.",
+      "goal": "Run an offline package and explain the exact API and resources its consumer receives.",
+      "prerequisites": [
+        "firebase"
+      ],
+      "lessons": [
+        "137",
+        "138",
+        "139",
+        "140"
+      ],
+      "workshops": [
+        "package-course"
+      ],
+      "guides": [
+        "generic-contracts"
+      ],
+      "checkpoint": [
+        "Is this API public to the consuming module?",
+        "What does a version pin prove?",
+        "How will a dependency failure or upgrade affect consumers?"
+      ]
+    },
+    {
+      "id": "interface",
+      "level": "Intermediate",
+      "title": "Practice complete interfaces",
+      "sourceCourseTitle": "SwiftUI in Practice",
+      "summary": "Compose an original feed, dashboard, detail and editor with reusable components, motion, focus and adaptation.",
+      "goal": "Deliver a usable interface with independent fixtures and a recorded accessibility/performance investigation.",
+      "prerequisites": [
+        "packages"
+      ],
+      "lessons": [
+        "141",
+        "142",
+        "143",
+        "144"
+      ],
+      "workshops": [
+        "interface-project"
+      ],
+      "guides": [],
+      "checkpoint": [
+        "Which value is the source of truth?",
+        "How does the UI respond to large text and reduced motion?",
+        "Which measured evidence supports a responsiveness claim?"
+      ]
+    },
+    {
+      "id": "advanced",
+      "level": "Advanced",
+      "title": "Study UI mechanics and difficult interactions",
+      "sourceCourseTitle": "Advanced Learning",
+      "summary": "Define measurement, reliability and privacy boundaries before deeper layout, reusable lists, editing, animation, multi-window ownership and advanced focus.",
+      "goal": "Explain one measured or explicitly pending operation and its privacy boundary. Build a screen that stays correct with large text, changing drafts, reuse, interruption and different windows.",
+      "prerequisites": [
+        "interface"
+      ],
+      "lessons": [
+        "023",
+        "024",
+        "025",
+        "029",
+        "030",
+        "031",
+        "032",
+        "033",
+        "034",
+        "035",
+        "095"
+      ],
+      "workshops": [
+        "ui-runtime-lab",
+        "ui-accessibility"
+      ],
+      "guides": [],
+      "checkpoint": [
+        "Which inputs invalidate a cached arrangement?",
+        "Are you changing an animation's model value or only its presentation?",
+        "Which scene owns the route and the presentation?"
+      ]
+    },
+    {
+      "id": "architecture",
+      "level": "Advanced",
+      "title": "Evolve a multi-feature app architecture",
+      "sourceCourseTitle": "Advanced Architecture",
+      "summary": "Build an original vertical slice, compare architecture choices, test boundaries and plan a reversible change.",
+      "goal": "Defend a simple design, then revise it after a changed requirement and independent review.",
+      "prerequisites": [
+        "advanced"
+      ],
+      "lessons": [
+        "145",
+        "146",
+        "147",
+        "148"
+      ],
+      "workshops": [
+        "architecture-course"
+      ],
+      "guides": [],
+      "checkpoint": [
+        "What additional cost does this abstraction introduce?",
+        "Where are account ownership, caching and navigation decided?",
+        "How will the design be adopted, checked and recovered?"
+      ]
+    }
+  ],
+  "extensions": [
+    {
+      "id": "quality-performance",
+      "prerequisites": [
+        "architecture"
+      ],
+      "level": "Advanced",
+      "title": "Measure performance and own delivery",
+      "summary": "Investigate launch, rendering, memory, networking, energy, dependencies and release artifacts.",
+      "goal": "Retain a reproducible investigation and explain a correctness-preserving improvement.",
+      "lessons": [
+        "026",
+        "036",
+        "037",
+        "038",
+        "039",
+        "040",
+        "041",
+        "042",
+        "043",
+        "044",
+        "045",
+        "046",
+        "047",
+        "048",
+        "049"
+      ],
+      "workshops": [
+        "instruments-first-run",
+        "regression-decisions",
+        "artifact-debugging"
+      ],
+      "guides": [],
+      "checkpoint": [
+        "Which population and configuration were measured?",
+        "Where is the bottleneck in the trace?",
+        "Can the binary, symbols and release settings be matched?"
+      ]
+    },
+    {
+      "id": "client-handoff",
+      "prerequisites": [
+        "quality-performance"
+      ],
+      "level": "Advanced",
+      "title": "Connect platform services to the client",
+      "summary": "Trace background work, notifications, universal links, Foundation values, persistence, authentication, permissions and extensions through their actual client boundaries.",
+      "goal": "Document one platform integration from its configuration and account owner to failure recovery. Separate host fixtures, native compilation and real device/provider acceptance.",
+      "lessons": [
+        "050",
+        "051",
+        "052",
+        "053",
+        "054",
+        "055",
+        "056"
+      ],
+      "workshops": [
+        "platform-adapters"
+      ],
+      "guides": [],
+      "checkpoint": [
+        "Which actual target builds the source?",
+        "Who releases the callbacks?",
+        "Which cold and warm entry paths have been exercised?"
+      ]
+    },
+    {
+      "id": "runtime-recovery",
+      "prerequisites": [
+        "client-handoff"
+      ],
+      "level": "Advanced",
+      "title": "Practice runtime behavior and durable recovery",
+      "summary": "Study scheduling, Swift 6 settings, resource ownership, real store migration, offline replay and release evidence.",
+      "goal": "Demonstrate a controlled failure/recovery case and record the remaining device or provider evidence.",
+      "lessons": [
+        "085",
+        "086",
+        "087",
+        "088",
+        "089",
+        "090",
+        "091",
+        "092",
+        "093",
+        "094",
+        "096",
+        "097",
+        "098",
+        "099",
+        "100",
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106"
+      ],
+      "workshops": [
+        "runtime-scheduling-lab",
+        "swift6-migration-lab",
+        "durable-data-lab",
+        "profiling-evidence-lab",
+        "delivery-review-lab"
+      ],
+      "guides": [
+        "callback-ownership"
+      ],
+      "checkpoint": [
+        "What blocks a worker rather than suspending a task?",
+        "What makes replay safe after an ambiguous acknowledgment?",
+        "Which compatibility settings and artifact evidence were observed?"
+      ]
+    },
+    {
+      "id": "staff-principal",
+      "prerequisites": [
+        "runtime-recovery"
+      ],
+      "level": "Advanced",
+      "title": "Practice staff and principal decisions",
+      "summary": "Connect implementation to cross-feature ownership, independent critique and multi-team adoption.",
+      "goal": "Revise a costed decision under feedback and name its owner, rollout, evidence and recovery.",
+      "lessons": [
+        "027",
+        "028",
+        "107",
+        "108"
+      ],
+      "workshops": [
+        "staff-principal-decisions",
+        "delivery-review-lab"
+      ],
+      "guides": [],
+      "checkpoint": [
+        "What simpler or no-change option was considered?",
+        "Who owns exceptions and sustained operation?",
+        "Which independent feedback changed your recommendation?"
+      ]
+    },
+    {
+      "id": "apple-electives",
+      "prerequisites": [
+        "architecture"
+      ],
+      "level": "Elective",
+      "title": "Choose additional Apple capabilities",
+      "summary": "Select commerce, live updates, cloud documents, media, hardware and additional platforms from product needs.",
+      "goal": "Plan a bounded specialist project and name its actual sandbox/device acceptance evidence.",
+      "lessons": [
+        "109",
+        "110",
+        "111",
+        "112"
+      ],
+      "workshops": [
+        "specialist-selection-lab"
+      ],
+      "guides": [],
+      "checkpoint": [
+        "Which system contract does the feature need?",
+        "Which simpler mechanism could meet the need?",
+        "Which provider, device and account tests remain?"
+      ]
+    }
+  ]
+}

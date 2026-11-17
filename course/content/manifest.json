@@ -133,6 +133,62 @@
       "first": 109,
       "count": 4,
       "track": "Specialist electives"
+    },
+    {
+      "file": "unit-20.json",
+      "order": 20,
+      "first": 113,
+      "count": 4,
+      "track": "Project sequence"
+    },
+    {
+      "file": "unit-21.json",
+      "order": 21,
+      "first": 117,
+      "count": 4,
+      "track": "Project sequence"
+    },
+    {
+      "file": "unit-22.json",
+      "order": 22,
+      "first": 121,
+      "count": 4,
+      "track": "Project sequence"
+    },
+    {
+      "file": "unit-23.json",
+      "order": 23,
+      "first": 125,
+      "count": 4,
+      "track": "Project sequence"
+    },
+    {
+      "file": "unit-24.json",
+      "order": 24,
+      "first": 129,
+      "count": 8,
+      "track": "Project sequence"
+    },
+    {
+      "file": "unit-25.json",
+      "order": 25,
+      "first": 137,
+      "count": 4,
+      "track": "Project sequence"
+    },
+    {
+      "file": "unit-26.json",
+      "order": 26,
+      "first": 141,
+      "count": 4,
+      "track": "Project sequence"
+    },
+    {
+      "file": "unit-27.json",
+      "order": 27,
+      "first": 145,
+      "count": 4,
+      "track": "Project sequence"
     }
   ],
   "interviewBanks": [
@@ -179,6 +235,38 @@
     {
       "file": "interview-specialists.json",
       "count": 8
+    },
+    {
+      "file": "interview-todo.json",
+      "count": 8
+    },
+    {
+      "file": "interview-git.json",
+      "count": 8
+    },
+    {
+      "file": "interview-map.json",
+      "count": 8
+    },
+    {
+      "file": "interview-market.json",
+      "count": 8
+    },
+    {
+      "file": "interview-firebase.json",
+      "count": 16
+    },
+    {
+      "file": "interview-packages.json",
+      "count": 8
+    },
+    {
+      "file": "interview-interface.json",
+      "count": 8
+    },
+    {
+      "file": "interview-architecture.json",
+      "count": 8
     }
   ],
   "practiceBanks": [
@@ -191,6 +279,14 @@
     "practice-durable-data.json",
     "practice-profiling.json",
     "practice-delivery.json",
-    "practice-specialists.json"
+    "practice-specialists.json",
+    "practice-todo.json",
+    "practice-git.json",
+    "practice-map.json",
+    "practice-market.json",
+    "practice-firebase.json",
+    "practice-packages.json",
+    "practice-interface.json",
+    "practice-architecture.json"
   ]
 }

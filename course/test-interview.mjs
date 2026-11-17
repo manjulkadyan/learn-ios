@@ -83,7 +83,11 @@ const productionExpanded = model.normalize(newState, allQuestions, lessons);
 check(JSON.stringify(productionExpanded.questions['iq-084-b']) === JSON.stringify(newState.questions['iq-084-b']) && !productionExpanded.questions['iq-085-a'] && !productionExpanded.questions['iq-112-b'], '84-session interview history survives the production expansion without inferred new attempts');
 const specialistAttempt = model.addAttempt(productionExpanded, 'iq-112-b', attempt('attempt-specialist'), allQuestions, lessons);
 check(specialistAttempt.questions['iq-112-b'].attempts.length === 1 && specialistAttempt.questions['iq-084-b'].attempts.length === 1, 'Elective interview practice remains separate from existing capstone history');
-for (const id of ['057','070','071','084','085','092','096','100','104','108','112']) {
+const projectExpanded = model.normalize(specialistAttempt, allQuestions, lessons);
+check(JSON.stringify(projectExpanded.questions['iq-112-b']) === JSON.stringify(specialistAttempt.questions['iq-112-b']) && !projectExpanded.questions['iq-113-a'] && !projectExpanded.questions['iq-148-b'], '112-session interview history survives the project expansion without inferred practice');
+const projectAttempt = model.addAttempt(projectExpanded, 'iq-148-b', attempt('attempt-architecture'), allQuestions, lessons);
+check(projectAttempt.questions['iq-148-b'].attempts.length === 1 && JSON.stringify(projectAttempt.questions['iq-112-b']) === JSON.stringify(specialistAttempt.questions['iq-112-b']), 'Architecture interview practice preserves the earlier ledger');
+for (const id of ['057','070','071','084','085','092','096','100','104','108','112','113','116','120','124','128','129','136','140','144','148']) {
   const newKeys = [...index.keys()].filter(key => key.startsWith(`q-${id}-`));
   check(newKeys.length === lessons.find(item => item.id === id).quiz.length, `Beginner quiz-bank scope ${id}`);
   const beginnerQuiz = { ...quiz, id: `quiz-${id}`, keys: newKeys, answers: Object.fromEntries(newKeys.map(key => [key, index.get(key).answer])) };

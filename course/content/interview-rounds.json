@@ -462,6 +462,106 @@
       ],
       "setupMinutes": 5,
       "debriefMinutes": 15
+    },
+    {
+      "id": "todo-git-project",
+      "title": "Todo delivery and source-control review",
+      "level": "Senior",
+      "minutes": 90,
+      "brief": "Explain a Todo feature from stable identity through failed persistence, then review a change and its recovery plan.",
+      "questions": ["iq-113-b", "iq-115-b", "iq-119-b"],
+      "steps": [
+        "Use 5 setup minutes to draw the model, store and scratch-repository boundaries.",
+        "Answer the three prompts within their stated timeboxes, using before/change/after values and a concrete diff.",
+        "Use spare rehearsal time to introduce a failed write or a conflicting edit. Reserve 15 debrief minutes to revise the decision and record missing evidence."
+      ],
+      "evidence": [
+        "Stable identity through editing and a policy for invalid input.",
+        "A failed save that does not silently claim durable success.",
+        "A reviewable source-control change with a justified recovery command."
+      ],
+      "setupMinutes": 5,
+      "debriefMinutes": 15
+    },
+    {
+      "id": "map-market-project",
+      "title": "Map and market request ownership",
+      "level": "Senior",
+      "minutes": 90,
+      "brief": "Predict search, selection and resource behavior when requests finish out of order or a screen disappears.",
+      "questions": ["iq-122-b", "iq-123-b", "iq-128-b"],
+      "steps": [
+        "Use 5 setup minutes to name the synthetic inputs, screen owner and request identities.",
+        "Answer the three prompts with a schedule that includes an obsolete success and an obsolete error.",
+        "Change one permission or offline input during spare rehearsal time. Reserve 15 debrief minutes to separate host results from pending native and provider checks."
+      ],
+      "evidence": [
+        "A latest-request policy that handles both success and failure.",
+        "Explicit cancellation and cache ownership rather than assuming disappearing UI stops work.",
+        "A readable offline/error state and a bounded native acceptance task."
+      ],
+      "setupMinutes": 5,
+      "debriefMinutes": 15
+    },
+    {
+      "id": "firebase-security-project",
+      "title": "Firebase account, authorization and recovery",
+      "level": "Staff",
+      "minutes": 90,
+      "brief": "Trace data ownership across authentication, backend authorization and account changes, then defend recovery and cost controls.",
+      "questions": ["iq-130-b", "iq-131-b", "iq-136-b"],
+      "steps": [
+        "Use 5 setup minutes to draw client, emulator, provider and production boundaries.",
+        "Answer the three prompts within their stated timeboxes, explaining which identity and permission each operation needs.",
+        "Introduce a stale listener, denied write or quota constraint during spare rehearsal time. Reserve 15 debrief minutes to identify the actual rule/provider evidence still required."
+      ],
+      "evidence": [
+        "An account-lifetime policy that rejects old-account results.",
+        "Server authorization distinguished from client validation and host mock checks.",
+        "Owned environment, emulator, rollback and quota controls with concrete next checks."
+      ],
+      "setupMinutes": 5,
+      "debriefMinutes": 15
+    },
+    {
+      "id": "package-interface-project",
+      "title": "Package consumer and interface integration",
+      "level": "Senior",
+      "minutes": 90,
+      "brief": "Defend a reusable package and a composed interface under dependency, accessibility and state changes.",
+      "questions": ["iq-138-b", "iq-140-b", "iq-143-b"],
+      "steps": [
+        "Use 5 setup minutes to name the package API, consumer target and state owner.",
+        "Answer the three prompts within their stated timeboxes, including a changed consumer and a large-text or focus scenario.",
+        "Introduce a resource or dependency failure during spare rehearsal time. Reserve 15 debrief minutes to revise the boundary and record pending native interaction checks."
+      ],
+      "evidence": [
+        "A consumer-facing contract checked outside the library's own implementation.",
+        "A reasoned compatibility/dependency decision with recovery.",
+        "Precise editing, focus and accessible adaptation behavior."
+      ],
+      "setupMinutes": 5,
+      "debriefMinutes": 15
+    },
+    {
+      "id": "architecture-project",
+      "title": "Architecture growth and change review",
+      "level": "Staff",
+      "minutes": 120,
+      "brief": "Grow a small app only where its observed needs justify ownership and module boundaries, then review a changed requirement.",
+      "questions": ["iq-145-b", "iq-146-b", "iq-147-b", "iq-148-b"],
+      "steps": [
+        "Use 5 setup minutes to state the product constraint and the simplest viable implementation.",
+        "Answer the four prompts within their stated timeboxes; compare MVVM, reducer and coordinator costs using a concrete feature flow.",
+        "Use spare rehearsal time to change the account, cache or delivery constraint. Reserve 15 debrief minutes to revise the plan and assign implementation, review and recovery evidence."
+      ],
+      "evidence": [
+        "Feature, navigation, dependency and task ownership expressed as concrete contracts.",
+        "A tested failure schedule and cache/account recovery policy.",
+        "Alternatives, migration cost, independent critique and a bounded rollout decision."
+      ],
+      "setupMinutes": 5,
+      "debriefMinutes": 15
     }
   ]
 }

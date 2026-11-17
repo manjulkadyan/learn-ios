@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { buildCatalogue } from './inventory.mjs';
 import { createHash } from 'node:crypto';
 import { simpleIssues, teachingIdentity, interviewIdentity } from './teaching.mjs';
+import { curriculumIssues } from './curriculum.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const workspace = path.resolve(root, '../..');
@@ -21,7 +22,7 @@ if (manifest?.version !== 1 || !Array.isArray(manifest?.units) || !manifest.unit
 let nextSession = 1;
 for (const [unitIndex, entry] of (manifest?.units || []).entries()) {
   const unitNumber = unitIndex + 1;
-  if (!/^unit-\d{2}\.json$/.test(entry.file) || entry.order !== unitNumber || entry.first !== nextSession || !Number.isInteger(entry.count) || entry.count < 1 || entry.count > 14 || unitNumber <= 12 && entry.count !== 7 || !['Core', 'Deep dive', 'Swift bootcamp', 'SwiftUI bootcamp', 'Advanced practice', 'Specialist electives'].includes(entry.track)) { errors.push(`manifest unit ${unitNumber}: invalid file, order, range, count, or track`); continue; }
+  if (!/^unit-\d{2}\.json$/.test(entry.file) || entry.order !== unitNumber || entry.first !== nextSession || !Number.isInteger(entry.count) || entry.count < 1 || entry.count > 14 || unitNumber <= 12 && entry.count !== 7 || !['Core', 'Deep dive', 'Swift bootcamp', 'SwiftUI bootcamp', 'Advanced practice', 'Specialist electives', 'Project sequence'].includes(entry.track)) { errors.push(`manifest unit ${unitNumber}: invalid file, order, range, count, or track`); continue; }
   nextSession += entry.count;
   const filename = `content/${entry.file}`;
   let content;
@@ -252,6 +253,11 @@ for (const lesson of lessons) {
   if (lesson.guides !== undefined && !Array.isArray(lesson.guides)) errors.push(`${lesson.id}: guide links must be an array`);
   for (const id of lesson.guides || []) if (!guideIDs.has(id)) errors.push(`${lesson.id}: unknown guide ${id}`);
 }
+let curriculum;
+try {
+  curriculum = JSON.parse(await fs.readFile(path.join(root, 'content/curriculum.json'), 'utf8'));
+  errors.push(...curriculumIssues(curriculum, { lessons, workshops, guides: essentials?.guides || [], paths: learningPaths?.paths || [] }));
+} catch (error) { errors.push(`curriculum.json: ${error.message}`); }
 const allowedTags = new Set('p h3 h4 ul ol li strong em code pre table thead tbody tr th td blockquote details summary a br caption'.split(' '));
 const allowedAttributes = new Set(['class', 'href', 'title', 'scope', 'colspan', 'rowspan']);
 for (const { label, html } of htmlBlocks) {
@@ -339,7 +345,7 @@ try {
     ...(essentials?.guides || []).map(item => [`guide:${item.id}`, item])
   ]);
   const questions = new Map(interviewQuestions.map(item => [item.id, item]));
-  if (contract.version !== 1 || !/^[a-f0-9]{40}$/.test(contract.basedOnCommit || '') || contract.entries?.length !== items.size || contract.interviews?.length !== questions.size) errors.push('Invalid plain-language teaching baseline');
+  if (contract.version !== 1 || !/^[a-f0-9]{40}$/.test(contract.basedOnCommit || '') || contract.entries?.length !== 133 || contract.interviews?.length !== 224) errors.push('Invalid original plain-language teaching baseline');
   for (const original of contract.entries || []) {
     const key = `${original.kind}:${original.id}`;
     const item = items.get(key);
@@ -351,12 +357,15 @@ try {
     if (!item || createHash('sha256').update(JSON.stringify(interviewIdentity(item))).digest('hex') !== original.sha256) errors.push(`${original.id}: interview identity, timing or code example changed`);
     questions.delete(original.id);
   }
-  if (items.size || questions.size) errors.push('Plain-language baseline does not cover every existing teaching and interview item');
+  for (const [key, item] of items) {
+    if (key.startsWith('lesson:') ? Number(item.id) <= 112 : key.startsWith('guide:') || !item.sessions.some(id => Number(id) > 112)) errors.push(`${key}: existing teaching item is outside its preservation baseline`);
+  }
+  for (const item of questions.values()) if (Number(item.lesson) <= 112) errors.push(`${item.id}: existing interview is outside its preservation baseline`);
 } catch (error) { errors.push(`progress-plain-contract.json: ${error.message}`); }
 if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1; }
 else {
   const catalogue = await buildCatalogue(workspace);
-  const data = { version: 1, title: 'Across the Stack', generatedAt: new Date().toISOString(), units, lessons, paths: learningPaths.paths, workshops, artifacts: [...artifacts.values()], reference: reference.reference, syntax: reference.syntax, coverage, catalogue, essentials: essentials.guides, interview: { questions: interviewQuestions, rounds: interviewRounds } };
+  const data = { version: 1, title: 'Across the Stack', generatedAt: new Date().toISOString(), units, lessons, curriculum, paths: learningPaths.paths, workshops, artifacts: [...artifacts.values()], reference: reference.reference, syntax: reference.syntax, coverage, catalogue, essentials: essentials.guides, interview: { questions: interviewQuestions, rounds: interviewRounds } };
   if (!checkOnly) await fs.writeFile(path.join(root, 'data.js'), `/* Generated from course/content by build.mjs. */\nwindow.IOS_COURSE = ${JSON.stringify(data, null, 2).replace(/</g, '\\u003c')};\n`);
   console.log(`${checkOnly ? 'Validated' : 'Built'} ${lessons.length} detailed sessions, ${lessons.reduce((total, lesson) => total + lesson.wordCount, 0).toLocaleString()} lesson teaching words, ${essentials.guides.length} Swift supplementary guides, ${learningPaths.paths.length} learning paths, ${workshops.length} implementation/tool/review workshops, ${artifacts.size} offline companion source files, ${coverage.groups.flatMap(group => group.topics).length} coverage topics, ${catalogue.packages.length} remote dependency entries, ${interviewQuestions.length} interview prompts and ${interviewRounds.length} mock rounds. Repository anchors and companion paths resolve.`);
 }

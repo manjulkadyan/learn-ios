@@ -29,7 +29,8 @@ for (const file of files) {
     for (const item of entries) {
       const label = `${file}:${item.id}`;
       errors.push(...simpleIssues(item.simple, label));
-      if (hash(teachingIdentity(item)) !== baseline.get(`${kind}:${item.id}`)) errors.push(`${label}: original quiz/checklist, section identities or verified code changed`);
+      const original = baseline.get(`${kind}:${item.id}`);
+      if (original ? hash(teachingIdentity(item)) !== original : kind === 'guide' || kind === 'lesson' && Number(item.id) <= 112 || kind === 'workshop' && !item.sessions.some(id => Number(id) > 112)) errors.push(`${label}: original quiz/checklist, section identities or verified code changed`);
       const count = words(item.sections.map(section => section.html).join(' ') + ' ' + item.exercise.solution);
       if (count < (kind === 'lesson' && Number(item.id) >= 85 ? 1300 : 900)) errors.push(`${label}: technical teaching depth fell below the existing floor`);
       if (item.simple?.story) {
@@ -40,7 +41,8 @@ for (const file of files) {
     }
   } else if (data.questions) {
     for (const item of data.questions) {
-      if (hash(interviewIdentity(item)) !== interviews.get(item.id)) errors.push(`${file}:${item.id}: interview identity, timing or code changed`);
+      const original = interviews.get(item.id);
+      if (original ? hash(interviewIdentity(item)) !== original : Number(item.lesson) <= 112) errors.push(`${file}:${item.id}: interview identity, timing or code changed`);
       if (words(item.answerHTML) < 100) errors.push(`${file}:${item.id}: answer lost its required depth`);
       interviewCount++;
     }

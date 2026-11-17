@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { handleRequest } from './serve.mjs';
 import { simpleIssues, teachingIdentity, interviewIdentity } from './teaching.mjs';
+import { curriculumIssues } from './curriculum.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const context = vm.createContext({ window: {} });
@@ -20,7 +21,7 @@ function check(condition, message) { assert.ok(condition, message); checks++; }
 const manifest = JSON.parse(await fs.readFile(path.join(root, 'content/manifest.json'), 'utf8'));
 check(lessons.length === manifest.units.reduce((total, unit) => total + unit.count, 0) && course.units.length === manifest.units.length, 'Complete manifest curriculum');
 check(lessons.filter(item => item.track === 'Core').length === 28 && lessons.filter(item => item.track === 'Deep dive').length === 28, 'Stable core and expanded deep-dive tracks');
-check(lessons.length === 112 && lessons.filter(item => item.track === 'Swift bootcamp').length === 14 && lessons.filter(item => item.track === 'SwiftUI bootcamp').length === 14, 'Beginner tracks retained alongside the production expansion');
+check(lessons.length === 148 && lessons.filter(item => item.track === 'Swift bootcamp').length === 14 && lessons.filter(item => item.track === 'SwiftUI bootcamp').length === 14 && lessons.filter(item => item.track === 'Project sequence').length === 36, 'Beginner tracks retained alongside complete progressive projects');
 check(lessons.filter(item => item.track === 'Advanced practice').length === 24 && lessons.filter(item => item.track === 'Specialist electives').length === 4, 'Runtime and production practice is distinct from specialist entry lessons');
 check(manifest.interviewBanks.reduce((total, bank) => total + bank.count, 0) === lessons.length * 2, 'Registered interview banks cover all lessons');
 const contract = JSON.parse(await fs.readFile(path.join(root, 'content/progress-contract.json'), 'utf8'));
@@ -35,7 +36,7 @@ for (const item of expansionContract.sessions) {
   const lesson = lessons.find(lesson => lesson.id === item.id);
   check(createHash('sha256').update(JSON.stringify({ quiz: lesson.quiz, checklist: lesson.checklist })).digest('hex') === item.sha256, `Pre-expansion storage identity ${item.id}`);
 }
-check(course.coverage.groups.length === 14 && course.coverage.groups.flatMap(group => group.topics).length >= 118, 'Auditable coverage breadth');
+check(course.coverage.groups.length >= 14 && course.coverage.groups.flatMap(group => group.topics).length >= 118, 'Auditable coverage breadth');
 check(course.catalogue.packages.length === 52 && course.catalogue.packages.filter(item => item.requirement).length === 23, 'Both checked-in remote pin graphs and direct declarations inventoried');
 check(course.catalogue.packages.find(item => item.id === 'peasy').graphs.length === 1, 'Legacy-only dependency is not called universally active');
 for (const entry of manifest.units) {
@@ -58,7 +59,7 @@ for (const guide of course.essentials) {
   check(guide.quiz.length >= 3 && guide.quiz.every(item => item.explanation && item.options[item.answer]), `Supplement assessments ${guide.id}`);
 }
 const expectedWorkshops = (await Promise.all(manifest.practiceBanks.map(async file => JSON.parse(await fs.readFile(path.join(root, 'content', file), 'utf8')).workshops.length))).reduce((total, count) => total + count, 0);
-check(course.paths.length === 8 && course.workshops.length === expectedWorkshops, 'Original paths plus advanced and elective paths with all registered practice');
+check(course.paths.length === 9 && course.workshops.length === expectedWorkshops, 'Complete course plus every original path and registered practice');
 check(course.paths.find(item => item.id === 'advanced').stages.flatMap(stage => stage.lessons).length === 24 && course.paths.find(item => item.id === 'specialists').stages.flatMap(stage => stage.lessons).length === 4, 'All new lessons have a deliberate reading path');
 check(course.paths.find(item => item.id === 'swift').stages[0].lessons[0] === '057' && course.paths.find(item => item.id === 'swiftui').stages[0].lessons[0] === '071', 'Reading paths can start from zero without renumbering original IDs');
 const plainContract = JSON.parse(await fs.readFile(path.join(root, 'content/progress-plain-contract.json'), 'utf8'));
@@ -67,7 +68,7 @@ const teaching = new Map([
   ...course.workshops.map(item => [`workshop:${item.id}`, item]),
   ...course.essentials.map(item => [`guide:${item.id}`, item])
 ]);
-check(teaching.size === 133 && plainContract.entries.length === teaching.size && plainContract.interviews.length === course.interview.questions.length, 'Every existing teaching page and interview is in the plain-language preservation contract');
+check(teaching.size === 177 && plainContract.entries.length === 133 && plainContract.interviews.length === 224, 'Original133 teaching pages and224 interviews remain protected while44 new pages are added');
 for (const item of plainContract.entries) {
   const original = teaching.get(`${item.kind}:${item.id}`);
   check(original && createHash('sha256').update(JSON.stringify(teachingIdentity(original))).digest('hex') === item.sha256, `Assessment, section and code preservation ${item.kind}/${item.id}`);
@@ -77,6 +78,18 @@ for (const item of plainContract.interviews) {
   const question = course.interview.questions.find(question => question.id === item.id);
   check(question && createHash('sha256').update(JSON.stringify(interviewIdentity(question))).digest('hex') === item.sha256, `Interview meaning boundary identity and code ${item.id}`);
 }
+for (const [key, item] of teaching) check(simpleIssues(item.simple, key).length === 0, `Every original and new page has a story, example, picture and vocabulary ${key}`);
+check(curriculumIssues(course.curriculum, { lessons, workshops: course.workshops, guides: course.essentials, paths: course.paths }).length === 0, 'Complete course order, projects and public-outline attribution agree');
+const sequence = [...course.curriculum.stages, ...course.curriculum.extensions].flatMap(stage => stage.lessons);
+check(sequence.length === lessons.length && new Set(sequence).size === lessons.length && sequence[0] === '057', 'Every lesson appears exactly once and a fresh course begins with Swift');
+const prematureLesson = lessons.map(lesson => lesson.id === '057' ? { ...lesson, prerequisites: ['148'] } : lesson);
+check(curriculumIssues(course.curriculum, { lessons: prematureLesson, workshops: course.workshops, guides: course.essentials, paths: course.paths }).some(message => message.includes('not earlier in the complete course')), 'The reading sequence rejects a lesson that depends on a future stage');
+const brokenCurriculum = JSON.parse(JSON.stringify(course.curriculum));
+brokenCurriculum.stages[2].lessons[0] = '057';
+check(curriculumIssues(brokenCurriculum, { lessons, workshops: course.workshops, guides: course.essentials, paths: course.paths }).some(message => message.includes('repeated')), 'A duplicated lesson cannot silently hide a missing project lesson');
+const noProject = JSON.parse(JSON.stringify(course.curriculum));
+noProject.stages[8].workshops[0] = 'unregistered-project';
+check(curriculumIssues(noProject, { lessons, workshops: course.workshops, guides: course.essentials, paths: course.paths }).some(message => message.includes('missing project')), 'A Firebase stage cannot link to an absent project');
 for (const learningPath of course.paths) for (const stage of learningPath.stages) {
   check(stage.lessons.every(id => lessons.some(lesson => lesson.id === id)) && stage.workshops.every(id => course.workshops.some(item => item.id === id)), `Path resolves ${learningPath.id}/${stage.title}`);
 }
@@ -94,7 +107,8 @@ for (const item of course.catalogue.packages) for (const graph of item.graphs) {
   check(source.split('\n')[graph.line - 1].includes(`"${item.id}"`), `Pin identity anchor ${item.id} in ${graph.name}`);
 }
 check(backupLimit(lessons) > lessons.length * 600000, 'A complete valid backup fits the import limit');
-check(emptyState().lastLesson === '004', 'Delivered mentor lesson is preserved');
+check(emptyState().lastLesson === '057', 'New learners start at the first Swift lesson');
+check(normalizeState({ ...emptyState(), lastLesson: '004' }, lessons).lastLesson === '004', 'An existing mentor reading position remains unchanged');
 check(Object.keys(emptyState().lessons).length === 0, 'No automatic completions');
 const complete = { ...blankEntry(), exerciseDone: true, checks: first.checklist.map((_, i) => i), quizzes: Object.fromEntries(first.quiz.map((q, i) => [i, q.answer])), reviewed: true };
 check(ready(first, complete), 'Complete self-review is eligible');
@@ -111,7 +125,7 @@ for (const raw of [null, [], { version: 2, lessons: {} }, { version: 1, lessons:
   assert.throws(() => normalizeState(raw, lessons)); checks++;
 }
 const unknown = normalizeState({ ...emptyState(), theme: 'script', lastLesson: '999', lessons: { '999': complete } }, lessons);
-check(unknown.theme === 'light' && unknown.lastLesson === '004' && !Object.keys(unknown.lessons).length, 'Unknown fields cannot create sessions');
+check(unknown.theme === 'light' && unknown.lastLesson === '057' && !Object.keys(unknown.lessons).length, 'Unknown fields cannot create sessions');
 const partial = { ...blankEntry(), notes: '<script>plain text only</script>', checks: [0], quizzes: { 0: first.quiz[0].answer }, bookmark: true };
 const imported = mergeState(emptyState(), backup(partial), lessons).lessons[first.id];
 check(imported.notes === partial.notes && imported.bookmark && imported.quizzes[0] === first.quiz[0].answer && imported.checks.includes(0), 'Partial progress imports into empty reader');
@@ -139,6 +153,10 @@ const old84 = { ...old56, lastLesson: '084', lessons: { ...old56.lessons, '084':
 const expanded112 = normalizeState(old84, lessons);
 check(expanded112.lastLesson === '084' && expanded112.lessons['084'].notes === old84.lessons['084'].notes && expanded112.lessons['084'].bookmark && !expanded112.lessons['084'].reviewed, '84-session notes, position and pending review survive the runtime expansion');
 check(expanded112.lessons['084'].quizzes[0] === old84.lessons['084'].quizzes[0] && expanded112.lessons['084'].checks[0] === 0 && !expanded112.lessons['085'] && !expanded112.lessons['112'], 'Old quiz/checklist indices survive and new practice is not inferred');
+const old112 = { ...old84, lastLesson: '112', lessons: { ...old84.lessons, '112': { ...blankEntry(), notes: 'My specialist device evidence is pending', bookmark: true, checks: [0], quizzes: { 0: lessons.find(item => item.id === '112').quiz[0].answer } } } };
+const expanded148 = normalizeState(old112, lessons);
+assert.deepEqual(JSON.parse(JSON.stringify(expanded148.lessons['112'])), JSON.parse(JSON.stringify(old112.lessons['112'])), '112-session notes and unfinished work survive complete-project expansion'); checks++;
+check(expanded148.lastLesson === '112' && !expanded148.lessons['113'] && !expanded148.lessons['148'], 'The complete-project expansion preserves reading position without inferred completion');
 check(!normalizeState({ ...legacy, lessons: { ...legacy.lessons, 'initialization-access': complete } }, lessons).lessons['initialization-access'], 'Supplement IDs cannot create numbered-session progress');
 
 async function request(url, method = 'GET') {
