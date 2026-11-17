@@ -7,8 +7,10 @@ push, create a real PR or alter learner records.
 
 ## Run and inspect
 
-Requirements: Python 3.9+ (Path.is_relative_to), Git 2.23+ (switch/restore), local
-filesystem access. No external Python packages. Older versions were not tested.
+Requirements: Python 3.9+ (Path.is_relative_to) and Git 2.28+
+(`init --initial-branch`). `switch` and `restore` themselves require Git 2.23;
+that lower minimum does not cover this complete setup. Local filesystem access
+is required. No external Python packages. Older versions were not tested.
 From the `ios-learning` workspace:
 
 ```sh
@@ -22,9 +24,19 @@ Per-command settings use fictional identity `Scratch Learner` /
 `learner@example.invalid`, disabled hooks/signing and deterministic text policy.
 The machine's normal Git configuration is untouched. No remote is configured.
 
+For manual practice, reuse lesson 117's `git_scratch` wrapper before initialization
+and every later Git invocation. Its preflight rejects all exported `GIT_*`
+variables, including `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_COMMON_DIR`,
+`GIT_OBJECT_DIRECTORY` and `GIT_ALTERNATE_OBJECT_DIRECTORIES`, and checks the
+new scratch path. Deliberately unset reported variables in that scratch shell
+before retrying. The runner instead removes all inherited `GIT_*` variables from
+each Git subprocess. `-C` selects a working directory; it does not clear repository
+redirects or establish isolation by itself.
+
 The script retains repositories and `evidence.json`, including captured staged/
 working diffs, conflict text, full IDs and range-diff. Inspect the printed root
-using explicit `git -C` if desired. Do not redirect any lesson command to the real
+with an explicit scratch path only after checking repository redirects. Do not
+redirect any lesson command to the real
 checkout. Remove only an exact known disposable root if you later choose cleanup.
 
 ## Author evidence — 17 November 2026

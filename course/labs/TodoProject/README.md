@@ -40,6 +40,7 @@ that exact run's disposable output.
 view model. The command and store implementation remains the same. This switch is
 necessary here because the managed sandbox blocks the compiler's macro subprocess.
 It must not be used to claim Observation invalidation or native app verification.
+The separate macro-enabled typecheck described below checks the native source.
 
 ## Author evidence — 17 November 2026
 
@@ -79,9 +80,23 @@ This invokes `xcrun swiftc -typecheck -swift-version 6 -sdk ... -target
 arm64-apple-ios17.0-simulator -module-cache-path ...` on Core and Native source,
 without `TODO_HOST`. Scratch `/private/tmp/todo-ios.dczCrF`. It exited 1 at the
 Observation macro subprocess with the same sandbox/plugin error. It did not
-produce an app bundle. Full macro-enabled typechecking and native compilation
-remain unverified; later native source edits are likewise unverified. The script
-retains the real integration check for a suitable environment.
+produce an app bundle. The ordinary script retains that integration check for a
+suitable environment.
+
+A separate integration check on 17 November passed with Swift 6 language mode,
+Apple Swift 6.4.2 and the iOS 27.2 Simulator SDK, targeting iOS 17. It added
+`-Xfrontend -disable-sandbox` so the compiler's macro helper runs inside the
+existing outer workspace sandbox. It included all three Core files and the
+native App source, without `TODO_HOST`, and exited 0 without diagnostics.
+The script exposes this optional configuration:
+
+```sh
+IOS_COURSE_MACRO_HELPER=1 zsh course/labs/TodoProject/typecheck-ios.sh
+```
+
+This establishes macro-enabled source typechecking in that configuration. It
+does not establish linking, an app bundle, a simulator launch, Observation
+invalidation at runtime or an interaction/accessibility result.
 
 ## Create an isolated Xcode target
 
@@ -119,10 +134,10 @@ visible snapshot and reorder disabled while filtering, or duplicate-task with a
 fresh UUID and a declared completion policy. Add a new stale-selection or failed-
 save case and run it. Supplied checks and a copied answer do not complete practice.
 
-Native checks still pending: macro-enabled target build, app bundle, simulator
+Native checks still pending: linked target build, app bundle, simulator
 journeys, keyboard/focus, VoiceOver, large Dynamic Type, row identity continuity,
 relaunch, migration UI, file protection, real storage failures/interruption,
 multiple windows and device installation. Observe labels and current completion
 value separately from the edit action; identifiers alone do not establish
 accessibility. No client app build, release, signing or broad visual verification
-occurred. Main owns shared course integration/reader validation.
+occurred.
