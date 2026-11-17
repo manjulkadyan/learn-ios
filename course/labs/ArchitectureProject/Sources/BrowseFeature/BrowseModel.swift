@@ -16,13 +16,15 @@ public final class BrowseModel {
         self.repository = repository; self.clock = clock
     }
 
-    // The caller owns the task. Revision guards both late success and late failure.
+    // The caller owns the task. Revision gates delayed work and both result paths.
     public func refresh(_ freshness: Freshness = .reload, delay: Duration = .zero) async {
         revision += 1
         let ticket = revision
         state = .loading
         do {
             if delay > .zero { try await clock.sleep(for: delay) }
+            try Task.checkCancellation()
+            guard ticket == revision else { return }
             let notes = try await repository.notes(freshness)
             try Task.checkCancellation()
             guard ticket == revision else { return }

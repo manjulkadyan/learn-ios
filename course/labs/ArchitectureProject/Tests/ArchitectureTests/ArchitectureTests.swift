@@ -81,6 +81,61 @@ private struct SavedFailureAccess: NoteAccess {
     func invalidate() async {}
 }
 
+private actor SequencedReader: NoteReading {
+    private var calls = 0
+    func load(account: String) async throws -> [Note] {
+        calls += 1
+        // B must be the only admitted request. An obsolete A would replace it.
+        return calls == 1 ? [second] : [first]
+    }
+    func count() -> Int { calls }
+}
+
+private actor HeldSavedAccess: NoteAccess {
+    let gate: GateReader
+    private var selected = false
+    private var reads = 0
+    init(gate: GateReader) { self.gate = gate }
+    func notes(_ freshness: Freshness) async throws -> [Note] { [first] }
+    func saved() async throws -> [Note] {
+        reads += 1
+        return selected ? [first] : []
+    }
+    func toggleSaved(id: String) async throws {
+        _ = try await gate.load(account: "toggle")
+        selected.toggle()
+    }
+    func detail(id: String) async throws -> Note { first }
+    func invalidate() async {}
+    func readCount() -> Int { reads }
+}
+
+@Test @MainActor func savedMutationReconcilesAfterOverlappingReload() async throws {
+    let gate = GateReader()
+    let access = HeldSavedAccess(gate: gate)
+    let model = SavedModel(repository: access)
+    let mutation = Task { await model.toggle(id: "n1") }
+    await gate.waitForCalls(1)
+    await model.reload()
+    #expect(model.notes.isEmpty && !model.failed)
+    await gate.release(0, .success([])); await mutation.value
+    #expect(model.notes == [first] && !model.failed)
+    #expect(await access.readCount() == 2)
+    #expect(try await access.saved() == [first])
+}
+
+@Test @MainActor func resetRejectsLateSavedMutationSuccess() async {
+    let gate = GateReader()
+    let access = HeldSavedAccess(gate: gate)
+    let model = SavedModel(repository: access)
+    let mutation = Task { await model.toggle(id: "n1") }
+    await gate.waitForCalls(1)
+    model.reset()
+    await gate.release(0, .success([])); await mutation.value
+    #expect(model.notes.isEmpty && !model.failed)
+    #expect(await access.readCount() == 0)
+}
+
 @Test @MainActor func resetSuppressesLateSavedErrors() async {
     for toggle in [false, true] {
         let gate = GateReader()
@@ -204,6 +259,22 @@ private struct SavedFailureAccess: NoteAccess {
     #expect(await clock.pendingCount() == 0)
     #expect(await reader.count() == 1)
     #expect(model.state == .idle)
+}
+
+@Test @MainActor func delayedObsoleteBrowseCannotReachRepository() async throws {
+    let reader = SequencedReader(), clock = TestClock()
+    let repo = NoteRepository(account: "demo-a", reader: reader, clock: clock)
+    let model = BrowseModel(repository: repo, clock: clock)
+    let delayedA = Task { await model.refresh(delay: .seconds(2)) }
+    await clock.waitForSleep()
+    await model.refresh()
+    #expect(model.state == .ready([second]))
+    await clock.advance(by: .seconds(2)); await delayedA.value
+    #expect(await reader.count() == 1)
+    #expect(await clock.pendingCount() == 0)
+    #expect(model.state == .ready([second]))
+    #expect(try await repo.notes(.cacheAllowed) == [second])
+    #expect(try await repo.detail(id: "n2") == second)
 }
 
 @Test @MainActor func verticalSliceSavedDetailAndAccountSwitch() async throws {

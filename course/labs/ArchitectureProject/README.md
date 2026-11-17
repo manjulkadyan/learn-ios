@@ -43,7 +43,7 @@ Do not put generated build output in another author's lab or course data files.
 | `Sources/BrowseFeature/BrowseModel.swift` | Observable loading/result state and revision gates |
 | `Sources/SavedFeature/SavedModel.swift` | Independent saved list state and reset-safe async paths |
 | `Sources/AppShell/Shell.swift` | Composition, session routes, account switching, Browse task ownership |
-| `Tests/ArchitectureTests/ArchitectureTests.swift` | Registered reader gates, virtual time, twelve behavior tests |
+| `Tests/ArchitectureTests/ArchitectureTests.swift` | Registered reader gates, virtual time, fifteen behavior tests |
 | `Native/ArchitectureApp.swift` | Separate SwiftUI App, root, Browse/Saved/detail adapters |
 | `ChangePlan.md` | Cost comparison, author review findings, proposed durable-store adoption/recovery |
 | `verify-host.sh` | Host test command and compiler cache paths |
@@ -67,6 +67,17 @@ The newest admitted fetch wins authority even if it fails; an older completion
 cannot refill the cache. Ordinary/malformed refresh failure preserves the last
 accepted cache, but Browse shows failure rather than claiming fresh success.
 
+Browse checks cancellation and its model revision after a delay, before invoking
+the shared repository. An obsolete delayed refresh cannot become a newly admitted
+fetch and replace shared cache/detail while leaving newer Browse rows visible.
+The success/error guards after the repository call still protect presentation.
+
+Saved separates `sessionRevision`, advanced by reset, from `readRevision`, advanced
+by reload. A completed read does not revoke a pending mutation's session authority.
+A successful current-session toggle starts a fresh reload even if an overlapping
+reload already returned empty. Reset rejects both late success and late failure;
+repository invalidation remains the separate owner of account data authority.
+
 Account switching requests Browse task cancellation, resets both models and
 path, revokes the repository, then publishes a new session. A session UUID plus
 account and record ID rejects obsolete routes, including A→B→A. Saved commands
@@ -80,7 +91,8 @@ TestClock advances manually and settles canceled/deadline continuations once.
 GateReader independently controls request registration and completion.
 Every held test operation is released and joined; tests use no elapsed sleeps.
 The XCTest harness prints zero tests because these are Swift Testing `@Test`
-functions. The subsequent Swift Testing result is the relevant twelve-test count.
+functions. The subsequent Swift Testing result is the relevant fifteen-test count:
+twelve original baseline tests and three follow-up regression tests.
 
 This is not durable persistence, authentication, server authorization, network
 cancellation, background execution, or cross-window synchronization. Saved IDs
@@ -143,7 +155,7 @@ and objects, compiles the actual SwiftUI adapter, links an executable, and calls
 `xcrun vtool -show-build`. It does not package an app or run a simulator.
 Linker-generated local code signatures are not provisioning/distribution evidence.
 
-Observed on 17 November 2026:
+Original author observations on 17 November 2026, before the follow-up fixes below:
 
 - Apple Swift 6.4.2, swift-driver 1.168.6, target arm64-apple-macosx26.0.
 - Xcode 27.2, build 27B52; iPhoneSimulator27.2.sdk.
@@ -175,6 +187,57 @@ Observed on 17 November 2026:
   manifest, and Swift Testing pages were fetched from primary documentation.
   Apple documentation data confirmed iOS 17 Observation, iOS 16 NavigationStack,
   and local ContinuousClock instants. Source anchors were read after AGENTS.md.
+
+## Follow-up fixes and evidence — 17 November 2026
+
+The independent source review found two additional schedules, now fixed and
+covered by deterministic tests. Lesson 146's simple picture now compares the
+actual branching imports. Lessons 147/148 and the workshop explain the authority
+checks and the current test inventory. IDs, quizzes, checklists, prerequisites,
+source/file registrations, exercise requirements, and existing teaching snippets
+were preserved. The interview bank was unchanged.
+
+| Test | Controlled schedule and asserted result |
+| --- | --- |
+| `delayedObsoleteBrowseCannotReachRepository` | Register A's delay, finish B with Garden plan, advance A, and join it. Exactly one reader call; Browse, cache, and detail keep Garden plan. |
+| `savedMutationReconcilesAfterOverlappingReload` | Hold a successful toggle, complete an empty reload, then release and join the toggle. Its follow-up read displays n1 and agrees with the repository. |
+| `resetRejectsLateSavedMutationSuccess` | Hold a successful toggle, reset, then release and join it. No follow-up read, rows, or failure from the old model session. |
+
+The Saved mutation fixture is a valid delayed `NoteAccess` implementation. Its
+reset test establishes presentation authority; it does not claim that resetting
+a model cancels a side effect or revokes a data adapter. Existing repository
+invalidation and A→B→A route tests continue to check those separate contracts.
+All held operations are released and joined without real elapsed sleeps.
+
+Executed against the changed source using Apple Swift 6.4.2 and Xcode 27.2/27B52:
+
+- `sh verify-host.sh`: PASS, fifteen Swift Testing tests, zero failures.
+- `python3 verify-content.py`: PASS, lessons 145–148 contain
+  1,939 / 1,914 / 2,107 / 2,122 teaching words; workshop contains 1,741.
+  Eight interviews, fourteen artifacts, and prerequisite ordering passed.
+- `python3 verify-examples.py`: PASS, all four existing lesson snippets
+  independently typechecked after the changed host package build.
+- `python3 verify-native.py`: PASS, all five simulator modules and the actual
+  SwiftUI adapter compiled and linked to
+  `/private/tmp/architecture-native-ksod1r2w/ArchitectureApp`.
+  `vtool` reported IOSSIMULATOR, minimum OS 17.0, SDK 27.2.
+- From the ios-learning root,
+  `node course/check-teaching.mjs unit-27.json practice-architecture.json interview-architecture.json`:
+  PASS, three files, five teaching introductions, eight interview identities.
+- A scoped before/after hash comparison confirmed unchanged IDs, assessments,
+  section links, exercise requirements, prerequisites, references, registrations,
+  and existing code blocks. No shared builder or generated course data was run.
+
+SwiftPM still warned about inaccessible optional user configuration/security
+caches; the supplied temporary cache settings allowed the host checks to pass.
+`ChangePlan.md` retains the original author's twelve-test review record as history;
+this follow-up records the current fifteen-test suite. Durable implementation and
+independent human review remain pending.
+
+The native result is compiler/linker evidence for the changed source. No isolated
+Xcode project build, app packaging/install, simulator interaction, accessibility
+or adaptive-window audit, physical-device run, provider call, or durable-store
+acceptance occurred. Runtime and data-recovery claims still need those checks.
 
 Pending: complete isolated Xcode project build/run, simulator interaction,
 accessibility and adaptive-window acceptance, physical-device behavior,

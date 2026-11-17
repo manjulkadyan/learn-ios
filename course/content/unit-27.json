@@ -330,24 +330,24 @@
           "after": "R is rejected because S1 differs from S3. New-session saved notes remain empty."
         },
         "picture": {
-          "kind": "flow",
-          "caption": "Feature imports point to contracts while the shell constructs implementations.",
+          "kind": "comparison",
+          "caption": "Declared project-target dependencies form branches toward NoteDomain.",
           "items": [
             {
               "label": "NoteDomain",
-              "text": "Defines note values and access promises."
+              "text": "Has no dependency on another project target."
             },
             {
               "label": "Feature modules",
-              "text": "Browse and Saved depend on those promises."
+              "text": "BrowseFeature and SavedFeature each depend only on NoteDomain."
             },
             {
               "label": "NoteData",
-              "text": "Implements the shared repository."
+              "text": "Depends on NoteDomain to implement its access and time contracts."
             },
             {
               "label": "AppShell",
-              "text": "Constructs session owners and validates routes."
+              "text": "Depends on NoteDomain, NoteData, BrowseFeature, and SavedFeature for composition."
             }
           ]
         },
@@ -420,7 +420,7 @@
         {
           "id": "test-time",
           "title": "Control time and request ordering independently",
-          "html": "<p>A test clock is a controllable time dependency. The companion's ProjectClock protocol exposes now and sleep(for:). LiveClock wraps ContinuousClock, which uses locally comparable monotonic time and keeps advancing through system sleep. TestClock advances only when a test explicitly asks. This narrow protocol is not a conformance to Swift's general Clock protocol.</p><p>Timing tests should observe registration before advancing. The two-second delayed refresh starts and registers its sleep. Advancing one second must leave reader call count zero. Advancing a second second releases the sleep and allows the first reader call. The test then supplies a result and joins the task. No real elapsed sleep is used to guess progress.</p><p>Cancellation of a registered sleeper removes it and resumes its continuation with CancellationError. A continuation represents one suspended operation that must be resumed exactly once. TestClock serializes cancellation and deadline completion through its actor; whichever removes the entry first owns its resume. Canceled entry is checked before registration too.</p><p>Request ordering uses a separate GateReader. It records when each call begins and holds a continuation for the test to release as success or failure. This deliberately ignores cancellation so the consumer's checks must work. All held operations are released and joined. Time advancement alone cannot force a request to have begun; gates and clocks control different inputs.</p><p>Optional deeper clock practice is <code>091</code> on clocks and task context, later in the sequence. This unit defines monotonic time, sleeper registration, continuation settlement, actor suspension, and cancellation locally. A passing deterministic host schedule proves those contracts under its fixtures; it is not a device responsiveness measurement.</p>"
+          "html": "<p>A test clock is a controllable time dependency. The companion's ProjectClock protocol exposes now and sleep(for:). LiveClock wraps ContinuousClock, which uses locally comparable monotonic time and keeps advancing through system sleep. TestClock advances only when a test explicitly asks. This narrow protocol is not a conformance to Swift's general Clock protocol.</p><p>Timing tests should observe registration before advancing. The two-second delayed refresh starts and registers its sleep. Advancing one second must leave reader call count zero. Advancing a second second releases the sleep and allows the first reader call. The test then supplies a result and joins the task. No real elapsed sleep is used to guess progress.</p><p>A delayed operation needs current authority before it calls shared data code, not only before it updates the screen. Start A with a two-second delay, complete newer B with Garden plan, then advance A's clock. BrowseModel checks cancellation and its revision after the delay, before calling the repository. A therefore starts no second reader request: Browse, cache, and detail all retain Garden plan. A guard only after the repository call would protect the screen while allowing obsolete A to replace shared data.</p><p>Cancellation of a registered sleeper removes it and resumes its continuation with CancellationError. A continuation represents one suspended operation that must be resumed exactly once. TestClock serializes cancellation and deadline completion through its actor; whichever removes the entry first owns its resume. Canceled entry is checked before registration too.</p><p>Request ordering uses a separate GateReader. It records when each call begins and holds a continuation for the test to release as success or failure. This deliberately ignores cancellation so the consumer's checks must work. All held operations are released and joined. Time advancement alone cannot force a request to have begun; gates and clocks control different inputs.</p><p>Optional deeper clock practice is <code>091</code> on clocks and task context, later in the sequence. This unit defines monotonic time, sleeper registration, continuation settlement, actor suspension, and cancellation locally. A passing deterministic host schedule proves those contracts under its fixtures; it is not a device responsiveness measurement.</p>"
         },
         {
           "id": "evidence",
@@ -579,7 +579,7 @@
         {
           "id": "whole-journey",
           "title": "Follow one useful action all the way through",
-          "html": "<p>A vertical slice is one useful behavior implemented through all necessary parts. A library visitor browses cards, opens Bridge sketch, marks it saved, and sees it at the Saved desk. This reaches UI, presentation state, navigation, repository policy, and domain identity. Finishing five isolated helper classes would not establish that this journey works together.</p><p>Our slice begins with Shell.refresh. Shell owns a task invoking BrowseModel.refresh. The model sets loading, requests repository notes, and sets ready after current-authority checks. SyntheticReader returns n1 and n2 with the active demo account in their titles. The repository validates and accepts them as one complete snapshot.</p><p>The person chooses n1. Shell.open creates a session-scoped Route and appends it to path. SwiftUI resolves that value to DetailScreen. Shell.resolve validates session and account, then asks for current detail. Toggle saved uses the same route gate and current SavedModel; the repository changes saved membership. SavedModel reloads a snapshot for its own visible list.</p><p>Switching to B clears paths and models and revokes the old repository before publishing replacements. An old A route cannot read or toggle B's n1 even though the synthetic identifier repeats. Returning to A creates a new session, so the first A route remains invalid. This is local lifetime correctness; it is not provider authorization or persistent account recovery.</p>"
+          "html": "<p>A vertical slice is one useful behavior implemented through all necessary parts. A library visitor browses cards, opens Bridge sketch, marks it saved, and sees it at the Saved desk. This reaches UI, presentation state, navigation, repository policy, and domain identity. Finishing five isolated helper classes would not establish that this journey works together.</p><p>Our slice begins with Shell.refresh. Shell owns a task invoking BrowseModel.refresh. The model sets loading, requests repository notes, and sets ready after current-authority checks. SyntheticReader returns n1 and n2 with the active demo account in their titles. The repository validates and accepts them as one complete snapshot.</p><p>The person chooses n1. Shell.open creates a session-scoped Route and appends it to path. SwiftUI resolves that value to DetailScreen. Shell.resolve validates session and account, then asks for current detail. Toggle saved uses the same route gate and current SavedModel; the repository changes saved membership. SavedModel reloads a snapshot for its own visible list.</p><p>Saved uses two different counters. A read revision orders overlapping reload results; a session revision ends presentation authority when reset runs. Suppose a toggle starts at session revision zero, and an overlapping reload advances the read revision to one and returns empty. The successful toggle still belongs to session zero, so it starts another reload, whose read revision two publishes n1. Reset instead advances the session revision to one: the old toggle may neither reload nor publish failure. Repository invalidation separately prevents old-account data commits.</p><p>Switching to B clears paths and models and revokes the old repository before publishing replacements. An old A route cannot read or toggle B's n1 even though the synthetic identifier repeats. Returning to A creates a new session, so the first A route remains invalid. This is local lifetime correctness; it is not provider authorization or persistent account recovery.</p>"
         },
         {
           "id": "adapter",
